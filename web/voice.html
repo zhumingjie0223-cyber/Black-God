@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>语音合成 - Black God</title>
+<style>
+:root {
+  --bg: #0a0a0f; --card: #15151f; --accent: #6c5ce7; --accent2: #a29bfe;
+  --text: #e8e8f0; --text2: #8888a0; --border: #2a2a3a; --danger: #e74c3c;
+  --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, 'PingFang SC', sans-serif; padding-top: var(--safe-top); padding-bottom: calc(60px + var(--safe-bottom)); }
+.header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
+.header h1 { font-size: 18px; font-weight: 600; }
+.back-btn { font-size: 24px; color: var(--accent2); cursor: pointer; }
+.section { padding: 16px 20px; }
+.section-title { font-size: 13px; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+textarea { width: 100%; min-height: 80px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: var(--text); font-size: 15px; resize: vertical; font-family: inherit; }
+textarea:focus { outline: none; border-color: var(--accent); }
+.emotion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.emotion-btn { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 6px; color: var(--text2); font-size: 12px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.emotion-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.emotion-btn:active { transform: scale(0.95); }
+.voice-select { display: flex; gap: 8px; margin-bottom: 12px; }
+.voice-option { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; font-size: 13px; color: var(--text2); }
+.voice-option.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.synth-btn { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; padding: 14px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: opacity 0.2s; }
+.synth-btn:active { opacity: 0.7; }
+.synth-btn:disabled { opacity: 0.4; }
+.audio-player { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 16px; display: none; }
+.audio-player.show { display: block; }
+.audio-player audio { width: 100%; margin-top: 8px; }
+.status-bar { padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-top: 8px; display: none; }
+.status-bar.show { display: block; }
+.status-bar.ok { background: rgba(46,204,113,0.15); color: #2ecc71; }
+.status-bar.err { background: rgba(231,76,60,0.15); color: var(--danger); }
+.status-bar.info { background: rgba(108,92,231,0.15); color: var(--accent2); }
+.tab-bar { display: flex; border-bottom: 1px solid var(--border); }
+.tab { flex: 1; padding: 12px; text-align: center; color: var(--text2); font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.ext-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-size: 14px; margin-bottom: 8px; }
+.ext-input:focus { outline: none; border-color: var(--accent); }
+.ext-input::placeholder { color: var(--text2); }
+.info-text { font-size: 12px; color: var(--text2); line-height: 1.6; margin-top: 8px; }
+.train-list { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+.train-list-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.train-list-desc { font-size: 12px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="back-btn" onclick="history.back()">‹</span>
+  <h1>🎙️ 语音合成</h1>
+  <span style="width:24px"></span>
+</div>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('synth')">合成</div>
+  <div class="tab" onclick="switchTab('external')">外接API</div>
+  <div class="tab" onclick="switchTab('train')">训练</div>
+</div>
+
+<!-- 合成 Tab -->
+<div class="tab-content active" id="tab-synth">
+  <div class="section">
+    <div class="section-title">输入文本</div>
+    <textarea id="text-input" placeholder="输入要合成的文字..." maxlength="500"></textarea>
+  </div>
+  <div class="section">
+    <div class="section-title">情绪选择</div>
+    <div class="emotion-grid" id="emotion-grid"></div>
+  </div>
+  <div class="section">
+    <button class="synth-btn" id="synth-btn" onclick="synthesize()">🔊 生成语音</button>
+    <div class="status-bar" id="status"></div>
+    <div class="audio-player" id="player">
+      <div class="section-title">合成结果</div>
+      <audio id="audio" controls></audio>
+    </div>
+  </div>
+</div>
+
+<!-- 外接API Tab -->
+<div class="tab-content" id="tab-external">
+  <div class="section">
+    <div class="section-title">外接 TTS API 配置</div>
+    <input class="ext-input" id="ext-url" placeholder="API URL (如 https://api.openai.com/v1/audio/speech)">
+    <input class="ext-input" id="ext-key" type="password" placeholder="API Key">
+    <input class="ext-input" id="ext-model" placeholder="模型 (如 tts-1, cosyvoice)">
+    <input class="ext-input" id="ext-voice" placeholder="音色 (如 alloy, nova)">
+    <button class="synth-btn" onclick="saveExternal()">保存配置</button>
+    <div class="status-bar" id="ext-status"></div>
+    <div class="info-text">
+      支持 OpenAI TTS 兼容格式。填好后合成将走外接 API，不填则用内置 edge-tts。<br>
+      常见支持：OpenAI TTS / 火山引擎 / Azure / 自建 GPT-SoVITS API
+    </div>
+  </div>
+</div>
+
+<!-- 训练 Tab -->
+<div class="tab-content" id="tab-train">
+  <div class="section">
+    <div class="section-title">训练接口（预留）</div>
+    <div class="info-text" style="margin-bottom:12px">
+      以下训练后端接口已预留，当前为占位状态。<br>
+      需在 GPU 环境部署后激活。
+    </div>
+    <div class="train-list">
+      <div class="train-list-title">GPT-SoVITS</div>
+      <div class="train-list-desc">少样本克隆，≥10条样本，需GPU</div>
+    </div>
+    <div class="train-list">
+      <div class="train-list-title">RVC</div>
+      <div class="train-list-desc">声音转换，≥5条样本，需GPU</div>
+    </div>
+    <div class="train-list">
+      <div class="train-list-title">CosyVoice (阿里)</div>
+      <div class="train-list-desc">多情绪克隆，≥3条样本，需GPU</div>
+    </div>
+    <div class="train-list">
+      <div class="train-list-title">F5-TTS</div>
+      <div class="train-list-desc">零样本克隆，≥1条样本，需GPU</div>
+    </div>
+    <div class="train-list">
+      <div class="train-list-title">ChatTTS</div>
+      <div class="train-list-desc">对话TTS，自带情绪，无需训练</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let selectedEmotion = 'serious';
+
+const emotions = {
+  "moan":"叫床","seductive":"发骚","whisper":"呢喃","shy":"欲拒还迎",
+  "cute":"撒娇","happy":"开心","cold":"高冷","angry":"生气","cry":"哭泣",
+  "tired":"累了","serious":"正经","report":"汇报","explain":"讲解",
+  "nervous":"紧张","surprised":"惊讶","comfort":"安慰","tease":"调侃","urgent":"催促"
+};
+
+function initEmotions() {
+  const grid = document.getElementById('emotion-grid');
+  grid.innerHTML = '';
+  for (const [k, v] of Object.entries(emotions)) {
+    const btn = document.createElement('div');
+    btn.className = 'emotion-btn' + (k === selectedEmotion ? ' active' : '');
+    btn.textContent = v;
+    btn.onclick = () => {
+      selectedEmotion = k;
+      document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    grid.appendChild(btn);
+  }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['synth','external','train'][i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function showStatus(msg, type) {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.className = 'status-bar show ' + type;
+}
+
+async function synthesize() {
+  const text = document.getElementById('text-input').value.trim();
+  if (!text) { showStatus('请输入文本', 'err'); return; }
+  const btn = document.getElementById('synth-btn');
+  btn.disabled = true; btn.textContent = '生成中...';
+  showStatus('正在合成...', 'info');
+  try {
+    const res = await fetch(API_BASE + '/api/voice/synthesize', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text, emotion: selectedEmotion, format: 'mp3' })
+    });
+    const data = await res.json();
+    if (data.code === 0) {
+      showStatus(`✅ 合成成功 | ${data.data.voice} | ${data.data.emotion} | ${data.data.duration}s`, 'ok');
+      const player = document.getElementById('player');
+      const audio = document.getElementById('audio');
+      player.classList.add('show');
+      audio.src = API_BASE + data.data.url;
+      audio.play();
+    } else {
+      showStatus('❌ ' + (data.error || '失败'), 'err');
+    }
+  } catch (e) {
+    showStatus('❌ 网络错误: ' + e.message, 'err');
+  }
+  btn.disabled = false; btn.textContent = '🔊 生成语音';
+}
+
+async function saveExternal() {
+  const url = document.getElementById('ext-url').value.trim();
+  const key = document.getElementById('ext-key').value.trim();
+  const model = document.getElementById('ext-model').value.trim();
+  const voice = document.getElementById('ext-voice').value.trim();
+  if (!url || !key) { showExtStatus('URL 和 Key 必填', 'err'); return; }
+  try {
+    const res = await fetch(API_BASE + '/api/voice/external', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url, key, model, voice })
+    });
+    const data = await res.json();
+    if (data.code === 0) { showExtStatus('✅ 外接API已启用', 'ok'); }
+    else { showExtStatus('❌ ' + (data.error || '失败'), 'err'); }
+  } catch (e) { showExtStatus('❌ ' + e.message, 'err'); }
+}
+
+function showExtStatus(msg, type) {
+  const s = document.getElementById('ext-status');
+  s.textContent = msg; s.className = 'status-bar show ' + type;
+}
+
+initEmotions();
+</script>
+</body>
+</html>
