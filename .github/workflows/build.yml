@@ -19,12 +19,12 @@ jobs:
       run: |
         cd ios-app
         xcodegen generate
-        echo "✅ 工程已生成"
         ls -la
 
     - name: Build App (unsigned)
       run: |
         cd ios-app
+        set -o pipefail
         xcodebuild build \
           -project BlackGod888.xcodeproj \
           -scheme BlackGod888 \
@@ -32,26 +32,21 @@ jobs:
           -sdk iphoneos \
           -derivedDataPath build \
           CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGN_IDENTITY="" \
-          | tee build.log | grep -E "error:|warning:|BUILD" || true
+          CODE_SIGN_IDENTITY=""
 
     - name: Package unsigned IPA
       run: |
         cd ios-app
         APP_PATH=$(find build -name "*.app" -type d | head -1)
-        if [ -n "$APP_PATH" ]; then
-          mkdir -p Payload
-          cp -r "$APP_PATH" Payload/
-          zip -r BlackGod888-unsigned.ipa Payload
-          echo "✅ IPA 已打包: $(ls -lh BlackGod888-unsigned.ipa)"
-        else
-          echo "⚠️ 未找到 .app，查看 build.log"
-          tail -30 build.log
-        fi
+        echo "App路径: $APP_PATH"
+        mkdir -p Payload
+        cp -r "$APP_PATH" Payload/
+        zip -r BlackGod888-unsigned.ipa Payload
+        echo "✅ IPA: $(ls -lh BlackGod888-unsigned.ipa)"
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
         name: BlackGod888-unsigned-IPA
         path: ios-app/BlackGod888-unsigned.ipa
-        if-no-files-found: warn
+        if-no-files-found: error
