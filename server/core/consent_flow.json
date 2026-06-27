@@ -1,0 +1,147 @@
+{
+  "consent_required": true,
+  "version": "1.0",
+  "title": "欢迎使用 Black God",
+  "subtitle": "懂您生活工作的智能助理",
+  "description": "为了更好地为您服务，Black God 需要学习您的使用习惯。",
+  
+  "consent_items": [
+    {
+      "id": "data_collection",
+      "title": "本地数据学习",
+      "description": "允许 Black God 在本地分析您的使用习惯，包括：",
+      "details": [
+        "您在 Black God 内的输入与操作行为",
+        "您常用的功能与工具类型",
+        "您的任务类型与成功率",
+        "您的回答风格偏好"
+      ],
+      "required": true,
+      "storage": "仅存储在本地设备，不上传云端"
+    },
+    {
+      "id": "ios_permissions",
+      "title": "iOS 系统权限",
+      "description": "根据您的需要，Black God 可能请求以下权限：",
+      "details": [
+        "📷 相机与相册 - 识别图片、OCR文字、分析内容",
+        "📁 文件访问 - 读取您授权的文档与文件",
+        "📋 剪贴板 - 快速粘贴内容到对话",
+        "📍 定位 - 提供位置相关服务（可选）",
+        "📆 日历与提醒 - 创建日程和提醒（可选）",
+        "🔔 通知 - 任务完成提醒（可选）"
+      ],
+      "required": false,
+      "storage": "按需申请，您可随时在系统设置中更改"
+    },
+    {
+      "id": "profile_creation",
+      "title": "建立个人画像",
+      "description": "根据您的授权数据，Black God 将在本地建立：",
+      "details": [
+        "您的称呼偏好与使用场景",
+        "您常做的任务类型",
+        "您偏好的回答风格（简短/详细）",
+        "您常用的工具与能力"
+      ],
+      "required": false,
+      "storage": "所有画像数据仅在本地存储，您可随时查看与清除"
+    }
+  ],
+  
+  "privacy_principles": [
+    "✓ 所有用户数据默认仅在本地存储",
+    "✓ 不上传您的隐私内容到云端",
+    "✓ 您可随时关闭数据学习",
+    "✓ 您可随时清除所有本地画像",
+    "✓ 联网请求仅发送必要的最小上下文"
+  ],
+  
+  "buttons": {
+    "accept": "同意并继续",
+    "reject": "拒绝（功能受限）",
+    "privacy_policy": "查看隐私政策",
+    "later": "稍后决定"
+  },
+  
+  "after_accept": {
+    "title": "感谢您的信任",
+    "message": "Black God 将在本地学习您的使用习惯，为您提供更准确的服务。",
+    "next_steps": [
+      "请告诉我您希望如何称呼？",
+      "您主要用 Black God 做什么？（代码/搜索/设计/文档/分析）",
+      "您偏好简短回答还是详细说明？"
+    ]
+  },
+  
+  "after_reject": {
+    "title": "您拒绝了数据学习",
+    "message": "Black God 仍可正常使用，但无法提供个性化服务。",
+    "limitations": [
+      "统一称呼为'您'",
+      "回答风格固定",
+      "不记录使用偏好",
+      "不优化任务推荐"
+    ],
+    "can_change": "您可随时在设置中开启数据学习"
+  },
+  
+  "settings_page": {
+    "title": "数据与隐私",
+    "sections": [
+      {
+        "title": "数据学习",
+        "items": [
+          {
+            "label": "本地数据学习",
+            "type": "toggle",
+            "value": true,
+            "description": "允许 Black God 在本地分析使用习惯"
+          },
+          {
+            "label": "查看我的画像",
+            "type": "link",
+            "action": "view_profile"
+          },
+          {
+            "label": "清除所有画像数据",
+            "type": "button",
+            "action": "clear_profile",
+            "confirm": "确定要清除所有本地画像数据吗？此操作不可恢复。"
+          }
+        ]
+      },
+      {
+        "title": "已授权的系统权限",
+        "items": [
+          {
+            "label": "相机与相册",
+            "type": "status",
+            "value": "granted"
+          },
+          {
+            "label": "文件访问",
+            "type": "status",
+            "value": "granted"
+          },
+          {
+            "label": "定位",
+            "type": "status",
+            "value": "not_requested"
+          }
+        ]
+      },
+      {
+        "title": "数据导出",
+        "items": [
+          {
+            "label": "导出我的数据",
+            "type": "button",
+            "action": "export_data",
+            "description": "导出所有本地存储的画像、记忆、任务记录"
+          }
+        ]
+      }
+    ]
+  }
+}

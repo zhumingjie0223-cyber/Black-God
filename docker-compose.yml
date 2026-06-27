@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # ─────────────────────────────────────
+  # Black God 主服务（内核沙箱）
+  # ─────────────────────────────────────
+  bg-agent:
+    build: .
+    container_name: blackgod-agent
+    restart: always
+    ports:
+      - "8765:8765"
+    environment:
+      - BG_KEY=sk-blackgod-quan-2026
+      - BG_BASE=http://bg-gateway:9000/v1
+      - BG_MODEL=auto
+      - BG_PORT=8765
+      - TZ=Asia/Shanghai
+    volumes:
+      # 持久化数据（记忆、技能、用户数据）
+      - ./data/memory:/app/server/memory
+      - ./data/skills:/app/server/skills
+    networks:
+      - blackgod-net
+    # 资源限制（沙箱边界）
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    depends_on:
+      - bg-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────
+  # 模型网关（独立容器）
+  # ─────────────────────────────────────
+  bg-gateway:
+    image: python:3.11-slim
+    container_name: blackgod-gateway
+    restart: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - /opt/bg_gateway.py:/app/bg_gateway.py:ro
+      - /opt/bg_model_caps.py:/app/bg_model_caps.py:ro
+    working_dir: /app
+    command: >
+      sh -c "pip install flask requests -q && python3 bg_gateway.py"
+    networks:
+      - blackgod-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+networks:
+  blackgod-net:
+    driver: bridge

@@ -1,0 +1,52 @@
+
+!default.mode1v3
+!default.mode2v3
+!default.pbxuser
+!default.perspectivev3
+!default.xcworkspace
+# Xcode
+# 排除临时文件
+# 排除敏感信息
+*.hmap
+*.ipa
+*.key
+*.log
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.pem
+*.perspectivev3
+*.tmp
+*.xccheckout
+*.xcuserstate
+*.xcworkspace
+*password*
+*secret*
+.DS_Store
+DerivedData
+build/
+claude_pool/
+xcuserdata/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.Python
+
+# 环境变量
+.env
+*.key
+*.pem
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+.DS_Store
+
+# 服务器数据
+server/memory/*.json
+server/uploads/

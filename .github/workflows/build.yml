@@ -1,0 +1,29 @@
+name: Build iOS (手动触发 - 需 macOS runner 额度)
+
+# 自动构建已禁用：GitHub 账号 macOS runner 需付费额度
+# 要编译时手动在 Actions 页点 "Run workflow"
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Build iOS App
+      working-directory: ios-app
+      run: |
+        xcodebuild clean build \
+          -project BlackGod.xcodeproj \
+          -scheme BlackGod \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          CODE_SIGNING_ALLOWED=NO
