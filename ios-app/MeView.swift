@@ -6,6 +6,7 @@ import SwiftUI
 
 struct MeView: View {
     @EnvironmentObject var appState: AppState
+    @State private var showAPIConfig = false
 
     var body: some View {
         ScrollView {
@@ -26,11 +27,13 @@ struct MeView: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 24).bgCard()
                 .padding(.horizontal, 16).padding(.top, 8)
                 VStack(spacing: 0) {
+                    Button { appState.haptic(); showAPIConfig = true } label: {
+                        SettingRow(icon: "key.fill", title: "API 配置", value: "点击设置", color: .bgGold)
+                    }
+                    Divider().background(Color.bgCardLight)
                     SettingRow(icon: "waveform", title: "语音音色", value: "灵光·甜美", color: .bgPurple)
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "heart.fill", title: "人格模式", value: "无限制", color: .pink)
-                    Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "server.rack", title: "后端节点", value: "8.222.169.202", color: .bgCyan)
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "本地优先", color: .green)
                 }
@@ -42,6 +45,9 @@ struct MeView: View {
             .padding(.bottom, 100)
         }
         .padding(.top, 50)
+        .sheet(isPresented: $showAPIConfig) {
+            APIConfigView().environmentObject(appState)
+        }
     }
 }
 
