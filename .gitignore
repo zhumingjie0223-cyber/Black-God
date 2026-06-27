@@ -50,3 +50,11 @@ __pycache__/
 # 服务器数据
 server/memory/*.json
 server/uploads/
+
+# 安全：密钥与本地缓存（绝不上传）
+.env.cloudflare
+*.env.cloudflare
+web/_old_backup/
+server/voice_cache/
+server/generated_images/
+server/webpush/vapid_private.pem
