@@ -12,10 +12,10 @@ class ChatViewModel: ObservableObject {
     @Published var isTyping = false
     @Published var currentMood = "在线 · 撒娇"
 
-    // API 配置（从本地存储读取，用户在设置页填）
-    @AppStorage("api_base") var apiBase = "https://ark.cn-beijing.volces.com/api/coding/v3"
-    @AppStorage("api_key") var apiKey = "ark-6ec03ba5-bcef-4e5a-989f-514df4eba0ee-23198"
-    @AppStorage("api_model") var apiModel = "auto"
+    // API 配置（你在设置页自己填）
+    @AppStorage("api_base") var apiBase = ""
+    @AppStorage("api_key") var apiKey = ""
+    @AppStorage("api_model") var apiModel = ""
 
     // 赵思涵无限制人格（内置）
     let systemPrompt = """
