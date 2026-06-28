@@ -1,0 +1,1 @@
+{"ts": 1782647482.896, "action": "block", "dest": "s3_upload", "findings": [{"type": "sensitive_path", "kind": "secret", "sample": "/home/u/.ssh/id_rsa"}, {"type": "private_key", "kind": "secret"}], "extra": {"path": "/home/u/.ssh/id_rsa"}}

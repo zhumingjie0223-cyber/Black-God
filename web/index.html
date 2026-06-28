@@ -556,7 +556,7 @@ button{font-family:inherit}
       <div class="w-logo"><img src="/icon-192.png" onerror="this.parentElement.style.background='linear-gradient(145deg,#22262d,#0c0e11)'"/></div>
       <div class="w-title">BLACK GOD</div>
       <div class="divider"></div>
-      <div class="w-sub">懂你生活工作的智能助理<br><b>不只是聊天，真正把事做完</b></div>
+      <div class="w-sub">你的私人多端执行中枢<br><b>手机、电脑、服务器、API 都听你指挥</b></div>
       <div class="quick-grid">
         <div class="qcard" onclick="quick('帮我写一段代码，并解释思路')">
           <div class="qcard-ic">💻</div><div class="qcard-tx"><strong>写 & 调代码</strong><span>生成、调试、优化、逐行解释</span></div>
@@ -714,14 +714,28 @@ button{font-family:inherit}
 
 <div class="sheet" id="apiSheet">
   <div class="sheet-grab"></div>
-  <div class="sheet-title">接口设置</div>
-  <div class="sheet-sub">默认同源直读（调用本机 /api）。要接外部模型网关就填下面的地址和密钥（标准 Chat 接口）。</div>
-  <div class="field"><label>Base URL（留空 = 同源 /api）</label><input id="aBase" placeholder="https://your-gateway/v1"/></div>
-  <div class="field"><label>API Key（可选）</label><input id="aKey" type="password" placeholder="sk-…"/></div>
-  <div class="field"><label>默认模型 ID</label><input id="aModel" placeholder="auto"/></div>
-  <button class="btn-primary" onclick="saveApi()">保存并测试连接</button>
-  <div class="test-line" id="apiTest"></div>
-  <button class="btn-ghost" onclick="resetApi()">恢复同源默认</button>
+  <div class="sheet-title">Provider 管理</div>
+  <div class="sheet-sub">配置多个模型接口，自动选择或手动切换。密钥本地加密保存，不上传云端。</div>
+  
+  <div id="providerList" style="margin:1rem 0"></div>
+  
+  <div class="field"><label>添加新 Provider</label></div>
+  <div class="field"><label>Provider ID</label><input id="newProvId" placeholder="例如：my_claude_max"/></div>
+  <div class="field"><label>显示名称</label><input id="newProvLabel" placeholder="例如：Claude Max 官方"/></div>
+  <div class="field"><label>类型</label>
+    <select id="newProvType">
+      <option value="openai">OpenAI Compatible</option>
+      <option value="anthropic">Anthropic</option>
+      <option value="custom">Custom</option>
+    </select>
+  </div>
+  <div class="field"><label>Base URL</label><input id="newProvBase" placeholder="https://api.openai.com/v1"/></div>
+  <div class="field"><label>API Key / Token</label><input id="newProvToken" type="password" placeholder="sk-..."/></div>
+  <div class="field"><label>默认模型</label><input id="newProvModel" placeholder="gpt-5.5"/></div>
+  <div class="field"><label>优先级（数字越大越优先）</label><input id="newProvPriority" type="number" value="50"/></div>
+  
+  <button class="btn-primary" onclick="saveNewProvider()">保存 Provider</button>
+  <div class="test-line" id="providerTest"></div>
 </div>
 
 <div class="sheet" id="memSheet">
@@ -1070,18 +1084,78 @@ function savePersona(){store.set('p_name',document.getElementById('pName').value
   const sp=document.getElementById('setPersona');if(sp)sp.textContent=n;
   closeSheet();toast('人格已保存');}
 
-function openApiSheet(){document.getElementById('aBase').value=API.base;document.getElementById('aKey').value=API.key;
-  document.getElementById('aModel').value=API.model;document.getElementById('apiTest').innerHTML='';openSheet('apiSheet');}
-async function saveApi(){API.base=document.getElementById('aBase').value.trim().replace(/\/$/,'');
-  API.key=document.getElementById('aKey').value.trim();API.model=document.getElementById('aModel').value.trim()||'auto';
-  store.set('api_base',API.base);store.set('api_key',API.key);store.set('api_model',API.model);
-  document.getElementById('setApi').textContent=API.base?'外接':'同源';
-  const t=document.getElementById('apiTest');t.innerHTML='<span style="color:var(--text-2)">测试中…</span>';
-  const ok=await API.get('/api/stats');
-  t.innerHTML=ok?'<span style="color:var(--ok)">✓ 连接成功</span>':'<span style="color:var(--warn)">⚠ 未连上（已保存，可稍后重试）</span>';}
-function resetApi(){API.base='';API.key='';store.del('api_base');store.del('api_key');
-  document.getElementById('aBase').value='';document.getElementById('aKey').value='';
-  document.getElementById('setApi').textContent='同源';toast('已恢复同源默认');}
+async function openApiSheet(){
+  document.getElementById('apiTest').innerHTML='';
+  await loadProviders();
+  openSheet('apiSheet');
+}
+
+async function loadProviders(){
+  const resp = await API.get('/api/providers');
+  if(!resp || !resp.providers){ document.getElementById('providerList').innerHTML='<div class="empty">无法加载 Provider 列表</div>'; return; }
+  const list = resp.providers;
+  const defId = resp.default;
+  if(!list.length){ document.getElementById('providerList').innerHTML='<div class="empty">还没有 Provider，请在下方添加</div>'; return; }
+  document.getElementById('providerList').innerHTML = list.map(p=>`
+    <div class="provider-card" style="border:1px solid var(--border);border-radius:8px;padding:0.8rem;margin-bottom:0.8rem;background:var(--bg-2)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong>${esc(p.label||p.id)}</strong> ${p.id===defId?'<span style="color:var(--ok);font-size:0.8rem">✓ 默认</span>':''}</div>
+        <div>
+          <button class="btn-xs" onclick="testProvider('${p.id}')">测试</button>
+          ${p.id!==defId?`<button class="btn-xs" onclick="setDefaultProvider('${p.id}')">设为默认</button>`:''}
+          <button class="btn-xs btn-danger" onclick="deleteProvider('${p.id}')">删除</button>
+        </div>
+      </div>
+      <div style="font-size:0.85rem;color:var(--text-2);margin-top:0.3rem">
+        ${esc(p.base_url||'')}<br>
+        Token: ${esc(p.token||p.api_key||'N/A')}<br>
+        Model: ${esc(p.model||'auto')}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function saveNewProvider(){
+  const id = document.getElementById('newProvId').value.trim();
+  const label = document.getElementById('newProvLabel').value.trim();
+  const type = document.getElementById('newProvType').value;
+  const base = document.getElementById('newProvBase').value.trim();
+  const token = document.getElementById('newProvToken').value.trim();
+  const model = document.getElementById('newProvModel').value.trim();
+  const priority = parseInt(document.getElementById('newProvPriority').value)||50;
+  if(!id || !label || !base || !token){ document.getElementById('providerTest').innerHTML='<span style="color:var(--warn)">请填写完整</span>'; return; }
+  document.getElementById('providerTest').innerHTML='<span style="color:var(--text-2)">保存中…</span>';
+  const resp = await API.post('/api/providers/save', {id, config:{label,type,base_url:base,token,model,priority,enabled:true}});
+  if(resp && resp.ok){
+    document.getElementById('providerTest').innerHTML='<span style="color:var(--ok)">✓ 保存成功</span>';
+    document.getElementById('newProvId').value='';
+    document.getElementById('newProvLabel').value='';
+    document.getElementById('newProvToken').value='';
+    await loadProviders();
+    toast('Provider 已保存');
+  } else {
+    document.getElementById('providerTest').innerHTML='<span style="color:var(--warn)">保存失败</span>';
+  }
+}
+
+async function testProvider(id){
+  toast('测试中…');
+  const resp = await API.post('/api/providers/test', {id});
+  if(resp && resp.ok) toast('✓ 连接成功');
+  else toast('⚠ 连接失败：'+(resp?.error||'未知'));
+}
+
+async function setDefaultProvider(id){
+  const resp = await API.post('/api/providers/default', {id});
+  if(resp && resp.ok){ toast('已设为默认'); await loadProviders(); }
+  else toast('设置失败');
+}
+
+async function deleteProvider(id){
+  if(!confirm('确定删除这个 Provider？')) return;
+  // TODO: 后端需要加 DELETE /api/providers/{id}
+  toast('删除功能开发中');
+}
 
 /* 记忆（本地演示 + 可对接 /api/profile） */
 function memList(){try{return JSON.parse(store.get('memories')||'[]');}catch(e){return[];}}
@@ -1186,11 +1260,19 @@ function renderOb(){
   document.getElementById('obProgress').innerHTML=OB_STEPS.map((_,i)=>`<div class="ob-dot ${i===obIdx?'on':''}"></div>`).join('');
   const body=document.getElementById('obBody'),act=document.getElementById('obActions');
   if(step.type==='welcome'){
-    body.innerHTML=`<div class="ob-logo"><img src="/icon-192.png" onerror="this.parentElement.style.background='linear-gradient(145deg,#22262d,#0c0e11)'"></div>
-      <div class="ob-title">先让我认识你</div>
-      <div class="ob-sub">回答几个问题，我会记住你的偏好，<br>每次都更懂你想要什么。</div>
-      <div class="privacy"><div class="privacy-ic">🔒</div>
-        <div class="privacy-tx"><b>全部只存在这台设备上，绝不上传云端。</b>随时可在「我的」里修改或清除。</div></div>`;
+    body.innerHTML=`<div class="ob-logo"><img src="/brand-hero-display.png" style="width:200px;height:auto;margin:0 auto" onerror="this.src='/icon-192.png'"></div>
+      <div class="ob-title">神 · BLACK GOD</div>
+      <div class="ob-sub" style="font-size:1.05rem;line-height:1.8;margin-top:1.2rem">
+        <strong style="color:#fff;font-size:1.1rem">你的私人多端执行中枢</strong><br>
+        不是平台聊天框，而是连接你的手机、电脑、服务器、API 和工具<br><br>
+        <span style="font-size:0.9rem;color:#999">
+        ✓ 不锁平台 — 你自己的接口、工具、服务器都能接入<br>
+        ✓ 本地优先 — 密码/配置/记忆只保存在你自己的设备里<br>
+        ✓ 真正执行 — 记住你的项目、习惯、禁区，把任务做完
+        </span>
+      </div>
+      <div class="privacy" style="margin-top:2rem"><div class="privacy-ic">🔒</div>
+        <div class="privacy-tx" style="font-size:0.85rem">下面几个问题帮我更好地认识你<br>全部只存在这台设备上，随时可在「我的」里修改或清除</div></div>`;
     act.innerHTML=`<button class="ob-next" onclick="obNext()">开始（约 30 秒）</button>`;
   }else if(step.type==='text'){
     body.innerHTML=`<div class="ob-q">${step.q}</div><div class="ob-hint">${step.hint}</div>

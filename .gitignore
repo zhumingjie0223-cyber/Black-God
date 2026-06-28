@@ -58,3 +58,8 @@ web/_old_backup/
 server/voice_cache/
 server/generated_images/
 server/webpush/vapid_private.pem
+server/webpush/vapid_keys.txt
+
+# 数据库(私人记忆,绝不上传)
+server/data/
+*.db
