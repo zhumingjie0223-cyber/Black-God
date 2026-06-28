@@ -10,6 +10,9 @@
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icon-192.png"/>
 <meta name="theme-color" content="#08090B"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 
 <!--
   ============================================================
@@ -76,11 +79,31 @@
   /* 动态字阶（随视口缩放） */
   --fs-brand:clamp(20px,5.6vw,26px);
   --fs-title:clamp(22px,6.4vw,30px);
-  --fs-body:15px;
+  --fs-body:17px;
+  /* —— Fixed UI scale (design system v3.0) —— */
+  --fs-h1:30px;
+  --fs-h2:25px;
+  --fs-h3:21px;
+  --fs-sub:15px;
+  --fs-cap:13px;
+  --fs-micro:12px;
+  /* —— Weights —— */
+  --fw-medium:500;
+  --fw-semibold:600;
+  --fw-bold:700;
+  --fw-heavy:800;
+  /* —— Tracking —— */
+  --ls-label:.18em;
+  --ls-brand:.14em;
+  --ls-tight:-.04em;
+  /* —— Spacing / radius —— */
+  --radius-xl:22px;
+  --radius-xs:9px;
+  --radius-pill:999px;
 }
 html,body{
   height:100%;background:var(--bg);color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",system-ui,sans-serif;
+  font-family:"Space Grotesk","Noto Sans SC",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   overflow:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility
 }
 button{font-family:inherit}
@@ -181,9 +204,9 @@ button{font-family:inherit}
 .msg.err .bubble{background:var(--err-dim);border:1px solid var(--err-line);color:#FF9A9A;border-radius:12px}
 .bubble strong{color:#fff;font-weight:600}
 .bubble pre{background:#06070A;border:1px solid var(--line);border-radius:10px;padding:11px;
-  overflow-x:auto;margin:8px 0;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5}
+  overflow-x:auto;margin:8px 0;font-family:"Space Mono",ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5}
 .bubble code{background:var(--surface-3);padding:2px 5px;border-radius:5px;
-  font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
+  font-family:"Space Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
 .bubble pre code{background:none;padding:0}
 
 .ts{font-size:11px;color:var(--text-3);margin-top:4px;padding:0 4px}
@@ -218,12 +241,12 @@ button{font-family:inherit}
 .step.failed .step-ic{background:var(--err-dim);border-color:var(--err-line);color:var(--err)}
 .step-body{flex:1;min-width:0}
 .step-top{display:flex;align-items:center;gap:7px}
-.step-tool{font-family:"SF Mono",ui-monospace,monospace;font-size:11px;color:var(--chrome-2);
+.step-tool{font-family:"Space Mono",ui-monospace,monospace;font-size:11px;color:var(--chrome-2);
   background:var(--surface);padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
 .step-title{font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .step.running .step-title{color:var(--run)}
 .step-detail{font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5;
-  font-family:"SF Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;
+  font-family:"Space Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;
   max-height:0;overflow:hidden;transition:max-height .25s ease}
 .step.open .step-detail{max-height:240px;overflow-y:auto}
 .step-toggle{font-size:11px;color:var(--text-3);cursor:pointer;flex-shrink:0;
@@ -441,7 +464,7 @@ button{font-family:inherit}
   justify-content:center;font-size:16px;background:var(--warn-dim);border:1px solid var(--warn-line);color:var(--warn)}
 .cb-title{font-size:15px;font-weight:700;flex:1}
 .cb-detail{font-size:12.5px;color:var(--text-2);line-height:1.5;margin-bottom:13px;
-  font-family:"SF Mono",ui-monospace,monospace;background:var(--bg);padding:9px 11px;border-radius:10px;
+  font-family:"Space Mono",ui-monospace,monospace;background:var(--bg);padding:9px 11px;border-radius:10px;
   border:1px solid var(--line);max-height:130px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
 .cb-btns{display:flex;gap:9px}
 .cb-btn{flex:1;height:44px;border:none;border-radius:12px;cursor:pointer;font-size:14.5px;font-weight:600;transition:.15s}
@@ -515,7 +538,7 @@ button{font-family:inherit}
 .dialog-ic.danger{background:var(--err-dim);border-color:var(--err-line)}
 .dialog-t{font-size:17px;font-weight:700;text-align:center;margin-bottom:8px}
 .dialog-d{font-size:13px;color:var(--text-2);text-align:center;line-height:1.6;margin-bottom:20px;
-  font-family:"SF Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;
+  font-family:"Space Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;
   max-height:160px;overflow-y:auto}
 .dialog-btns{display:flex;gap:10px}
 .dialog-btns button{flex:1;height:46px;border-radius:13px;cursor:pointer;font-size:14.5px;font-weight:600;transition:.15s}
@@ -534,6 +557,44 @@ button{font-family:inherit}
   *{animation-duration:.01ms!important;transition-duration:.01ms!important}
   .thinking span,.spin,.step-spin,.dot.running{animation:none!important}
 }
+
+/* —— StatTile (design system) —— */
+.stat-tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:14px 14px 12px;box-shadow:0 2px 14px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04)}
+.st-label{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px}
+.st-value{font-size:28px;font-weight:800;background:var(--chrome-grad);-webkit-background-clip:text;
+  background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.02em;line-height:1.1}
+.st-value[style*="color"]{-webkit-text-fill-color:unset;background:none}
+.st-delta{font-size:11.5px;color:var(--text-3);margin-top:4px}
+.st-ok{border-color:var(--ok-line);background:var(--ok-dim)}
+
+/* —— CascadeBar (design system · L0-L6) —— */
+.cascade-panel{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);
+  padding:14px;margin-bottom:6px;box-shadow:0 2px 16px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
+.cascade-title{font-size:12.5px;color:var(--text-2);font-weight:600;margin-bottom:12px}
+.cascade-bars{display:flex;flex-direction:column;gap:7px}
+.cb-row{display:flex;align-items:center;gap:10px}
+.cb-label{font-size:12px;color:var(--text-3);font-family:"Space Mono",ui-monospace,monospace;
+  flex:0 0 100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-track{flex:1;height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden}
+.cb-fill{height:100%;border-radius:3px;transition:width .6s var(--ease-out,cubic-bezier(.2,.7,.3,1))}
+.cb-pct{font-size:11.5px;font-family:"Space Mono",ui-monospace,monospace;flex:0 0 34px;text-align:right}
+
+/* —— Tab icon update: unicode chrome chars —— */
+.tab-ic{font-size:19px;line-height:1;transition:transform .2s;
+  filter:grayscale(1) opacity(.55);font-family:system-ui,sans-serif}
+.tab.active .tab-ic{transform:scale(1.1) translateY(-1px);filter:none;color:var(--chrome-1)}
+.tab.active .tab-lb{color:var(--chrome-1);font-weight:600}
+
+/* —— Provider row (ProviderSheet) —— */
+.prov-row{display:flex;align-items:center;gap:12px;padding:13px 14px;
+  background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sm);
+  transition:border-color .2s,box-shadow .2s}
+.prov-row.on{border-color:var(--line-chrome);box-shadow:0 2px 16px rgba(0,0,0,.35),0 0 10px var(--chrome-glow)}
+.prov-name{font-size:15px;color:var(--text);font-weight:600}
+.prov-model{font-size:12.5px;color:var(--text-3);font-family:"Space Mono",ui-monospace,monospace;margin-top:2px}
+.prov-badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:20px;
+  font-size:11px;font-weight:600;background:var(--ok-dim);border:1px solid var(--ok-line);color:var(--ok);margin-left:7px}
 </style>
 </head>
 <body>
@@ -546,7 +607,7 @@ button{font-family:inherit}
       <div class="brand-logo"><img src="/icon-192.png" onerror="this.parentElement.style.background='linear-gradient(145deg,#22262d,#0c0e11)'"/></div>
       <span class="wordmark">BLACK GOD</span>
     </div>
-    <div class="model-pill" onclick="openModelSheet()"><span class="dot"></span><span id="modelName">Auto</span></div>
+    <div class="model-pill" onclick="openProviderSheet()"><span class="dot"></span><span id="modelName">Auto</span></div>
     <div class="icon-btn" onclick="newChat()" title="新对话">＋</div>
   </div>
 
@@ -556,7 +617,7 @@ button{font-family:inherit}
       <div class="w-logo"><img src="/icon-192.png" onerror="this.parentElement.style.background='linear-gradient(145deg,#22262d,#0c0e11)'"/></div>
       <div class="w-title">BLACK GOD</div>
       <div class="divider"></div>
-      <div class="w-sub">你的私人多端执行中枢<br><b>手机、电脑、服务器、API 都听你指挥</b></div>
+      <div class="w-sub">懂你生活工作的智能助理<br><b>不只是聊天，真正把事做完</b></div>
       <div class="quick-grid">
         <div class="qcard" onclick="quick('帮我写一段代码，并解释思路')">
           <div class="qcard-ic">💻</div><div class="qcard-tx"><strong>写 & 调代码</strong><span>生成、调试、优化、逐行解释</span></div>
@@ -596,33 +657,61 @@ button{font-family:inherit}
 
   <!-- 记录页 -->
   <div class="page" id="tasksPage">
-    <div class="page-h">RECORDS</div>
-    <div class="card">
-      <div class="stat2">
-        <div class="stat-box"><div class="stat-n" id="tTotal">-</div><div class="stat-l">总任务</div></div>
-        <div class="stat-box" style="background:var(--ok-dim);border-color:var(--ok-line)">
-          <div class="stat-n" id="tDone" style="-webkit-text-fill-color:var(--ok)">-</div><div class="stat-l">已完成</div></div>
+    <div style="padding:20px 16px 0">
+      <div style="font-size:12px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:4px">RECORDS · 记忆</div>
+      <div style="font-size:var(--fs-h1);font-weight:800;color:var(--text);margin-bottom:16px;letter-spacing:var(--ls-tight)">越用越懂你</div>
+      <!-- Cost stat tiles -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="stat-tile">
+          <div class="st-label">总任务</div>
+          <div class="st-value" id="tTotal">—</div>
+          <div class="st-delta" id="tDelta">本会话</div>
+        </div>
+        <div class="stat-tile st-ok">
+          <div class="st-label">已完成</div>
+          <div class="st-value" id="tDone" style="color:var(--ok)">—</div>
+          <div class="st-delta" style="color:var(--ok)">⚡ 缓存优先</div>
+        </div>
+      </div>
+      <!-- L0-L6 Cascade bar -->
+      <div class="cascade-panel">
+        <div class="cascade-title">成本级联 · 今日请求分布</div>
+        <div class="cascade-bars" id="cascadeBars">
+          <div class="cb-row" data-lvl="0"><div class="cb-label">L0 规则/缓存</div><div class="cb-track"><div class="cb-fill" style="width:45%;background:var(--ok)"></div></div><div class="cb-pct" style="color:var(--ok)">45%</div></div>
+          <div class="cb-row" data-lvl="1"><div class="cb-label">L1 精确缓存</div><div class="cb-track"><div class="cb-fill" style="width:20%;background:var(--ok)"></div></div><div class="cb-pct" style="color:var(--ok)">20%</div></div>
+          <div class="cb-row" data-lvl="2"><div class="cb-label">L2 语义缓存</div><div class="cb-track"><div class="cb-fill" style="width:15%;background:var(--run)"></div></div><div class="cb-pct" style="color:var(--run)">15%</div></div>
+          <div class="cb-row" data-lvl="3"><div class="cb-label">L3 记忆检索</div><div class="cb-track"><div class="cb-fill" style="width:10%;background:var(--run)"></div></div><div class="cb-pct" style="color:var(--run)">10%</div></div>
+          <div class="cb-row" data-lvl="4"><div class="cb-label">L4 技能命中</div><div class="cb-track"><div class="cb-fill" style="width:6%;background:var(--warn)"></div></div><div class="cb-pct" style="color:var(--warn)">6%</div></div>
+          <div class="cb-row" data-lvl="5"><div class="cb-label">L5 小模型</div><div class="cb-track"><div class="cb-fill" style="width:3%;background:var(--warn)"></div></div><div class="cb-pct" style="color:var(--warn)">3%</div></div>
+          <div class="cb-row" data-lvl="6"><div class="cb-label">L6 强模型</div><div class="cb-track"><div class="cb-fill" style="width:1%;background:var(--err)"></div></div><div class="cb-pct" style="color:var(--err)">1%</div></div>
+        </div>
       </div>
     </div>
-    <div class="filters" id="filters">
+    <!-- Task filter chips -->
+    <div class="filters" id="filters" style="padding:14px 16px 4px">
       <div class="filt on" data-f="all" onclick="setFilter(this)">全部</div>
       <div class="filt" data-f="running" onclick="setFilter(this)">进行中</div>
       <div class="filt" data-f="completed" onclick="setFilter(this)">已完成</div>
       <div class="filt" data-f="failed" onclick="setFilter(this)">失败</div>
     </div>
-    <div class="card"><div id="taskList"><div class="empty">加载中…</div></div></div>
+    <div class="card" style="margin-bottom:20px"><div id="taskList"><div class="empty">加载中…</div></div></div>
   </div>
 
   <!-- 我的页 -->
   <div class="page" id="minePage">
-    <div class="page-h">PROFILE</div>
-    <div class="card">
-      <div class="card-t">使用统计</div>
-      <div class="stat3">
-        <div><div class="stat-n" id="mSkills">-</div><div class="stat-l">技能</div></div>
-        <div><div class="stat-n" id="mTasks" style="-webkit-text-fill-color:var(--run)">-</div><div class="stat-l">任务</div></div>
-        <div><div class="stat-n" id="mMems" style="-webkit-text-fill-color:var(--ok)">-</div><div class="stat-l">记忆</div></div>
+    <!-- Identity header (design system ProfileScreen) -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 16px 18px;text-align:center">
+      <div style="width:76px;height:76px;border-radius:20px;overflow:hidden;border:1.5px solid var(--line-chrome);box-shadow:0 0 40px var(--chrome-glow)">
+        <img src="/icon-192.png" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>
       </div>
+      <div style="font-size:19px;font-weight:700;color:var(--text)" id="profileName">你的私人执行中枢</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:var(--radius-pill);border:1px solid var(--line-chrome);font-size:12px;color:var(--chrome-1);font-weight:600">本地优先 · 数据在你手里</div>
+    </div>
+    <!-- Stats (3-up) -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px 14px">
+      <div class="stat-tile"><div class="st-label">技能</div><div class="st-value" id="mSkills">—</div></div>
+      <div class="stat-tile" style="border-color:var(--run-line)"><div class="st-label">任务</div><div class="st-value" id="mTasks" style="color:var(--run)">—</div></div>
+      <div class="stat-tile" style="border-color:var(--ok-line)"><div class="st-label">记忆</div><div class="st-value" id="mMems" style="color:var(--ok)">—</div></div>
     </div>
 
     <div class="card">
@@ -644,9 +733,13 @@ button{font-family:inherit}
         <div class="set-ic">🎭</div><div class="set-main"><div class="set-k">人格</div><div class="set-d">名字、语气、系统提示词</div></div>
         <div class="set-v" id="setPersona">默认</div><div class="set-arrow">›</div>
       </div>
-      <div class="set-row" onclick="openApiSheet()">
-        <div class="set-ic">🔌</div><div class="set-main"><div class="set-k">接口设置</div><div class="set-d">同源直读 / 外接网关</div></div>
+      <div class="set-row" onclick="openProviderSheet()">
+        <div class="set-ic">🔌</div><div class="set-main"><div class="set-k">Provider Hub</div><div class="set-d">自己接入模型网关，不被单一厂商绑架</div></div>
         <div class="set-v" id="setApi">同源</div><div class="set-arrow">›</div>
+      </div>
+      <div class="set-row" onclick="openApiSheet()">
+        <div class="set-ic">⚙️</div><div class="set-main"><div class="set-k">接口设置</div><div class="set-d">Base URL · API Key · 模型 ID</div></div>
+        <div class="set-v">配置</div><div class="set-arrow">›</div>
       </div>
       <div class="set-row" onclick="openMemorySheet()">
         <div class="set-ic">📚</div><div class="set-main"><div class="set-k">记忆管理</div><div class="set-d">查看、搜索、清除记忆</div></div>
@@ -686,14 +779,35 @@ button{font-family:inherit}
 
   <!-- Tab -->
   <div class="tabbar">
-    <div class="tab active" id="tab0" onclick="switchTab(0)"><div class="tab-ic">💬</div><div class="tab-lb">对话</div></div>
-    <div class="tab" id="tab1" onclick="switchTab(1)"><div class="tab-ic">📋</div><div class="tab-lb">记录</div></div>
-    <div class="tab" id="tab2" onclick="switchTab(2)"><div class="tab-ic">👤</div><div class="tab-lb">我的</div></div>
+    <div class="tab active" id="tab0" onclick="switchTab(0)"><div class="tab-ic">◈</div><div class="tab-lb">执行</div></div>
+    <div class="tab" id="tab1" onclick="switchTab(1)"><div class="tab-ic">▤</div><div class="tab-lb">记忆</div></div>
+    <div class="tab" id="tab2" onclick="switchTab(2)"><div class="tab-ic">◉</div><div class="tab-lb">我的</div></div>
   </div>
 </div>
 
 <!-- Sheets -->
 <div class="sheet-mask" id="mask" onclick="closeSheet()"></div>
+
+<!-- Provider Hub Sheet (design system ProviderSheet.jsx) -->
+<div class="sheet" id="providerSheet">
+  <div class="sheet-grab"></div>
+  <div style="display:flex;align-items:flex-start;margin-bottom:4px">
+    <div>
+      <div class="sheet-title" style="margin-bottom:2px">Provider Hub</div>
+      <div class="sheet-sub" style="margin-bottom:0">自己接入模型 · 不被单一厂商绑架</div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="icon-btn" onclick="closeSheet()" style="margin-top:2px">✕</div>
+  </div>
+  <div id="providerRows" style="display:flex;flex-direction:column;gap:9px;margin:16px 0 14px">
+    <!-- populated by JS -->
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--line);margin-bottom:14px">
+    <span style="font-size:16px">🔑</span>
+    <span style="font-size:12.5px;color:var(--text-2);line-height:1.55">密钥保存在 <b style="color:var(--chrome-1)">本地 SQLite</b>，永不上传。审计日志已开启。</span>
+  </div>
+  <button class="btn-primary" onclick="openAddProvider()">＋ 添加自定义网关</button>
+</div>
 
 <div class="sheet" id="modelSheet">
   <div class="sheet-grab"></div>
@@ -714,28 +828,14 @@ button{font-family:inherit}
 
 <div class="sheet" id="apiSheet">
   <div class="sheet-grab"></div>
-  <div class="sheet-title">Provider 管理</div>
-  <div class="sheet-sub">配置多个模型接口，自动选择或手动切换。密钥本地加密保存，不上传云端。</div>
-  
-  <div id="providerList" style="margin:1rem 0"></div>
-  
-  <div class="field"><label>添加新 Provider</label></div>
-  <div class="field"><label>Provider ID</label><input id="newProvId" placeholder="例如：my_claude_max"/></div>
-  <div class="field"><label>显示名称</label><input id="newProvLabel" placeholder="例如：Claude Max 官方"/></div>
-  <div class="field"><label>类型</label>
-    <select id="newProvType">
-      <option value="openai">OpenAI Compatible</option>
-      <option value="anthropic">Anthropic</option>
-      <option value="custom">Custom</option>
-    </select>
-  </div>
-  <div class="field"><label>Base URL</label><input id="newProvBase" placeholder="https://api.openai.com/v1"/></div>
-  <div class="field"><label>API Key / Token</label><input id="newProvToken" type="password" placeholder="sk-..."/></div>
-  <div class="field"><label>默认模型</label><input id="newProvModel" placeholder="gpt-5.5"/></div>
-  <div class="field"><label>优先级（数字越大越优先）</label><input id="newProvPriority" type="number" value="50"/></div>
-  
-  <button class="btn-primary" onclick="saveNewProvider()">保存 Provider</button>
-  <div class="test-line" id="providerTest"></div>
+  <div class="sheet-title">接口设置</div>
+  <div class="sheet-sub">默认同源直读（调用本机 /api）。要接外部模型网关就填下面的地址和密钥（标准 Chat 接口）。</div>
+  <div class="field"><label>Base URL（留空 = 同源 /api）</label><input id="aBase" placeholder="https://your-gateway/v1"/></div>
+  <div class="field"><label>API Key（可选）</label><input id="aKey" type="password" placeholder="sk-…"/></div>
+  <div class="field"><label>默认模型 ID</label><input id="aModel" placeholder="auto"/></div>
+  <button class="btn-primary" onclick="saveApi()">保存并测试连接</button>
+  <div class="test-line" id="apiTest"></div>
+  <button class="btn-ghost" onclick="resetApi()">恢复同源默认</button>
 </div>
 
 <div class="sheet" id="memSheet">
@@ -776,6 +876,7 @@ button{font-family:inherit}
 <div class="toast" id="toast"></div>
 
 <script src="/push-client.js"></script>
+<script src="/notify-fx.js"></script>
 <script>
 /* ========== 安全存储（artifact 沙箱内自动退回内存，真实部署用 localStorage） ========== */
 const store=(()=>{let mem={},ls=null;try{ls=window.localStorage;ls.setItem('__t','1');ls.removeItem('__t');}catch(e){ls=null;}
@@ -869,7 +970,11 @@ function bgVibe(kind){
   const P={done:[18],fail:[45,35,45],confirm:[22,40,22,40,22],info:[10]};
   try{navigator.vibrate(P[kind]||[12]);}catch(e){}
 }
-function bgFeedback(kind){bgSound(kind);bgVibe(kind);}
+function bgFeedback(kind){
+  // 优先用开源 notify-fx（window.BGFX），不可用则退回内置合成音
+  if(window.BGFX){try{BGFX.fire(kind,{sound:store.get('sound')!=='0',vibrate:store.get('haptic')!=='0'});return;}catch(e){}}
+  bgSound(kind);bgVibe(kind);
+}
 function bgPop(el){if(!el)return;el.classList.remove('bgpop');void el.offsetWidth;el.classList.add('bgpop');setTimeout(()=>el.classList.remove('bgpop'),520);}
 
 
@@ -1043,6 +1148,9 @@ function resumeTask(m){switchTab(0);document.getElementById('inp').value=m;
 async function loadMine(){
   refreshProfileCard();
   const pf=loadProfile();const sp=document.getElementById('setPersona');if(sp&&pf.name)sp.textContent=pf.name;
+  // Update identity header
+  const pn=document.getElementById('profileName');
+  if(pn)pn.textContent=(pf.name?pf.name+' · ':'')+'你的私人执行中枢';
   const s=await API.get('/api/stats');
   document.getElementById('mSkills').textContent=s?.skills?.total??73;
   document.getElementById('mTasks').textContent=s?.tasks?.total??'—';
@@ -1065,6 +1173,42 @@ const MODELS=[
   {id:'deep',name:'深思 Deep',d:'强推理 · 长上下文',ic:'🎯'},
   {id:'swift',name:'疾风 Swift',d:'高性价比 · 代码强',ic:'🚀'},
   {id:'lite',name:'轻羽 Lite',d:'通用 · 稳定省流',ic:'🪶'}];
+/* ========== Provider Hub (design system ProviderSheet.jsx) ========== */
+const DEFAULT_PROVIDERS=[
+  {id:'deepseek',name:'DeepSeek',model:'deepseek-chat · L3 默认',on:true},
+  {id:'anthropic',name:'Anthropic',model:'claude-3-5-sonnet · L4 升级路径',on:false},
+  {id:'openai',name:'OpenAI',model:'gpt-4o · 备用网关',on:false},
+  {id:'local',name:'本地模型',model:'qwen2.5 · Ollama :11434',on:false,local:true},
+];
+let PROVIDERS=JSON.parse(store.get('providers')||'null')||DEFAULT_PROVIDERS;
+function saveProviders(){store.set('providers',JSON.stringify(PROVIDERS));}
+function openProviderSheet(){
+  const box=document.getElementById('providerRows');
+  box.innerHTML=PROVIDERS.map((p,i)=>`
+    <div class="prov-row ${p.on?'on':''}" id="prow-${p.id}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center">
+          <span class="prov-name">${p.name}</span>
+          ${p.local?'<span class="prov-badge">本地</span>':''}
+        </div>
+        <div class="prov-model">${p.model}</div>
+      </div>
+      <div class="switch ${p.on?'on':''}" onclick="toggleProvider(${i})" style="flex-shrink:0"></div>
+    </div>`).join('');
+  openSheet('providerSheet');
+  // Update model pill to show active provider
+  const active=PROVIDERS.find(p=>p.on);
+  if(active)document.getElementById('modelName').textContent=active.name;
+}
+function toggleProvider(idx){
+  PROVIDERS[idx].on=!PROVIDERS[idx].on;
+  saveProviders();openProviderSheet();
+  // Update model name in topbar
+  const active=PROVIDERS.find(p=>p.on);
+  document.getElementById('modelName').textContent=active?active.name:'Auto';
+}
+function openAddProvider(){closeSheet();setTimeout(()=>openSheet('apiSheet'),180);}
+
 function openModelSheet(){const box=document.getElementById('modelOpts');
   box.innerHTML=MODELS.map(m=>`<div class="opt ${m.id===API.model?'sel':''}" onclick="pickModel('${m.id}','${m.name}')">
     <div class="opt-ic">${m.ic}</div><div class="opt-main"><div class="opt-k">${m.name}</div><div class="opt-d">${m.d}</div></div>
@@ -1084,78 +1228,18 @@ function savePersona(){store.set('p_name',document.getElementById('pName').value
   const sp=document.getElementById('setPersona');if(sp)sp.textContent=n;
   closeSheet();toast('人格已保存');}
 
-async function openApiSheet(){
-  document.getElementById('apiTest').innerHTML='';
-  await loadProviders();
-  openSheet('apiSheet');
-}
-
-async function loadProviders(){
-  const resp = await API.get('/api/providers');
-  if(!resp || !resp.providers){ document.getElementById('providerList').innerHTML='<div class="empty">无法加载 Provider 列表</div>'; return; }
-  const list = resp.providers;
-  const defId = resp.default;
-  if(!list.length){ document.getElementById('providerList').innerHTML='<div class="empty">还没有 Provider，请在下方添加</div>'; return; }
-  document.getElementById('providerList').innerHTML = list.map(p=>`
-    <div class="provider-card" style="border:1px solid var(--border);border-radius:8px;padding:0.8rem;margin-bottom:0.8rem;background:var(--bg-2)">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><strong>${esc(p.label||p.id)}</strong> ${p.id===defId?'<span style="color:var(--ok);font-size:0.8rem">✓ 默认</span>':''}</div>
-        <div>
-          <button class="btn-xs" onclick="testProvider('${p.id}')">测试</button>
-          ${p.id!==defId?`<button class="btn-xs" onclick="setDefaultProvider('${p.id}')">设为默认</button>`:''}
-          <button class="btn-xs btn-danger" onclick="deleteProvider('${p.id}')">删除</button>
-        </div>
-      </div>
-      <div style="font-size:0.85rem;color:var(--text-2);margin-top:0.3rem">
-        ${esc(p.base_url||'')}<br>
-        Token: ${esc(p.token||p.api_key||'N/A')}<br>
-        Model: ${esc(p.model||'auto')}
-      </div>
-    </div>
-  `).join('');
-}
-
-async function saveNewProvider(){
-  const id = document.getElementById('newProvId').value.trim();
-  const label = document.getElementById('newProvLabel').value.trim();
-  const type = document.getElementById('newProvType').value;
-  const base = document.getElementById('newProvBase').value.trim();
-  const token = document.getElementById('newProvToken').value.trim();
-  const model = document.getElementById('newProvModel').value.trim();
-  const priority = parseInt(document.getElementById('newProvPriority').value)||50;
-  if(!id || !label || !base || !token){ document.getElementById('providerTest').innerHTML='<span style="color:var(--warn)">请填写完整</span>'; return; }
-  document.getElementById('providerTest').innerHTML='<span style="color:var(--text-2)">保存中…</span>';
-  const resp = await API.post('/api/providers/save', {id, config:{label,type,base_url:base,token,model,priority,enabled:true}});
-  if(resp && resp.ok){
-    document.getElementById('providerTest').innerHTML='<span style="color:var(--ok)">✓ 保存成功</span>';
-    document.getElementById('newProvId').value='';
-    document.getElementById('newProvLabel').value='';
-    document.getElementById('newProvToken').value='';
-    await loadProviders();
-    toast('Provider 已保存');
-  } else {
-    document.getElementById('providerTest').innerHTML='<span style="color:var(--warn)">保存失败</span>';
-  }
-}
-
-async function testProvider(id){
-  toast('测试中…');
-  const resp = await API.post('/api/providers/test', {id});
-  if(resp && resp.ok) toast('✓ 连接成功');
-  else toast('⚠ 连接失败：'+(resp?.error||'未知'));
-}
-
-async function setDefaultProvider(id){
-  const resp = await API.post('/api/providers/default', {id});
-  if(resp && resp.ok){ toast('已设为默认'); await loadProviders(); }
-  else toast('设置失败');
-}
-
-async function deleteProvider(id){
-  if(!confirm('确定删除这个 Provider？')) return;
-  // TODO: 后端需要加 DELETE /api/providers/{id}
-  toast('删除功能开发中');
-}
+function openApiSheet(){document.getElementById('aBase').value=API.base;document.getElementById('aKey').value=API.key;
+  document.getElementById('aModel').value=API.model;document.getElementById('apiTest').innerHTML='';openSheet('apiSheet');}
+async function saveApi(){API.base=document.getElementById('aBase').value.trim().replace(/\/$/,'');
+  API.key=document.getElementById('aKey').value.trim();API.model=document.getElementById('aModel').value.trim()||'auto';
+  store.set('api_base',API.base);store.set('api_key',API.key);store.set('api_model',API.model);
+  document.getElementById('setApi').textContent=API.base?'外接':'同源';
+  const t=document.getElementById('apiTest');t.innerHTML='<span style="color:var(--text-2)">测试中…</span>';
+  const ok=await API.get('/api/stats');
+  t.innerHTML=ok?'<span style="color:var(--ok)">✓ 连接成功</span>':'<span style="color:var(--warn)">⚠ 未连上（已保存，可稍后重试）</span>';}
+function resetApi(){API.base='';API.key='';store.del('api_base');store.del('api_key');
+  document.getElementById('aBase').value='';document.getElementById('aKey').value='';
+  document.getElementById('setApi').textContent='同源';toast('已恢复同源默认');}
 
 /* 记忆（本地演示 + 可对接 /api/profile） */
 function memList(){try{return JSON.parse(store.get('memories')||'[]');}catch(e){return[];}}
@@ -1260,19 +1344,11 @@ function renderOb(){
   document.getElementById('obProgress').innerHTML=OB_STEPS.map((_,i)=>`<div class="ob-dot ${i===obIdx?'on':''}"></div>`).join('');
   const body=document.getElementById('obBody'),act=document.getElementById('obActions');
   if(step.type==='welcome'){
-    body.innerHTML=`<div class="ob-logo"><img src="/brand-hero-display.png" style="width:200px;height:auto;margin:0 auto" onerror="this.src='/icon-192.png'"></div>
-      <div class="ob-title">神 · BLACK GOD</div>
-      <div class="ob-sub" style="font-size:1.05rem;line-height:1.8;margin-top:1.2rem">
-        <strong style="color:#fff;font-size:1.1rem">你的私人多端执行中枢</strong><br>
-        不是平台聊天框，而是连接你的手机、电脑、服务器、API 和工具<br><br>
-        <span style="font-size:0.9rem;color:#999">
-        ✓ 不锁平台 — 你自己的接口、工具、服务器都能接入<br>
-        ✓ 本地优先 — 密码/配置/记忆只保存在你自己的设备里<br>
-        ✓ 真正执行 — 记住你的项目、习惯、禁区，把任务做完
-        </span>
-      </div>
-      <div class="privacy" style="margin-top:2rem"><div class="privacy-ic">🔒</div>
-        <div class="privacy-tx" style="font-size:0.85rem">下面几个问题帮我更好地认识你<br>全部只存在这台设备上，随时可在「我的」里修改或清除</div></div>`;
+    body.innerHTML=`<div class="ob-logo"><img src="/icon-192.png" onerror="this.parentElement.style.background='linear-gradient(145deg,#22262d,#0c0e11)'"></div>
+      <div class="ob-title">先让我认识你</div>
+      <div class="ob-sub">回答几个问题，我会记住你的偏好，<br>每次都更懂你想要什么。</div>
+      <div class="privacy"><div class="privacy-ic">🔒</div>
+        <div class="privacy-tx"><b>全部只存在这台设备上，绝不上传云端。</b>随时可在「我的」里修改或清除。</div></div>`;
     act.innerHTML=`<button class="ob-next" onclick="obNext()">开始（约 30 秒）</button>`;
   }else if(step.type==='text'){
     body.innerHTML=`<div class="ob-q">${step.q}</div><div class="ob-hint">${step.hint}</div>
@@ -1344,8 +1420,10 @@ function toggleNotif(el){el.classList.toggle('on');const on=el.classList.contain
   store.set('notif',on?'1':'0');if(on){bgEnablePush(false);}else{if(window.BGPush)BGPush.disable().catch(()=>{});}haptic();}
 
 (function init(){
-  // 还原模型名
-  const m=MODELS.find(x=>x.id===API.model);if(m){document.getElementById('modelName').textContent=m.name.split(' ')[0];}
+  // 还原 Provider 名
+  const active=PROVIDERS.find(p=>p.on);
+  if(active)document.getElementById('modelName').textContent=active.name;
+  else{const m=MODELS.find(x=>x.id===API.model);if(m)document.getElementById('modelName').textContent=m.name.split(' ')[0];}
   // 还原开关
   if(store.get('reduce_motion')==='1'){document.getElementById('swMotion').classList.add('on');document.getElementById('bg').style.display='none';}
   if(store.get('haptic')==='0')document.getElementById('swHaptic').classList.remove('on');
