@@ -1,0 +1,52 @@
+name: Build Black God 888 iOS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install XcodeGen
+      run: brew install xcodegen
+
+    - name: Generate Xcode Project
+      run: |
+        cd ios-app
+        xcodegen generate
+        ls -la
+
+    - name: Build App (unsigned)
+      run: |
+        cd ios-app
+        set -o pipefail
+        xcodebuild build \
+          -project BlackGod888.xcodeproj \
+          -scheme BlackGod888 \
+          -configuration Release \
+          -sdk iphoneos \
+          -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGN_IDENTITY=""
+
+    - name: Package unsigned IPA
+      run: |
+        cd ios-app
+        APP_PATH=$(find build -name "*.app" -type d | head -1)
+        echo "App路径: $APP_PATH"
+        mkdir -p Payload
+        cp -r "$APP_PATH" Payload/
+        zip -r BlackGod888-unsigned.ipa Payload
+        echo "✅ IPA: $(ls -lh BlackGod888-unsigned.ipa)"
+
+    - name: Upload IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: BlackGod888-unsigned-IPA
+        path: ios-app/BlackGod888-unsigned.ipa
+        if-no-files-found: error
