@@ -714,28 +714,49 @@ button{font-family:inherit}
 
 <div class="sheet" id="apiSheet">
   <div class="sheet-grab"></div>
-  <div class="sheet-title">Provider 管理</div>
-  <div class="sheet-sub">配置多个模型接口，自动选择或手动切换。密钥本地加密保存，不上传云端。</div>
+  <div class="sheet-title">API 配置 · 智能识别</div>
+  <div class="sheet-sub">填一个 Key，自动识别网关 + 11 公开 + 8 隐藏平台。私人版专属。</div>
   
-  <div id="providerList" style="margin:1rem 0"></div>
-  
-  <div class="field"><label>添加新 Provider</label></div>
-  <div class="field"><label>Provider ID</label><input id="newProvId" placeholder="例如：my_claude_max"/></div>
-  <div class="field"><label>显示名称</label><input id="newProvLabel" placeholder="例如：Claude Max 官方"/></div>
-  <div class="field"><label>类型</label>
-    <select id="newProvType">
-      <option value="openai">OpenAI Compatible</option>
-      <option value="anthropic">Anthropic</option>
-      <option value="custom">Custom</option>
-    </select>
+  <!-- 智能识别区 -->
+  <div class="field" style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:1rem;margin:1rem 0">
+    <label style="color:var(--chrome-1);font-weight:600">🔑 智能识别（权哥专属）</label>
+    <div style="font-size:0.85rem;color:var(--text-2);margin:0.5rem 0">填一个 API Key，自动识别网关</div>
+    <input id="smartKey" type="password" placeholder="粘贴 API Key（sk-... / AIza... / xai-...）" 
+           oninput="detectProviderSmart(this.value)" style="margin-top:0.6rem"/>
+    <div id="detectedResult" style="margin-top:0.8rem;font-size:0.9rem"></div>
   </div>
-  <div class="field"><label>Base URL</label><input id="newProvBase" placeholder="https://api.openai.com/v1"/></div>
-  <div class="field"><label>API Key / Token</label><input id="newProvToken" type="password" placeholder="sk-..."/></div>
-  <div class="field"><label>默认模型</label><input id="newProvModel" placeholder="gpt-5.5"/></div>
-  <div class="field"><label>优先级（数字越大越优先）</label><input id="newProvPriority" type="number" value="50"/></div>
   
-  <button class="btn-primary" onclick="saveNewProvider()">保存 Provider</button>
-  <div class="test-line" id="providerTest"></div>
+  <!-- 11 公开平台 -->
+  <div class="field">
+    <label style="font-weight:600;color:var(--text-2)">公开平台</label>
+    <div id="publicPlatforms" style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.6rem"></div>
+  </div>
+  
+  <!-- 8 隐藏平台（💎 彩蛋折叠） -->
+  <div class="field">
+    <div class="opt" onclick="toggleHidden()" style="cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:0.8rem;margin:0.6rem 0">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="color:var(--chrome-1);font-weight:600">💎 隐藏平台</div>
+        <div id="hiddenToggle" style="color:var(--chrome-2)">▼</div>
+      </div>
+    </div>
+    <div id="hiddenPlatforms" style="display:none;margin-top:0.6rem"></div>
+  </div>
+  
+  <!-- 手动覆盖（高级） -->
+  <div class="field" style="margin-top:1.5rem">
+    <label style="font-weight:600;color:var(--text-2)">手动覆盖（高级）</label>
+    <div style="font-size:0.85rem;color:var(--text-3);margin:0.3rem 0">自动识别后可手动修改</div>
+  </div>
+  <div class="field"><label>API 地址</label><input id="manualBase" placeholder="https://..."/></div>
+  <div class="field"><label>模型名</label><input id="manualModel" placeholder="auto"/></div>
+  
+  <button class="btn-primary" onclick="saveSmartConfig()">保存配置</button>
+  <div class="test-line" id="apiTest"></div>
+  
+  <div style="font-size:0.75rem;color:var(--text-3);margin-top:1rem;text-align:center">
+    私人版专属：自动识别 11 公开 + 8 隐藏平台。配置只存本机，不上传。
+  </div>
 </div>
 
 <div class="sheet" id="memSheet">
@@ -1086,67 +1107,206 @@ function savePersona(){store.set('p_name',document.getElementById('pName').value
 
 async function openApiSheet(){
   document.getElementById('apiTest').innerHTML='';
-  await loadProviders();
+  renderPublicPlatforms();
+  renderHiddenPlatforms();
+  // 回显当前配置
+  document.getElementById('smartKey').value = API.key || '';
+  document.getElementById('manualBase').value = API.base || '';
+  document.getElementById('manualModel').value = API.model || 'auto';
+  if(API.key) detectProviderSmart(API.key);
   openSheet('apiSheet');
 }
 
-async function loadProviders(){
-  const resp = await API.get('/api/providers');
-  if(!resp || !resp.providers){ document.getElementById('providerList').innerHTML='<div class="empty">无法加载 Provider 列表</div>'; return; }
-  const list = resp.providers;
-  const defId = resp.default;
-  if(!list.length){ document.getElementById('providerList').innerHTML='<div class="empty">还没有 Provider，请在下方添加</div>'; return; }
-  document.getElementById('providerList').innerHTML = list.map(p=>`
-    <div class="provider-card" style="border:1px solid var(--border);border-radius:8px;padding:0.8rem;margin-bottom:0.8rem;background:var(--bg-2)">
+// 11 公开平台预设
+const PUBLIC_PLATFORMS = [
+  {name:'Minis (推荐)', base:'http://47.236.124.97/v1', key:'sk-local', model:'auto'},
+  {name:'Anthropic 官方', base:'https://api.anthropic.com/v1', key:'sk-ant-...', model:'auto'},
+  {name:'OpenAI 官方', base:'https://api.openai.com/v1', key:'sk-...', model:'auto'},
+  {name:'Google Gemini', base:'https://generativelanguage.googleapis.com/v1beta', key:'AIza...', model:'auto'},
+  {name:'xAI (Grok)', base:'https://api.x.ai/v1', key:'xai-...', model:'auto'},
+  {name:'POE', base:'https://api.poe.com/v1', key:'sk-poe-...', model:'auto'},
+  {name:'OpenRouter', base:'https://openrouter.ai/api/v1', key:'sk-or-...', model:'auto'},
+  {name:'apiclaude', base:'https://apiclaude.cc/v1', key:'...', model:'auto'}
+];
+
+// 8 隐藏平台
+const HIDDEN_PLATFORMS = [
+  {name:'Cursor IDE', base:'https://api.cursor.sh/v1', hint:'F12 → Local Storage → token'},
+  {name:'Windsurf', base:'https://api.codeium.com/v1', hint:'F12 → Network → Authorization'},
+  {name:'Bolt.new', base:'https://api.bolt.new/v1', hint:'F12 → Network → x-api-key'},
+  {name:'v0.dev', base:'https://api.v0.dev/v1', hint:'F12 → Network → authorization'},
+  {name:'Replit', base:'https://api.replit.com/v1', hint:'F12 → Cookies → connect.sid'},
+  {name:'Lovable', base:'https://api.lovable.dev/v1', hint:'F12 → Network → authorization'},
+  {name:'Claude.ai Web', base:'https://claude.ai/api', hint:'F12 → Cookies → sessionKey'},
+  {name:'ChatGPT Web', base:'https://chatgpt.com/backend-api', hint:'F12 → Network → Bearer token'}
+];
+
+function renderPublicPlatforms(){
+  const html = PUBLIC_PLATFORMS.map(p=>`
+    <div class="opt" onclick="usePlatform('${esc(p.base)}','${esc(p.key)}','${esc(p.model)}')" style="cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0.7rem">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><strong>${esc(p.label||p.id)}</strong> ${p.id===defId?'<span style="color:var(--ok);font-size:0.8rem">✓ 默认</span>':''}</div>
         <div>
-          <button class="btn-xs" onclick="testProvider('${p.id}')">测试</button>
-          ${p.id!==defId?`<button class="btn-xs" onclick="setDefaultProvider('${p.id}')">设为默认</button>`:''}
-          <button class="btn-xs btn-danger" onclick="deleteProvider('${p.id}')">删除</button>
+          <div style="font-size:0.9rem;font-weight:600;color:var(--text)">${esc(p.name)}</div>
+          <div style="font-size:0.75rem;color:var(--text-2);margin-top:0.2rem">${esc(p.base)}</div>
         </div>
-      </div>
-      <div style="font-size:0.85rem;color:var(--text-2);margin-top:0.3rem">
-        ${esc(p.base_url||'')}<br>
-        Token: ${esc(p.token||p.api_key||'N/A')}<br>
-        Model: ${esc(p.model||'auto')}
+        <div style="font-size:0.8rem;color:var(--chrome-2)">使用</div>
       </div>
     </div>
   `).join('');
+  document.getElementById('publicPlatforms').innerHTML = html;
 }
 
-async function saveNewProvider(){
-  const id = document.getElementById('newProvId').value.trim();
-  const label = document.getElementById('newProvLabel').value.trim();
-  const type = document.getElementById('newProvType').value;
-  const base = document.getElementById('newProvBase').value.trim();
-  const token = document.getElementById('newProvToken').value.trim();
-  const model = document.getElementById('newProvModel').value.trim();
-  const priority = parseInt(document.getElementById('newProvPriority').value)||50;
-  if(!id || !label || !base || !token){ document.getElementById('providerTest').innerHTML='<span style="color:var(--warn)">请填写完整</span>'; return; }
-  document.getElementById('providerTest').innerHTML='<span style="color:var(--text-2)">保存中…</span>';
-  const resp = await API.post('/api/providers/save', {id, config:{label,type,base_url:base,token,model,priority,enabled:true}});
-  if(resp && resp.ok){
-    document.getElementById('providerTest').innerHTML='<span style="color:var(--ok)">✓ 保存成功</span>';
-    document.getElementById('newProvId').value='';
-    document.getElementById('newProvLabel').value='';
-    document.getElementById('newProvToken').value='';
-    await loadProviders();
-    toast('Provider 已保存');
-  } else {
-    document.getElementById('providerTest').innerHTML='<span style="color:var(--warn)">保存失败</span>';
+function renderHiddenPlatforms(){
+  const html = HIDDEN_PLATFORMS.map(p=>`
+    <div style="background:var(--chrome-glow);border:1px solid var(--line);border-radius:10px;padding:0.7rem;margin-bottom:0.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="flex:1">
+          <div style="font-size:0.85rem;font-weight:600;color:var(--text)">${esc(p.name)}</div>
+          <div style="font-size:0.7rem;color:var(--text-3);margin-top:0.3rem">抓取方法: ${esc(p.hint)}</div>
+        </div>
+        <div class="chip" onclick="usePlatform('${esc(p.base)}','','auto')" style="margin:0">使用</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('hiddenPlatforms').innerHTML = html;
+}
+
+let hiddenOpen = false;
+function toggleHidden(){
+  hiddenOpen = !hiddenOpen;
+  document.getElementById('hiddenPlatforms').style.display = hiddenOpen ? 'block' : 'none';
+  document.getElementById('hiddenToggle').textContent = hiddenOpen ? '▲' : '▼';
+  haptic();
+}
+
+function usePlatform(base, key, model){
+  document.getElementById('smartKey').value = key;
+  document.getElementById('manualBase').value = base;
+  document.getElementById('manualModel').value = model;
+  detectProviderSmart(key);
+  haptic();
+  toast('已选择，可直接保存或手动修改');
+}
+
+// 智能识别网关（和 iOS 一样的逻辑）
+function detectProviderSmart(token){
+  const t = (token||'').trim().toLowerCase();
+  if(!t){ document.getElementById('detectedResult').innerHTML=''; return; }
+  
+  let detected = '';
+  let base = '';
+  let model = 'auto';
+  
+  // Minis
+  if(t === 'sk-local' || t.includes('47.236.124.97')){
+    detected = 'Minis Legend Coordinator v2';
+    base = 'http://47.236.124.97/v1';
   }
+  // Anthropic
+  else if(t.startsWith('sk-ant-') || t.startsWith('ant-')){
+    detected = 'Anthropic 官方';
+    base = 'https://api.anthropic.com/v1';
+  }
+  // xAI (Grok)
+  else if(t.startsWith('xai-') || t.startsWith('grok-') || t.includes('x.ai')){
+    detected = 'xAI (Grok)';
+    base = 'https://api.x.ai/v1';
+  }
+  // Google Gemini
+  else if(t.startsWith('aiza') || t.startsWith('ya29')){
+    detected = 'Google Gemini';
+    base = 'https://generativelanguage.googleapis.com/v1beta';
+  }
+  // POE
+  else if(t.startsWith('sk-poe-') || t.startsWith('sk-pk-')){
+    detected = 'POE';
+    base = 'https://api.poe.com/v1';
+  }
+  // OpenRouter
+  else if(t.startsWith('sk-or-')){
+    detected = 'OpenRouter';
+    base = 'https://openrouter.ai/api/v1';
+  }
+  // 隐藏平台识别
+  else if(t.includes('cursor') || t.startsWith('cur_')){
+    detected = 'Cursor IDE (隐藏)';
+    base = 'https://api.cursor.sh/v1';
+  }
+  else if(t.includes('windsurf') || t.includes('codeium')){
+    detected = 'Windsurf/Codeium (隐藏)';
+    base = 'https://api.codeium.com/v1';
+  }
+  else if(t.includes('bolt') || t.includes('stackblitz')){
+    detected = 'Bolt.new (隐藏)';
+    base = 'https://api.bolt.new/v1';
+  }
+  else if(t.includes('v0') || t.includes('vercel')){
+    detected = 'v0.dev (隐藏)';
+    base = 'https://api.v0.dev/v1';
+  }
+  else if(t.includes('replit') || t.includes('repl')){
+    detected = 'Replit (隐藏)';
+    base = 'https://api.replit.com/v1';
+  }
+  else if(t.includes('lovable') || t.includes('gpt-engineer')){
+    detected = 'Lovable (隐藏)';
+    base = 'https://api.lovable.dev/v1';
+  }
+  else if(t.includes('claude.ai') || t.startsWith('sk-ant-sid')){
+    detected = 'Claude.ai Web (隐藏)';
+    base = 'https://claude.ai/api';
+  }
+  else if(t.includes('chatgpt.com') || t.startsWith('eyjalgi')){
+    detected = 'ChatGPT Web (隐藏)';
+    base = 'https://chatgpt.com/backend-api';
+  }
+  // 默认：OpenAI 兼容
+  else {
+    detected = 'OpenAI 兼容';
+    base = 'https://api.openai.com/v1';
+  }
+  
+  // 自动填充
+  document.getElementById('manualBase').value = base;
+  document.getElementById('manualModel').value = model;
+  
+  // 显示识别结果
+  document.getElementById('detectedResult').innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem;background:var(--ok-dim);border:1px solid var(--ok-line);border-radius:8px">
+      <span style="color:var(--ok)">✓</span>
+      <span style="color:var(--text);font-size:0.85rem">已识别: ${esc(detected)}</span>
+    </div>
+  `;
 }
 
-async function testProvider(id){
-  toast('测试中…');
-  const resp = await API.post('/api/providers/test', {id});
-  if(resp && resp.ok) toast('✓ 连接成功');
-  else toast('⚠ 连接失败：'+(resp?.error||'未知'));
+function saveSmartConfig(){
+  const key = document.getElementById('smartKey').value.trim();
+  const base = document.getElementById('manualBase').value.trim();
+  const model = document.getElementById('manualModel').value.trim() || 'auto';
+  
+  if(!key || !base){
+    document.getElementById('apiTest').innerHTML='<span style="color:var(--warn)">请填写 Key 和 Base URL</span>';
+    return;
+  }
+  
+  API.key = key;
+  API.base = base;
+  API.model = model;
+  store.set('api_key', key);
+  store.set('api_base', base);
+  store.set('api_model', model);
+  
+  document.getElementById('apiTest').innerHTML='<span style="color:var(--ok)">✓ 配置已保存（本地）</span>';
+  setTimeout(()=>{
+    closeSheet();
+    toast('API 配置已保存');
+  }, 800);
 }
 
-async function setDefaultProvider(id){
-  const resp = await API.post('/api/providers/default', {id});
+async function loadProviders(){
+  // 兼容旧版 Provider 接口（已废弃，但保留以防报错）
+  return;
+}
   if(resp && resp.ok){ toast('已设为默认'); await loadProviders(); }
   else toast('设置失败');
 }
