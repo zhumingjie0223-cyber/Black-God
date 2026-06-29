@@ -1113,9 +1113,8 @@ async function openApiSheet(){
   openSheet('apiSheet');
 }
 
-// 11 公开平台预设
+// 11 公开平台预设（无推荐，用户自选）
 const PUBLIC_PLATFORMS = [
-  {name:'Legend (推荐)', base:'http://47.236.124.97/v1', key:'sk-local', model:'auto'},
   {name:'Anthropic 官方', base:'https://api.anthropic.com/v1', key:'sk-ant-...', model:'auto'},
   {name:'OpenAI 官方', base:'https://api.openai.com/v1', key:'sk-...', model:'auto'},
   {name:'Google Gemini', base:'https://generativelanguage.googleapis.com/v1beta', key:'AIza...', model:'auto'},
@@ -1185,11 +1184,6 @@ function detectProviderSmart(token){
   let base = '';
   let model = 'auto';
   
-  // Legend
-  if(t === 'sk-local' || t.includes('47.236.124.97')){
-    detected = 'Legend Coordinator v2';
-    base = 'http://47.236.124.97/v1';
-  }
   // Anthropic
   else if(t.startsWith('sk-ant-') || t.startsWith('ant-')){
     detected = 'Anthropic 官方';

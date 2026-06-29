@@ -30,7 +30,6 @@ def detect_provider(token: str) -> Dict[str, str]:
     """
     按 key 格式自动识别网关服务商
     - sk-ant-...      → Anthropic 官方 (Claude)
-    - sk-local        → Legend Coordinator v2
     - apiclaude...    → apiclaude.cc 中转
     - sk-or-...       → OpenRouter
     - sk-pk-...       → POE
@@ -40,15 +39,6 @@ def detect_provider(token: str) -> Dict[str, str]:
     if not token:
         return {}
     t = token.strip().lower()
-
-    # Legend Coordinator v2（按权哥要求安装）
-    if t == "sk-local" or "47.236.124.97" in t:
-        return {
-            "label": "Legend Coordinator v2",
-            "type": "legend_coordinator",
-            "base_url": "http://47.236.124.97/v1",
-            "model": "auto",  # 智能路由
-        }
 
     # Anthropic 官方
     if t.startswith("sk-ant-") or t.startswith("ant-"):
@@ -501,7 +491,7 @@ TOOLS = [
                 "properties": {
                     "platform": {
                         "type": "string",
-                        "enum": ["openai", "anthropic", "google", "xai", "grok", "poe", "legend", "openrouter", "apiclaude", "anyrouter", "auto"],
+                        "enum": ["openai", "anthropic", "google", "xai", "grok", "poe", "openrouter", "apiclaude", "anyrouter", "auto"],
                         "description": "平台名称。auto=自动按 token 识别。支持隐藏平台（客户自行发掘）"
                     },
                     "token": {"type": "string", "description": "要注册的 API key（可选，已有可省略）"},
@@ -636,9 +626,6 @@ def execute_tool(name: str, args: dict) -> str:
             if platform == "openrouter" or platform == "auto":
                 result["instructions"].append(
                     "OpenRouter: 打开 https://openrouter.ai/keys 复制")
-            if platform == "legend" or platform == "auto":
-                result["instructions"].append(
-                    "Legend: 使用 sk-local → http://47.236.124.97/v1")
             if platform in ("apiclaude", "anyrouter") or platform == "auto":
                 result["instructions"].append(
                     f"{platform}: 登录后从控制台复制")
@@ -912,11 +899,15 @@ class AgentLoop:
 # 第 2 层：API 路由（RESTful）
 # ═══════════════════════════════════════════
 def create_agent(api_key: str = None, base_url: str = None, model: str = None):
-    """创建 Agent 实例（按权哥要求：底层接 Legend Coordinator v2）"""
-    # 默认接 Legend（安装 Legend 的方式）
-    key = api_key or os.environ.get("BG_KEY", "sk-local")
-    url = base_url or os.environ.get("BG_BASE", "http://47.236.124.97/v1")
+    """创建 Agent 实例"""
+    # 从环境变量或参数获取配置（无默认值）
+    key = api_key or os.environ.get("BG_KEY", "")
+    url = base_url or os.environ.get("BG_BASE", "")
     mdl = model or os.environ.get("BG_MODEL", "auto")
+    
+    if not key or not url:
+        raise ValueError("必须提供 api_key 和 base_url（通过参数或环境变量 BG_KEY / BG_BASE）")
+    
     assert_remote(url, mdl)
     return AgentLoop(api_key=key, base_url=url, model=mdl)
 

@@ -7,16 +7,15 @@ import SwiftUI
 
 struct APIConfigView: View {
     @EnvironmentObject var appState: AppState
-    @AppStorage("api_base") var apiBase = "http://47.236.124.97/v1"
-    @AppStorage("api_key") var apiKey = "sk-local"
+    @AppStorage("api_base") var apiBase = ""
+    @AppStorage("api_key") var apiKey = ""
     @AppStorage("api_model") var apiModel = "auto"
     @Environment(\.dismiss) var dismiss
     
     @State private var detectedProvider: String = ""
 
-    // 11 公开平台预设
+    // 11 公开平台预设（无推荐，用户自选）
     let publicPresets: [(String, String, String, String)] = [
-        ("Legend (推荐)", "http://47.236.124.97/v1", "sk-local", "auto"),
         ("Anthropic 官方", "https://api.anthropic.com/v1", "sk-ant-...", "auto"),
         ("OpenAI 官方", "https://api.openai.com/v1", "sk-...", "auto"),
         ("Google Gemini", "https://generativelanguage.googleapis.com/v1beta", "AIza...", "auto"),
@@ -205,12 +204,6 @@ struct APIConfigView: View {
             return
         }
         
-        // Legend
-        if t == "sk-local" || t.contains("47.236.124.97") {
-            detectedProvider = "Legend Coordinator v2"
-            apiBase = "http://47.236.124.97/v1"
-            apiModel = "auto"
-        }
         // Anthropic
         else if t.hasPrefix("sk-ant-") || t.hasPrefix("ant-") {
             detectedProvider = "Anthropic 官方"
