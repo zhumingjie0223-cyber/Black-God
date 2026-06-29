@@ -1,0 +1,15 @@
+name = "blackgod88"
+main = "worker.js"
+compatibility_date = "2026-06-29"
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "black-god-db"
+database_id = "xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "black-god-assets"
