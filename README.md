@@ -22,10 +22,14 @@
 ## 📸 预览
 
 <div align="center">
-  <img src="assets/screenshots/home.png" alt="Black God 首页" width="250">
-  <img src="assets/screenshots/chat.png" alt="对话执行" width="250">
-  <img src="assets/screenshots/records.png" alt="记录中心" width="250">
+
+| Hero | Brand | Logo | Icon 192 | Icon 512 |
+|------|-------|------|----------|----------|
+| ![Hero](web/brand-hero.png) | ![Brand](web/brand-hero-display.png) | ![Logo](web/logo.png) | ![Icon 192](web/icon-192.png) | ![Icon 512](web/icon-512.png) |
+
 </div>
+
+> 所有图标均为黑曜石 + 冷金属风格（Obsidian Chrome），单一神字金属标。
 
 ---
 
