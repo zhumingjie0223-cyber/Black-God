@@ -691,6 +691,11 @@ class AgentLoop:
         self.model = model
         self.max_steps = max_steps
         
+        # ===== 按权哥要求：真人对话模式（持续上下文）=====
+        self.conversation_history = []  # 完整对话历史（不重建）
+        self.last_topic = ""  # 上一个话题
+        self.pending_action = None  # 待确认的动作
+        
         # ===== 集成优化器（10大核心能力） =====
         try:
             from core.optimizer import BlackGodOptimizer
@@ -733,7 +738,18 @@ class AgentLoop:
             return json.loads(resp.read().decode('utf-8'))
     
     def run(self, user_message: str, context: List[Dict] = None) -> Dict:
-        """执行 Agent Loop：多步推理 + 工具调用 + 自我反思"""
+        """执行 Agent Loop：多步推理 + 工具调用 + 自我反思（按权哥要求：真人对话模式）"""
+        
+        # ===== 【真人对话层】识别指代词和上下文 =====
+        is_continuation = any(kw in user_message.lower() for kw in ["继续", "那个", "刚才", "上面", "之前", "接着", "然后呢", "还有呢"])
+        
+        # 如果是续问，且有历史对话，加强上下文提示
+        context_hint = ""
+        if is_continuation and self.conversation_history:
+            last_exchange = self.conversation_history[-2:] if len(self.conversation_history) >= 2 else self.conversation_history
+            context_hint = f"\n\n## 权哥刚才说的（上下文）\n" + "\n".join(
+                f"[{m['role']}]: {m['content'][:300]}" for m in last_exchange
+            )
         
         # ===== 【优化层】第0步：智能优化策略 =====
         optimization_meta = {}
@@ -745,6 +761,9 @@ class AgentLoop:
             if opt_result.get("cached"):
                 memory.save_session("user", user_message)
                 memory.save_session("assistant", opt_result["response"][:500])
+                # 也加入对话历史
+                self.conversation_history.append({"role": "user", "content": user_message})
+                self.conversation_history.append({"role": "assistant", "content": opt_result["response"]})
                 return {
                     "response": opt_result["response"],
                     "steps": [],
@@ -757,23 +776,47 @@ class AgentLoop:
                     }
                 }
         
-        # 第 1 层：System Prompt 注入
-        system_prompt = CONSTITUTION + "\n\n## 可用技能\n" + "\n".join(f"- {k}: {v}" for k, v in SKILLS.items())
+        # 第 1 层：System Prompt 注入（真人对话增强）
+        system_prompt = CONSTITUTION + f"""
+
+## 真人对话模式（按权哥要求）
+1. **接得住话**：权哥说"继续"、"那个"、"刚才的"，你要知道指什么
+2. **上下文连贯**：前后句要接得住，不是孤立回答
+3. **可以提醒反问**：你可以说"权哥你是不是想XXX？"、"明白，立刻干"、"收到"
+4. **同一句话多个意思都要答**：一句话里有两个问题，都要回答
+5. **不丢回问题**：严禁"我需要更多信息"、"能否告诉我"，直接推断或行动
+
+## 可用技能
+""" + "\n".join(f"- {k}: {v}" for k, v in SKILLS.items())
         
-        messages = [{"role": "system", "content": system_prompt}]
+        # ===== 【持续对话】不重建 messages，而是累积 =====
+        if not self.conversation_history:
+            # 首次对话，初始化 system prompt
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # 注入历史记忆（从数据库）
+            recent_memories = memory.get_session(20)
+            if recent_memories:
+                mem_text = "## 历史对话记忆（数据库）\n" + "\n".join(f"[{m['role']}]: {m['content'][:200]}" for m in recent_memories[-10:])
+                messages.append({"role": "system", "content": mem_text})
+        else:
+            # 续接对话，复用历史（保留 system + 最近 20 轮）
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.extend(self.conversation_history[-40:])  # 保留最近 20 轮（user+assistant=40条）
         
-        # 注入记忆上下文
-        recent_memories = memory.get_session(20)
-        if recent_memories:
-            mem_text = "## 最近对话记忆\n" + "\n".join(f"[{m['role']}]: {m['content'][:200]}" for m in recent_memories[-10:])
-            messages.append({"role": "system", "content": mem_text})
+        # 加上下文提示（如果是续问）
+        if context_hint:
+            messages.append({"role": "system", "content": context_hint})
         
         if context:
             messages.extend(context)
         
-        messages.append({"role": "user", "content": user_message})
+        # 当前用户消息
+        current_user_msg = {"role": "user", "content": user_message}
+        messages.append(current_user_msg)
+        self.conversation_history.append(current_user_msg)  # 加入持续历史
         
-        # 保存用户消息到会话记忆
+        # 保存用户消息到会话记忆（数据库）
         memory.save_session("user", user_message)
         
         steps_log = []
@@ -787,7 +830,8 @@ class AgentLoop:
                 
                 # 检查是否有工具调用
                 if msg.get("tool_calls"):
-                    messages.append({"role": "assistant", "content": msg.get("content", ""), "tool_calls": msg["tool_calls"]})
+                    assistant_msg = {"role": "assistant", "content": msg.get("content", ""), "tool_calls": msg["tool_calls"]}
+                    messages.append(assistant_msg)
                     
                     for tc in msg["tool_calls"]:
                         func_name = tc["function"]["name"]
@@ -798,15 +842,18 @@ class AgentLoop:
                         step_info["result"] = result[:500]
                         steps_log.append(step_info)
                         
-                        messages.append({
+                        tool_msg = {
                             "role": "tool",
                             "tool_call_id": tc["id"],
                             "content": result
-                        })
+                        }
+                        messages.append(tool_msg)
                 else:
                     # 最终回复
                     final_response = msg.get("content", "")
-                    messages.append({"role": "assistant", "content": final_response})
+                    assistant_final_msg = {"role": "assistant", "content": final_response}
+                    messages.append(assistant_final_msg)
+                    self.conversation_history.append(assistant_final_msg)  # 加入持续历史
                     break
                     
             except Exception as e:
@@ -816,16 +863,28 @@ class AgentLoop:
                     try:
                         response = self._call_model(messages)
                         final_response = response["choices"][0]["message"].get("content", "")
+                        assistant_final_msg = {"role": "assistant", "content": final_response}
+                        self.conversation_history.append(assistant_final_msg)
                         break
                     except:
                         final_response = f"模型调用失败: {str(e)}"
+                        self.conversation_history.append({"role": "assistant", "content": final_response})
                 break
         
         if not final_response and steps_log:
             final_response = f"执行了 {len(steps_log)} 步工具调用，但未生成最终回复。"
+            self.conversation_history.append({"role": "assistant", "content": final_response})
         
-        # 保存助手回复到会话记忆
+        # 保存助手回复到会话记忆（数据库）
         memory.save_session("assistant", final_response[:500])
+        
+        # ===== 【真人对话层】更新话题追踪 =====
+        self.last_topic = user_message[:50]  # 记住最近话题
+        
+        # 限制对话历史长度（避免无限增长）
+        if len(self.conversation_history) > 100:
+            # 保留最近 50 轮（100 条消息）
+            self.conversation_history = self.conversation_history[-100:]
         
         # ===== 【优化层】后处理：保存缓存 =====
         if self.optimizer_enabled and self.optimizer and final_response:
