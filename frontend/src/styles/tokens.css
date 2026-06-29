@@ -1,0 +1,78 @@
+/* ============================================================
+   Black God · 设计系统核心令牌 (Design Tokens) v5
+   从内到外质感升级的"根" —— 全站字体/色/按钮/间距/动效都取这里
+   改一处，全站统一变。
+   ============================================================ */
+
+:root{
+  /* ── 色板：从金属神字 logo 真实取色 ── */
+  --bg:#0a0c0d;            /* 纯黑底（图标最暗部）*/
+  --bg-1:#101416;         /* 次背景 */
+  --bg-2:#161b1d;         /* 卡片 */
+  --bg-3:#1c2325;         /* 浮起层 */
+  --line:#2a3638;         /* 金属边框（图标主色系）*/
+  --line-hi:#3a4a4c;      /* 高亮边框 */
+
+  --silver:#979b9d;       /* 金属银主色（神字高光）*/
+  --silver-hi:#d4d8da;    /* 镜面高光 */
+  --silver-lo:#5a6668;    /* 暗银 */
+  --chrome:#e6eaec;       /* 最亮铬白 */
+  --cyan:#405050;         /* 冷青灰点缀 */
+
+  --text:#e8ecee;         /* 主文字 */
+  --text-2:#a8b0b2;       /* 次文字 */
+  --text-3:#7e8a8c;       /* 弱文字 */
+  --text-dim:#5a6466;     /* 占位 */
+
+  --danger:#c25a5a;       /* 危险（冷红，不刺眼）*/
+  --ok:#6b9b8a;           /* 成功（冷青绿）*/
+
+  /* ── 字体：刚柔同体 ── */
+  --font-display:"Noto Serif SC",serif;          /* 大标题·神性宋体 */
+  --font-script:"Pinyon Script",cursive;         /* 花体·BLACK GOD */
+  --font-en:"Cinzel",serif;                      /* 英文衬线·神性 */
+  --font-body:-apple-system,"PingFang SC","Helvetica Neue",system-ui,sans-serif;
+  --font-mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
+
+  /* ── 字号阶梯 ── */
+  --fs-hero:92px;  --fs-h1:30px;  --fs-h2:22px;  --fs-h3:18px;
+  --fs-body:15px;  --fs-sm:13px;  --fs-xs:11px;
+
+  /* ── 间距阶梯（8pt 网格）── */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+  --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px;
+
+  /* ── 圆角 ── */
+  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-pill:999px;
+
+  /* ── 金属质感渐变（按钮/卡片复用）── */
+  --grad-metal:linear-gradient(160deg,#e6eaec 0%,#aeb6b8 45%,#cdd3d5 60%,#9aa3a5 100%);
+  --grad-metal-dark:linear-gradient(160deg,#2a3234 0%,#161b1d 100%);
+  --grad-text-silver:linear-gradient(160deg,#f4f7f8 0%,#c4cacc 26%,#878f91 50%,#dadee0 68%,#798385 100%);
+
+  /* ── 阴影/光 ── */
+  --sh-card:0 8px 32px rgba(0,0,0,.5);
+  --sh-float:0 12px 48px rgba(0,0,0,.6);
+  --sh-glow:0 0 24px rgba(151,155,157,.25);
+  --inset-hi:inset 0 1px 0 rgba(212,216,218,.10);
+
+  /* ── 动效曲线（质感关键）── */
+  --ease:cubic-bezier(.22,.61,.36,1);       /* 顺滑出 */
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);/* 微弹 */
+  --t-fast:.15s; --t-mid:.28s; --t-slow:.5s;
+}
+
+/* ── 全局基底 ── */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--font-body);background:var(--bg);color:var(--text);
+  font-size:var(--fs-body);line-height:1.6;-webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;overflow-x:hidden;
+}
+/* 极淡金属拉丝氛围光 */
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 50% -10%,rgba(151,155,157,.08),transparent 55%),
+    radial-gradient(90% 60% at 80% 100%,rgba(64,80,80,.06),transparent 60%);
+}

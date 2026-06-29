@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/>
+<title>Black God</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Pinyon+Script&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* —— 从 logo 金属神字取的真实色板 —— */
+  --bg:#0a0c0d;            /* 纯黑底（图标最暗部）*/
+  --bg2:#121618;          /* 次背景 */
+  --card:#161b1d;         /* 卡片 */
+  --line:#2a3638;         /* 金属边框（图标占比最高色系）*/
+  --silver:#979b9d;       /* 金属银主色（神字高光）*/
+  --silver-hi:#d4d8da;    /* 镜面高光 */
+  --silver-lo:#5a6668;    /* 金属暗银 */
+  --cyan:#405050;         /* 冷青灰点缀 */
+  --text:#e8ecee;
+  --text-dim:#7e8a8c;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+/* 背景：极淡的金属拉丝光晕 */
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(151,155,157,.10), transparent 55%),
+    radial-gradient(90% 60% at 80% 100%, rgba(64,80,80,.08), transparent 60%);
+}
+
+#onboard{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;
+  padding:max(env(safe-area-inset-top),20px) 24px max(env(safe-area-inset-bottom),24px);}
+
+/* 进度点：下移避开状态栏，当前点金属高光 */
+.ob-progress{display:flex;gap:7px;justify-content:center;margin:14px 0 0}
+.ob-dot{width:7px;height:7px;border-radius:50%;background:#2a3638;transition:.3s}
+.ob-dot.on{width:22px;border-radius:4px;
+  background:linear-gradient(90deg,var(--silver-lo),var(--silver-hi));
+  box-shadow:0 0 10px rgba(151,155,157,.5)}
+
+.ob-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px 0}
+
+/* —— 金属神字 logo —— */
+.brand-mark{width:128px;height:128px;margin:0 auto;position:relative;border-radius:28px;
+  background:linear-gradient(145deg,#1c2224,#0c1011);
+  border:1px solid var(--line);
+  box-shadow:0 12px 40px rgba(0,0,0,.6), inset 0 1px 0 rgba(212,216,218,.12);
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.brand-mark img{width:100%;height:100%;object-fit:cover}
+
+/* —— 标题：刚七柔三 —— 
+   神字：金属银渐变 + 锋利描边（刚） + 笔锋微妖（柔藏细节）
+   BLACK GOD：Cinzel 罗马神性衬线 */
+.brand-title{margin-top:30px;line-height:1}
+.brand-cn{
+  font-family:"Noto Serif SC",serif;font-weight:900;font-size:92px;letter-spacing:4px;
+  background:linear-gradient(160deg,#f4f7f8 0%,#c4cacc 26%,#878f91 50%,#dadee0 68%,#798385 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 3px 2px rgba(0,0,0,.75)) drop-shadow(0 0 22px rgba(151,155,157,.30));
+  position:relative;display:inline-block;
+}
+.brand-en{
+  font-family:"Cinzel",serif;font-weight:600;font-size:24px;letter-spacing:10px;margin-top:16px;
+  background:linear-gradient(180deg,var(--silver-hi),var(--silver-lo));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  padding-left:10px;
+}
+.brand-en-svg{width:300px;height:auto;margin-top:8px;
+  filter:drop-shadow(0 0 16px rgba(151,155,157,.25))}
+.brand-sub{margin-top:18px;font-size:14px;color:var(--text-dim);letter-spacing:.5px;line-height:1.9}
+.brand-sub b{color:var(--silver-hi);font-weight:600}
+
+/* —— 设备自动识别卡（真读 navigator）—— */
+.device-card{margin-top:26px;width:100%;max-width:340px;border:1px solid var(--line);border-radius:16px;
+  background:linear-gradient(145deg,rgba(22,27,29,.9),rgba(12,16,17,.9));
+  padding:16px 18px;text-align:left;
+  box-shadow:inset 0 1px 0 rgba(212,216,218,.06)}
+.device-head{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--silver);
+  letter-spacing:1px;margin-bottom:12px;font-weight:600}
+.device-head .ic{width:15px;height:15px;stroke:var(--silver);fill:none;stroke-width:1.6}
+.device-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.dv{display:flex;flex-direction:column;gap:3px}
+.dv-k{font-size:10.5px;color:var(--text-dim);letter-spacing:.5px}
+.dv-v{font-size:13.5px;color:var(--text);font-weight:500}
+.dv-v.live{color:var(--silver-hi)}
+
+/* —— 隐私条：去土绿，金属暗边 —— */
+.privacy{margin-top:18px;width:100%;max-width:340px;display:flex;gap:11px;align-items:flex-start;
+  border:1px solid var(--line);border-radius:14px;padding:13px 15px;
+  background:linear-gradient(145deg,rgba(40,64,64,.14),rgba(12,16,17,.5))}
+.privacy .ic{width:18px;height:18px;flex-shrink:0;stroke:var(--silver);fill:none;stroke-width:1.6;margin-top:1px}
+.privacy-tx{font-size:12px;color:var(--text-dim);line-height:1.7}
+.privacy-tx b{color:var(--silver-hi);font-weight:600}
+
+/* —— 按钮：金属银渐变 + 高光描边 —— */
+.ob-actions{display:flex;gap:12px;margin-top:8px}
+.ob-btn{flex:1;height:54px;border-radius:15px;font-size:16px;font-weight:600;letter-spacing:1px;
+  border:none;cursor:pointer;font-family:inherit;transition:.18s;position:relative;overflow:hidden}
+.ob-btn.primary{
+  color:#0a0c0d;
+  background:linear-gradient(160deg,#e6eaec 0%,#aeb6b8 45%,#cdd3d5 60%,#9aa3a5 100%);
+  box-shadow:0 8px 24px rgba(151,155,157,.28), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.ob-btn.primary::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+  transform:translateX(-120%);transition:.6s}
+.ob-btn.primary:active{transform:scale(.97)}
+.ob-btn.primary:active::after{transform:translateX(120%)}
+.ob-btn.ghost{flex:0 0 96px;color:var(--silver);background:transparent;border:1px solid var(--line)}
+.ob-btn.ghost:active{background:rgba(151,155,157,.08)}
+</style>
+</head>
+<body>
+<div id="onboard">
+  <div class="ob-progress">
+    <div class="ob-dot on"></div><div class="ob-dot"></div><div class="ob-dot"></div>
+    <div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div>
+  </div>
+
+  <div class="ob-body">
+    <div class="brand-mark"><img src="/var/minis/shared/blackgod/web/logo.png" alt="神"/></div>
+
+    <div class="brand-title">
+      <div class="brand-cn">神</div>
+      <!-- BLACK GOD：连笔花体，保留妖娆，去掉多余装饰线，收一档 -->
+      <svg class="brand-en-svg" viewBox="0 0 360 96" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#e6eaec"/>
+            <stop offset="0.5" stop-color="#a4adaf"/>
+            <stop offset="1" stop-color="#5e6a6c"/>
+          </linearGradient>
+        </defs>
+        <text x="180" y="62" text-anchor="middle"
+          font-family="'Pinyon Script',cursive" font-size="60"
+          fill="url(#ag)" letter-spacing="1"
+          style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))">Black God</text>
+      </svg>
+    </div>
+
+    <div class="brand-sub">
+      <b>先让我认识你</b><br>
+      不必多说，我已经读懂了这台设备
+    </div>
+
+    <!-- 真·自动读设备 -->
+    <div class="device-card">
+      <div class="device-head">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+        已自动识别 · 全程本地
+      </div>
+      <div class="device-grid" id="dvGrid">
+        <div class="dv"><span class="dv-k">设备</span><span class="dv-v live" id="dv-device">识别中…</span></div>
+        <div class="dv"><span class="dv-k">系统</span><span class="dv-v live" id="dv-os">识别中…</span></div>
+        <div class="dv"><span class="dv-k">当前时段</span><span class="dv-v live" id="dv-time">识别中…</span></div>
+        <div class="dv"><span class="dv-k">语言</span><span class="dv-v live" id="dv-lang">识别中…</span></div>
+        <div class="dv"><span class="dv-k">屏幕</span><span class="dv-v live" id="dv-screen">识别中…</span></div>
+        <div class="dv"><span class="dv-k">处理器</span><span class="dv-v live" id="dv-cpu">识别中…</span></div>
+      </div>
+    </div>
+
+    <div class="privacy">
+      <svg class="ic" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      <div class="privacy-tx"><b>全部只存在这台设备上，绝不上传云端。</b>随时可在「我的」里修改或清除。</div>
+    </div>
+  </div>
+
+  <div class="ob-actions">
+    <button class="ob-btn ghost">跳过</button>
+    <button class="ob-btn primary">就这样开始</button>
+  </div>
+</div>
+
+<script>
+// —— 真·读取设备信息（不是问卷，是真读 navigator）——
+(function(){
+  const ua = navigator.userAgent;
+  // 设备
+  let dev='未知设备';
+  if(/iPhone/.test(ua)) dev='iPhone';
+  else if(/iPad/.test(ua)) dev='iPad';
+  else if(/Android/.test(ua)) dev='Android 机';
+  else if(/Macintosh/.test(ua)) dev='Mac';
+  else if(/Windows/.test(ua)) dev='Windows PC';
+  // 系统
+  let os='—';
+  let m;
+  if((m=ua.match(/OS (\d+)[_.](\d+)/))&&/iPhone|iPad/.test(ua)) os='iOS '+m[1]+'.'+m[2];
+  else if(/Android (\d+)/.test(ua)) os='Android '+RegExp.$1;
+  else if(/Mac OS X (\d+)[_.](\d+)/.test(ua)) os='macOS '+RegExp.$1+'.'+RegExp.$2;
+  else if(/Windows NT 10/.test(ua)) os='Windows 10/11';
+  // 时段
+  const h=new Date().getHours();
+  let t = h<6?'凌晨':h<9?'清晨':h<12?'上午':h<14?'午间':h<18?'下午':h<23?'夜晚':'深夜';
+  // 语言
+  const lang=(navigator.language||'zh').startsWith('zh')?'中文':navigator.language;
+  // 屏幕
+  const scr=window.screen.width+'×'+window.screen.height;
+  // CPU
+  const cpu=(navigator.hardwareConcurrency||'—')+' 核';
+
+  document.getElementById('dv-device').textContent=dev;
+  document.getElementById('dv-os').textContent=os;
+  document.getElementById('dv-time').textContent=t+'活跃';
+  document.getElementById('dv-lang').textContent=lang;
+  document.getElementById('dv-screen').textContent=scr;
+  document.getElementById('dv-cpu').textContent=cpu;
+})();
+</script>
+</body>
+</html>

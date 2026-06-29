@@ -1,0 +1,68 @@
+/* ============================================================
+   Black God · 按钮组件库 v5
+   金属质感统一按钮系统 —— 主/幽灵/胶囊/图标/危险
+   依赖 tokens.css
+   ============================================================ */
+
+/* ── 基类 ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  font-family:var(--font-body);font-weight:600;letter-spacing:.5px;
+  border:none;cursor:pointer;user-select:none;position:relative;overflow:hidden;
+  transition:transform var(--t-fast) var(--ease),box-shadow var(--t-mid) var(--ease),
+             background var(--t-mid) var(--ease);
+  border-radius:var(--r-md);
+}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* ── 主按钮：金属银渐变 + 高光扫光 ── */
+.btn-primary{
+  height:54px;padding:0 var(--sp-8);font-size:var(--fs-h3);color:#0a0c0d;
+  background:var(--grad-metal);
+  box-shadow:0 8px 24px rgba(151,155,157,.28),inset 0 1px 0 rgba(255,255,255,.5);
+}
+.btn-primary::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);
+  transform:translateX(-130%);transition:transform var(--t-slow) var(--ease)}
+.btn-primary:hover::after,.btn-primary:active::after{transform:translateX(130%)}
+
+/* ── 幽灵按钮：金属描边 ── */
+.btn-ghost{
+  height:54px;padding:0 var(--sp-6);font-size:var(--fs-h3);
+  color:var(--silver);background:transparent;border:1px solid var(--line);
+}
+.btn-ghost:hover{background:rgba(151,155,157,.06);border-color:var(--line-hi)}
+
+/* ── 功能胶囊：联网/深度思考/代码... 那排 ── */
+.chip{
+  display:inline-flex;align-items:center;gap:var(--sp-2);height:38px;padding:0 var(--sp-4);
+  font-size:var(--fs-sm);font-weight:500;color:var(--text-2);white-space:nowrap;
+  background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-pill);
+  cursor:pointer;transition:all var(--t-fast) var(--ease);flex-shrink:0;
+}
+.chip:active{transform:scale(.94)}
+.chip.on{color:#0a0c0d;background:var(--grad-metal);border-color:transparent;
+  box-shadow:var(--sh-glow)}
+.chip .ic{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7}
+/* 胶囊排：可横滑不切断 */
+.chip-row{display:flex;gap:var(--sp-2);overflow-x:auto;padding:var(--sp-2) var(--sp-4);
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chip-row::-webkit-scrollbar{display:none}
+
+/* ── 图标按钮：圆形金属 ── */
+.btn-icon{
+  width:44px;height:44px;border-radius:50%;flex-shrink:0;
+  color:var(--silver);background:var(--bg-2);border:1px solid var(--line);
+}
+.btn-icon:hover{background:var(--bg-3);color:var(--silver-hi)}
+.btn-icon.send{color:#0a0c0d;background:var(--grad-metal);border:none;
+  box-shadow:var(--sh-glow)}
+.btn-icon .ic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
+
+/* ── 危险按钮 ── */
+.btn-danger{height:54px;padding:0 var(--sp-6);color:#fff;
+  background:linear-gradient(160deg,#c25a5a,#8a3a3a);border-radius:var(--r-md)}
+
+/* ── 全宽 ── */
+.btn-block{display:flex;width:100%}
