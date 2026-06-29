@@ -1,0 +1,22 @@
+<!-- @dsCard group="Effects" viewport="700x180" name="Chrome Panels & Glow" subtitle="Machined-metal speculars, brand glow, and the field background" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--field-bg); font-family: var(--font-sans); padding: 24px; color: var(--text); display: flex; gap: 16px; }
+  .panel { flex: 1; height: 110px; border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .t { font-size: 13px; font-weight: 600; }
+  .s { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); margin-top: 3px; }
+  .raised { background: var(--bg-2); border: 1px solid var(--line); box-shadow: var(--panel-chrome); }
+  .chrome { background: linear-gradient(160deg,var(--bg-2),var(--bg-1)); border: 1px solid var(--line-chrome); box-shadow: var(--panel-chrome), var(--glow-chrome-sm); }
+  .inset { background: var(--bg); border: 1px solid var(--line); box-shadow: inset 0 2px 8px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+  <div class="panel raised"><span class="t">raised</span><span class="s">panel-chrome</span></div>
+  <div class="panel chrome"><span class="t" style="color:var(--chrome-1)">chrome</span><span class="s">+ glow-chrome</span></div>
+  <div class="panel inset"><span class="t">inset well</span><span class="s">logs · terminal</span></div>
+</body>
+</html>

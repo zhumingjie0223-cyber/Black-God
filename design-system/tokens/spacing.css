@@ -1,0 +1,39 @@
+/* ============================================================
+   BLACK GOD · Spacing, Radius & Layout Tokens
+   8px-ish rhythm, tuned to the PWA's actual paddings.
+   ============================================================ */
+:root {
+  /* —— Spacing scale —— */
+  --sp-1: 4px;
+  --sp-2: 7px;
+  --sp-3: 9px;
+  --sp-4: 12px;
+  --sp-5: 14px;
+  --sp-6: 16px;
+  --sp-7: 18px;
+  --sp-8: 22px;
+  --sp-9: 26px;
+  --sp-10:32px;
+
+  /* —— Radii —— */
+  --radius:    18px;  /* cards, sheets corner */
+  --radius-sm: 12px;  /* inner controls */
+  --radius-xs: 9px;   /* chips, tiny tiles */
+  --radius-pill: 30px;/* pills, capability chips */
+  --radius-full: 999px;
+
+  /* —— Control heights —— */
+  --h-chip: 34px;
+  --h-icon: 34px;
+  --h-field:52px;
+  --h-btn:  52px;
+  --h-tab:  54px;
+
+  /* —— iOS safe areas —— */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+
+  /* —— Layout —— */
+  --maxw-content: 360px;  /* mobile content column */
+  --gutter: 16px;
+}

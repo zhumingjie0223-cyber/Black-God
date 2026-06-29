@@ -1,0 +1,37 @@
+<!-- @dsCard group="Spacing" viewport="700x150" name="Radius & Spacing" subtitle="Corner radii and the 4→32 spacing rhythm" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--bg); font-family: var(--font-sans); padding: 20px; color: var(--text); display: flex; gap: 28px; align-items: center; }
+  .group { display: flex; gap: 12px; align-items: flex-end; }
+  .box { background: var(--surface-2); border: 1px solid var(--line-chrome); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
+  .sp { background: var(--chrome-grad-soft); border-radius: 3px; }
+  .cap { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-3); font-weight: 600; margin-bottom: 8px; }
+  .col { display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+  <div class="col">
+    <span class="cap">Radius</span>
+    <div class="group">
+      <div class="box" style="width:60px;height:60px;border-radius:var(--radius-xs)">9</div>
+      <div class="box" style="width:60px;height:60px;border-radius:var(--radius-sm)">12</div>
+      <div class="box" style="width:60px;height:60px;border-radius:var(--radius)">18</div>
+      <div class="box" style="width:60px;height:60px;border-radius:var(--radius-pill)">pill</div>
+    </div>
+  </div>
+  <div class="col">
+    <span class="cap">Spacing</span>
+    <div class="group" style="height:60px">
+      <div class="sp" style="width:var(--sp-1);height:var(--sp-1)"></div>
+      <div class="sp" style="width:var(--sp-4);height:var(--sp-4)"></div>
+      <div class="sp" style="width:var(--sp-6);height:var(--sp-6)"></div>
+      <div class="sp" style="width:var(--sp-8);height:var(--sp-8)"></div>
+      <div class="sp" style="width:var(--sp-10);height:var(--sp-10)"></div>
+    </div>
+  </div>
+</body>
+</html>

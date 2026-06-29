@@ -1,0 +1,55 @@
+/* ============================================================
+   BLACK GOD · Color Tokens
+   "Obsidian Chrome" — 黑曜石底 / 冷铬银灰金属
+   Source of truth: web/index.html v3.0 (Obsidian Chrome rebuild)
+   ============================================================ */
+:root {
+  /* —— Obsidian base / elevation (cool-toned blacks) —— */
+  --bg:        #08090B;   /* app canvas, deepest */
+  --bg-1:      #0D0F13;   /* sheets, raised panels */
+  --bg-2:      #13161B;   /* cards, inset wells */
+  --bg-3:      #1A1E25;   /* chips, control fills */
+
+  /* —— Surfaces (white-alpha veils over obsidian) —— */
+  --surface:   rgba(255,255,255,.035);
+  --surface-2: rgba(255,255,255,.06);
+  --surface-3: rgba(255,255,255,.09);
+
+  /* —— Hairlines —— */
+  --line:        rgba(255,255,255,.08);
+  --line-2:      rgba(255,255,255,.13);
+  --line-chrome: rgba(196,205,216,.22);  /* metal-edge hairline */
+
+  /* —— Chrome (the brand accent — pure cold silver, NEVER blue/purple) —— */
+  --chrome-hi: #EEF1F5;   /* specular highlight */
+  --chrome-1:  #C8CED6;   /* primary chrome text/icon */
+  --chrome-2:  #9AA1AB;   /* secondary chrome */
+  --chrome-3:  #6B727C;   /* tertiary / muted chrome */
+  --chrome-4:  #454B54;   /* deep chrome shadow */
+
+  /* —— Chrome gradients (wordmark, primary buttons, "on" states) —— */
+  --chrome-grad:      linear-gradient(157deg,#F2F4F7 0%,#C6CDD5 20%,#838A94 47%,#D2D8DF 68%,#8E95A0 100%); /* @kind color */
+  --chrome-grad-soft: linear-gradient(160deg,#D8DDE3,#9AA1AB); /* @kind color */
+  --chrome-glow:      rgba(200,206,214,.16);
+
+  /* —— Text —— */
+  --text:   #F1F3F7;
+  --text-2: #969CA6;
+  --text-3: #646B75;
+
+  /* —— Semantic state colors (functional, NOT brand) —— */
+  --ok:   #3DD68C;  --ok-dim:   rgba(61,214,140,.12);  --ok-line:   rgba(61,214,140,.22);
+  --run:  #5AC8FA;  --run-dim:  rgba(90,200,250,.12);  --run-line:  rgba(90,200,250,.22);
+  --warn: #F5B544;  --warn-dim: rgba(245,181,68,.12);  --warn-line: rgba(245,181,68,.22);
+  --err:  #FF6B6B;  --err-dim:  rgba(255,107,107,.10); --err-line:  rgba(255,107,107,.20);
+
+  /* —— Legacy "Imperial Gold" accent (v2 theme.css — kept for ceremony/launch only) —— */
+  --gold:      #D4AF37;
+  --gold-soft: #F5D76E;
+  --gold-deep: #8F6B18;
+  --gold-glow: rgba(212,175,55,.20);
+
+  /* —— User message bubble (light chrome plate on dark) —— */
+  --bubble-user:      linear-gradient(150deg,#E9ECF1,#C2C9D2); /* @kind color */
+  --bubble-user-ink:  #14171C; /* @kind color */
+}

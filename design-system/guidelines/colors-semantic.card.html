@@ -1,0 +1,24 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Semantic States" subtitle="Functional status only — the sole non-chrome color in the system" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--bg); font-family: var(--font-sans); }
+  .row { display: flex; gap: 10px; padding: 20px; }
+  .sw { flex: 1; height: 100px; border-radius: var(--radius-sm); display: flex; flex-direction: column; justify-content: space-between; padding: 12px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .n { font-size: 12px; font-weight: 700; }
+  .v { font-size: 11px; font-family: var(--font-mono); opacity: .8; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="sw" style="background:var(--ok-dim);border:1px solid var(--ok-line)"><span class="dot" style="background:var(--ok);box-shadow:0 0 8px var(--ok)"></span><div><div class="n" style="color:var(--ok)">ok · 完成</div><div class="v" style="color:var(--ok)">#3DD68C</div></div></div>
+    <div class="sw" style="background:var(--run-dim);border:1px solid var(--run-line)"><span class="dot" style="background:var(--run);box-shadow:0 0 8px var(--run)"></span><div><div class="n" style="color:var(--run)">run · 执行中</div><div class="v" style="color:var(--run)">#5AC8FA</div></div></div>
+    <div class="sw" style="background:var(--warn-dim);border:1px solid var(--warn-line)"><span class="dot" style="background:var(--warn);box-shadow:0 0 8px var(--warn)"></span><div><div class="n" style="color:var(--warn)">warn · 确认</div><div class="v" style="color:var(--warn)">#F5B544</div></div></div>
+    <div class="sw" style="background:var(--err-dim);border:1px solid var(--err-line)"><span class="dot" style="background:var(--err);box-shadow:0 0 8px var(--err)"></span><div><div class="n" style="color:var(--err)">err · 失败</div><div class="v" style="color:var(--err)">#FF6B6B</div></div></div>
+  </div>
+</body>
+</html>

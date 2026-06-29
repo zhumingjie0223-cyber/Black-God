@@ -1,0 +1,52 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Core — Buttons, Pills, Cards" subtitle="Chrome actions, icon controls, status pills, panels" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--field-bg); font-family: var(--font-sans); padding: 22px; }
+  .grid { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .lbl { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-3); font-weight: 600; width: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { Button, IconButton, Pill, Card, Chip } = window.BlackGodDesignSystem_7a1b36;
+  function Demo() {
+    return (
+      <div className="grid">
+        <div className="row">
+          <span className="lbl">Buttons</span>
+          <Button variant="primary">允许执行</Button>
+          <Button variant="secondary" icon="🔌">接口设置</Button>
+          <Button variant="ghost">拒绝</Button>
+          <Button variant="danger">清除记忆</Button>
+        </div>
+        <div className="row">
+          <span className="lbl">Icon · Pills · Chips</span>
+          <IconButton variant="chrome" size="lg">↑</IconButton>
+          <IconButton variant="soft" active>🔌</IconButton>
+          <IconButton variant="bare">✕</IconButton>
+          <Pill status="ok">DeepSeek · 本地优先</Pill>
+          <Chip selected icon="🔒">本地优先</Chip>
+          <Chip>不锁平台</Chip>
+        </div>
+        <div className="row" style={{ alignItems: "stretch" }}>
+          <Card variant="raised" style={{ flex: 1 }}>raised panel</Card>
+          <Card variant="chrome" style={{ flex: 1, color: "var(--chrome-1)" }}>chrome panel</Card>
+          <Card variant="inset" style={{ flex: 1, color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>$ tail -f agent.log</Card>
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

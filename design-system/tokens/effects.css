@@ -1,0 +1,53 @@
+/* ============================================================
+   BLACK GOD · Effects — shadows, glows, metal bevels, blur
+   The "Obsidian Chrome" feel lives here: cold glows + inset
+   speculars that read as machined metal, never soft/friendly.
+   ============================================================ */
+:root {
+  /* —— Elevation shadows (cool, deep) —— */
+  --shadow-sm:  0 2px 14px rgba(0,0,0,.30);
+  --shadow:     0 4px 24px rgba(0,0,0,.40);
+  --shadow-lg:  0 12px 44px rgba(0,0,0,.55);
+  --shadow-xl:  0 24px 64px rgba(0,0,0,.65);
+
+  /* —— Chrome glows (brand) —— */
+  --glow-chrome: 0 0 24px var(--chrome-glow);
+  --glow-chrome-sm: 0 0 10px var(--chrome-glow);
+
+  /* —— Inset speculars — the top-edge highlight that makes panels
+        read as machined metal. Layer over a dark fill. —— */
+  --inset-hi:   inset 0 1px 0 rgba(255,255,255,.06);
+  --inset-hi-2: inset 0 1px 0 rgba(255,255,255,.08);
+
+  /* —— Composite: the signature "chrome panel" (timeline, raised cards) —— */
+  --panel-chrome: 0 2px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+
+  /* —— Focus ring (chrome) —— */
+  --ring: 0 0 0 3px var(--chrome-glow);
+
+  /* —— Primary button lift —— */
+  --btn-lift: 0 4px 16px var(--chrome-glow);
+
+  /* —— State glows —— */
+  --glow-ok:  0 0 6px var(--ok);
+  --glow-run: 0 0 6px var(--run);
+  --glow-err: 0 0 8px var(--err);
+
+  /* —— Blur (frosted bars/sheets) —— */
+  --blur-bar: blur(28px); /* @kind other */
+  --blur-soft: blur(6px); /* @kind other */
+
+  /* —— Motion —— */
+  --ease-out:    cubic-bezier(.2,.7,.3,1);     /* @kind other */
+  --ease-spring: cubic-bezier(.34,1.5,.5,1);   /* @kind other */
+  --ease-sheet:  cubic-bezier(.34,1.2,.5,1);   /* @kind other */
+  --t-fast: .15s; /* @kind other */
+  --t-base: .25s; /* @kind other */
+  --t-slow: .35s; /* @kind other */
+
+  /* —— Background field: static metal vignette + fine noise —— */
+  --field-bg:
+    radial-gradient(120% 80% at 50% -10%, rgba(150,160,174,.10), transparent 55%),
+    radial-gradient(90% 60% at 100% 110%, rgba(90,100,114,.08), transparent 60%),
+    linear-gradient(180deg, #0A0B0E, #08090B 40%, #06070A); /* @kind other */
+}

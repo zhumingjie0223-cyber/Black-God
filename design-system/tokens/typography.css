@@ -1,0 +1,44 @@
+/* ============================================================
+   BLACK GOD · Typography Tokens
+   Space Grotesk (display/UI) + Noto Sans SC (CJK) + Space Mono (data).
+   Loaded via Google Fonts CDN — self-host for production in China.
+   ============================================================ */
+:root {
+  /* —— Families —— */
+  /* Space Grotesk (Latin/UI) + Noto Sans SC (CJK fall-through, char-by-char) */
+  --font-display: "Space Grotesk", system-ui, sans-serif;  /* @kind font — wordmark, headings */
+  --font-sans:    "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;  /* @kind font */
+  --font-mono:    "Space Mono", ui-monospace, monospace;   /* @kind font — cost · latency · tokens */
+
+  /* —— Fluid display sizes (scale with viewport) —— */
+  --fs-hero:  clamp(40px, 8vw, 84px);   /* @kind font */
+  --fs-brand: clamp(22px, 5.8vw, 30px); /* @kind font */
+  --fs-title: clamp(26px, 6.8vw, 38px); /* @kind font */
+
+  /* —— Fixed UI scale —— */
+  --fs-h1: 30px;   /* @kind font */
+  --fs-h2: 25px;   /* @kind font */
+  --fs-h3: 21px;   /* @kind font */
+  --fs-body: 17px; /* @kind font */
+  --fs-sub:  15px; /* @kind font */
+  --fs-cap:  13px; /* @kind font */
+  --fs-micro:12px; /* @kind font */
+
+  /* —— Weights —— */
+  --fw-regular: 400;  /* @kind font */
+  --fw-medium:  500;  /* @kind font */
+  --fw-semibold:600;  /* @kind font */
+  --fw-bold:    700;  /* @kind font */
+  --fw-heavy:   800;  /* @kind font */
+
+  /* —— Line heights —— */
+  --lh-tight: 1.05;  /* @kind font */
+  --lh-snug:  1.4;   /* @kind font */
+  --lh-body:  1.6;   /* @kind font */
+  --lh-loose: 1.75;  /* @kind font */
+
+  /* —— Tracking —— */
+  --ls-tight: -0.04em;  /* @kind font */
+  --ls-brand:  0.14em;  /* @kind font */
+  --ls-label:  0.18em;  /* @kind font */
+}

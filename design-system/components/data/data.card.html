@@ -1,0 +1,48 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Data — Cascade, Stats, Badges" subtitle="The L0–L6 cascade, metric tiles, state badges, avatars" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--field-bg); font-family: var(--font-sans); padding: 22px; }
+  .grid { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .lbl { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { CascadeBar, StatTile, Badge, Avatar } = window.BlackGodDesignSystem_7a1b36;
+  function Demo() {
+    return (
+      <div className="grid">
+        <span className="lbl">Cost cascade · resolved at L0 (cache hit)</span>
+        <CascadeBar resolvedAt={0} />
+        <div className="row">
+          <StatTile label="本月省下" value="¥248" delta="↓ 62% vs 全大模型" deltaTone="ok" style={{flex:1}} />
+          <StatTile label="缓存命中" value="71" unit="%" icon="⚡" style={{flex:1}} />
+          <StatTile label="闭环任务" value="1,204" delta="↑ 本周 +86" style={{flex:1}} />
+        </div>
+        <div className="row">
+          <span className="lbl" style={{width:"100%"}}>Badges &amp; avatars</span>
+          <Badge tone="ok" dot>已完成</Badge>
+          <Badge tone="run" dot>执行中</Badge>
+          <Badge tone="warn">需确认</Badge>
+          <Badge tone="err" dot>失败</Badge>
+          <Badge tone="chrome">L0 命中</Badge>
+          <Avatar kind="god" src="../../assets/logo-god.png" size={32} />
+          <Avatar kind="user" label="林" size={32} />
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

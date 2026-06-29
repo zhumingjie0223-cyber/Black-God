@@ -1,0 +1,77 @@
+<!-- @dsCard group="App" viewport="390x780" name="Black God PWA" subtitle="Local-first execution hub — chat, memory, provider hub" -->
+<!-- @startingPoint section="Black God" subtitle="Black God mobile PWA — chat + records + provider hub" viewport="390x780" -->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Black God · PWA</title>
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #050608; }
+  body { display: flex; align-items: center; justify-content: center; font-family: var(--font-sans); }
+  .phone {
+    position: relative; width: 390px; height: 780px; overflow: hidden;
+    background: var(--bg); border-radius: 0; display: flex; flex-direction: column;
+  }
+  .screen { flex: 1; min-height: 0; position: relative; }
+  .tabbar {
+    flex: 0 0 auto; display: flex; align-items: stretch;
+    background: rgba(10,11,14,.82); backdrop-filter: var(--blur-bar);
+    border-top: 1px solid var(--line); padding-bottom: var(--safe-bot);
+  }
+  .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; height: var(--h-tab); border: none; background: none; cursor: pointer;
+    color: var(--text-3); font-family: var(--font-sans); font-size: 10.5px; font-weight: 600;
+    letter-spacing: .04em; transition: color var(--t-fast);
+  }
+  .tab .ic { font-size: 19px; line-height: 1; filter: grayscale(1) opacity(.6); transition: filter var(--t-fast), transform var(--t-fast); }
+  .tab.on { color: var(--chrome-1); }
+  .tab.on .ic { filter: none; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="ChatScreen.jsx"></script>
+<script type="text/babel" src="RecordsScreen.jsx"></script>
+<script type="text/babel" src="ProfileScreen.jsx"></script>
+<script type="text/babel" src="ProviderSheet.jsx"></script>
+<script type="text/babel">
+  function App() {
+    const [tab, setTab] = React.useState("chat");
+    const [provOpen, setProvOpen] = React.useState(false);
+    const { ChatScreen, RecordsScreen, ProfileScreen, ProviderSheet } = window;
+
+    return (
+      <div className="phone">
+        <div className="screen">
+          {tab === "chat" && <ChatScreen onOpenProvider={() => setProvOpen(true)} />}
+          {tab === "records" && <RecordsScreen />}
+          {tab === "profile" && <ProfileScreen onOpenProvider={() => setProvOpen(true)} />}
+          <ProviderSheet open={provOpen} onClose={() => setProvOpen(false)} />
+        </div>
+        <div className="tabbar">
+          {[
+            { id: "chat", ic: "◈", label: "执行" },
+            { id: "records", ic: "▤", label: "记忆" },
+            { id: "profile", ic: "◉", label: "我的" },
+          ].map((t) => (
+            <button key={t.id} className={"tab" + (tab === t.id ? " on" : "")} onClick={() => setTab(t.id)}>
+              <span className="ic">{t.ic}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

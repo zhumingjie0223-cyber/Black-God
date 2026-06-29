@@ -1,0 +1,24 @@
+/* ============================================================
+   BLACK GOD · Fonts
+   By design, Black God ships NO external webfonts — the PWA must
+   load instantly inside China without CDN dependencies and must
+   render 中文 natively. The brand uses the platform system stack
+   (see tokens/typography.css → --font-sans / --font-mono).
+
+   The metallic "神" wordmark is a raster brand asset, not a font:
+     assets/logo-god.png  (512×512)
+
+   If you ever need a display face for marketing surfaces, the
+   nearest licensed match to the chrome wordmark weight is a heavy
+   grotesque (e.g. "Saira" / "Archivo" 800). Flag any substitution.
+   ============================================================ */
+
+/* ============================================================
+   Google Fonts CDN — Space Grotesk (Latin display/UI) +
+   Noto Sans SC (CJK body) + Space Mono (cost/latency mono).
+
+   ⚠️  PRODUCTION NOTE: Google Fonts CDN is blocked in mainland China.
+   Self-host the font files alongside the design system for production PWA use.
+   Design-system preview: CDN is fine.
+   ============================================================ */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap");
