@@ -732,15 +732,11 @@ button{font-family:inherit}
     <div id="publicPlatforms" style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.6rem"></div>
   </div>
   
-  <!-- 8 隐藏平台（💎 彩蛋折叠） -->
+  <!-- 8 隐藏平台（私人版直接显示）-->
   <div class="field">
-    <div class="opt" onclick="toggleHidden()" style="cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:0.8rem;margin:0.6rem 0">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="color:var(--chrome-1);font-weight:600">💎 隐藏平台</div>
-        <div id="hiddenToggle" style="color:var(--chrome-2)">▼</div>
-      </div>
-    </div>
-    <div id="hiddenPlatforms" style="display:none;margin-top:0.6rem"></div>
+    <label style="font-weight:600;color:var(--chrome-1)">隐藏平台</label>
+    <div style="font-size:0.85rem;color:var(--text-2);margin:0.3rem 0">网页 App API 抓取（客户自行发掘 F12）</div>
+    <div id="hiddenPlatforms" style="margin-top:0.6rem"></div>
   </div>
   
   <!-- 手动覆盖（高级） -->
@@ -1169,14 +1165,6 @@ function renderHiddenPlatforms(){
     </div>
   `).join('');
   document.getElementById('hiddenPlatforms').innerHTML = html;
-}
-
-let hiddenOpen = false;
-function toggleHidden(){
-  hiddenOpen = !hiddenOpen;
-  document.getElementById('hiddenPlatforms').style.display = hiddenOpen ? 'block' : 'none';
-  document.getElementById('hiddenToggle').textContent = hiddenOpen ? '▲' : '▼';
-  haptic();
 }
 
 function usePlatform(base, key, model){

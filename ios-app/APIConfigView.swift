@@ -13,7 +13,6 @@ struct APIConfigView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var detectedProvider: String = ""
-    @State private var showHiddenPlatforms = false
 
     // 11 公开平台预设
     let publicPresets: [(String, String, String, String)] = [
@@ -114,30 +113,17 @@ struct APIConfigView: View {
                         }
                     }
                     
-                    // ===== 8 隐藏平台（💎 私人版彩蛋）=====
+                    // ===== 8 隐藏平台（私人版直接显示）=====
                     VStack(alignment: .leading, spacing: 10) {
-                        Button {
-                            withAnimation(.spring(response: 0.3)) {
-                                showHiddenPlatforms.toggle()
-                            }
-                            appState.haptic(.light)
-                        } label: {
-                            HStack {
-                                Text("💎 隐藏平台")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.bgGold)
-                                Spacer()
-                                Image(systemName: showHiddenPlatforms ? "chevron.up" : "chevron.down")
-                                    .foregroundStyle(Color.bgGold)
-                            }
-                        }
+                        Text("隐藏平台")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.bgGold)
                         
-                        if showHiddenPlatforms {
-                            Text("网页 App API 抓取（客户自行发掘）")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.bgTextSecondary)
-                            
-                            ForEach(hiddenPresets, id: \.0) { preset in
+                        Text("网页 App API 抓取（客户自行发掘 F12）")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.bgTextSecondary)
+                        
+                        ForEach(hiddenPresets, id: \.0) { preset in
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack {
                                         Text(preset.0)
