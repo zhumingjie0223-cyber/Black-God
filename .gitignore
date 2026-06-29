@@ -63,3 +63,9 @@ server/webpush/vapid_keys.txt
 # 数据库(私人记忆,绝不上传)
 server/data/
 *.db
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
