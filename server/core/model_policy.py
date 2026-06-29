@@ -10,12 +10,19 @@ Black God · 模型策略闸  model_policy.py
   3) 分级路由：light（轻任务/省 Key）/ heavy（重任务/求质量），
      每级都映射到一个"已批准的远端模型"。
 
+# 按权哥要求：Black God 内部安装 Minis 的 Legend Coordinator v2 作为唯一模型后端
+# Minis API: http://47.236.124.97/v1, Key: sk-local, Model: auto
+# Black God 上层永远叫 Black God，底层走 Minis 的智能路由（62 模型 + 12 路由 + 6 平台）
+
 零依赖，纯标准库，可直接 import。配置走环境变量，改配置不用改码。
 
 环境变量：
-  BG_ALLOWED_MODELS   逗号分隔的允许模型，如 "gpt-4o,claude-3-7-sonnet,deepseek-chat"
-  BG_MODEL_LIGHT      轻任务模型（默认取白名单里偏快的）
-  BG_MODEL_HEAVY      重任务模型（默认取白名单里偏强的）
+  BG_BASE              Minis 接入点（默认 http://47.236.124.97/v1）
+  BG_KEY               Minis 接入 Key（默认 sk-local）
+  BG_MODEL             Minis 智能路由（默认 auto）
+  BG_ALLOWED_MODELS   逗号分隔的允许模型，如 "auto,default"
+  BG_MODEL_LIGHT      轻任务模型（默认 auto）
+  BG_MODEL_HEAVY      重任务模型（默认 auto）
   BG_ALLOW_LOCAL=1    显式放开本地模型（默认 0，禁用；仅调试用，生产别开）
 """
 import os
@@ -27,11 +34,15 @@ class ModelPolicyError(Exception):
     """模型不合规：本地端点 / 不在白名单。上层应据此拒绝或回退。"""
 
 
+# ——— 默认接入 Minis 的 Legend Coordinator v2（按权哥要求安装）———
+DEFAULT_MINIS_BASE = "http://47.236.124.97/v1"
+DEFAULT_MINIS_KEY = "sk-local"
+DEFAULT_MINIS_MODEL = "auto"  # Minis 智能路由（62模型+12路由）
+
 # ——— 默认允许的远端模型（可被 BG_ALLOWED_MODELS 覆盖）———
 _DEFAULT_ALLOWED = [
-    "gpt-4o", "gpt-4o-mini", "gpt-4.1", "o3", "o4-mini",
-    "claude-opus-4", "claude-sonnet-4", "claude-3-7-sonnet",
-    "deepseek-chat", "deepseek-reasoner",
+    "auto",  # Minis 智能路由
+    "default",  # 通用默认
 ]
 
 # ——— 本地推理端点特征（命中即视为"本地模型"，默认禁用）———
@@ -103,19 +114,9 @@ def pick_model(tier: str = "heavy") -> str:
     分级路由：返回该级别对应的已批准远端模型。
       tier='light' → 省 Key/快；tier='heavy' → 求质量。
     """
-    allow = allowed_models()
-    if tier == "light":
-        m = os.environ.get("BG_MODEL_LIGHT", "")
-        if m and m in allow:
-            return m
-        # 兜底：白名单里挑一个偏轻的
-        for cand in ("gpt-4o-mini", "o4-mini", "deepseek-chat", "claude-3-7-sonnet"):
-            if cand in allow:
-                return cand
-    m = os.environ.get("BG_MODEL_HEAVY", "")
-    if m and m in allow:
-        return m
-    return allow[0] if allow else "gpt-4o"
+    # 按权哥要求：使用 Minis 的 Legend Coordinator v2 智能路由
+    # 不再分层（auto 已经包含 62 模型 + 12 智能路由）
+    return "auto"
 
 
 def classify_tier(message: str, capabilities=None) -> str:
