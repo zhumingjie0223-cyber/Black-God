@@ -16,7 +16,7 @@ struct APIConfigView: View {
 
     // 11 公开平台预设
     let publicPresets: [(String, String, String, String)] = [
-        ("Minis (推荐)", "http://47.236.124.97/v1", "sk-local", "auto"),
+        ("Legend (推荐)", "http://47.236.124.97/v1", "sk-local", "auto"),
         ("Anthropic 官方", "https://api.anthropic.com/v1", "sk-ant-...", "auto"),
         ("OpenAI 官方", "https://api.openai.com/v1", "sk-...", "auto"),
         ("Google Gemini", "https://generativelanguage.googleapis.com/v1beta", "AIza...", "auto"),
@@ -205,9 +205,9 @@ struct APIConfigView: View {
             return
         }
         
-        // Minis
+        // Legend
         if t == "sk-local" || t.contains("47.236.124.97") {
-            detectedProvider = "Minis Legend Coordinator v2"
+            detectedProvider = "Legend Coordinator v2"
             apiBase = "http://47.236.124.97/v1"
             apiModel = "auto"
         }
