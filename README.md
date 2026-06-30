@@ -29,7 +29,17 @@
 
 </div>
 
-> 所有图标均为黑曜石 + 冷金属风格（Obsidian Chrome），单一神字金属标。
+> 所有图标均为黑曜石 + 冷金属风格（Obsidian Chrome），单一神字金标。
+
+### 真实界面
+
+<div align="center">
+
+| 首页 | 对话 |
+|------|------|
+| ![首页](assets/screenshots/home.png) | ![对话](assets/screenshots/chat.png) |
+
+</div>
 
 ---
 
