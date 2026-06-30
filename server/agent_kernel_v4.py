@@ -665,11 +665,12 @@ try:
 except Exception:
     def guard_model_messages(m, **k): return m, {"blocked": False, "findings": []}
 try:
-    from core.model_policy import assert_remote, ModelPolicyError, pick_model
+    from core.model_policy import assert_remote, ModelPolicyError, pick_model, classify_tier
 except Exception:
     class ModelPolicyError(Exception): pass
     def assert_remote(b, m): return True
-    def pick_model(t="heavy"): return os.environ.get("BG_MODEL", "gpt-4o")
+    def pick_model(t="heavy"): return os.environ.get("BG_MODEL", "auto")
+    def classify_tier(message, capabilities=None): return "heavy"
 
 class AgentLoop:
     def __init__(self, api_key: str, base_url: str, model: str, max_steps: int = 5):
@@ -692,17 +693,18 @@ class AgentLoop:
             self.optimizer = None
             self.optimizer_enabled = False
     
-    def _call_model(self, messages: List[Dict], tools: List[Dict] = None) -> Dict:
-        """调用模型 API（OpenAI 兼容）"""
+    def _call_model(self, messages: List[Dict], tools: List[Dict] = None, model_override: str = None, tier: str = "heavy") -> Dict:
+        """调用模型 API（OpenAI 兼容）。支持按任务轻重动态选择模型。"""
         # 模型策略：本地端点/非白名单 → 直接报错，绝不静默降质
-        assert_remote(self.base_url, self.model)
+        selected_model = model_override or self.model
+        assert_remote(self.base_url, selected_model)
         # 隐私护栏：发送前脱敏密钥/私钥/PII/禁碰清单，绝不回传隐私
         try:
             messages, _pg = guard_model_messages(messages)
         except Exception:
             pass
         payload = {
-            "model": self.model,
+            "model": selected_model,
             "messages": messages,
             # 事实/工具类任务低温更准；可用 BG_TEMPERATURE 调
             "temperature": float(os.environ.get("BG_TEMPERATURE", "0.3")),
@@ -726,6 +728,10 @@ class AgentLoop:
     
     def run(self, user_message: str, context: List[Dict] = None) -> Dict:
         """执行 Agent Loop：多步推理 + 工具调用 + 自我反思（按权哥要求：真人对话模式）"""
+        # ===== 【模型路由】轻任务省Key，重任务求质量 =====
+        route_tier = classify_tier(user_message, capabilities=[])
+        route_model = pick_model(route_tier)
+        route_reason = "轻任务/短消息 → 省Key模型" if route_tier == "light" else "重任务/工具/长文本 → 质量模型"
         
         # ===== 【真人对话层】识别指代词和上下文 =====
         is_continuation = any(kw in user_message.lower() for kw in ["继续", "那个", "刚才", "上面", "之前", "接着", "然后呢", "还有呢"])
@@ -754,8 +760,9 @@ class AgentLoop:
                 return {
                     "response": opt_result["response"],
                     "steps": [],
-                    "model": self.model,
+                    "model": route_model,
                     "timestamp": datetime.now().isoformat(),
+                    "routing": {"tier": route_tier, "model_used": route_model, "reason": "缓存命中，未调用模型；原始路由为" + route_reason},
                     "optimization": {
                         "source": "cache",
                         "strategy": "cache",
@@ -811,7 +818,7 @@ class AgentLoop:
         
         for step in range(self.max_steps):
             try:
-                response = self._call_model(messages, TOOLS)
+                response = self._call_model(messages, TOOLS, model_override=route_model, tier=route_tier)
                 choice = response["choices"][0]
                 msg = choice["message"]
                 
@@ -848,7 +855,7 @@ class AgentLoop:
                 if step == 0:
                     # 首次失败，尝试不带工具直接回复
                     try:
-                        response = self._call_model(messages)
+                        response = self._call_model(messages, model_override=route_model, tier=route_tier)
                         final_response = response["choices"][0]["message"].get("content", "")
                         assistant_final_msg = {"role": "assistant", "content": final_response}
                         self.conversation_history.append(assistant_final_msg)
@@ -880,8 +887,9 @@ class AgentLoop:
         result = {
             "response": final_response,
             "steps": steps_log,
-            "model": self.model,
-            "timestamp": datetime.now().isoformat()
+            "model": route_model,
+            "timestamp": datetime.now().isoformat(),
+            "routing": {"tier": route_tier, "model_used": route_model, "reason": route_reason}
         }
         
         # 添加优化统计

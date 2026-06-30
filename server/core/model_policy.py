@@ -58,8 +58,15 @@ _LOCAL_MARKERS = ("ollama", "lmstudio", "lm-studio", "llama.cpp", "llamacpp",
 def allowed_models():
     env = os.environ.get("BG_ALLOWED_MODELS", "").strip()
     if env:
-        return [m.strip() for m in env.split(",") if m.strip()]
-    return list(_DEFAULT_ALLOWED)
+        allow = [m.strip() for m in env.split(",") if m.strip()]
+    else:
+        allow = list(_DEFAULT_ALLOWED)
+    # 自动纳入当前配置的轻/重/默认模型，避免设置 BG_MODEL_LIGHT 后忘记同步白名单
+    for key in ("BG_MODEL", "BG_MODEL_LIGHT", "BG_MODEL_HEAVY"):
+        v = os.environ.get(key, "").strip()
+        if v and v not in allow:
+            allow.append(v)
+    return allow
 
 
 def _allow_local():
@@ -112,11 +119,16 @@ def assert_remote(base_url: str, model: str):
 def pick_model(tier: str = "heavy") -> str:
     """
     分级路由：返回该级别对应的已批准远端模型。
-      tier='light' → 省 Key/快；tier='heavy' → 求质量。
+      tier='light' → 省 Key/快：BG_MODEL_LIGHT
+      tier='heavy' → 求质量：BG_MODEL_HEAVY
+
+    注意：不在代码里写死具体供应商模型名，避免污染品牌/仓库。
+    默认都回退到 BG_MODEL / auto；真正便宜模型由环境变量配置。
     """
-    # 按权哥要求：使用 Minis 的 Legend Coordinator v2 智能路由
-    # 不再分层（auto 已经包含 62 模型 + 12 智能路由）
-    return "auto"
+    base = os.environ.get("BG_MODEL", DEFAULT_MINIS_MODEL).strip() or DEFAULT_MINIS_MODEL
+    if (tier or "").lower() == "light":
+        return os.environ.get("BG_MODEL_LIGHT", base).strip() or base
+    return os.environ.get("BG_MODEL_HEAVY", base).strip() or base
 
 
 def classify_tier(message: str, capabilities=None) -> str:

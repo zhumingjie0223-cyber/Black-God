@@ -63,3 +63,10 @@ server/webpush/vapid_keys.txt
 # 数据库(私人记忆,绝不上传)
 server/data/
 *.db
+
+# 枢语 nexus-final：密钥占位文件 + 大词库(规则生成,不进Git)
+nexus-final/metadata.json
+nexus-final/wrangler.toml
+nexus-final/lexicon_full.json
+nexus-final/lexicon_data.json
+nexus-final/lexicon_vocab.json
