@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业贷款 · 十套高端设计提案演示片</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ease:cubic-bezier(.22,.9,.24,1);
+  --gold:#C9A86A;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:'Noto Sans SC',sans-serif;
+  background:#050505;color:#fff;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:'Noto Serif SC',serif}
+.en{font-family:'Cormorant Garamond',serif}
+
+/* ============ PLAYER FRAME ============ */
+#stage{position:fixed;inset:0;display:flex;flex-direction:column}
+#screen{position:relative;flex:1;overflow:hidden;background:#050505}
+
+/* progress segments */
+#progress{
+  position:absolute;top:0;left:0;right:0;z-index:60;
+  display:flex;gap:5px;padding:14px 18px 10px;
+}
+.seg{
+  flex:1;height:2.5px;background:rgba(255,255,255,.22);
+  border-radius:2px;cursor:pointer;position:relative;overflow:hidden;
+  transition:height .2s;
+}
+.seg:hover{height:5px}
+.seg .fill{
+  position:absolute;inset:0;background:#fff;border-radius:2px;
+  transform:scaleX(0);transform-origin:left;
+}
+.seg.done .fill{transform:scaleX(1)}
+
+/* control bar */
+#bar{
+  height:58px;background:#0A0A0A;border-top:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;gap:16px;padding:0 20px;z-index:70;flex-shrink:0;
+}
+#bar button{
+  background:none;border:1px solid rgba(255,255,255,.22);color:#fff;
+  width:36px;height:36px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .25s,background .25s;flex-shrink:0;
+}
+#bar button:hover{border-color:var(--gold);background:rgba(201,168,106,.12)}
+#bar button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#bar svg{width:14px;height:14px;fill:#fff}
+#counter{font-size:12px;letter-spacing:.2em;color:rgba(255,255,255,.55);min-width:64px}
+#scene-title{
+  font-size:13px;letter-spacing:.14em;color:rgba(255,255,255,.85);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;
+}
+#scene-title b{color:var(--gold);font-weight:500;margin-right:10px}
+#hint{font-size:11px;color:rgba(255,255,255,.3);letter-spacing:.08em;white-space:nowrap}
+@media(max-width:760px){#hint{display:none}}
+
+/* ============ SCENES ============ */
+.scene{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  opacity:0;visibility:hidden;transition:opacity .9s var(--ease),visibility 0s .9s;
+}
+.scene.active{opacity:1;visibility:visible;transition:opacity .9s var(--ease);z-index:10}
+
+/* reveal system: children animate only when scene active */
+.rv{opacity:0}
+.scene.active .rv{animation:rise 1s var(--ease) both}
+.scene.active .rv.d1{animation-delay:.15s}
+.scene.active .rv.d2{animation-delay:.3s}
+.scene.active .rv.d3{animation-delay:.45s}
+.scene.active .rv.d4{animation-delay:.6s}
+.scene.active .rv.d5{animation-delay:.78s}
+.scene.active .rv.d6{animation-delay:.95s}
+@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes lineGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes drift{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-24px)}}
+
+/* standard split layout */
+.split{
+  width:min(1240px,92%);display:grid;grid-template-columns:1fr 1.05fr;
+  gap:56px;align-items:center;
+}
+@media(max-width:960px){
+  .split{grid-template-columns:1fr;gap:28px;width:90%}
+  .mock{display:none}
+}
+.eyebrow{
+  font-size:11px;letter-spacing:.42em;text-transform:uppercase;
+  margin-bottom:20px;display:flex;align-items:center;gap:14px;
+}
+.eyebrow::before{content:"";width:34px;height:1px;background:currentColor;opacity:.6}
+.s-name{font-size:clamp(44px,5.2vw,72px);font-weight:900;line-height:1.08;letter-spacing:.02em}
+.s-en{font-size:clamp(18px,1.7vw,24px);font-style:italic;margin-top:8px;opacity:.72;font-weight:500}
+.s-quote{margin-top:24px;font-size:15.5px;line-height:1.9;max-width:420px;opacity:.86;font-weight:300}
+.swatches{display:flex;gap:10px;margin-top:28px}
+.sw{width:52px}
+.sw i{display:block;height:34px;border-radius:5px;border:1px solid rgba(255,255,255,.14)}
+.sw span{display:block;font-size:9px;letter-spacing:.04em;margin-top:6px;opacity:.6;font-family:ui-monospace,monospace}
+.meta{margin-top:26px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;letter-spacing:.06em}
+.meta div{display:flex;gap:14px}
+.meta b{font-weight:500;opacity:.5;min-width:64px}
+
+/* browser mock */
+.mock{
+  border-radius:12px;overflow:hidden;
+  box-shadow:0 40px 90px -20px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08);
+}
+.chrome{
+  height:36px;background:#1a1a1a;display:flex;align-items:center;gap:8px;padding:0 14px;
+}
+.chrome i{width:9px;height:9px;border-radius:50%;background:#3a3a3a}
+.chrome i:nth-child(1){background:#e0564f}.chrome i:nth-child(2){background:#e2a63d}.chrome i:nth-child(3){background:#57b558}
+.chrome .url{
+  flex:1;height:20px;background:#0d0d0d;border-radius:10px;margin-left:8px;
+  font-size:9.5px;color:#777;display:flex;align-items:center;padding:0 12px;letter-spacing:.05em;
+  font-family:ui-monospace,monospace;
+}
+.canvas{height:390px;position:relative;overflow:hidden}
+@media(max-height:760px){.canvas{height:320px}}
+
+/* mock nav shared */
+.mnav{display:flex;justify-content:space-between;align-items:center;padding:16px 26px;font-size:10px;letter-spacing:.16em;position:relative;z-index:5}
+.mnav .links{display:flex;gap:16px;opacity:.75}
+.mcta{display:inline-block;padding:9px 24px;font-size:10.5px;letter-spacing:.2em;cursor:default}
+
+/* ===== OPENING / CLOSING ===== */
+.scene-cover{background:radial-gradient(ellipse at 50% 120%,#12100b 0%,#050505 60%)}
+.cover-inner{text-align:center;width:min(900px,90%)}
+.cover-eyebrow{font-size:12px;letter-spacing:.6em;color:var(--gold);margin-bottom:34px}
+.cover-title{font-size:clamp(40px,6.4vw,86px);font-weight:900;line-height:1.2}
+.cover-sub{font-size:clamp(16px,2vw,22px);font-style:italic;color:rgba(255,255,255,.55);margin-top:18px}
+.cover-line{width:120px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:38px auto;transform-origin:center}
+.scene.active .cover-line{animation:lineGrow 1.4s var(--ease) .5s both}
+.cover-note{font-size:12px;letter-spacing:.3em;color:rgba(255,255,255,.4)}
+
+/* ===== S1 世家 ===== */
+.s1{background:#08251B}
+.s1 .info{color:#F4EADE}
+.s1 .eyebrow{color:#C9A86A}
+.s1 .c{background:#F4EADE;color:#0A3D2E}
+.s1 .mnav{color:#0A3D2E;border-bottom:1px solid rgba(10,61,46,.15)}
+.s1 .hero1{text-align:center;padding:34px 30px 0}
+.s1 .h-eyebrow{font-size:9px;letter-spacing:.5em;color:#B08D57;margin-bottom:16px}
+.s1 .h-title{font-size:31px;font-weight:900;line-height:1.5}
+.s1 .h-line{width:52px;height:1px;background:#C9A86A;margin:20px auto}
+.s1 .h-sub{font-size:11px;letter-spacing:.1em;color:rgba(10,61,46,.65);line-height:1.9}
+.s1 .mcta{border:1px solid #B08D57;color:#0A3D2E;margin-top:20px}
+.s1 .strip{position:absolute;bottom:0;left:0;right:0;background:#0A3D2E;display:flex;justify-content:space-around;padding:16px 0}
+.s1 .strip div{text-align:center}
+.s1 .strip b{display:block;font-size:17px;color:#C9A86A;font-family:'Noto Serif SC',serif}
+.s1 .strip span{font-size:8.5px;letter-spacing:.2em;color:rgba(244,234,222,.6)}
+
+/* ===== S2 华尔街 ===== */
+.s2{background:#001F38}
+.s2 .info{color:#EEF2F7}
+.s2 .eyebrow{color:#7399C6}
+.s2 .c{background:#fff;color:#00355F}
+.s2 .mnav{background:#00355F;color:#fff}
+.s2 .hero2{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;padding:32px 26px;align-items:center}
+.s2 .h-title{font-size:26px;font-weight:900;line-height:1.55}
+.s2 .h-sub{font-size:10.5px;line-height:1.9;color:#5A6B7E;margin-top:12px}
+.s2 .mcta{background:#00355F;color:#fff;border-radius:999px;margin-top:18px}
+.s2 .stat-card{background:#EEF2F7;border-top:3px solid #B87333;padding:20px;border-radius:6px}
+.s2 .stat-card b{display:block;font-size:22px;color:#00355F;font-family:'Noto Serif SC',serif}
+.s2 .stat-card span{font-size:9px;letter-spacing:.15em;color:#5A6B7E}
+.s2 .stat-card em{display:block;height:1px;background:rgba(0,53,95,.12);margin:13px 0}
+.s2 .trust{position:absolute;bottom:0;left:0;right:0;border-top:1px solid rgba(0,53,95,.12);display:flex;justify-content:space-around;padding:12px;font-size:9px;letter-spacing:.18em;color:#5A6B7E}
+
+/* ===== S3 苏黎世 ===== */
+.s3{background:#E9E9E7}
+.s3 .info{color:#0A0A0A}
+.s3 .eyebrow{color:#2B50EC}
+.s3 .s-quote{opacity:.7}
+.s3 .sw i{border-color:rgba(0,0,0,.15)}
+.s3 .mock{box-shadow:0 40px 90px -20px rgba(0,0,0,.3),0 0 0 1px rgba(0,0,0,.06)}
+.s3 .c{background:#fff;color:#0A0A0A}
+.s3 .mnav{color:#0A0A0A}
+.s3 .hero3{padding:44px 30px 0}
+.s3 .h-title{font-family:'Noto Sans SC',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.s3 .h-sub{font-size:11px;color:#888;margin-top:16px;font-weight:300;letter-spacing:.06em}
+.s3 .mcta{color:#2B50EC;border-bottom:2px solid #2B50EC;padding:6px 2px;margin-top:22px;font-weight:500}
+.s3 .rows{position:absolute;bottom:24px;left:30px;right:30px}
+.s3 .rows div{display:flex;justify-content:space-between;padding:11px 0;border-top:1px solid #E4E4E1;font-size:10px;letter-spacing:.1em;color:#444}
+.s3 .rows span:last-child{color:#aaa;font-family:ui-monospace,monospace}
+
+/* ===== S4 曜金 ===== */
+.s4{background:#07091C}
+.s4 .info{color:#F1F5F9}
+.s4 .eyebrow{color:#F96BEE}
+.s4 .c{background:#0D1026;color:#F1F5F9}
+.s4 .orb{position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(70px);opacity:.55}
+.s4 .o1{background:#533AFD;top:-90px;right:-60px;animation:drift 9s ease-in-out infinite}
+.s4 .o2{background:#F96BEE;bottom:-120px;left:-80px;animation:drift 11s ease-in-out infinite reverse}
+.s4 .mnav{color:#F1F5F9}
+.s4 .hero4{padding:30px 26px;position:relative;z-index:4;display:grid;grid-template-columns:1fr .9fr;gap:18px;align-items:center}
+.s4 .h-title{font-size:25px;font-weight:700;line-height:1.55}
+.s4 .h-title em{font-style:normal;background:linear-gradient(90deg,#533AFD,#F96BEE);-webkit-background-clip:text;background-clip:text;color:transparent}
+.s4 .h-sub{font-size:10.5px;color:#8B93B5;line-height:1.9;margin-top:10px;font-weight:300}
+.s4 .mcta{background:linear-gradient(90deg,#533AFD,#F96BEE);color:#fff;border-radius:8px;margin-top:16px;font-weight:500}
+.s4 .ui{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:16px;backdrop-filter:blur(8px)}
+.s4 .ui .row{display:flex;justify-content:space-between;font-size:9.5px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);color:#B8BFDC}
+.s4 .ui .row b{color:#22D3EE;font-family:ui-monospace,monospace}
+.s4 .ui .big{font-size:19px;color:#fff;font-weight:700;padding-top:10px;font-family:ui-monospace,monospace}
+
+/* ===== S5 墨韵 ===== */
+.s5{background:#14140F}
+.s5 .info{color:#F5F1E8}
+.s5 .eyebrow{color:#9A2D2D}
+.s5 .c{background:#F5F1E8;color:#1C1C1A}
+.s5 .c::after{content:"";position:absolute;left:0;right:0;bottom:0;height:130px;background:radial-gradient(ellipse at 30% 130%,rgba(28,28,26,.16),transparent 70%)}
+.s5 .mnav{color:#1C1C1A}
+.s5 .hero5{padding:46px 34px 0;position:relative}
+.s5 .h-title{font-size:33px;font-weight:900;line-height:1.55;color:#1C1C1A}
+.s5 .h-sub{font-size:11px;color:#5C4433;margin-top:16px;letter-spacing:.24em}
+.s5 .mcta{border:1px solid #1C1C1A;color:#1C1C1A;margin-top:24px}
+.s5 .vtext{position:absolute;right:34px;top:42px;writing-mode:vertical-rl;font-size:15px;letter-spacing:.5em;color:#2E3A38;font-weight:600;border-right:1px solid rgba(46,58,56,.3);padding-right:14px}
+.s5 .seal{position:absolute;right:96px;bottom:60px;width:46px;height:46px;background:#9A2D2D;color:#F5F1E8;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;border-radius:5px;box-shadow:2px 3px 0 rgba(28,28,26,.15);transform:rotate(-4deg)}
+
+/* ===== S6 典藏 ===== */
+.s6{background:#211E19}
+.s6 .info{color:#FAF8F4}
+.s6 .eyebrow{color:#C6F135}
+.s6 .c{background:#FAF8F4;color:#16130F}
+.s6 .mnav{color:#16130F;border-bottom:2px solid #16130F;font-weight:700}
+.s6 .tag{display:inline-block;background:#C6F135;color:#16130F;font-size:9px;letter-spacing:.28em;padding:5px 12px;margin:22px 0 0 30px;font-weight:700}
+.s6 .hero6{padding:14px 30px 0;display:grid;grid-template-columns:1.25fr .75fr;gap:22px}
+.s6 .h-title{font-size:30px;font-weight:900;line-height:1.45}
+.s6 .h-body{font-size:10px;line-height:1.95;color:#585349;margin-top:14px;column-gap:16px}
+.s6 .h-body::first-letter{font-size:30px;float:left;line-height:.9;padding-right:7px;font-family:'Noto Serif SC',serif;font-weight:900;color:#16130F}
+.s6 .photo{background:linear-gradient(160deg,#3A362E,#16130F);border-radius:2px;position:relative;min-height:190px}
+.s6 .photo::after{content:"FIG. 01 — 制造业客户实录";position:absolute;bottom:10px;left:12px;font-size:8px;letter-spacing:.2em;color:rgba(250,248,244,.55)}
+
+/* ===== S7 穹顶 ===== */
+.s7{background:#020308}
+.s7 .info{color:#E6E8EC}
+.s7 .eyebrow{color:#22D3EE}
+.s7 .c{background:#05060A;color:#E6E8EC}
+.s7 .grid-bg{position:absolute;inset:0;background:linear-gradient(rgba(34,211,238,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.05) 1px,transparent 1px);background-size:36px 36px}
+.s7 .sphere{position:absolute;right:40px;top:50%;transform:translateY(-50%);width:190px;height:190px;animation:floatY 7s ease-in-out infinite}
+.s7 .sphere i{position:absolute;inset:0;border:1px solid rgba(34,211,238,.4);border-radius:50%}
+.s7 .sphere i:nth-child(2){transform:rotateX(66deg) scaleY(.4);border-color:rgba(34,211,238,.28)}
+.s7 .sphere i:nth-child(3){transform:rotate(60deg) scaleX(.45);border-color:rgba(198,155,60,.4)}
+.s7 .sphere i:nth-child(4){transform:rotate(-60deg) scaleX(.45);border-color:rgba(34,211,238,.22)}
+.s7 .sphere::after{content:"";position:absolute;inset:34%;background:radial-gradient(circle,rgba(34,211,238,.6),transparent 70%);border-radius:50%;filter:blur(6px)}
+.s7 .hero7{padding:52px 30px;position:relative;z-index:3;max-width:60%}
+.s7 .h-eyebrow{font-size:8.5px;letter-spacing:.5em;color:#22D3EE;margin-bottom:16px;font-family:ui-monospace,monospace}
+.s7 .h-title{font-size:27px;font-weight:300;line-height:1.6;letter-spacing:.06em}
+.s7 .h-title b{font-weight:700;color:#22D3EE}
+.s7 .mcta{border:1px solid rgba(34,211,238,.5);color:#22D3EE;margin-top:26px;font-family:ui-monospace,monospace}
+.s7 .hud{position:absolute;font-size:8px;letter-spacing:.2em;color:rgba(230,232,236,.4);font-family:ui-monospace,monospace}
+.s7 .hud.tl{top:52px;left:30px}.s7 .hud.br{bottom:18px;right:30px}
+
+/* ===== S8 金阁 ===== */
+.s8{background:#050505}
+.s8 .info{color:#EDE6D6}
+.s8 .eyebrow{color:#C69B3C}
+.s8 .c{background:#0A0A0A;color:#EDE6D6}
+.s8 .rays{position:absolute;left:50%;bottom:-100px;width:560px;height:560px;transform:translateX(-50%);background:repeating-conic-gradient(from -90deg at 50% 100%,rgba(198,155,60,.14) 0deg 3deg,transparent 3deg 12deg);border-radius:50%;pointer-events:none}
+.s8 .frame{position:absolute;inset:18px;border:1px solid #C69B3C;pointer-events:none}
+.s8 .frame::after{content:"";position:absolute;inset:5px;border:1px solid rgba(198,155,60,.4)}
+.s8 .hero8{position:relative;z-index:3;text-align:center;padding-top:58px}
+.s8 .h-mark{font-size:10px;letter-spacing:.7em;color:#C69B3C;margin-bottom:20px}
+.s8 .h-title{font-size:35px;font-weight:900;letter-spacing:.28em;text-indent:.28em}
+.s8 .diamond{width:9px;height:9px;background:#C69B3C;transform:rotate(45deg);margin:24px auto}
+.s8 .h-sub{font-size:10.5px;letter-spacing:.3em;color:rgba(237,230,214,.6)}
+.s8 .romans{display:flex;justify-content:center;gap:40px;margin-top:32px;font-family:'Cormorant Garamond',serif}
+.s8 .romans div{text-align:center}
+.s8 .romans b{display:block;font-size:20px;color:#C69B3C;font-weight:600}
+.s8 .romans span{font-size:9px;letter-spacing:.24em;color:rgba(237,230,214,.55)}
+
+/* ===== S9 棱镜 ===== */
+.s9{background:#020617}
+.s9 .info{color:#F1F5F9}
+.s9 .eyebrow{color:#22D3EE}
+.s9 .c{background:linear-gradient(160deg,#0F172A,#020617);color:#F1F5F9}
+.s9 .orb{position:absolute;border-radius:50%;filter:blur(56px)}
+.s9 .o1{width:230px;height:230px;background:rgba(83,58,253,.5);top:-60px;left:-40px;animation:drift 10s ease-in-out infinite}
+.s9 .o2{width:200px;height:200px;background:rgba(34,211,238,.4);bottom:-70px;right:-30px;animation:drift 12s ease-in-out infinite reverse}
+.s9 .hero9{position:relative;z-index:4;padding:36px 28px}
+.s9 .h-title{font-size:25px;font-weight:700;line-height:1.6}
+.s9 .glassrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:26px}
+.s9 .g{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:16px 12px;backdrop-filter:blur(14px);box-shadow:0 8px 28px rgba(0,0,0,.3)}
+.s9 .g b{display:block;font-size:16px;color:#22D3EE;font-family:ui-monospace,monospace}
+.s9 .g span{font-size:8.5px;letter-spacing:.14em;color:rgba(241,245,249,.65);display:block;margin-top:6px}
+
+/* ===== S10 仪表盘 ===== */
+.s10{background:#07090E}
+.s10 .info{color:#C9D1D9}
+.s10 .eyebrow{color:#16C784}
+.s10 .c{background:#0B0E14;color:#C9D1D9;font-family:ui-monospace,monospace}
+.s10 .term{display:grid;grid-template-columns:120px 1fr;height:100%}
+.s10 .side{border-right:1px solid #232A36;padding:20px 14px;font-size:9px;letter-spacing:.1em}
+.s10 .side div{padding:9px 10px;border-radius:5px;color:#5C6673;margin-bottom:4px}
+.s10 .side div.on{background:#141922;color:#3B82F6}
+.s10 .main{padding:20px}
+.s10 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.s10 .kpi{background:#141922;border:1px solid #232A36;border-radius:7px;padding:13px}
+.s10 .kpi span{font-size:8px;letter-spacing:.14em;color:#5C6673;display:block}
+.s10 .kpi b{font-size:16px;color:#E6EDF3;display:block;margin-top:6px}
+.s10 .kpi em{font-style:normal;font-size:9px;color:#16C784}
+.s10 .chart{background:#141922;border:1px solid #232A36;border-radius:7px;margin-top:12px;padding:14px;height:150px;position:relative}
+.s10 .chart svg{width:100%;height:100%}
+.s10 .chart .lbl{position:absolute;top:12px;left:14px;font-size:8.5px;letter-spacing:.14em;color:#5C6673}
+
+/* closing */
+.close-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:44px auto 0;width:min(1000px,90%)}
+@media(max-width:900px){.close-grid{grid-template-columns:repeat(2,1fr)}}
+.cg{border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:16px 12px;text-align:left}
+.cg i{display:block;width:100%;height:5px;border-radius:3px;margin-bottom:12px}
+.cg b{font-size:14px;font-weight:700;display:block}
+.cg span{font-size:9.5px;color:rgba(255,255,255,.45);letter-spacing:.06em;display:block;margin-top:5px;line-height:1.6}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition-duration:.01ms!important}
+  .rv{opacity:1}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="screen">
+    <div id="progress" aria-label="进度"></div>
+
+    <!-- 0 · 开场 -->
+    <section class="scene scene-cover active" data-title="开场 · 提案总览" data-eyebrow="OPENING">
+      <div class="cover-inner">
+        <div class="cover-eyebrow rv">DESIGN PROPOSAL SHOWREEL · 2026</div>
+        <h1 class="cover-title serif rv d1">企业贷款 · 十套高端设计提案</h1>
+        <p class="cover-sub en rv d2">Ten Directions for Corporate Lending, Beyond the Ordinary</p>
+        <div class="cover-line"></div>
+        <p class="cover-note rv d4">银行金融科技 × 对公信贷 · 高端不设上限</p>
+      </div>
+    </section>
+
+    <!-- 1 世家 -->
+    <section class="scene s1" data-title="世家 The Private Office" data-eyebrow="方案 01">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 01 · 私人银行式奢华</div>
+          <h2 class="s-name serif rv d1">世家</h2>
+          <p class="s-en en rv d1">The Private Office</p>
+          <p class="s-quote rv d2">不是申请贷款，而是获得一位私人银行家。墨绿沉稳、金箔克制、象牙留白——为企业主管家式定制的财资体验。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#0A3D2E"></i><span>0A3D2E</span></div>
+            <div class="sw"><i style="background:#F4EADE"></i><span>F4EADE</span></div>
+            <div class="sw"><i style="background:#C9A86A"></i><span>C9A86A</span></div>
+            <div class="sw"><i style="background:#0F172A"></i><span>0F172A</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>大中型企业主 · 家族企业 · 高净值客户</span></div>
+            <div><b>参考基准</b><span>J.P. Morgan Private Bank · Aman</span></div>
+            <div><b>实现难度</b><span>中</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/private-office</div></div>
+          <div class="canvas c">
+            <div class="mnav"><span class="serif" style="font-weight:900;font-size:13px">衡信 · 私人财资</span><div class="links"><span>融资方案</span><span>财资顾问</span><span>客户之声</span></div></div>
+            <div class="hero1">
+              <div class="h-eyebrow">PRIVATE CORPORATE BANKING</div>
+              <div class="h-title serif">为企业主而设的私人银行</div>
+              <div class="h-line"></div>
+              <div class="h-sub">最高授信 ¥3 亿 · 专属客户经理终身服务 · 定制还款结构</div>
+              <span class="mcta">预约您的私人银行家</span>
+            </div>
+            <div class="strip">
+              <div><b>¥862亿</b><span>累计授信</span></div>
+              <div><b>28年</b><span>对公深耕</span></div>
+              <div><b>1:15</b><span>顾问服务比</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 华尔街 -->
+    <section class="scene s2" data-title="华尔街 The Ledger" data-eyebrow="方案 02">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 02 · 经典金融衬线</div>
+          <h2 class="s-name serif rv d1">华尔街</h2>
+          <p class="s-en en rv d1">The Ledger</p>
+          <p class="s-quote rv d2">以百年投行的深蓝与衬线，传递稳健与权威——用华尔街的信用，做您企业的后盾。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#00355F"></i><span>00355F</span></div>
+            <div class="sw"><i style="background:#7399C6"></i><span>7399C6</span></div>
+            <div class="sw"><i style="background:#B87333"></i><span>B87333</span></div>
+            <div class="sw"><i style="background:#EEF2F7"></i><span>EEF2F7</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>成熟中大型企业 · 上市公司 · CFO</span></div>
+            <div><b>参考基准</b><span>Goldman Sachs · Morgan Stanley</span></div>
+            <div><b>实现难度</b><span>低 — 中</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/corporate-credit</div></div>
+          <div class="canvas c">
+            <div class="mnav"><span style="font-weight:700;font-size:12px;letter-spacing:.3em">衡信银行</span><div class="links"><span>流动资金贷</span><span>固定资产贷</span><span>供应链金融</span></div></div>
+            <div class="hero2">
+              <div>
+                <div class="h-title serif">以百年信用<br>作企业后盾</div>
+                <div class="h-sub">授信额度最高 ¥5,000 万，年化利率 3.2% 起，T+1 极速放款。</div>
+                <span class="mcta">测算我的额度</span>
+              </div>
+              <div class="stat-card">
+                <span>累计放款</span><b>¥1,247 亿</b><em></em>
+                <span>服务企业</span><b>36 万家</b>
+              </div>
+            </div>
+            <div class="trust"><span>银保监许可</span><span>AAA 主体评级</span><span>存款保险</span><span>等保三级</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 苏黎世 -->
+    <section class="scene s3" data-title="苏黎世 Zürich Minimal" data-eyebrow="方案 03">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 03 · 瑞士极简主义</div>
+          <h2 class="s-name rv d1" style="font-family:'Noto Sans SC';font-weight:700">苏黎世</h2>
+          <p class="s-en en rv d1">Zürich Minimal</p>
+          <p class="s-quote rv d2">极致克制即极致高端。黑白栅格、单一强调色、字重代替装饰——少，即是信任。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#0A0A0A"></i><span>0A0A0A</span></div>
+            <div class="sw"><i style="background:#FFFFFF"></i><span>FFFFFF</span></div>
+            <div class="sw"><i style="background:#2B50EC"></i><span>2B50EC</span></div>
+            <div class="sw"><i style="background:#BFC1C2"></i><span>BFC1C2</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>科技型企业 · 外资企业 · 专业人士</span></div>
+            <div><b>参考基准</b><span>UBS · Stripe · 瑞士国际主义排版</span></div>
+            <div><b>实现难度</b><span>低</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/business</div></div>
+          <div class="canvas c">
+            <div class="mnav"><span style="font-weight:700">衡信</span><div class="links"><span>产品</span><span>利率</span><span>申请</span></div></div>
+            <div class="hero3">
+              <div class="h-title">少，即是信任。</div>
+              <div class="h-sub">企业经营贷 · 年化 3.2% 起 · 全线上办理</div>
+              <span class="mcta">开始申请 →</span>
+            </div>
+            <div class="rows">
+              <div><span>流动资金贷款</span><span>≤ ¥3,000万</span></div>
+              <div><span>科创信用贷款</span><span>≤ ¥1,000万</span></div>
+              <div><span>供应链票据融资</span><span>T+0 放款</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 曜金 -->
+    <section class="scene s4" data-title="曜金 Neon Prestige" data-eyebrow="方案 04">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 04 · 新锐科技渐变</div>
+          <h2 class="s-name serif rv d1">曜金</h2>
+          <p class="s-en en rv d1">Neon Prestige</p>
+          <p class="s-quote rv d2">深空底色上的流动渐变与真实产品界面——为增长而生的资本引擎，面向新经济的现代资本力量。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#0D1026"></i><span>0D1026</span></div>
+            <div class="sw"><i style="background:#533AFD"></i><span>533AFD</span></div>
+            <div class="sw"><i style="background:#F96BEE"></i><span>F96BEE</span></div>
+            <div class="sw"><i style="background:#22D3EE"></i><span>22D3EE</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>科技 / 新经济成长型企业 · VC 背景公司</span></div>
+            <div><b>参考基准</b><span>Stripe · Pipe</span></div>
+            <div><b>实现难度</b><span>中 — 高</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.tech/capital</div></div>
+          <div class="canvas c">
+            <div class="orb o1"></div><div class="orb o2"></div>
+            <div class="mnav"><span style="font-weight:700">衡信资本</span><div class="links"><span>增长贷</span><span>API</span><span>定价</span></div></div>
+            <div class="hero4">
+              <div>
+                <div class="h-title">为增长而生的<br><em>资本引擎</em></div>
+                <div class="h-sub">基于经营数据实时授信，额度随增长自动上调。</div>
+                <span class="mcta">3 分钟获取额度</span>
+              </div>
+              <div class="ui">
+                <div class="row"><span>可用额度</span><b>¥12,800,000</b></div>
+                <div class="row"><span>本月已提款</span><b>¥3,200,000</b></div>
+                <div class="row"><span>综合年化</span><b>4.05%</b></div>
+                <div class="big">↑ 额度较上季 +34%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 墨韵 -->
+    <section class="scene s5" data-title="墨韵 The Orient" data-eyebrow="方案 05">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 05 · 东方美学新中式</div>
+          <h2 class="s-name serif rv d1">墨韵</h2>
+          <p class="s-en en rv d1">The Orient</p>
+          <p class="s-quote rv d2">宣纸留白、水墨黑、一点朱砂——以东方的留白与意境承载财资智慧：上善若水，润泽实业。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#1C1C1A"></i><span>1C1C1A</span></div>
+            <div class="sw"><i style="background:#F5F1E8"></i><span>F5F1E8</span></div>
+            <div class="sw"><i style="background:#9A2D2D"></i><span>9A2D2D</span></div>
+            <div class="sw"><i style="background:#B08D57"></i><span>B08D57</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>传统实业 · 制造业 · 区域龙头 · 国潮品牌</span></div>
+            <div><b>参考基准</b><span>观夏东方新摩登 · 新中式空间美学</span></div>
+            <div><b>实现难度</b><span>中</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/shiye</div></div>
+          <div class="canvas c">
+            <div class="mnav"><span class="serif" style="font-weight:900;font-size:13px">衡信 · 实业金融</span><div class="links"><span>经营贷</span><span>厂房贷</span><span>匠心案例</span></div></div>
+            <div class="hero5">
+              <div class="h-title serif">上善若水<br>润泽实业</div>
+              <div class="h-sub">三十年 · 与十万家工厂同行</div>
+              <span class="mcta">洽谈融资</span>
+            </div>
+            <div class="vtext serif">实业为本 · 长期陪伴</div>
+            <div class="seal serif">贷</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 典藏 -->
+    <section class="scene s6" data-title="典藏 Editorial" data-eyebrow="方案 06">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 06 · 杂志编辑排版</div>
+          <h2 class="s-name serif rv d1">典藏</h2>
+          <p class="s-en en rv d1">Editorial</p>
+          <p class="s-quote rv d2">把企业金融做成一本值得阅读的商业杂志——读懂资本，是一门学问。真实客户人物摄影 + 长图文叙事。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#FAF8F4"></i><span>FAF8F4</span></div>
+            <div class="sw"><i style="background:#16130F"></i><span>16130F</span></div>
+            <div class="sw"><i style="background:#C6F135"></i><span>C6F135</span></div>
+            <div class="sw"><i style="background:#A8A29E"></i><span>A8A29E</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>品牌敏感的成长企业 · 专业服务机构 · 创始人</span></div>
+            <div><b>参考基准</b><span>Robinhood × Porto Rocha · Mercury</span></div>
+            <div><b>实现难度</b><span>中</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/journal</div></div>
+          <div class="canvas c">
+            <div class="mnav"><span class="serif" style="font-weight:900;font-size:13px">衡信商業評論</span><div class="links"><span>融资</span><span>洞见</span><span>案例</span></div></div>
+            <span class="tag">ISSUE 07 · 资本读本</span>
+            <div class="hero6">
+              <div>
+                <div class="h-title serif">读懂资本，<br>是一门学问。</div>
+                <p class="h-body">当一家苏州的精密制造企业决定扩建第三条产线时，摆在创始人面前的不是要不要借，而是如何让每一分授信都长成产能……</p>
+              </div>
+              <div class="photo"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 穹顶 -->
+    <section class="scene s7" data-title="穹顶 Dimension" data-eyebrow="方案 07">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 07 · 3D 未来科技</div>
+          <h2 class="s-name serif rv d1">穹顶</h2>
+          <p class="s-en en rv d1">Dimension</p>
+          <p class="s-quote rv d2">WebGL 三维资本网络 + 滚动驱动镜头——让资金的力量看得见。弱机自动降级为静态回退。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#05060A"></i><span>05060A</span></div>
+            <div class="sw"><i style="background:#22D3EE"></i><span>22D3EE</span></div>
+            <div class="sw"><i style="background:#C69B3C"></i><span>C69B3C</span></div>
+            <div class="sw"><i style="background:#BFC1C2"></i><span>BFC1C2</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>科技驱动型企业 · 供应链金融平台</span></div>
+            <div><b>参考基准</b><span>Sopra Banking · Three.js 沉浸叙事</span></div>
+            <div><b>实现难度</b><span>高</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.tech/dimension</div></div>
+          <div class="canvas c">
+            <div class="grid-bg"></div>
+            <div class="sphere"><i></i><i></i><i></i><i></i></div>
+            <div class="hud tl">CAPITAL NETWORK / LIVE</div>
+            <div class="hud br">NODE 2,847 · FLOW ¥4.8B</div>
+            <div class="hero7">
+              <div class="h-eyebrow">HENGXIN CAPITAL OS</div>
+              <div class="h-title">让资金的力量<br><b>看得见</b></div>
+              <span class="mcta">ENTER →</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 金阁 -->
+    <section class="scene s8" data-title="金阁 Deco" data-eyebrow="方案 08">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 08 · Art Deco 复古奢华</div>
+          <h2 class="s-name serif rv d1">金阁</h2>
+          <p class="s-en en rv d1">Deco</p>
+          <p class="s-quote rv d2">1920s 黄金时代的财富美学：黑金对称、太阳放射纹、几何徽章——传承的财富，恒久的信赖。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#0A0A0A"></i><span>0A0A0A</span></div>
+            <div class="sw"><i style="background:#C69B3C"></i><span>C69B3C</span></div>
+            <div class="sw"><i style="background:#0A3D2E"></i><span>0A3D2E</span></div>
+            <div class="sw"><i style="background:#F4EADE"></i><span>F4EADE</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>传统财富型企业 · 家族企业 · 高端制造 / 地产</span></div>
+            <div><b>参考基准</b><span>Amex Centurion · Art Deco 平面语言</span></div>
+            <div><b>实现难度</b><span>中 — 高</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/heritage</div></div>
+          <div class="canvas c">
+            <div class="rays"></div>
+            <div class="frame"></div>
+            <div class="hero8">
+              <div class="h-mark">HENGXIN HERITAGE · EST. 1998</div>
+              <div class="h-title serif">恒久信赖</div>
+              <div class="diamond"></div>
+              <div class="h-sub">为传承而设的企业融资</div>
+              <div class="romans">
+                <div><b>I</b><span>专属授信</span></div>
+                <div><b>II</b><span>家族财资</span></div>
+                <div><b>III</b><span>代际传承</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 棱镜 -->
+    <section class="scene s9" data-title="棱镜 Aurora Glass" data-eyebrow="方案 09">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 09 · 玻璃拟态轻奢</div>
+          <h2 class="s-name serif rv d1">棱镜</h2>
+          <p class="s-en en rv d1">Aurora Glass</p>
+          <p class="s-quote rv d2">深色极光之上的磨砂玻璃层，呼应 Apple Liquid Glass——清晰，是最高级的信任。文字区强制通过 WCAG AA。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#0F172A"></i><span>0F172A</span></div>
+            <div class="sw"><i style="background:#020617"></i><span>020617</span></div>
+            <div class="sw"><i style="background:#22D3EE"></i><span>22D3EE</span></div>
+            <div class="sw"><i style="background:#533AFD"></i><span>533AFD</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>现代轻奢中小企业 · 跨境 / 多币种企业</span></div>
+            <div><b>参考基准</b><span>Apple Liquid Glass · Revolut Business</span></div>
+            <div><b>实现难度</b><span>中 — 高</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">hengxin.bank/glass</div></div>
+          <div class="canvas c">
+            <div class="orb o1"></div><div class="orb o2"></div>
+            <div class="mnav"><span style="font-weight:700">衡信 Business</span><div class="links"><span>额度</span><span>汇率</span><span>账户</span></div></div>
+            <div class="hero9">
+              <div class="h-title">清晰，<br>是最高级的信任。</div>
+              <div class="glassrow">
+                <div class="g"><b>¥3,000万</b><span>最高额度</span></div>
+                <div class="g"><b>3.2%</b><span>年化利率起</span></div>
+                <div class="g"><b>T+0</b><span>极速放款</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 仪表盘 -->
+    <section class="scene s10" data-title="仪表盘 The Terminal" data-eyebrow="方案 10">
+      <div class="split">
+        <div class="info">
+          <div class="eyebrow rv">方案 10 · 数据可视化专业</div>
+          <h2 class="s-name serif rv d1">仪表盘</h2>
+          <p class="s-en en rv d1">The Terminal</p>
+          <p class="s-quote rv d2">彭博终端级的可信感：等宽数字、迷你图、实时放款流水——用数据说话的企业融资伙伴，为 CFO 而设。</p>
+          <div class="swatches rv d3">
+            <div class="sw"><i style="background:#0B0E14"></i><span>0B0E14</span></div>
+            <div class="sw"><i style="background:#3B82F6"></i><span>3B82F6</span></div>
+            <div class="sw"><i style="background:#16C784"></i><span>16C784</span></div>
+            <div class="sw"><i style="background:#F5A623"></i><span>F5A623</span></div>
+          </div>
+          <div class="meta rv d4">
+            <div><b>目标客群</b><span>CFO / 财务总监 · 数据敏感中大型企业</span></div>
+            <div><b>参考基准</b><span>Bloomberg Terminal · Ramp · Brex</span></div>
+            <div><b>实现难度</b><span>中 — 高</span></div>
+          </div>
+        </div>
+        <div class="mock rv d3">
+          <div class="chrome"><i></i><i></i><i></i><div class="url">terminal.hengxin.bank</div></div>
+          <div class="canvas c">
+            <div class="term">
+              <div class="side">
+                <div class="on">▸ 授信总览</div><div>▸ 提款测算</div><div>▸ 现金流</div><div>▸ 合规文档</div><div>▸ API 集成</div>
+              </div>
+              <div class="main">
+                <div class="kpis">
+                  <div class="kpi"><span>本月放款</span><b>¥4.82亿</b><em>▲ +12.4%</em></div>
+                  <div class="kpi"><span>加权年化</span><b>3.86%</b><em style="color:#F5A623">◆ 持平</em></div>
+                  <div class="kpi"><span>平均审批</span><b>4.2h</b><em>▲ 提速18%</em></div>
+                </div>
+                <div class="chart">
+                  <span class="lbl">放款趋势 / 近12月</span>
+                  <svg viewBox="0 0 300 100" preserveAspectRatio="none">
+                    <polyline points="0,80 25,74 50,78 75,62 100,66 125,52 150,56 175,44 200,48 225,34 250,30 275,22 300,14"
+                      fill="none" stroke="#3B82F6" stroke-width="2"/>
+                    <polyline points="0,80 25,74 50,78 75,62 100,66 125,52 150,56 175,44 200,48 225,34 250,30 275,22 300,14 300,100 0,100"
+                      fill="rgba(59,130,246,.12)" stroke="none"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 收尾 -->
+    <section class="scene scene-cover" data-title="选型建议 · 收尾" data-eyebrow="ENDING">
+      <div class="cover-inner">
+        <div class="cover-eyebrow rv">HOW TO CHOOSE</div>
+        <h1 class="cover-title serif rv d1" style="font-size:clamp(32px,4.6vw,58px)">按客群锁定方向，把预算花在分水岭上</h1>
+        <div class="cover-line"></div>
+        <div class="close-grid rv d3">
+          <div class="cg"><i style="background:#0A3D2E"></i><b>尊贵传承</b><span>世家 · 金阁<br>家族与财富型企业</span></div>
+          <div class="cg"><i style="background:#00355F"></i><b>权威稳健</b><span>华尔街 · 苏黎世<br>成熟企业与 CFO</span></div>
+          <div class="cg"><i style="background:linear-gradient(90deg,#533AFD,#F96BEE)"></i><b>科技增长</b><span>曜金 · 棱镜 · 穹顶<br>新经济成长企业</span></div>
+          <div class="cg"><i style="background:#9A2D2D"></i><b>文化认同</b><span>墨韵 · 典藏<br>实业与品牌型企业</span></div>
+          <div class="cg"><i style="background:#3B82F6"></i><b>数据专业</b><span>仪表盘<br>财务专业买家</span></div>
+        </div>
+        <p class="cover-note rv d5" style="margin-top:38px">定制字体授权 · 高质摄影/3D · 计算器交互 · 微交互打磨 —— 高端与廉价的分水岭</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="bar">
+    <button id="btn-play" aria-label="播放 / 暂停">
+      <svg id="ic-pause" viewBox="0 0 24 24"><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+      <svg id="ic-play" viewBox="0 0 24 24" style="display:none"><path d="M6 4l14 8-14 8z"/></svg>
+    </button>
+    <button id="btn-prev" aria-label="上一幕"><svg viewBox="0 0 24 24"><path d="M15 4l-8 8 8 8V4z"/></svg></button>
+    <button id="btn-next" aria-label="下一幕"><svg viewBox="0 0 24 24"><path d="M9 4l8 8-8 8V4z"/></svg></button>
+    <span id="counter">01 / 12</span>
+    <span id="scene-title"><b>OPENING</b>开场 · 提案总览</span>
+    <span id="hint">空格 播放/暂停 · ← → 切换 · 点击顶部进度跳转</span>
+    <button id="btn-fs" aria-label="全屏"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z"/></svg></button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const DUR = 8000;
+  const scenes = Array.from(document.querySelectorAll('.scene'));
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const titleEl = document.getElementById('scene-title');
+  const btnPlay = document.getElementById('btn-play');
+  const icPlay = document.getElementById('ic-play');
+  const icPause = document.getElementById('ic-pause');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // build segments
+  const fills = scenes.map((s,i)=>{
+    const seg = document.createElement('div');
+    seg.className='seg';
+    seg.setAttribute('role','button');
+    seg.setAttribute('aria-label','跳转到第'+(i+1)+'幕');
+    const fill = document.createElement('div');
+    fill.className='fill';
+    seg.appendChild(fill);
+    seg.addEventListener('click',()=>go(i,true));
+    progress.appendChild(seg);
+    return fill;
+  });
+
+  let cur = 0, playing = !reduced, elapsed = 0, last = null, raf = null;
+
+  function pad(n){return String(n+1).padStart(2,'0')}
+
+  function render(){
+    scenes.forEach((s,i)=>s.classList.toggle('active', i===cur));
+    progress.querySelectorAll('.seg').forEach((seg,i)=>{
+      seg.classList.toggle('done', i<cur);
+      if(i>cur) seg.classList.remove('done');
+    });
+    fills.forEach((f,i)=>{ if(i!==cur) f.style.transform = i<cur ? 'scaleX(1)':'scaleX(0)'; });
+    counter.textContent = pad(cur)+' / '+String(scenes.length).padStart(2,'0');
+    const sc = scenes[cur];
+    titleEl.innerHTML = '<b>'+sc.dataset.eyebrow+'</b>'+sc.dataset.title;
+  }
+
+  function tick(t){
+    if(last===null) last=t;
+    if(playing){
+      elapsed += t-last;
+      const p = Math.min(elapsed/DUR,1);
+      fills[cur].style.transform = 'scaleX('+p+')';
+      if(p>=1){ next(); }
+    }
+    last=t;
+    raf=requestAnimationFrame(tick);
+  }
+
+  function go(i,manual){
+    cur = (i+scenes.length)%scenes.length;
+    elapsed = 0;
+    render();
+    if(manual && reduced){/* stay paused-friendly */}
+  }
+  function next(){go(cur+1)}
+  function prev(){go(cur-1)}
+
+  function setPlay(p){
+    playing=p;
+    icPlay.style.display = p?'none':'block';
+    icPause.style.display = p?'block':'none';
+  }
+
+  btnPlay.addEventListener('click',()=>setPlay(!playing));
+  document.getElementById('btn-next').addEventListener('click',()=>next());
+  document.getElementById('btn-prev').addEventListener('click',()=>prev());
+  document.getElementById('btn-fs').addEventListener('click',()=>{
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen();
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.code==='Space'){e.preventDefault();setPlay(!playing);}
+    if(e.code==='ArrowRight')next();
+    if(e.code==='ArrowLeft')prev();
+  });
+
+  if(reduced) setPlay(false); else setPlay(true);
+  render();
+  raf=requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
