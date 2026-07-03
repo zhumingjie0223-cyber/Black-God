@@ -1,11 +1,12 @@
 name: Deploy 神枢 nexus-do
 
-# 一 push 到 main（且改动了 web/nexus-do/）就自动构建 + 部署 nexus-do，
-# 并绑定自定义域名 aquan.lufei.uk（由 wrangler.jsonc 的 custom_domain 完成）。
+# 一 push 到 main（且改动了 web/nexus-do/）就自动构建 + 部署 nexus-do。
+# 域名 aquan.lufei.uk 由 wrangler.jsonc 的 routes 配置绑定。
 #
 # 需要在仓库 Settings → Secrets and variables → Actions 里加一个密钥：
-#   CLOUDFLARE_API_TOKEN   （Workers Scripts:Edit + Workers Routes:Edit + Zone:DNS:Edit 权限）
+#   CLOUDFLARE_API_TOKEN   （权限：Workers Scripts:Edit + Workers Routes:Edit + Zone DNS:Edit）
 # 账号 id 已写在 wrangler.jsonc，无需再配。
+# 没配密钥时：只构建+自测，跳过部署（不报错）。
 
 on:
   push:
@@ -17,6 +18,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # 提到 job 级：这样各步骤的 if 条件才能读到（step 级 env 在自身 if 里不可见）
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     defaults:
       run:
         working-directory: web/nexus-do
@@ -39,12 +43,9 @@ jobs:
       - name: Deploy to Cloudflare Workers
         if: ${{ env.CF_TOKEN != '' }}
         env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy
 
       - name: Skip notice
         if: ${{ env.CF_TOKEN == '' }}
-        env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: echo "⚠️ 未配置 CLOUDFLARE_API_TOKEN 密钥，已跳过部署（仅构建+自测）。到仓库 Settings 加密钥后即自动部署。"
