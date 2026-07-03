@@ -69,7 +69,7 @@ class DemoMemory:
     """L3：种了几条事实，关键词命中。"""
     def __init__(self):
         self.facts = {
-            "称呼": "你的称呼: 思涵",
+            "称呼": "你的称呼: 朋友",
             "服务器": "禁碰清单: prod-01 不可写操作",
             "公开仓库": "black-god-public 是公开版仓库",
         }

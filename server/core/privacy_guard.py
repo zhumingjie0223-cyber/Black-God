@@ -268,7 +268,7 @@ def _consent_ok(token: str) -> bool:
 # 自测
 # ============================================================
 if __name__ == "__main__":
-    demo = "我的 key 是 sk-ABCDEFGHIJKLMNOPQRSTUVWX 还有 ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa，手机 13800138000"
+    demo = "我的 key 是 sk-ABCDEFGHIJKLMNOPQRSTUVWX 还有 <GITHUB_TOKEN_ENV>，手机 13800138000"
     clean, rep = redact(demo)
     print("脱敏后:", clean)
     print("报告:", rep)

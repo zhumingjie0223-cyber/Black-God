@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-安全沙箱 — Black God 888 红队强化版
+安全沙箱 — Black God
 隔离执行代码/命令，防炸、防逃逸、后台稳定运行
 
 核心：
@@ -10,11 +10,11 @@
 - 资源限制（CPU/内存/时间/网络）
 - 后台服务防护（nohup + setsid + 崩溃自重启）
 
-红队强化（针对渗透/远控/逆向/反杀）：
-- 网络隔离可选（渗透时需联网，可配置）
-- 提权测试环境（可选 root 容器）
-- 端口映射（远控/C2 监听）
-- 文件系统持久化（逆向分析需保留二进制）
+高级配置（仅用于自己拥有或已授权的环境）：
+- 网络模式可选（默认隔离，需要时可配置联网）
+- 特权容器（可选 root，仅在明确需要时启用）
+- 端口映射（本地服务调试 / 监听）
+- 文件系统持久化（保留中间产物，便于分析）
 - 多架构支持（x86/ARM/MIPS 交叉编译）
 """
 import os
@@ -27,15 +27,15 @@ from pathlib import Path
 
 
 class Sandbox:
-    """安全沙箱：隔离执行，后台稳定，红队强化"""
+    """安全沙箱：隔离执行，后台稳定"""
 
     def __init__(self, mode="auto", timeout=30, memory_limit="512m", 
                  network="none", privileged=False, ports=None):
         """
         mode: auto/docker/firejail/simple
-        network: none(隔离)/bridge(联网)/host(直通) — 渗透时用 bridge
-        privileged: 提权测试环境（危险，仅红队场景）
-        ports: 端口映射 {"8080": "80"} — 远控/C2 监听
+        network: none(隔离)/bridge(联网)/host(直通)
+        privileged: 特权容器（危险，仅在明确需要时启用）
+        ports: 端口映射 {"8080": "80"} — 本地服务调试/监听
         """
         self.mode = self._detect_mode() if mode == "auto" else mode
         self.timeout = timeout
@@ -64,22 +64,22 @@ class Sandbox:
             return self._simple_exec(code, language)
 
     def _docker_exec(self, code: str, language: str) -> dict:
-        """Docker 容器隔离（最安全，红队强化）"""
+        """Docker 容器隔离（最安全）"""
         image = "python:3.11-alpine" if language == "python" else "alpine:latest"
         code_file = self.work_dir / f"code_{int(time.time())}.py"
         code_file.write_text(code)
         try:
             cmd = [
                 "docker", "run", "--rm",
-                "--network", self.network,  # 红队：可配置联网
+                "--network", self.network,  # 可配置联网
                 "--memory", self.memory_limit,
                 "--cpus", "1",
                 "-v", f"{code_file}:/code.py:ro",
             ]
-            # 红队：提权容器（危险）
+            # 特权容器（危险，仅在明确需要时）
             if self.privileged:
                 cmd.append("--privileged")
-            # 红队：端口映射（C2/远控监听）
+            # 端口映射（本地服务调试/监听）
             for host_port, container_port in self.ports.items():
                 cmd.extend(["-p", f"{host_port}:{container_port}"])
             
@@ -153,7 +153,7 @@ class Sandbox:
 
     def run_service_stable(self, cmd: str, name: str, log_dir="/tmp/bg88_services") -> dict:
         """
-        后台服务稳定运行（权哥要求：不能被干掉）
+        后台服务稳定运行（不被意外终止）
         - nohup：忽略挂断信号
         - setsid：脱离会话
         - 输出重定向：防 SIGPIPE

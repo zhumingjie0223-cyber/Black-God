@@ -13,7 +13,7 @@ for envf in "$ROOT/.env" "$ROOT/../.env"; do
 done
 
 # 默认网关（仅地址，无密钥）
-: "${BG_BASE:=https://apiclaude.cc/v1}"
+: "${BG_BASE:=https://your-gateway.example/v1}"
 : "${BG_MODEL:=gpt-5.5}"
 : "${BG_PORT:=8765}"
 export BG_BASE BG_MODEL BG_PORT

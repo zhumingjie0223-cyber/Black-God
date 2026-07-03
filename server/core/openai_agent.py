@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Black God Agent —— OpenAI 兼容驱动（适配中转站 apiclaude.cc）
+Black God Agent —— OpenAI 兼容驱动（适配中转站 your-gateway.example）
 用 OpenAI tools 协议调真 Claude。工具调用 + 多步 loop + 路2强制路由。
 """
 import os, re, json, time, urllib.request, pathlib, sys
@@ -107,7 +107,7 @@ def force_route(msg):
     return None
 
 class OpenAIAgent:
-    def __init__(self, api_key, base_url="https://apiclaude.cc/v1",
+    def __init__(self, api_key, base_url="https://your-gateway.example/v1",
                  model="claude-haiku-4-5-20251001", max_steps=10, auto_evolve=True):
         self.key, self.base, self.model, self.max_steps = api_key, base_url, model, max_steps
         self.mem = Memory(); self.skills = SkillSystem()

@@ -12,7 +12,7 @@
 
 | 版本 | 位置 | 状态 | 用途 |
 |------|------|------|------|
-| **生产版** | 8.222.169.202:8765 | ✅ 在线运行 | 公网访问，用户使用 |
+| **生产版** | localhost:8765 | ✅ 在线运行 | 公网访问，用户使用 |
 | **本地开发版** | /var/minis/shared/blackgod/ | ✅ 代码完整 | 本地开发、测试、修改 |
 | **融合框架版** | /var/minis/workspace/ | ⏳ 实验性 | Node.js 工作流编辑器 |
 
@@ -92,7 +92,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ```python
 # 从 simple_chat.py 推断
 BASE = os.environ.get("BG_BASE", "http://127.0.0.1:9000/v1")
-KEY = os.environ.get("BG_KEY", "sk-blackgod-quan-2026")
+KEY = os.environ.get("BG_KEY", "sk-your-api-key-here")
 MODEL = os.environ.get("BG_MODEL", "auto")
 ```
 

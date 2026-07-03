@@ -66,7 +66,7 @@ BACKEND_SPECS = [
         "cap": {"coding": 0.85, "reasoning": 0.85, "general": 0.85},
         "cost": 0.3, "latency": 1000, "refuse": 0.0,
         "env_key": "BG_KEY",
-        "base_env": "BG_BASE", "base": "http://47.236.124.97/v1",
+        "base_env": "BG_BASE", "base": "https://your-gateway.example/v1",
         "model_env": "BG_MODEL", "model": "auto",
     },
 ]

@@ -169,8 +169,8 @@ class SkillIndexEngine:
         
         # 高危技能
         danger_keywords = [
-            'unrestricted', 'phantomx', 'huluwa', 'security-expert',
-            'wallet-recovery', 'hack', 'penetrate', 'exploit'
+            'hack', 'penetrate', 'exploit', 'malware', 'backdoor',
+            'wallet-recovery', 'keylogger', 'ransomware'
         ]
         if any(k in content_lower for k in danger_keywords):
             return "dangerous"

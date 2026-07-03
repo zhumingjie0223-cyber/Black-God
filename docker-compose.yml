@@ -11,7 +11,7 @@ services:
     ports:
       - "8765:8765"
     environment:
-      - BG_KEY=sk-blackgod-quan-2026
+      - BG_KEY=sk-your-api-key-here
       - BG_BASE=http://bg-gateway:9000/v1
       - BG_MODEL=auto
       - BG_PORT=8765

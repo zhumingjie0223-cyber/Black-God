@@ -57,7 +57,7 @@ class SimpleChat:
 
 if __name__ == "__main__":
     chat = SimpleChat(
-        api_key="sk-blackgod-quan-2026",
+        api_key="sk-your-api-key-here",
         base_url="http://127.0.0.1:9000/v1",
         model="auto"
     )

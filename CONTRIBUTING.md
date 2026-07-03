@@ -256,8 +256,8 @@ def bubble_sort(arr):
 
 ## 📧 联系方式
 
-- **Email**: blackgod@aquan.love
-- **Telegram**: [@Boos8888](https://t.me/Boos8888)
+- **Email**: your-email@example.com
+- **Telegram**: [@your_channel](https://t.me/your_channel)
 - **GitHub Issues**: [提问讨论](https://github.com/uumingtian-max/blackgod/issues)
 
 ---

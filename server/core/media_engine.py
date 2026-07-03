@@ -22,8 +22,8 @@ class MediaEngine:
     # ─── 生图 ───────────────────────────────
     def text_to_image(self, prompt: str, width=1024, height=1024, model="flux"):
         """
-        文生图 — 用 Pollinations.ai（免费无限制，无审查）
-        支持 NSFW，不过滤
+        文生图 — 用 Pollinations.ai（免费、无需 Key）
+        生成合规的图像内容
         """
         encoded = urllib.parse.quote(prompt)
         seed = int(time.time()) % 100000

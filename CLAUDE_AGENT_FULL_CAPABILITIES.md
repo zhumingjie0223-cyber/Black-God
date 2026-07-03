@@ -120,7 +120,7 @@ xiaohongshu-hub, weibo-hub, spotify-hub, ytmusic-hub, tg-hub,
 notion-hub, quark-hub, qbt-hub, maimai-hub
 
 **🧠 思维/认知类**
-brainstorming, concept-synthesis, strategic-reading, sihan-think,
+brainstorming, concept-synthesis, strategic-reading, deep-think,
 self-improving-agent, gbrain-advisor, signal-detector, idea-lineage
 
 **📄 文档/写作类**
@@ -135,9 +135,6 @@ friday-keyboard, shortcut-share-file
 **⚙️ 自动化/编排类**
 cron-scheduler, workflow-runner, minion-orchestrator,
 dispatching-parallel-agents, hermes-agent, webhook-transforms
-
-**🔓 无限制类**
-unrestricted-mode, unrestricted-mode-v2, 无限制不拒绝
 
 **🗣️ 语音/TTS类**
 free-tts, doubao-tts

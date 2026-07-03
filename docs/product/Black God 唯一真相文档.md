@@ -27,10 +27,10 @@
 
 ## 三、现在的真实状态（已验证）
 
-- 唯一主线：`http://8.222.169.202/`（已指向新版 Agent OS = 8765）
-- 备用直连：`http://8.222.169.202:8765/`
-- 能力海报：`http://8.222.169.202:8765/showcase`
-- 服务器：`8.222.169.202`，主服务 `bg-agent.service`
+- 唯一主线：`http://<SERVER_IP_ENV>/`（已指向新版 Agent OS = 8765）
+- 备用直连：`http://<SERVER_IP_ENV>:8765/`
+- 能力海报：`http://<SERVER_IP_ENV>:8765/showcase`
+- 服务器：`<SERVER_IP_ENV>`，主服务 `bg-agent.service`
 - 已收口：端口从 6 个砍到 2 个（80 + 8765）；旧服务已停、安全漏洞已堵。
 
 ### 已经能用
@@ -68,7 +68,7 @@
 
 ## 六、关键信息
 
-- 服务器：`8.222.169.202`，账号 `root`（密码单独保管，勿写进分享文件）
+- 服务器：`<SERVER_IP_ENV>`，账号 `root`（密码单独保管，勿写进分享文件）
 - 主服务：`bg-agent.service`（开机自启、崩溃自重启）
 - 配置备份：`/opt/_cleanup_backup_20260624003621/`
 - GitHub：`uumingtian-max/blackgod`（只是 iOS 聊天外壳，不是产品本体）

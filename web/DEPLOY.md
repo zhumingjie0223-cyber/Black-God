@@ -1,6 +1,6 @@
 # Black God 网站首页 —— 上线说明
 
-这套 `web/` 文件是 **aquan.love 的新版黑金品牌首页**。做好后需要放到服务器上才能生效。
+这套 `web/` 文件是 **your-domain.example 的新版黑金品牌首页**。做好后需要放到服务器上才能生效。
 
 ## 文件清单
 
@@ -15,7 +15,7 @@ web/
 └── icon-512.png    # PWA 图标
 ```
 
-## 怎么让它在 aquan.love 生效（交给服务器维护方照做）
+## 怎么让它在 your-domain.example 生效（交给服务器维护方照做）
 
 服务器上现有站点目录是 `/opt/bg-agent/web/`，端口 `8765`，服务名 `bg-agent.service`。
 
@@ -37,7 +37,7 @@ curl -I http://127.0.0.1:8765/            # 应返回 200
 curl    http://127.0.0.1:8765/api/health  # 应返回 {"status":"ok"}
 ```
 
-然后手机浏览器打开 `http://aquan.love`，应看到黑金新首页。
+然后手机浏览器打开 `https://your-domain.example`，应看到黑金新首页。
 iOS Safari：分享 → 添加到主屏幕；Android Chrome：会自动提示安装。
 
 ## 首页依赖的后端接口（服务器现有，无需改动）

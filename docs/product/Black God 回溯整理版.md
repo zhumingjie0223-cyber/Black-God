@@ -84,9 +84,9 @@
 ## 3. 当前产品是什么
 
 ### 3.1 当前主线
-- `http://8.222.169.202/` → 已指向新版 Agent OS
-- `http://8.222.169.202:8765/` → 直接访问新版 Agent OS
-- `http://8.222.169.202:8765/showcase` → 能力海报
+- `http://<SERVER_IP_ENV>/` → 已指向新版 Agent OS
+- `http://<SERVER_IP_ENV>:8765/` → 直接访问新版 Agent OS
+- `http://<SERVER_IP_ENV>:8765/showcase` → 能力海报
 
 ### 3.2 现在已经有的能力
 - 对话
