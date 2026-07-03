@@ -1,0 +1,23 @@
+name = "nexus-do"
+main = "nexus_do.mjs"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "aquan.lufei.uk", zone_id = "ZONE_ID_HERE" }
+]
+
+[[durable_objects.bindings]]
+name = "SHENSHU"
+class_name = "ShenshuCore"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ShenshuCore"]
+
+[[kv_namespaces]]
+binding = "SOUL_KV"
+id = "2978edea205e462d97cd3613f4745fbf"
+
+[ai]
+binding = "AI"
