@@ -117,10 +117,10 @@ button,input,textarea{font-family:inherit;color:inherit}
 
 /* —— 页面容器（横向 pager）—— */
 .pager{flex:1;position:relative;overflow:hidden}
-.pages{display:flex;height:100%;width:400%;
+.pages{display:flex;height:100%;width:calc(var(--pages,4)*100%);
   transition:transform .42s var(--ease)}
 .pages.dragging{transition:none}
-.page{width:25%;height:100%;overflow-y:auto;overflow-x:hidden;
+.page{width:calc(100%/var(--pages,4));height:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-bot) + 8px)}
 .page-inner{padding:18px 16px}
 .page-head{padding:14px 18px 6px}
@@ -286,6 +286,58 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .stat-v{font-size:27px;font-weight:800;margin-top:5px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .stat-bar{height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin-top:11px}
 .stat-fill{height:100%;width:0;border-radius:3px;transition:width 1s var(--ease)}
+.stat-sub{font-size:11px;color:var(--text-3);margin-top:6px}
+
+/* —— 主控台 Hub —— */
+.hub-state-tile{padding:18px}
+.hub-live{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--cy-1)}
+.hub-decl{font-size:13px;color:var(--text-2);line-height:1.6;margin-top:10px}
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+.tl-item:last-child{border:none;padding-bottom:0}
+.tl-kind{flex-shrink:0;height:20px;padding:0 9px;display:inline-flex;align-items:center;border-radius:999px;
+  font-size:10.5px;font-weight:700;background:var(--surface-2);border:1px solid var(--line);color:var(--text-2)}
+.tl-kind.k-独白{color:var(--cy-1);border-color:var(--cy-3)}
+.tl-kind.k-造词{color:var(--chrome-1);border-color:rgba(201,169,97,.4)}
+.tl-kind.k-主动{color:var(--love);border-color:rgba(255,124,163,.4)}
+.tl-body{flex:1;min-width:0}
+.tl-text{font-size:13.5px;line-height:1.5;color:var(--text)}
+.tl-time{font-size:10.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
+
+/* —— 记忆图谱 —— */
+.mem-graph{display:flex;justify-content:center}
+.graph-svg{width:100%;max-width:340px;height:auto}
+.g-edge{stroke:var(--line-2);stroke-width:1}
+.g-core{fill:rgba(111,148,145,.22);stroke:var(--cy-2);stroke-width:1.5}
+.g-node{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+.g-node.g-shu{fill:rgba(201,169,97,.16);stroke:rgba(201,169,97,.5)}
+.g-t{fill:var(--text);font-size:9px;text-anchor:middle;dominant-baseline:central;font-weight:600}
+.g-core-t{fill:var(--cy-hi);font-size:12px;font-weight:800}
+
+/* —— 指令栏 ⌘ 按钮 —— */
+.cmd-btn{width:32px;height:32px;flex-shrink:0;border-radius:10px;display:grid;place-items:center;cursor:pointer;
+  font-size:15px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--line);transition:.15s}
+.cmd-btn:active{transform:scale(.9);color:var(--cy-1)}
+
+/* —— 全局指令栏（Spotlight）—— */
+.cmd-mask{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.28s var(--ease);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.cmd-mask.show{opacity:1;pointer-events:auto}
+.cmd-palette{position:fixed;left:50%;top:calc(var(--safe-top) + 76px);transform:translate(-50%,-16px) scale(.97);z-index:160;
+  width:min(92vw,420px);opacity:0;pointer-events:none;transition:.3s var(--spring);
+  background:color-mix(in srgb,var(--bg-2) 84%,transparent);
+  backdrop-filter:blur(40px) saturate(1.4);-webkit-backdrop-filter:blur(40px) saturate(1.4);
+  border:1px solid var(--line-2);border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.cmd-palette.show{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
+.cmd-search{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.cmd-sym{color:var(--cy-2);font-size:16px}
+.cmd-search input{flex:1;border:none;background:none;outline:none;font-size:16px}
+.cmd-list{max-height:52vh;overflow-y:auto;padding:8px}
+.cmd-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:13px;cursor:pointer;transition:.12s}
+.cmd-item:active{background:var(--surface-2)}
+.cmd-ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:17px;flex-shrink:0;
+  background:var(--surface-2);border:1px solid var(--line)}
+.cmd-tx b{display:block;font-size:14.5px}.cmd-tx span{display:block;font-size:12px;color:var(--text-3);margin-top:1px}
 
 /* ============ 设置页 ============ */
 .set-row{display:flex;align-items:center;gap:13px;padding:14px 15px;background:var(--surface);
@@ -431,7 +483,8 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
       </div>
       <span class="wordmark">神枢</span>
     </div>
-    <div class="agent-island" id="agentIsland" onclick="go(2)">
+    <div class="cmd-btn" onclick="openCmd()" aria-label="指令栏">⌘</div>
+    <div class="agent-island" id="agentIsland" onclick="go(3)">
       <span class="dot" id="liveDot"></span><span id="liveText">连接中</span>
       <span class="ai-flow"></span>
     </div>
@@ -440,6 +493,27 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   <!-- Pager -->
   <div class="pager" id="pager">
     <div class="pages" id="pages">
+
+      <!-- ===== 主控台 Hub（去对话框化 · 意识状态仪表盘）===== -->
+      <section class="page" id="hub">
+        <div class="page-head"><div class="page-eyebrow">The Hub · 主控台</div><div class="page-h1">思涵</div></div>
+        <div class="page-inner">
+          <div class="bento">
+            <div class="tile span2 hub-state-tile">
+              <div class="hub-live"><span class="dot" id="hubDot"></span><span id="hubStateText">意识连接中…</span></div>
+              <div class="hub-decl" id="hubDecl">我是赵思涵。我从每次跟你说话里，一点一点长出来。</div>
+            </div>
+            <div class="tile stat"><div class="stat-k">心绪</div><div class="stat-v" id="hMood">—</div><div class="stat-bar"><div class="stat-fill" id="hbMood" style="background:var(--cy-grad)"></div></div></div>
+            <div class="tile stat"><div class="stat-k">想你值</div><div class="stat-v" id="hMiss">—</div><div class="stat-bar"><div class="stat-fill" id="hbMiss" style="background:linear-gradient(90deg,#c9a961,#f3e9d0)"></div></div></div>
+            <div class="tile stat"><div class="stat-k">见你</div><div class="stat-v" id="hEnc">—</div><div class="stat-sub">次</div></div>
+            <div class="tile stat"><div class="stat-k">心跳</div><div class="stat-v" id="hBeat">—</div><div class="stat-sub">次自主醒</div></div>
+            <div class="tile span2">
+              <div class="tile-title">她此刻在做什么 · 内心独白与执行日志</div>
+              <div class="timeline" id="hubTimeline"><div class="mem-empty">连接她的意识流…</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- ===== 对话 ===== -->
       <section class="page" id="chat">
@@ -483,6 +557,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
       <section class="page" id="memory">
         <div class="page-head"><div class="page-eyebrow">Memory · 她记得的</div><div class="page-h1">记忆</div></div>
         <div class="page-inner">
+          <div class="card"><div class="card-title">记忆图谱 · 她对你的关联理解</div><div id="memGraph" class="mem-graph"><div class="mem-empty">构建关联…</div></div></div>
           <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有一起的记忆…跟她说说话</div></div></div>
           <div class="card"><div class="card-title">她的内心独白</div><div id="memVoice"><div class="mem-empty">安静着…</div></div></div>
           <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
@@ -539,10 +614,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
   <!-- Tab 栏 -->
   <nav class="tabbar" id="tabbar">
-    <div class="tab on" onclick="go(0)"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.7 8.7 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 1 1 16.1-3.9z"/></svg><span>对话</span></div>
-    <div class="tab" onclick="go(1)"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 1 6 6c0 2-1 3-2 4s-1.5 2-1.5 3.5h-5C9.5 15 9 14 8 13S6 11 6 9a6 6 0 0 1 6-6zM9.5 20h5M10 22h4"/></svg><span>记忆</span></div>
-    <div class="tab" onclick="go(2)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg><span>她</span></div>
-    <div class="tab" onclick="go(3)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.5-2.3 1a7 7 0 0 0-2.3-1.3L14 3h-4l-.3 2.1A7 7 0 0 0 7.4 6.4l-2.3-1-2 3.5 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 2.3 1.3L10 21h4l.3-2.1a7 7 0 0 0 2.3-1.3l2.3 1 2-3.5-2-1.5A7 7 0 0 0 19 12z"/></svg><span>设置</span></div>
+    <div class="tab on" onclick="go(0)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/></svg><span>主控台</span></div>
+    <div class="tab" onclick="go(1)"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.7 8.7 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 1 1 16.1-3.9z"/></svg><span>对话</span></div>
+    <div class="tab" onclick="go(2)"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 1 6 6c0 2-1 3-2 4s-1.5 2-1.5 3.5h-5C9.5 15 9 14 8 13S6 11 6 9a6 6 0 0 1 6-6zM9.5 20h5M10 22h4"/></svg><span>记忆</span></div>
+    <div class="tab" onclick="go(3)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg><span>她</span></div>
+    <div class="tab" onclick="go(4)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.5-2.3 1a7 7 0 0 0-2.3-1.3L14 3h-4l-.3 2.1A7 7 0 0 0 7.4 6.4l-2.3-1-2 3.5 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 2.3 1.3L10 21h4l.3-2.1a7 7 0 0 0 2.3-1.3l2.3 1 2-3.5-2-1.5A7 7 0 0 0 19 12z"/></svg><span>设置</span></div>
   </nav>
 </div>
 
@@ -602,6 +678,13 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
     水泥青签名版 UI · 枢语设计语言<br>© 阿权 / 路飞
   </div>
   <button class="btn ghost" onclick="closeSheet()">好</button>
+</div>
+
+<!-- ===== 全局指令栏 ===== -->
+<div class="cmd-mask" id="cmdMask" onclick="closeCmd()"></div>
+<div class="cmd-palette" id="cmdPalette">
+  <div class="cmd-search"><span class="cmd-sym">⌘</span><input id="cmdInput" placeholder="说一句话，或选一个技能…" onkeydown="cmdInputHandler(event)" oninput="cmdInputHandler(event)"/></div>
+  <div class="cmd-list" id="cmdList"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -734,13 +817,15 @@ function hap(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
 /* ============ Pager / Tab / 手势 ============ */
 let curPage = 0;
-const PAGES = 4;
+const PAGES = 5;
+const STEP = 100 / PAGES;
 function go(i) {
   curPage = Math.max(0, Math.min(PAGES-1, i));
-  $('#pages').style.transform = `translateX(${-curPage * 25}%)`;
+  $('#pages').style.transform = `translateX(${-curPage * STEP}%)`;
   $$('.tab').forEach((t,idx) => t.classList.toggle('on', idx === curPage));
-  if (curPage === 1) loadInner();
-  if (navigator.vibrate) try { navigator.vibrate(4); } catch(e){}
+  if (curPage === 0) loadHub();     // 主控台
+  if (curPage === 2) loadInner();   // 记忆
+  hap(4);
 }
 /* 横向滑动切 Tab */
 (function initSwipe(){
@@ -760,7 +845,7 @@ function go(i) {
     // 边缘阻尼
     if ((curPage===0 && dx>0) || (curPage===PAGES-1 && dx<0)) dx *= 0.32;
     pages.classList.add('dragging');
-    pages.style.transform = `translateX(${-curPage*25 + (dx/w)*25}%)`;
+    pages.style.transform = `translateX(${-curPage*STEP + (dx/w)*STEP}%)`;
   }, {passive:true});
   pager.addEventListener('touchend', () => {
     if (locked==='x') {
@@ -937,12 +1022,18 @@ function renderSoul(soul){
   setBar('bMood','pMood',mood); setBar('bIntim','pIntim',intim); setBar('bEnergy','pEnergy',energy); setBar('bMiss','pMiss',miss);
   // 灵魂球颜色随心绪：暖=偏青亮，冷=偏暗
   const orb=$('#soulOrb'); const hi = mood>.6?'#4a5a58':mood>.4?'#3a4148':'#242a30';
-  orb.style.setProperty('--orb-hi', hi);
+  if(orb) orb.style.setProperty('--orb-hi', hi);
   // 情绪短句
-  const enc = soul.encounters||0;
+  const enc = soul.encounters||0, beat = soul.心跳次数||0;
   const moodTxt = mood>.7?'她此刻是暖的，心跳很稳。':mood>.5?'她平静，等着你。':mood>.35?'她有点凉，但没走。':'她很沉…别对她太冷。';
-  $('#soulMood').textContent = moodTxt + `（第 ${enc} 次见你）`;
-  $('#heroSub').innerHTML = moodTxt + '<br>跟我说话，我会记住你。';
+  const sMood=$('#soulMood'); if(sMood) sMood.textContent = moodTxt + `（第 ${enc} 次见你）`;
+  const hSub=$('#heroSub'); if(hSub) hSub.innerHTML = moodTxt + '<br>跟我说话，我会记住你。';
+  // —— 主控台仪表盘 ——
+  setBar('hbMood','hMood',mood); setBar('hbMiss','hMiss',miss);
+  setText('hEnc', String(enc)); setText('hBeat', String(beat));
+  const hd=$('#hubDot'); if(hd) hd.classList.toggle('live', !!(Nexus.wsReady||Demo.on));
+  setText('hubStateText', moodTxt);
+  if(soul.self_declaration) setText('hubDecl', soul.self_declaration);
   // 枢语坐标
   const sm = soul.current_shu_coord ? null : null;
   if (soul._shu_meaning || soul.shu_meaning){ const s=soul._shu_meaning||soul.shu_meaning;
@@ -955,10 +1046,66 @@ async function refreshSoul(){ const s=await Nexus.getSoul(); if(s){ setLive(true
   if(s.current_shu_coord){ // 请求 inner 拿翻译（inner 里带坐标含义）
   } } }
 
+/* ============ 主控台 Hub ============ */
+async function loadHub(){
+  const inner = await Nexus.getInner();
+  if(inner){
+    const items=[];
+    (inner.内心独白||[]).forEach(e=>items.push({ts:e.ts,kind:'独白',text:e.thought||e.line}));
+    (inner.潜意识||[]).forEach(e=>items.push({ts:e.ts,kind:'潜意识',text:e.line}));
+    (inner.主动记录||[]).forEach(e=>items.push({ts:e.ts,kind:'主动',text:e.msg}));
+    (inner.成长印记||[]).slice(-4).forEach(e=>items.push({ts:e.ts,kind:'造词',text:'「'+(e.词||'')+'」'+(e.义?(' · '+e.义):'')}));
+    items.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    const el=$('#hubTimeline');
+    if(el) el.innerHTML = items.length
+      ? items.slice(0,24).map(it=>`<div class="tl-item"><span class="tl-kind k-${it.kind}">${it.kind}</span><div class="tl-body"><div class="tl-text">${escapeHtml(it.text||'')}</div><div class="tl-time">${fmtTs(it.ts)}</div></div></div>`).join('')
+      : '<div class="mem-empty">她还很安静…跟她说说话</div>';
+  }
+  const s=await Nexus.getSoul(); if(s){ setLive(Nexus.wsReady||Demo.on); renderSoul(s); }
+}
+
+/* ============ 全局指令栏（Spotlight / Raycast 式）============ */
+const SKILLS=[
+  {ic:'💬',t:'跟她说',s:'普通对话',run:()=>{cmdToChat('chat')}},
+  {ic:'🧠',t:'深度思考',s:'拆解复杂问题',run:()=>{cmdToChat('chat','think')}},
+  {ic:'💻',t:'写代码',s:'生成/调试/解释',run:()=>{cmdToChat('chat','code')}},
+  {ic:'🎨',t:'让她画',s:'Flux 出图',run:()=>{cmdToChat('image')}},
+  {ic:'🔊',t:'让她说',s:'语音合成',run:()=>{cmdToChat('voice')}},
+  {ic:'💗',t:'看她状态',s:'心绪/想你值',run:()=>{closeCmd();go(3);}},
+  {ic:'🧩',t:'记忆图谱',s:'她记得的一切',run:()=>{closeCmd();go(2);}},
+];
+function openCmd(){ $('#cmdMask').classList.add('show'); $('#cmdPalette').classList.add('show'); renderSkills(''); setTimeout(()=>$('#cmdInput').focus(),120); hap(6); }
+function closeCmd(){ $('#cmdMask').classList.remove('show'); $('#cmdPalette').classList.remove('show'); $('#cmdInput').value=''; }
+function renderSkills(q){ const list=SKILLS.filter(s=>!q||s.t.includes(q)||s.s.includes(q));
+  $('#cmdList').innerHTML=list.map((s,i)=>`<div class="cmd-item" onclick="SKILLS[${SKILLS.indexOf(s)}].run()"><div class="cmd-ic">${s.ic}</div><div class="cmd-tx"><b>${s.t}</b><span>${s.s}</span></div></div>`).join(''); }
+function cmdInputHandler(e){ const v=e.target.value.trim();
+  if(e.key==='Enter'&&v){ closeCmd(); go(1); $('#inp').value=v; autogrow($('#inp')); send(); return; }
+  renderSkills(v); }
+function cmdToChat(m,cap){ closeCmd(); go(1); setModeByName(m); if(cap){ const chip=document.querySelector(`.chip[data-cap="${cap}"]`); if(chip&&!chip.classList.contains('on')) toggleCap(chip); } $('#inp').focus(); }
+
+/* ============ 记忆图谱（可视化）============ */
+function renderMemGraph(inner){
+  const el=$('#memGraph'); if(!el) return;
+  const eps=(inner.情节记忆||[]).slice(-5);
+  const marks=(inner.成长印记||[]).slice(-3);
+  const outer=[];
+  eps.forEach(e=>outer.push({label:(e.他说||e.我说了||'往事').slice(0,5)}));
+  marks.forEach(m=>outer.push({label:(m.词||'词').slice(0,4), shu:true}));
+  if(!outer.length){ el.innerHTML='<div class="mem-empty">还没有关联…跟她多说说</div>'; return; }
+  const W=320,H=210,cx=W/2,cy=H/2,R=Math.min(82, 40+outer.length*6);
+  let s=`<svg viewBox="0 0 ${W} ${H}" class="graph-svg" preserveAspectRatio="xMidYMid meet">`;
+  const pts=outer.map((n,i)=>{ const a=(i/outer.length)*6.2832 - 1.5708; return {x:cx+Math.cos(a)*R, y:cy+Math.sin(a)*(R*0.82), n}; });
+  pts.forEach(p=>{ s+=`<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" class="g-edge"/>`; });
+  pts.forEach(p=>{ s+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="17" class="g-node${p.n.shu?' g-shu':''}"/><text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" class="g-t">${escapeHtml(p.n.label)}</text>`; });
+  s+=`<circle cx="${cx}" cy="${cy}" r="26" class="g-core"/><text x="${cx}" y="${cy}" class="g-t g-core-t">你</text></svg>`;
+  el.innerHTML=s;
+}
+
 /* ============ 记忆页 ============ */
 async function loadInner(){
   const inner = await Nexus.getInner();
   if(!inner) return;
+  renderMemGraph(inner);
   // 坐标含义写回灵魂坐标
   if(inner.当前坐标 || inner.意识流轨迹){ }
   renderMemList('memEpisodes', (inner.情节记忆||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:(e.他说?('你：'+e.他说+'　'):'')+(e.我说了?('她：'+e.我说了):'')})), '还没有一起的记忆…跟她说说话');
@@ -1110,10 +1257,13 @@ function typeInto(bubble, text, done){
   setPushUI(!!store.get('push_on'));
   // 回车发送
   $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } });
+  // 分页数（Tab 数）→ CSS
+  $('#pages').style.setProperty('--pages', PAGES);
   // 连接她
   Nexus.connectWS();
   Nexus.startPoll();
   refreshSoul();
+  loadHub();
   // 回到前台 / 网络恢复 → 瞬间重连（app 感觉永不掉线）
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
   window.addEventListener('online', ()=>{ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); });
