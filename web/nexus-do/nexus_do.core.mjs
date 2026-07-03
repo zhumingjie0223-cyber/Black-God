@@ -16,6 +16,7 @@
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
+import { ICON_PNG_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
 loadCapabilities(LEXICON_DATA);
 
@@ -65,6 +66,10 @@ export class ShenshuCore {
     if (path === '/manifest.json') return new Response(MANIFEST_JSON, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
     if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
+    if (path === '/apple-touch-icon.png' || path === '/apple-touch-icon-precomposed.png' || path === '/icon-180.png' || path === '/icon-192.png' || path === '/icon.png') {
+      const bytes = Uint8Array.from(atob(ICON_PNG_B64), c => c.charCodeAt(0));
+      return new Response(bytes, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
+    }
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
@@ -818,7 +823,9 @@ const MANIFEST_JSON = JSON.stringify({
   theme_color: '#08090B',
   lang: 'zh-CN',
   icons: [
-    { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
   ],
 });
 

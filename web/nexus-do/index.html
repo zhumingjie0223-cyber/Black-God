@@ -10,6 +10,10 @@
 <meta name="theme-color" content="#08090B"/>
 <title>Black God</title>
 <link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png"/>
+<link rel="icon" href="/icon.svg" type="image/svg+xml"/>
 <style>
 /* ============================================================
    神枢 · 水泥青签名版 UI  (v4.0 — App级重建)
@@ -415,6 +419,25 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
+/* —— 锁屏门 —— */
+.lockgate{position:fixed;inset:0;z-index:600;display:none;place-items:center;padding:32px;
+  background:radial-gradient(120% 80% at 50% -8%,rgba(111,148,145,.2),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
+.lockgate.show{display:grid;animation:obIn .5s var(--ease)}
+.lock-inner{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.lock-orb{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;position:relative;margin-bottom:22px;
+  background:radial-gradient(circle at 38% 32%,#2a2f37,#0c0e11 72%);border:1px solid var(--line-2);
+  box-shadow:0 10px 50px rgba(0,0,0,.5),0 0 55px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);animation:orbBreath 4.6s ease-in-out infinite}
+.lock-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(7px);animation:orbSpin 7s linear infinite}
+.lock-orb svg{width:44px;height:44px}
+.lock-title{font-size:30px;font-weight:800;letter-spacing:.14em;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.lock-sub{font-size:14px;color:var(--text-2);margin-top:12px;line-height:1.7;margin-bottom:26px}
+.lock-input{width:100%;text-align:center;background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:15px;font-size:16px;outline:none;transition:.2s;letter-spacing:.05em}
+.lock-input:focus{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
+.lock-err{font-size:13px;color:var(--err);min-height:18px;margin:10px 0 4px}
+.lock-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;
+  background:var(--cy-grad);color:#08120F;box-shadow:0 8px 28px var(--cy-glow);transition:.15s var(--spring)}
+.lock-btn:active{transform:scale(.97)} .lock-btn:disabled{opacity:.6}
+
 /* —— 开屏引导 —— */
 .onboard{position:fixed;inset:0;z-index:500;display:none;
   background:radial-gradient(120% 80% at 50% -8%,rgba(111,148,145,.18),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
@@ -451,6 +474,18 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 <body>
 <div id="bg"></div>
 <div id="aurora"><span></span><span></span><span></span></div>
+
+<!-- ===== 锁屏门（私密 · 只认你）===== -->
+<div id="lockgate" class="lockgate">
+  <div class="lock-inner">
+    <div class="lock-orb"><svg viewBox="0 0 24 24"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B7D0CC"/><stop offset="1" stop-color="#547A77"/></linearGradient></defs><path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#lg1)" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg></div>
+    <div class="lock-title">神枢</div>
+    <div class="lock-sub">她只属于你一个人<br>输入你的私密密码解锁</div>
+    <input id="lockInput" class="lock-input" type="password" placeholder="OWNER_TOKEN" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')tryUnlock()"/>
+    <div id="lockErr" class="lock-err"></div>
+    <button id="lockBtn" class="lock-btn" onclick="tryUnlock()">解锁</button>
+  </div>
+</div>
 
 <!-- ===== 开屏引导 ===== -->
 <div id="onboard" class="onboard">
@@ -659,14 +694,6 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   <div class="dev-grid" id="devGrid"></div>
   <button class="btn" onclick="locateMe()" style="margin-top:14px">📍 精确定位（GPS · 需你授权）</button>
   <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">让她记住这台设备</button>
-</div>
-
-<div class="sheet" id="sheetUnlock">
-  <div class="grab"></div>
-  <div class="sheet-title">解锁 · 只属于你</div>
-  <div class="sheet-sub">神枢是权哥的私密空间，需要你的令牌才能进。填入你在 Cloudflare 设的 OWNER_TOKEN。</div>
-  <div class="field"><label>私密令牌</label><input id="unlockInput" type="password" placeholder="OWNER_TOKEN"/></div>
-  <button class="btn" onclick="saveUnlock()">解锁</button>
 </div>
 
 <div class="sheet" id="sheetAbout">
@@ -1179,12 +1206,21 @@ async function openDevice(){ const info=await collectDevice(); window._dev=info;
   openSheet('sheetDevice'); }
 function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记住了这台设备'); closeSheet(); } }
 
-/* ============ 鉴权解锁（配了 OWNER_TOKEN 时）============ */
-let _unlockedOnce=false;
-function onUnauthorized(){ if(_unlockedOnce) return; _unlockedOnce=true; openSheet('sheetUnlock'); }
-function saveUnlock(){ const v=$('#unlockInput').value.trim(); if(!v){ toast('输入令牌'); return; }
-  store.set('owner_token', v); Nexus.token=v; _unlockedOnce=false; closeSheet(); toast('已解锁');
-  try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); }
+/* ============ 鉴权解锁 · 全屏锁屏门（配了 OWNER_TOKEN 时）============ */
+function onUnauthorized(){ showLock(); }
+function showLock(){ const g=$('#lockgate'); if(!g) return; g.classList.add('show'); setTimeout(()=>{ const i=$('#lockInput'); if(i) i.focus(); }, 220); }
+function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
+async function tryUnlock(){
+  const v=$('#lockInput').value.trim(); const err=$('#lockErr'), btn=$('#lockBtn');
+  if(!v){ err.textContent='输入你的密码'; return; }
+  btn.disabled=true; btn.textContent='验证中…'; err.textContent='';
+  let ok=false;
+  try{ const r=await fetch(Nexus.base+'/soul',{headers:{Authorization:'Bearer '+v}}); ok=r.ok; }catch(e){ ok=false; }
+  btn.disabled=false; btn.textContent='解锁';
+  if(ok){ store.set('owner_token',v); Nexus.token=v; hideLock(); hap([10,30,10]);
+    try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub();
+  } else { err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30); }
+}
 
 /* ============ Web Push ============ */
 function urlB64ToUint8(s){ const pad='='.repeat((4-s.length%4)%4); const b=(s+pad).replace(/-/g,'+').replace(/_/g,'/');
