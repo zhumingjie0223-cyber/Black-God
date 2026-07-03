@@ -37,10 +37,10 @@
     "crons": ["*/5 * * * *"]
   },
 
-  // —— 自定义域名：aquan.lufei.uk（lufei.uk 需在你的 CF 账号里是活跃 zone）——
-  // 部署时 wrangler 自动建 DNS + 签证书，把域名指向这个 Worker。
+  // —— 路由：aquan.lufei.uk（与 CF 面板已有路由一致：aquan.lufei.uk/* → nexus-do）——
+  // 用 zone route 而非 custom_domain，避免与已存在的 DNS 记录/路由冲突。
   "routes": [
-    { "pattern": "aquan.lufei.uk", "custom_domain": true }
+    { "pattern": "aquan.lufei.uk/*", "zone_name": "lufei.uk" }
   ]
 
   // —— Secrets（用 `wrangler secret put <NAME>` 设置，不写进仓库）——
