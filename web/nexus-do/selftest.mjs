@@ -32,7 +32,7 @@ const ta = S.computeTimeAwareness({ last_seen: Date.now() - 3600000, born: Date.
 ok('时间感知有时段与离开时长', !!ta.时段 && !!ta.离开时长 && !!ta.我活了);
 
 // 枢语引擎往返
-ok('枢语容量 = 29.5 亿', CAPACITY === 2949120000);
+ok('枢语容量 = 76.7 亿（32 新核心族扩充后）', CAPACITY === 7667712000);
 const w = decode(123456789);
 ok('decode→encode 往返一致', encode(w.词) === 123456789);
 ok('coinWord 产出合法词', !!coinWord('情感').词);
