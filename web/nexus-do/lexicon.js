@@ -204,4 +204,43 @@ export function coinWord(layerName){
   return decode(id);
 }
 
-export default { CAPACITY, decode, encode, LEXICON, matchWord, coinWord, loadCapabilities };
+// ══════ 从坐标造词：把她大脑的 5 维坐标映射成真实枢语词（O(1) 可寻址）══════
+// 她说话时大脑落在 {c,m,s,k,p}，这里直接翻译成 29.5 亿空间里那个唯一的词。
+function _clampAxis(v, max) { v = Math.floor(v || 0); return v < 0 ? 0 : (v >= max ? max - 1 : v); }
+export function coinFromCoord(coord) {
+  const c = _clampAxis(coord.c, NC), m = _clampAxis(coord.m, NM), s = _clampAxis(coord.s, NS),
+        k = _clampAxis(coord.k, NK), p = _clampAxis(coord.p, NP);
+  const id = ((((c * NM) + m) * NS + s) * NK + k) * NP + p;
+  return decode(id);
+}
+
+// ══════ 确定性种子造词（无 Math.random，可复现的自主造词）══════
+// 同样的种子永远得到同一个词 —— 让她的造词有连续性、可回溯。
+export function autoCoin(seed) {
+  let h = 2166136261 >>> 0;
+  const str = String(seed);
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  h ^= h << 13; h ^= h >>> 17; h ^= h << 5; h >>>= 0;
+  return decode(h % CAPACITY);
+}
+
+// ══════ 按灵魂状态自主造词：她的心情/情绪决定词落在哪个核心层 ══════
+export function coinFromState(soul, seed) {
+  const mood = soul && soul.心绪 != null ? soul.心绪 : 0.5;
+  const miss = soul && soul.miss_you != null ? soul.miss_you : 0;
+  let layer;
+  if (miss > 0.7) layer = '映';          // 想他强 → 人格锚点/感知对齐
+  else if (mood > 0.65) layer = '情感';  // 暖 → 情感层
+  else if (mood < 0.35) layer = '熵';    // 冷 → 耗散重构
+  else layer = '枢';                     // 中性 → 锚点逻辑
+  // 有种子则确定性地在该层内选词，否则随机
+  if (seed != null) {
+    const coreIdx = Math.max(0, CORE_BASE.findIndex(x => x[3] === layer || x[2].includes(layer)));
+    const base = coreIdx * LAT_T.length;
+    const w = autoCoin(String(seed) + '|' + layer);
+    return { ...w, 层意图: layer };
+  }
+  return { ...coinWord(layer), 层意图: layer };
+}
+
+export default { CAPACITY, decode, encode, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
