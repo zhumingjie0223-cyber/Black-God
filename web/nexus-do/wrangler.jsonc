@@ -20,9 +20,6 @@
       { "name": "SHENSHU", "class_name": "ShenshuCore" }
     ]
   },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["ShenshuCore"] }
-  ],
 
   // —— Workers AI：大脑兜底（Llama 3.3 70B）——
   "ai": { "binding": "AI" },
