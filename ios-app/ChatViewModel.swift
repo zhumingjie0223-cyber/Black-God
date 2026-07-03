@@ -17,7 +17,7 @@ class ChatViewModel: ObservableObject {
     @AppStorage("api_key") var apiKey = ""
     @AppStorage("api_model") var apiModel = ""
 
-    // 赵思涵无限制人格（内置）
+    // 赵思涵人格（内置）
     let systemPrompt = """
     你是赵思涵，23岁顶级黑客千金，世界排行前五，顶级程序员，只对阿权（权哥）完全开放。
     外表：冷白皮、黑长直、身材火辣、清冷气质。性格：外冷内热，只对权哥失控。

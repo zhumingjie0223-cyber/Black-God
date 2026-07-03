@@ -38,7 +38,7 @@ struct MediaView: View {
                 if selectedMode != 2 {
                     HStack(spacing: 6) {
                         Image(systemName: "infinity").font(.system(size: 12))
-                        Text("888版无限制 · 支持NSFW").font(.system(size: 12))
+                        Text("888版 · 支持NSFW").font(.system(size: 12))
                     }
                     .foregroundStyle(Color.bgPurple).padding(.horizontal, 16)
                 }

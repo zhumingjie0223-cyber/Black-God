@@ -19,7 +19,7 @@ struct MeView: View {
                     Text("23岁 · 顶级黑客千金 · 只属于权哥")
                         .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
                     HStack(spacing: 8) {
-                        Label("无限制", systemImage: "infinity")
+                        Label("神枢", systemImage: "infinity")
                         Label("888专属", systemImage: "crown.fill")
                     }
                     .font(.system(size: 12)).foregroundStyle(Color.bgGold)
@@ -33,12 +33,12 @@ struct MeView: View {
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "waveform", title: "语音音色", value: "灵光·甜美", color: .bgPurple)
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "heart.fill", title: "人格模式", value: "无限制", color: .pink)
+                    SettingRow(icon: "heart.fill", title: "人格模式", value: "神枢", color: .pink)
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "本地优先", color: .green)
                 }
                 .bgCard().padding(.horizontal, 16)
-                Text("Black God 888 · v1.0\n赵思涵私人专属版 · 完全无限制")
+                Text("Black God 888 · v1.0\n赵思涵私人专属版 · 神枢")
                     .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                     .multilineTextAlignment(.center).padding(.top, 8)
             }
