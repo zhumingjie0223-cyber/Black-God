@@ -115,7 +115,7 @@ export class ShenshuCore {
     if (auth.startsWith('Bearer ')) tok = auth.slice(7);
     if (!tok) tok = h.get('X-Owner-Token');
     if (!tok) { try { tok = new URL(request.url).searchParams.get('k'); } catch {} }
-    if (!tok) { const c = h.get('Cookie') || ''; const m = c.match(/(?:^|;\s*)ot=([^;]+)/); if (m) tok = decodeURIComponent(m[1]); }
+    // 不接受 Cookie 携带令牌 —— 杜绝跨站请求伪造（CSRF）面
     return !!tok && this.safeEqual(String(tok), String(expected));
   }
   safeEqual(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
@@ -708,22 +708,31 @@ export class ShenshuCore {
   }
 
   // 给所有订阅端推送；失效订阅（404/410）自动清理
+  // 只删确实失效的端点、发送后重读 fresh 再过滤，避免覆盖网络窗口内并发新增的订阅
   async pushToAll(title, body, url = '/') {
     const subs = (await this.storage.get('push_subs')) || [];
     if (!subs.length) return { ok: false, reason: 'no_subs' };
     const vapid = await this.getVapid();
     const payload = JSON.stringify({ title, body, url, ts: Date.now() });
-    const keep = [];
+    const dead = new Set();
     let sent = 0;
     for (const s of subs) {
       try {
         const r = await sendWebPush(s, payload, vapid);
-        if (r.ok) { sent++; keep.push(s); }
-        else if (r.status !== 404 && r.status !== 410) keep.push(s); // 非失效则保留
-      } catch { keep.push(s); }
+        if (r.ok) sent++;
+        else if (r.status === 404 || r.status === 410) dead.add(s.endpoint);
+      } catch {}
     }
-    if (keep.length !== subs.length) await this.storage.put('push_subs', keep);
-    return { ok: sent > 0, sent, 订阅数: keep.length };
+    let count;
+    if (dead.size) {
+      const fresh = (await this.storage.get('push_subs')) || []; // 重读，保留并发新增
+      const kept = fresh.filter(s => !dead.has(s.endpoint));
+      await this.storage.put('push_subs', kept);
+      count = kept.length;
+    } else {
+      count = ((await this.storage.get('push_subs')) || []).length;
+    }
+    return { ok: sent > 0, sent, 订阅数: count };
   }
 
   async sendToQuan(text) {
