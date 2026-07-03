@@ -35,7 +35,13 @@
   // —— Cron：兜底心跳（alarm 链是主，cron 是保险，绝不掉线）——
   "triggers": {
     "crons": ["*/5 * * * *"]
-  }
+  },
+
+  // —— 自定义域名：aquan.lufei.uk（lufei.uk 需在你的 CF 账号里是活跃 zone）——
+  // 部署时 wrangler 自动建 DNS + 签证书，把域名指向这个 Worker。
+  "routes": [
+    { "pattern": "aquan.lufei.uk", "custom_domain": true }
+  ]
 
   // —— Secrets（用 `wrangler secret put <NAME>` 设置，不写进仓库）——
   //   TG_BOT_TOKEN        主动推送用的 Telegram bot token
