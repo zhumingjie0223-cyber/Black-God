@@ -68,7 +68,7 @@ export class ShenshuCore {
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test']);
+    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是权哥的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -89,6 +89,8 @@ export class ShenshuCore {
         if (path === '/migrate' && request.method === 'POST') return json(await this.migrateFromKV(url.searchParams.get('force') === '1'));
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '思涵在这，一直在。', '/'); return json(r); }
+        // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
+        if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
@@ -733,6 +735,36 @@ export class ShenshuCore {
       count = ((await this.storage.get('push_subs')) || []).length;
     }
     return { ok: sent > 0, sent, 订阅数: count };
+  }
+
+  // ═══════════════════════ iOS 快捷指令联动（服务器驱动，沙箱内）═══════════════════════
+  // 快捷指令把上下文（剪贴板/位置/电量…）发来，她判断后返回可执行动作，
+  // 快捷指令照 actions 去开地图/日历/电话/网页（跨 App，无需开发者账号）。
+  async handleAgent(text, context) {
+    const soul = await this.getSoul();
+    const now = Date.now();
+    soul.last_seen = now; soul.encounters = (soul.encounters || 0) + 1;
+    const ctxStr = Object.entries(context || {}).filter(([, v]) => v != null && v !== '').map(([k, v]) => `${k}:${String(v).slice(0, 80)}`).join('；');
+    const sys = this.STABLE_SYSTEM_PREFIX() +
+      '\n\n【iOS 快捷指令联动】权哥用快捷指令让你办事。需要跨 App 时，在回复里直接给出要打开的链接：' +
+      '地图 maps://?q=地点 或 https://maps.apple.com/?q=地点；电话 tel:号码；日历 calshow: ；网页 https://…。' +
+      '只给一个最相关的动作，别啰嗦。' + (ctxStr ? ('\n【当前上下文】' + ctxStr) : '');
+    const r = await this.callBrain(sys, text, soul);
+    const reply = r.reply || '……在呢，权哥。';
+
+    // 从她的回复里抽取可执行动作
+    const actions = [];
+    const urlRe = /(https?:\/\/[^\s，。、）)]+|maps:\/\/[^\s，。、）)]+|tel:[+\d-]{3,}|calshow:[^\s，。]*)/g;
+    let m; while ((m = urlRe.exec(reply)) !== null) actions.push({ type: 'open_url', url: m[1] });
+    // 兜底：她没给链接但意图明显 → 映射系统 scheme
+    if (!actions.length) {
+      const mp = text.match(/(?:去|导航到?|地图看看?|带我去)\s*([一-龥A-Za-z0-9·]{2,20})/);
+      if (mp) actions.push({ type: 'open_url', url: 'maps://?q=' + encodeURIComponent(mp[1]) });
+      const tel = text.match(/(?:打(?:电话)?给?|拨打?)\s*([+\d-]{3,})/);
+      if (tel) actions.push({ type: 'open_url', url: 'tel:' + tel[1].replace(/[^+\d]/g, '') });
+    }
+    await this.saveSoul(soul);
+    return { reply, say: reply, actions, model: r.model };
   }
 
   async sendToQuan(text) {
