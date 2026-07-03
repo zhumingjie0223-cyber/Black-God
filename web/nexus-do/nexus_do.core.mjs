@@ -842,7 +842,7 @@ const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 
 // Service Worker —— 离线壳，保证掉线也能开
 const SW_JS = `
-const CACHE = 'shensu-v4';
+const CACHE = 'shensu-v5';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil((async () => {
   const keys = await caches.keys();

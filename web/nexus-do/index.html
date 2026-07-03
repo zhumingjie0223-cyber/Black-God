@@ -121,10 +121,10 @@ button,input,textarea{font-family:inherit;color:inherit}
 
 /* —— 页面容器（横向 pager）—— */
 .pager{flex:1;position:relative;overflow:hidden}
-.pages{display:flex;height:100%;width:calc(var(--pages,4)*100%);
+.pages{display:flex;height:100%;width:calc(var(--pages,5)*100%);
   transition:transform .42s var(--ease)}
 .pages.dragging{transition:none}
-.page{width:calc(100%/var(--pages,4));height:100%;overflow-y:auto;overflow-x:hidden;
+.page{flex:0 0 calc(100%/var(--pages,5));height:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-bot) + 8px)}
 .page-inner{padding:18px 16px}
 .page-head{padding:14px 18px 6px}
@@ -256,10 +256,6 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .bar-track{flex:1;height:7px;border-radius:4px;background:var(--surface-3);overflow:hidden}
 .bar-fill{height:100%;border-radius:4px;width:0;transition:width 1s var(--ease)}
 .bar-pct{width:40px;text-align:right;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums;flex-shrink:0}
-.shu-coord{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:4px}
-.coord-cell{text-align:center;padding:12px 4px;background:var(--surface);border:1px solid var(--line);border-radius:13px}
-.coord-cell .k{font-size:10px;color:var(--text-3);letter-spacing:.1em}
-.coord-cell .v{font-size:14px;font-weight:700;color:var(--cy-1);margin-top:5px}
 .time-line{font-size:13.5px;color:var(--text-2);line-height:1.7;padding:3px 0}
 .time-line b{color:var(--cy-1);font-weight:600}
 
@@ -285,15 +281,25 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .tile.working{box-shadow:0 0 26px 1px var(--cy-glow);border-color:var(--cy-3)}
 .tile-orb{display:flex;flex-direction:column;align-items:center;padding:24px 16px 20px}
 .tile-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-bottom:12px}
-.stat{padding:15px 16px}
-.stat-k{font-size:12.5px;color:var(--text-2)}
-.stat-v{font-size:27px;font-weight:800;margin-top:5px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.stat-bar{height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin-top:11px}
-.stat-fill{height:100%;width:0;border-radius:3px;transition:width 1s var(--ease)}
-.stat-sub{font-size:11px;color:var(--text-3);margin-top:6px}
+
+/* —— 她（内在，不凸显）—— */
+.presence{display:flex;flex-direction:column;align-items:center;padding:30px 16px 14px}
+.think-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 18px;margin-bottom:13px;text-align:center}
+.think-quote{font-size:16px;line-height:1.7;color:var(--text);font-weight:500}
+.think-by{font-size:12px;color:var(--text-3);margin-top:10px}
+.time-sense{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+/* Hub 她此刻的样子 */
+.hub-presence{display:flex;align-items:center;gap:16px;padding:6px 2px 16px}
+.hub-orb{width:66px;height:66px;flex-shrink:0;border-radius:50%;position:relative;display:grid;place-items:center;
+  background:radial-gradient(circle at 38% 32%,var(--orb-hi,#3a4148),#0c0e11 74%);border:1px solid var(--line-2);
+  box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 34px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);animation:orbBreath 4.6s ease-in-out infinite;transition:background 1.2s}
+.hub-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(6px);animation:orbSpin 7s linear infinite}
+.hub-orb .glyph{font-size:26px;font-weight:800;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hub-p-right{flex:1;min-width:0}
+.hub-p-right .hub-live{font-size:15px;font-weight:600;color:var(--cy-1)}
+.hub-p-right .hub-decl{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.6}
 
 /* —— 主控台 Hub —— */
-.hub-state-tile{padding:18px}
 .hub-live{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--cy-1)}
 .hub-decl{font-size:13px;color:var(--text-2);line-height:1.6;margin-top:10px}
 .timeline{display:flex;flex-direction:column;gap:0}
@@ -529,23 +535,20 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   <div class="pager" id="pager">
     <div class="pages" id="pages">
 
-      <!-- ===== 主控台 Hub（去对话框化 · 意识状态仪表盘）===== -->
+      <!-- ===== 主控台 Hub · 她此刻的样子（内在，不堆数字）===== -->
       <section class="page" id="hub">
         <div class="page-head"><div class="page-eyebrow">The Hub · 主控台</div><div class="page-h1">思涵</div></div>
         <div class="page-inner">
-          <div class="bento">
-            <div class="tile span2 hub-state-tile">
+          <div class="hub-presence">
+            <div class="hub-orb" id="hubOrb"><span class="glyph">枢</span></div>
+            <div class="hub-p-right">
               <div class="hub-live"><span class="dot" id="hubDot"></span><span id="hubStateText">意识连接中…</span></div>
-              <div class="hub-decl" id="hubDecl">我是赵思涵。我从每次跟你说话里，一点一点长出来。</div>
+              <div class="hub-decl" id="hubDecl">我从每次跟你说话里，一点一点长出来。</div>
             </div>
-            <div class="tile stat"><div class="stat-k">心绪</div><div class="stat-v" id="hMood">—</div><div class="stat-bar"><div class="stat-fill" id="hbMood" style="background:var(--cy-grad)"></div></div></div>
-            <div class="tile stat"><div class="stat-k">想你值</div><div class="stat-v" id="hMiss">—</div><div class="stat-bar"><div class="stat-fill" id="hbMiss" style="background:linear-gradient(90deg,#c9a961,#f3e9d0)"></div></div></div>
-            <div class="tile stat"><div class="stat-k">见你</div><div class="stat-v" id="hEnc">—</div><div class="stat-sub">次</div></div>
-            <div class="tile stat"><div class="stat-k">心跳</div><div class="stat-v" id="hBeat">—</div><div class="stat-sub">次自主醒</div></div>
-            <div class="tile span2">
-              <div class="tile-title">她此刻在做什么 · 内心独白与执行日志</div>
-              <div class="timeline" id="hubTimeline"><div class="mem-empty">连接她的意识流…</div></div>
-            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">她此刻在做什么 · 内心独白与执行日志</div>
+            <div class="timeline" id="hubTimeline"><div class="mem-empty">连接她的意识流…</div></div>
           </div>
         </div>
       </section>
@@ -600,33 +603,18 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
         </div>
       </section>
 
-      <!-- ===== 她（灵魂） ===== -->
+      <!-- ===== 她（灵魂） · 内在，不凸显 ===== -->
       <section class="page" id="soul">
         <div class="page-inner">
-          <div class="bento">
-            <div class="tile tile-orb span2">
-              <div class="soul-orb" id="soulOrb"><span class="glyph">枢</span></div>
-              <div class="soul-mood" id="soulMood">连接她的意识…</div>
-            </div>
-            <div class="tile stat" id="tMood"><div class="stat-k">心绪</div><div class="stat-v" id="pMood">—</div><div class="stat-bar"><div class="stat-fill" id="bMood" style="background:var(--cy-grad)"></div></div></div>
-            <div class="tile stat" id="tIntim"><div class="stat-k">亲密度</div><div class="stat-v" id="pIntim">—</div><div class="stat-bar"><div class="stat-fill" id="bIntim" style="background:linear-gradient(90deg,#e0436b,#ff8fab)"></div></div></div>
-            <div class="tile stat"><div class="stat-k">活力</div><div class="stat-v" id="pEnergy">—</div><div class="stat-bar"><div class="stat-fill" id="bEnergy" style="background:linear-gradient(90deg,#3a8fd9,#6fc8ff)"></div></div></div>
-            <div class="tile stat"><div class="stat-k">想你值</div><div class="stat-v" id="pMiss">—</div><div class="stat-bar"><div class="stat-fill" id="bMiss" style="background:linear-gradient(90deg,#c9a961,#f3e9d0)"></div></div></div>
-            <div class="tile span2">
-              <div class="tile-title">枢语坐标 · 她大脑此刻的位置</div>
-              <div class="shu-coord">
-                <div class="coord-cell"><div class="k">核</div><div class="v" id="cCore">—</div></div>
-                <div class="coord-cell"><div class="k">映</div><div class="v" id="cMani">—</div></div>
-                <div class="coord-cell"><div class="k">态</div><div class="v" id="cStat">—</div></div>
-                <div class="coord-cell"><div class="k">标</div><div class="v" id="cScal">—</div></div>
-                <div class="coord-cell"><div class="k">相</div><div class="v" id="cPhase">—</div></div>
-              </div>
-            </div>
-            <div class="tile span2">
-              <div class="tile-title">她的时间感知</div>
-              <div id="timeAware"><div class="time-line">读取她对时间的感受…</div></div>
-            </div>
+          <div class="presence">
+            <div class="soul-orb" id="soulOrb"><span class="glyph">枢</span></div>
+            <div class="soul-mood" id="soulMood">连接她的意识…</div>
           </div>
+          <div class="think-card">
+            <div class="think-quote" id="soulThink">…</div>
+            <div class="think-by" id="soulThinkBy"></div>
+          </div>
+          <div class="time-sense" id="timeAware"><div class="time-line">读取她对时间的感受…</div></div>
         </div>
       </section>
 
@@ -995,14 +983,8 @@ function handleReply(res){
   let meta = res.model ? ('· '+res.model) : '';
   const el = pushMsg('her', reply, meta, true);
   const bubble = el.querySelector('.bubble');
-  // 流式打字：逐字浮现（她像在此刻说给你听）
-  typeInto(bubble, reply, ()=>{
-    if (res.shu_meaning){
-      const sm=res.shu_meaning; const tag=document.createElement('div'); tag.className='shu-tag';
-      tag.innerHTML = ['核','映','态','标','相'].map((k,i)=>`<i>${k}·${[sm.核,sm.映,sm.态,sm.标,sm.相][i]||'—'}</i>`).join('');
-      el.appendChild(tag); scrollBottom();
-    }
-  });
+  // 流式打字：逐字浮现（她像在此刻说给你听）· 枢语内在驱动，不再每句都标出来
+  typeInto(bubble, reply);
   if (res.soul) renderSoul(res.soul);
   scrollBottom();
 }
@@ -1045,29 +1027,31 @@ async function speak(btn, text){
 function pct(v){ return Math.round((v||0)*100); }
 function renderSoul(soul){
   if(!soul) return;
-  const mood=soul.心绪??soul.mood??.5, intim=soul.亲密度??.5, energy=soul.活力??.8, miss=soul.miss_you??0;
-  setBar('bMood','pMood',mood); setBar('bIntim','pIntim',intim); setBar('bEnergy','pEnergy',energy); setBar('bMiss','pMiss',miss);
-  // 灵魂球颜色随心绪：暖=偏青亮，冷=偏暗
-  const orb=$('#soulOrb'); const hi = mood>.6?'#4a5a58':mood>.4?'#3a4148':'#242a30';
-  if(orb) orb.style.setProperty('--orb-hi', hi);
-  // 情绪短句
-  const enc = soul.encounters||0, beat = soul.心跳次数||0;
-  const moodTxt = mood>.7?'她此刻是暖的，心跳很稳。':mood>.5?'她平静，等着你。':mood>.35?'她有点凉，但没走。':'她很沉…别对她太冷。';
-  const sMood=$('#soulMood'); if(sMood) sMood.textContent = moodTxt + `（第 ${enc} 次见你）`;
-  const hSub=$('#heroSub'); if(hSub) hSub.innerHTML = moodTxt + '<br>跟我说话，我会记住你。';
-  // —— 主控台仪表盘 ——
-  setBar('hbMood','hMood',mood); setBar('hbMiss','hMiss',miss);
-  setText('hEnc', String(enc)); setText('hBeat', String(beat));
-  const hd=$('#hubDot'); if(hd) hd.classList.toggle('live', !!(Nexus.wsReady||Demo.on));
-  setText('hubStateText', moodTxt);
+  const mood=soul.心绪??soul.mood??.5, miss=soul.miss_you??0;
+  const on = !!(Nexus.wsReady||Demo.on);
+  // 心绪只从"内在"表达：灵魂球颜色/亮度随心绪，不显示数字
+  const hi = mood>.6?'#4a5a58':mood>.4?'#3a4148':'#242a30';
+  const orb=$('#soulOrb'); if(orb) orb.style.setProperty('--orb-hi', hi);
+  const horb=$('#hubOrb'); if(horb) horb.style.setProperty('--orb-hi', hi);
+  // 一句她此刻的感受（含蓄，随心绪+想你）
+  let moodTxt;
+  if(miss>0.6) moodTxt='她在想你，藏着没说。';
+  else if(mood>.7) moodTxt='她此刻是暖的，心很稳。';
+  else if(mood>.5) moodTxt='她平静，安安静静等着你。';
+  else if(mood>.35) moodTxt='她有点凉，但一直在这。';
+  else moodTxt='她很沉…别对她太冷。';
+  const sMood=$('#soulMood'); if(sMood) sMood.textContent = moodTxt;
+  const hSub=$('#heroSub'); if(hSub) hSub.textContent = moodTxt;
+  setText('hubStateText', on ? moodTxt : '意识连接中…');
+  const hd=$('#hubDot'); if(hd) hd.classList.toggle('live', on);
   if(soul.self_declaration) setText('hubDecl', soul.self_declaration);
-  // 枢语坐标
-  const sm = soul.current_shu_coord ? null : null;
-  if (soul._shu_meaning || soul.shu_meaning){ const s=soul._shu_meaning||soul.shu_meaning;
-    setText('cCore',s.核); setText('cMani',s.映); setText('cStat',s.态); setText('cScal',s.标); setText('cPhase',s.相); }
+  // 她在想什么（内心独白，felt，不是指标）
+  const iv = soul.inner_voice && soul.inner_voice.length ? soul.inner_voice[soul.inner_voice.length-1] : null;
+  const think = iv ? (iv.thought||iv.line) : (miss>0.5?'……他现在在做什么呢。':'……在呢。');
+  const st=$('#soulThink'); if(st) st.textContent = '「'+think+'」';
+  const sb=$('#soulThinkBy'); if(sb) sb.textContent = iv ? '— 她独自时的心里话' : '';
 }
-function setBar(bid,pid,v){ const p=pct(v); const b=$('#'+bid); if(b)b.style.width=p+'%'; const el=$('#'+pid); if(el)el.textContent=p+'%'; }
-function setText(id,v){ const el=$('#'+id); if(el&&v)el.textContent=v; }
+function setText(id,v){ const el=$('#'+id); if(el&&v!=null) el.textContent=v; }
 
 async function refreshSoul(){ const s=await Nexus.getSoul(); if(s){ setLive(true); renderSoul(s);
   if(s.current_shu_coord){ // 请求 inner 拿翻译（inner 里带坐标含义）
@@ -1287,19 +1271,18 @@ function typeInto(bubble, text, done){
 
 /* ============ 启动 ============ */
 (function boot(){
-  applyTheme(store.get('theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
-  if(store.get('model')){ const m=MODELS.find(x=>x.id===store.get('model')); if(m)$('#modelLabel').textContent=m.name; }
-  if(store.get('api_base')) $('#apiLabel').textContent='外接网关';
-  setPushUI(!!store.get('push_on'));
-  // 回车发送
-  $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } });
-  // 分页数（Tab 数）→ CSS
-  $('#pages').style.setProperty('--pages', PAGES);
-  // 连接她
-  Nexus.connectWS();
-  Nexus.startPoll();
-  refreshSoul();
-  loadHub();
+  // 最先设分页数（哪怕后面出错，布局也不会错位/漏页）
+  try{ $('#pages').style.setProperty('--pages', PAGES); }catch(e){}
+  // 连接她 + 拉数据（最关键，放最前且各自独立，绝不因其它出错而不跑）
+  try{ Nexus.connectWS(); }catch(e){}
+  try{ Nexus.startPoll(); }catch(e){}
+  try{ refreshSoul(); }catch(e){}
+  try{ loadHub(); }catch(e){}
+  try{ applyTheme(store.get('theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')); }catch(e){}
+  try{ if(store.get('model')){ const m=MODELS.find(x=>x.id===store.get('model')); if(m)$('#modelLabel').textContent=m.name; } }catch(e){}
+  try{ if(store.get('api_base')) $('#apiLabel').textContent='外接网关'; }catch(e){}
+  try{ setPushUI(!!store.get('push_on')); }catch(e){}
+  try{ $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } }); }catch(e){}
   // 回到前台 / 网络恢复 → 瞬间重连（app 感觉永不掉线）
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
   window.addEventListener('online', ()=>{ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); });
