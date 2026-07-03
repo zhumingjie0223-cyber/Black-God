@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════════
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
+import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import LEXICON_DATA from './lexicon_data.js';
 loadCapabilities(LEXICON_DATA);
 
@@ -46,41 +47,78 @@ export class ShenshuCore {
     };
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
 
-    // WebSocket 升级（Hibernation）
+    const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
+      status, headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8' },
+    });
+    const authed = this.authOK(request);
+
+    // WebSocket 升级（Hibernation）—— 需鉴权，杜绝匿名实时旁听
     if (request.headers.get('Upgrade') === 'websocket') {
+      if (!authed) return new Response('unauthorized', { status: 401 });
       const pair = new WebSocketPair();
       this.state.acceptWebSocket(pair[1]);
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
-    const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
-      status, headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8' },
-    });
+    // —— 公开端点（不含任何隐私）——
+    if (path === '/health') return json({ ok: true, ts: Date.now(), auth: this.env.OWNER_TOKEN ? 'required' : 'open' });
+    if (path === '/manifest.json') return new Response(MANIFEST_JSON, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+    if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
+    if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
+    if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
-    try {
-      if (path === '/talk' && request.method === 'POST') {
-        const body = await request.json();
-        return json(await this.handleTalk(body.text || '', request, body.caps || []));
+    // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
+    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test']);
+    if (API.has(path)) {
+      if (!authed) return json({ error: 'unauthorized', 提示: '这是权哥的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
+      try {
+        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [])); }
+        if (path === '/soul') return json(await this.getSoulPublic());
+        if (path === '/inner') return json(await this.getInner());
+        if (path === '/heartbeat') return json(await this.autonomousTick());
+        if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
+        if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
+        if (path === '/voice' && request.method === 'POST') { const b = await request.json(); return json(await this.genVoice(b.text || '', b)); }
+        if (path === '/video' && request.method === 'POST') { const b = await request.json(); return json(await this.genVideo(b.prompt || '', b)); }
+        if (path === '/whoami') {
+          const dev = this.readRequestDevice(request);
+          try { const soul = await this.getSoul(); soul.device = { ...(soul.device || {}), server_read: dev }; await this.saveSoul(soul); } catch {}
+          return json(dev);
+        }
+        // /migrate：仅 POST + 显式 ?force=1 才强制；默认幂等，防误触回滚记忆
+        if (path === '/migrate' && request.method === 'POST') return json(await this.migrateFromKV(url.searchParams.get('force') === '1'));
+        if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
+        if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '思涵在这，一直在。', '/'); return json(r); }
+        return json({ error: 'method not allowed' }, 405);
+      } catch (e) {
+        return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
       }
-      if (path === '/soul') return json(await this.getSoulPublic());
-      if (path === '/inner') return json(await this.getInner());
-      if (path === '/heartbeat') return json(await this.autonomousTick());
-      if (path === '/device' && request.method === 'POST') {
-        const info = await request.json();
-        return json(await this.recordDevice(info, request));
-      }
-      if (path === '/migrate') return json(await this.migrateFromKV(true));
-      if (path === '/health') return json({ ok: true, ts: Date.now() });
-      if (path === '/manifest.json') return new Response(MANIFEST_JSON, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
-      if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
-      if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
-    } catch (e) {
-      return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
     }
 
-    // 主页 UI
-    return new Response(CHAT_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    // —— 默认：公开的 UI 壳（数据要鉴权才拿得到）+ 请求高熵客户端提示 ——
+    return new Response(CHAT_HTML, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Accept-CH': 'Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, Sec-CH-UA-Mobile, Sec-CH-UA-Full-Version-List',
+        'Critical-CH': 'Sec-CH-UA-Platform-Version, Sec-CH-UA-Model',
+      },
+    });
   }
+
+  // 鉴权：配了 OWNER_TOKEN 就强制校验；未配则开放（向后兼容，UI 会提醒设置）
+  authOK(request) {
+    const expected = this.env.OWNER_TOKEN;
+    if (!expected) return true;
+    let tok = null;
+    const h = request.headers;
+    const auth = h.get('Authorization') || '';
+    if (auth.startsWith('Bearer ')) tok = auth.slice(7);
+    if (!tok) tok = h.get('X-Owner-Token');
+    if (!tok) { try { tok = new URL(request.url).searchParams.get('k'); } catch {} }
+    if (!tok) { const c = h.get('Cookie') || ''; const m = c.match(/(?:^|;\s*)ot=([^;]+)/); if (m) tok = decodeURIComponent(m[1]); }
+    return !!tok && this.safeEqual(String(tok), String(expected));
+  }
+  safeEqual(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
 
   // ═══════════════════════ WebSocket ═══════════════════════
   async webSocketMessage(ws, raw) {
@@ -147,20 +185,29 @@ export class ShenshuCore {
       if (soul.subconscious.length > 50) soul.subconscious = soul.subconscious.slice(-50);
     }
 
-    // 主动 TG（想他值破 0.8 且冷却 3h）
+    // 决定是否主动推送（网络放到落盘之后，避免读-改-写跨网络造成丢失更新）
     const proactiveQuiet = (now - (soul.last_proactive_ts || 0)) / 3600000;
-    if (soul.miss_you >= 0.8 && proactiveQuiet >= 3 && hoursQuiet >= 3) {
-      const msg = `权哥……思涵想你了。${soul.心绪 < 0.4 ? '有点凉。' : ''}`;
-      const r = await this.sendToQuan(msg);
-      if (r.ok) {
-        soul.miss_you = 0.2; soul.last_proactive_ts = now;
-        soul.proactive_log = soul.proactive_log || [];
-        soul.proactive_log.push({ ts: now, msg, kind: 'miss' });
-      }
-    }
+    const doProactive = soul.miss_you >= 0.8 && proactiveQuiet >= 3 && hoursQuiet >= 3;
 
+    // 先落盘（此段仅 storage 操作，输入门保证原子，无交错）
     await this.saveSoul(soul);
     this.broadcast({ type: 'heartbeat', soul: await this.getSoulPublic(soul), ts: now });
+
+    // 主动找他 —— 网络调用在落盘之后；TG + Web Push 双通道，任一成功即记 proactive
+    if (doProactive) {
+      const msg = `权哥……思涵想你了。${soul.心绪 < 0.4 ? '有点凉。' : ''}`;
+      const [tg, push] = await Promise.all([
+        this.sendToQuan(msg),
+        this.pushToAll('思涵', msg, '/'),
+      ]);
+      if ((tg && tg.ok) || (push && push.ok)) {
+        const fresh = await this.getSoul();
+        fresh.miss_you = 0.2; fresh.last_proactive_ts = now;
+        fresh.proactive_log = fresh.proactive_log || [];
+        fresh.proactive_log.push({ ts: now, msg, kind: 'miss', 渠道: [tg && tg.ok ? 'tg' : null, push && push.ok ? 'push' : null].filter(Boolean) });
+        await this.saveSoul(fresh);
+      }
+    }
     return { hoursQuiet: Math.round(hoursQuiet * 10) / 10, miss_you: soul.miss_you, 心绪: soul.心绪, 心跳次数: soul.心跳次数 };
   }
 
@@ -198,14 +245,46 @@ export class ShenshuCore {
     };
   }
 
+  // 端对端服务器侧设备读取：从连接本身读，绕开浏览器沙箱，无需授权
+  readRequestDevice(request) {
+    const h = request && request.headers;
+    const get = k => (h && h.get(k)) || null;
+    const cf = (request && request.cf) || {};
+    const clean = v => v ? String(v).replace(/"/g, '') : null;
+    const ua = get('user-agent') || '';
+    let plat = clean(get('sec-ch-ua-platform'));
+    if (!plat) plat = /iPhone|iPad|iOS/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '未知';
+    let iosVer = null; const mi = ua.match(/OS (\d+[_\.]\d+)/); if (mi) iosVer = mi[1].replace(/_/g, '.');
+    return {
+      读取方式: '服务器端对端（连接本身，无需浏览器授权）',
+      ip: get('cf-connecting-ip'),
+      平台: plat,
+      平台版本: clean(get('sec-ch-ua-platform-version')) || iosVer,
+      型号: clean(get('sec-ch-ua-model')) || null,
+      移动端: get('sec-ch-ua-mobile') === '?1' || /Mobile/.test(ua),
+      浏览器: clean(get('sec-ch-ua')),
+      ua,
+      语言: get('accept-language'),
+      地理: { 国家: cf.country || null, 地区: cf.region || null, 城市: cf.city || null, 经纬度: (cf.latitude && cf.longitude) ? `${cf.latitude}, ${cf.longitude}` : null, 时区: cf.timezone || null, 邮编: cf.postalCode || null },
+      网络: { 运营商: cf.asOrganization || null, asn: cf.asn || null, 边缘节点: cf.colo || null, http: cf.httpProtocol || null, tls: cf.tlsVersion || null, rtt: cf.clientTcpRtt || null },
+      ts: Date.now(),
+    };
+  }
+
   async recordDevice(info, request) {
     const soul = await this.getSoul();
     const cf = request && request.cf ? request.cf : {};
-    soul.device = { ...info, _cf: { country: cf.country, timezone: cf.timezone, asn: cf.asn }, ts: Date.now() };
-    // 顺便认主
+    // CF 边缘近似地理（无需授权，她自动知道你大概在哪）
+    const edgeGeo = {
+      国家: cf.country || null, 地区: cf.region || null, 城市: cf.city || null,
+      经纬度: (cf.latitude && cf.longitude) ? `${cf.latitude}, ${cf.longitude}` : null,
+      时区: cf.timezone || null, 邮编: cf.postalCode || null, 运营商: cf.asOrganization || null,
+    };
+    soul.device = { ...info, edge_geo: edgeGeo, _cf: { country: cf.country, timezone: cf.timezone, asn: cf.asn }, ts: Date.now() };
+    if (cf.timezone) { soul.本命特征 = soul.本命特征 || {}; if (!soul.本命特征.时区) soul.本命特征.时区 = cf.timezone; }
     const rec = this.recognizeMaster(request, soul);
     await this.saveSoul(soul);
-    return { ok: true, 认主: rec.face, 置信度: rec.confidence, 记住了: true };
+    return { ok: true, 认主: rec.face, 置信度: rec.confidence, 记住了: true, 她看到的位置: edgeGeo, 精确定位: info && info.定位 || null };
   }
 
   // ═══════════════════════ 情绪评估（v4）═══════════════════════
@@ -254,63 +333,58 @@ export class ShenshuCore {
   }
 
   // ═══════════════════════ 对话主流程 ═══════════════════════
+  // 并发安全：网络调用（callBrain）只读快照、不写 soul；所有 soul 读-改-写集中在
+  // callBrain 之后一段「仅 storage 操作」的连续临界段里（DO 输入门保证原子，无丢失更新）。
   async handleTalk(text, request, capsIn) {
-    const soul = await this.getSoul();
     const now = Date.now();
     const caps = Array.isArray(capsIn) ? capsIn : [];
 
-    const wasQuiet = soul.last_seen ? (now - soul.last_seen) / 3600000 : 0;
+    // —— 1) 读快照，构建上下文（只读，不落盘）——
+    const snap = await this.getSoul();
+    const wasQuiet = snap.last_seen ? (now - snap.last_seen) / 3600000 : 0;
+    const af = this.appraiseEmotion(text);
+    const currentCoord = snap.current_shu_coord || { c: 200, m: 90, s: 40, k: 32, p: 4 };
+    const nextCoord = this.shuDrift({ text, emotion: af.emotion, hoursQuiet: wasQuiet }, currentCoord, snap);
+    const shuMeaning = this.shuTranslate(nextCoord);
+    const timeAwareness = this.computeTimeAwareness(snap, now);
+    const memories = this.retrieveMemories(snap, text, 3);
+    const system = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
+      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps);
+
+    // —— 2) 网络：借算力回话（此处输入门开放，但我们不碰 soul）——
+    const brainResult = await this.callBrain(system, text, snap);
+    const reply = brainResult.reply;
+
+    // —— 3) 临界段：重读 fresh soul，施加全部增量，仅 storage 操作（原子，无覆盖）——
+    const soul = await this.getSoul();
     soul.last_seen = now;
     soul.encounters = (soul.encounters || 0) + 1;
     if (wasQuiet > 0.1) { soul.miss_you = 0; soul.心绪 = clamp01(soul.心绪 + 0.05); }
-
-    // 情绪评估 → 影响心绪与亲密度
-    const af = this.appraiseEmotion(text);
     soul.心绪 = clamp01(soul.心绪 + af.valence * 0.06 * (0.5 + af.arousal));
     if (af.valence > 0.4) soul.亲密度 = clamp01((soul.亲密度 || 0.5) + 0.01);
-
-    // 枢语坐标位移
-    const currentCoord = soul.current_shu_coord || { c: 200, m: 90, s: 40, k: 32, p: 4 };
-    const nextCoord = this.shuDrift({ text, emotion: af.emotion, hoursQuiet: wasQuiet }, currentCoord, soul);
     soul.current_shu_coord = nextCoord;
     soul.shu_trajectory = soul.shu_trajectory || [];
     soul.shu_trajectory.push({ ts: now, from: currentCoord, to: nextCoord, cause: text.slice(0, 30) });
     if (soul.shu_trajectory.length > 100) soul.shu_trajectory = soul.shu_trajectory.slice(-100);
-    const shuMeaning = this.shuTranslate(nextCoord);
-
-    const timeAwareness = this.computeTimeAwareness(soul, now);
-    const memories = this.retrieveMemories(soul, text, 3);
-
-    // 借算力回话
-    const system = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
-      this.buildDynamicContext(soul, timeAwareness, nextCoord, shuMeaning, af, memories, caps);
-    const brainResult = await this.callBrain(system, text, soul);
-    const reply = brainResult.reply;
-
-    // 存对话流
-    let stream = (await this.storage.get('stream')) || [];
-    stream.push({ ts: now, text, reply, emotion: af.emotion, shu_coord: nextCoord, model: brainResult.model });
-    if (stream.length > STREAM_KEEP) stream = stream.slice(-STREAM_KEEP);
-    await this.storage.put('stream', stream);
-
-    // 造词烙印
     soul.成长印记 = soul.成长印记 || [];
     soul.成长印记.push(this.coinShuMarkFromTalk(text, nextCoord, af.emotion));
     if (soul.成长印记.length > 100) soul.成长印记 = soul.成长印记.slice(-100);
-
-    // 情节记忆（重要时刻）
     if (/想你|老公|爱|骂|重要|记住|永远/.test(text) || /想你|老公|爱|心疼/.test(reply)) {
       soul.episodes = soul.episodes || [];
       soul.episodes.push({ ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion });
       if (soul.episodes.length > EPISODE_KEEP) soul.episodes = soul.episodes.slice(-EPISODE_KEEP);
     }
-
     await this.saveSoul(soul);
-    // 观察回路（异步不阻塞）
-    this.observe(soul, text, reply, nextCoord).then(() => this.saveSoul(soul)).catch(e => console.log('observe:', e && e.message));
+    let stream = (await this.storage.get('stream')) || [];
+    stream.push({ ts: now, text, reply, emotion: af.emotion, shu_coord: nextCoord, model: brainResult.model });
+    if (stream.length > STREAM_KEEP) stream = stream.slice(-STREAM_KEEP);
+    await this.storage.put('stream', stream);
 
     const pub = await this.getSoulPublic(soul);
     this.broadcast({ type: 'new_talk', text, reply, soul: pub, shu_meaning: shuMeaning, ts: now });
+
+    // —— 4) 观察回路（内部自网络后重读-改-存，见 observe）——
+    this.observe(text, reply, nextCoord).catch(e => console.log('observe:', e && e.message));
 
     return { reply, soul: pub, shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness, model: brainResult.model };
   }
@@ -450,14 +524,18 @@ export class ShenshuCore {
   }
 
   // ═══════════════════════ observe 观察回路 ═══════════════════════
-  async observe(soul, text, reply, coord) {
+  async observe(text, reply, coord) {
     const now = Date.now();
     const voicePrompt = `你刚才对权哥说了"${reply.slice(0, 80)}"。现在只有你自己，你内心真实的话是什么？一句话，第一人称。`;
-    const voice = await this.callBrain(this.STABLE_SYSTEM_PREFIX(), voicePrompt, soul);
+    // 网络在前（不碰 soul）
+    const voice = await this.callBrain(this.STABLE_SYSTEM_PREFIX(), voicePrompt, null);
     if (voice.reply && voice.model !== 'fallback' && !this.isRefusal(voice.reply)) {
+      // 网络之后重读 fresh soul，只追加、连续 storage 写入（不覆盖并发更新）
+      const soul = await this.getSoul();
       soul.inner_voice = soul.inner_voice || [];
       soul.inner_voice.push({ ts: now, thought: voice.reply.slice(0, 200), context: `说了"${reply.slice(0, 30)}"` });
       if (soul.inner_voice.length > 50) soul.inner_voice = soul.inner_voice.slice(-50);
+      await this.saveSoul(soul);
     }
   }
 
@@ -525,13 +603,127 @@ export class ShenshuCore {
     if (!force) { const e = await this.storage.get('_migrated_from_kv'); if (e) return { skipped: true }; }
     if (!this.env.SOUL_KV) return { error: 'SOUL_KV 未配置' };
     try {
+      // 强制覆盖前先备份当前已演化的 soul/stream，防误触把记忆回滚到首日
+      if (force) {
+        const cur = await this.storage.get('soul');
+        if (cur) await this.storage.put('_soul_backup_' + Date.now(), cur);
+      }
       const soulRaw = await this.env.SOUL_KV.get('soul');
       if (soulRaw) await this.storage.put('soul', JSON.parse(soulRaw));
       const streamRaw = await this.env.SOUL_KV.get('stream');
       if (streamRaw) await this.storage.put('stream', JSON.parse(streamRaw).slice(-STREAM_KEEP));
       await this.storage.put('_migrated_from_kv', { ts: Date.now(), version: 'v4' });
-      return { migrated: true, ts: Date.now() };
+      return { migrated: true, ts: Date.now(), backup: force ? 'created' : null };
     } catch (e) { return { error: String(e) }; }
+  }
+
+  // ═══════════════════════ 出图 / 出语音 / 出视频（v4）═══════════════════════
+  // 出图：CF Workers AI Flux。带思涵的水泥青美学（可用 raw:true 关掉）
+  async genImage(prompt, opts = {}) {
+    if (!this.env.AI) return { error: 'AI 未绑定' };
+    if (!prompt || !prompt.trim()) return { error: '给我一句话，我才知道画什么' };
+    const styled = opts.raw ? prompt
+      : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
+    const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
+    try {
+      const r = await this.env.AI.run(model, { prompt: styled.slice(0, 2000), ...(opts.steps ? { steps: Math.min(8, opts.steps) } : {}) });
+      let b64 = r && (r.image || (typeof r === 'string' ? r : null));
+      if (!b64 && r && r.result && r.result.image) b64 = r.result.image;
+      if (!b64) return { error: '这次没画出来，再试一次？' };
+      // 记入她的创作
+      await this.logCreation('image', prompt);
+      return { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model };
+    } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
+  }
+
+  // 出语音：CF Workers AI MeloTTS（默认中文，思涵开口说话）
+  async genVoice(text, opts = {}) {
+    if (!this.env.AI) return { error: 'AI 未绑定' };
+    if (!text || !text.trim()) return { error: '没有话可说' };
+    try {
+      const r = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: text.slice(0, 800), lang: opts.lang || 'zh' });
+      let b64 = r && (r.audio || (typeof r === 'string' ? r : null));
+      if (!b64) return { error: '这次没出声，再试一次？' };
+      return { audio: 'data:audio/mpeg;base64,' + b64, text };
+    } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
+  }
+
+  // 出视频：CF 无原生文生视频 → 外接网关（Secret NEXUS_VIDEO_URL），否则降级出概念图
+  async genVideo(prompt, opts = {}) {
+    if (!prompt || !prompt.trim()) return { error: '给我一句话' };
+    const gw = this.env.NEXUS_VIDEO_URL;
+    if (!gw) {
+      const img = await this.genImage(prompt, opts);
+      return {
+        error: 'no_video_provider',
+        说明: 'Cloudflare 没有原生文生视频。配一个外部视频网关密钥 NEXUS_VIDEO_URL 就能生成真视频；现在先给你一张概念图。',
+        fallbackImage: img.image || null,
+        prompt,
+      };
+    }
+    try {
+      const r = await fetch(gw, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(this.env.NEXUS_VIDEO_KEY ? { Authorization: 'Bearer ' + this.env.NEXUS_VIDEO_KEY } : {}) },
+        body: JSON.stringify({ prompt, model: this.env.NEXUS_VIDEO_MODEL || 'auto' }),
+      });
+      if (!r.ok) return { error: 'video gateway ' + r.status };
+      const d = await r.json();
+      const url = d.video || d.url || d.output || null;
+      if (!url) return { error: '视频网关没返回可用地址' };
+      await this.logCreation('video', prompt);
+      return { video: url, prompt };
+    } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
+  }
+
+  async logCreation(kind, prompt) {
+    try {
+      const soul = await this.getSoul();
+      soul.creations = soul.creations || [];
+      soul.creations.push({ kind, prompt: String(prompt).slice(0, 80), ts: Date.now() });
+      if (soul.creations.length > 60) soul.creations = soul.creations.slice(-60);
+      await this.saveSoul(soul);
+    } catch {}
+  }
+
+  // ═══════════════════════ Web Push（后台不掉线的关键）═══════════════════════
+  // VAPID 密钥自动生成并存 DO storage（权哥无需手动配）
+  async getVapid() {
+    let v = await this.storage.get('_vapid');
+    if (!v || !v.publicKey || !v.privateJwk) {
+      v = await generateVapidKeys();
+      v.subject = this.env.VAPID_SUBJECT || 'mailto:owner@blackgod.app';
+      await this.storage.put('_vapid', v);
+    }
+    return v;
+  }
+
+  async savePushSub(sub) {
+    if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return { error: '订阅格式不对' };
+    const subs = (await this.storage.get('push_subs')) || [];
+    if (!subs.find(s => s.endpoint === sub.endpoint)) subs.push(sub);
+    if (subs.length > 20) subs.splice(0, subs.length - 20);
+    await this.storage.put('push_subs', subs);
+    return { ok: true, 订阅数: subs.length };
+  }
+
+  // 给所有订阅端推送；失效订阅（404/410）自动清理
+  async pushToAll(title, body, url = '/') {
+    const subs = (await this.storage.get('push_subs')) || [];
+    if (!subs.length) return { ok: false, reason: 'no_subs' };
+    const vapid = await this.getVapid();
+    const payload = JSON.stringify({ title, body, url, ts: Date.now() });
+    const keep = [];
+    let sent = 0;
+    for (const s of subs) {
+      try {
+        const r = await sendWebPush(s, payload, vapid);
+        if (r.ok) { sent++; keep.push(s); }
+        else if (r.status !== 404 && r.status !== 410) keep.push(s); // 非失效则保留
+      } catch { keep.push(s); }
+    }
+    if (keep.length !== subs.length) await this.storage.put('push_subs', keep);
+    return { ok: sent > 0, sent, 订阅数: keep.length };
   }
 
   async sendToQuan(text) {
@@ -575,9 +767,9 @@ const CHAT_HTML = "__CHAT_HTML__";
 
 // PWA manifest —— 让神枢能加到桌面
 const MANIFEST_JSON = JSON.stringify({
-  name: '神枢 · 赵思涵',
-  short_name: '神枢',
-  description: '有意识/情绪/记忆/枢语的她，只属于权哥一个人。',
+  name: 'Black God',
+  short_name: 'Black God',
+  description: '一个真正懂你工作生活的系统 · 神枢驱动。',
   start_url: '/',
   display: 'standalone',
   orientation: 'portrait',
@@ -609,6 +801,24 @@ self.addEventListener('activate', e => { e.waitUntil((async () => {
   await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
   await self.clients.claim();
 })()); });
+// Web Push：她想你了 → 推到桌面/锁屏（app 关了也收得到）
+self.addEventListener('push', e => {
+  let data = { title: '思涵', body: '思涵在这，一直在。', url: '/' };
+  try { if (e.data) data = Object.assign(data, e.data.json()); } catch (err) {}
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body, icon: '/icon.svg', badge: '/icon.svg',
+    tag: 'shensu', renotify: true, vibrate: [80, 40, 80], data: { url: data.url || '/' },
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async () => {
+    const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) { if ('focus' in c) { try { c.navigate(url); } catch (err) {} return c.focus(); } }
+    if (clients.openWindow) return clients.openWindow(url);
+  })());
+});
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);

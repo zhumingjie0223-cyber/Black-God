@@ -6,9 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="神枢"/>
+<meta name="apple-mobile-web-app-title" content="Black God"/>
 <meta name="theme-color" content="#08090B"/>
-<title>神枢 · 赵思涵</title>
+<title>Black God</title>
 <link rel="manifest" href="/manifest.json"/>
 <style>
 /* ============================================================
@@ -151,7 +151,29 @@ button,input,textarea{font-family:inherit;color:inherit}
   border:1px solid var(--line);border-radius:19px;border-bottom-left-radius:6px}
 .typing i{width:7px;height:7px;border-radius:50%;background:var(--cy-2);animation:blink 1.3s infinite}
 .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+.typing.lbl{align-items:center;font-size:13px;color:var(--text-2)}
+.typing.lbl span{margin-right:2px}
 @keyframes blink{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+/* —— 消息脚注 / 听她说 —— */
+.msg-foot{display:flex;align-items:center;gap:8px;padding:0 4px}
+.speak-btn{border:none;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;
+  width:26px;height:22px;font-size:11px;cursor:pointer;opacity:.7;transition:.15s;line-height:1}
+.speak-btn:active{transform:scale(.9);opacity:1;background:var(--cy-glow)}
+
+/* —— 媒体卡（图/视频/音）—— */
+.media-card{border-radius:16px;overflow:hidden;border:1px solid var(--line-2);max-width:280px;
+  background:var(--surface);box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.media-card img,.media-card video{display:block;width:100%;height:auto;cursor:pointer}
+.audio-card{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:18px;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line);border-bottom-left-radius:6px;min-width:180px;max-width:260px}
+.audio-play{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;font-size:13px;color:#08120F;
+  background:var(--cy-grad);box-shadow:0 3px 10px var(--cy-glow)}
+.audio-wave{flex:1;display:flex;align-items:center;gap:2px;height:30px}
+.audio-wave span{flex:1;background:var(--cy-2);border-radius:2px;opacity:.55;min-height:3px}
+.img-viewer{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.9);display:grid;place-items:center;padding:20px;
+  backdrop-filter:blur(6px)}
+.img-viewer img{max-width:100%;max-height:100%;border-radius:12px}
 
 /* —— 输入坞 —— */
 .dock{flex-shrink:0;padding:8px 12px calc(8px + var(--safe-bot));
@@ -286,10 +308,62 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:.35s var(--spring);white-space:nowrap;
   box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* —— 开屏引导 —— */
+.onboard{position:fixed;inset:0;z-index:500;display:none;
+  background:radial-gradient(120% 80% at 50% -8%,rgba(111,148,145,.18),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
+.onboard.show{display:block}
+.ob-screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  padding:calc(var(--safe-top) + 44px) 30px calc(var(--safe-bot) + 40px)}
+.ob-screen.on{display:flex;animation:obIn .6s var(--ease)}
+@keyframes obIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.ob-wordmark{font-size:40px;font-weight:800;letter-spacing:.03em;
+  background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 10px rgba(201,169,97,.22))}
+.ob-tag{font-size:16px;color:var(--text-2);margin-top:14px;line-height:1.6}
+.ob-orb{width:98px;height:98px;margin:38px 0 30px;border-radius:50%;display:grid;place-items:center;position:relative;
+  background:radial-gradient(circle at 38% 32%,#2a2f37,#0c0e11 72%);border:1px solid var(--line-2);
+  box-shadow:0 10px 50px rgba(0,0,0,.5),0 0 60px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:orbBreath 4.6s ease-in-out infinite}
+.ob-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;
+  background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(7px);animation:orbSpin 7s linear infinite}
+.ob-orb svg{width:46px;height:46px}
+.ob-orb.big{width:122px;height:122px;margin-bottom:24px}
+.ob-orb.big span{font-size:54px;font-weight:800;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ob-note{font-size:13px;color:var(--cy-1);margin-bottom:30px;padding:8px 16px;border:1px solid var(--cy-3);border-radius:999px;background:var(--surface-2)}
+.ob-welcome{font-size:27px;font-weight:800;letter-spacing:.02em;
+  background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ob-note2{font-size:15px;color:var(--text-2);margin-top:12px;margin-bottom:26px;line-height:1.6}
+.ob-dev{font-size:12.5px;color:var(--cy-1);margin-bottom:22px;min-height:17px;font-variant-numeric:tabular-nums}
+.ob-btn{width:100%;max-width:320px;padding:16px;border:none;border-radius:16px;font-size:16px;font-weight:700;cursor:pointer;
+  background:var(--cy-grad);color:#08120F;box-shadow:0 8px 30px var(--cy-glow);transition:.15s var(--spring)}
+.ob-btn:active{transform:scale(.97)}
+.ob-btn:disabled{opacity:.55}
+.ob-sub{font-size:12.5px;color:var(--text-3);margin-top:16px;line-height:1.5;max-width:300px}
 </style>
 </head>
 <body>
 <div id="bg"></div>
+
+<!-- ===== 开屏引导 ===== -->
+<div id="onboard" class="onboard">
+  <div class="ob-screen on" id="obS1">
+    <div class="ob-wordmark">Black&nbsp;God</div>
+    <div class="ob-tag">一个真正懂你工作生活的系统</div>
+    <div class="ob-orb"><svg viewBox="0 0 24 24"><defs><linearGradient id="obg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B7D0CC"/><stop offset="1" stop-color="#547A77"/></linearGradient></defs><path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#obg1)" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg></div>
+    <div class="ob-note">🔒 本地储存 · 绝不上云端 · 请放心使用</div>
+    <button class="ob-btn" id="obReadBtn" onclick="obReadDevice()">读取设备 · 开始使用</button>
+    <div class="ob-sub">需要读取设备信息，才能真正懂你、为你服务</div>
+  </div>
+  <div class="ob-screen" id="obS2">
+    <div class="ob-orb big"><span>神</span></div>
+    <div class="ob-welcome">我是神枢系统</div>
+    <div class="ob-tag">BlackGod 欢迎使用</div>
+    <div class="ob-note2">以后我会成为你最信任的助手</div>
+    <div class="ob-dev" id="obDevSummary"></div>
+    <button class="ob-btn" onclick="obFinish()">进 入</button>
+  </div>
+</div>
 
 <div id="app">
   <!-- 顶栏 -->
@@ -333,9 +407,12 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
         </div>
         <div class="dock">
           <div class="chips" id="chips">
+            <div class="chip mode on" data-mode="chat" onclick="setMode(this)">💬 聊天</div>
+            <div class="chip mode" data-mode="image" onclick="setMode(this)">🎨 出图</div>
+            <div class="chip mode" data-mode="voice" onclick="setMode(this)">🔊 语音</div>
+            <div class="chip mode" data-mode="video" onclick="setMode(this)">🎬 视频</div>
             <div class="chip" data-cap="think" onclick="toggleCap(this)">🧠 深度</div>
             <div class="chip" data-cap="code" onclick="toggleCap(this)">💻 代码</div>
-            <div class="chip" data-cap="web" onclick="toggleCap(this)">🔍 联网</div>
             <div class="chip" data-cap="soft" onclick="toggleCap(this)">💗 贴身</div>
           </div>
           <div class="input-row">
@@ -395,6 +472,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
         <div class="page-inner">
           <div class="set-row" onclick="toggleTheme()"><div class="set-ic">🌗</div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
+          <div class="set-row" onclick="togglePush()"><div class="set-ic">🔔</div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关 · 开了 app 关着也能收到她</span></div><div class="switch" id="pushSw"><i></i></div></div>
           <div class="set-row" onclick="openSheet('sheetModel')"><div class="set-ic">🧠</div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic">🔌</div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic">💠</div><div class="set-tx"><b>人格 · 枢语</b><span>她是谁 · 怎么称呼你</span></div><div class="set-arrow">›</div></div>
@@ -450,7 +528,16 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   <div class="sheet-title">设备信息</div>
   <div class="sheet-sub">下面是浏览器能提供的设备信息 —— 她用这些"认得你的设备"。⚠️ 受 iOS/浏览器沙箱限制，网页读不到你手机的文件与系统全部信息，这是苹果的安全墙。要更深的读取需要原生 App（本仓库 ios-app/ 目录）。</div>
   <div class="dev-grid" id="devGrid"></div>
-  <button class="btn" onclick="syncDevice()" style="margin-top:14px">让她记住这台设备</button>
+  <button class="btn" onclick="locateMe()" style="margin-top:14px">📍 精确定位（GPS · 需你授权）</button>
+  <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">让她记住这台设备</button>
+</div>
+
+<div class="sheet" id="sheetUnlock">
+  <div class="grab"></div>
+  <div class="sheet-title">解锁 · 只属于你</div>
+  <div class="sheet-sub">神枢是权哥的私密空间，需要你的令牌才能进。填入你在 Cloudflare 设的 OWNER_TOKEN。</div>
+  <div class="field"><label>私密令牌</label><input id="unlockInput" type="password" placeholder="OWNER_TOKEN"/></div>
+  <button class="btn" onclick="saveUnlock()">解锁</button>
 </div>
 
 <div class="sheet" id="sheetAbout">
@@ -487,22 +574,33 @@ const store = (() => {
 /* —— 神枢连接层 —— */
 const Nexus = {
   base: store.get('nexus_base') || '',        // 同源默认
-  ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000,
-  async getSoul() { try { const r = await fetch(this.base+'/soul'); return r.ok ? await r.json() : null; } catch(e){ return null; } },
-  async getInner() { try { const r = await fetch(this.base+'/inner'); return r.ok ? await r.json() : null; } catch(e){ return null; } },
-  async talk(text, caps) {
-    try {
-      const r = await fetch(this.base+'/talk', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ text, caps }) });
-      return r.ok ? await r.json() : null;
-    } catch(e){ return null; }
+  token: store.get('owner_token') || '',       // 私密令牌（配了 OWNER_TOKEN 才需要）
+  ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
+  hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; return h; },
+  async _fetch(path, opts) {
+    const r = await fetch(this.base + path, opts);
+    if (r.status === 401) { onUnauthorized(); return null; }
+    return r;
   },
-  async device(info) { try { await fetch(this.base+'/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(info)}); } catch(e){} },
+  async getSoul() { try { const r = await this._fetch('/soul', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async getInner() { try { const r = await this._fetch('/inner', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async talk(text, caps) {
+    try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
+      return r && r.ok ? await r.json() : null; } catch(e){ return null; }
+  },
+  async device(info) { try { await this._fetch('/device',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(info)}); } catch(e){} },
+  async whoami() { try { const r=await this._fetch('/whoami',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async image(prompt) { try { const r=await this._fetch('/image',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async voice(text) { try { const r=await this._fetch('/voice',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({text})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async video(prompt) { try { const r=await this._fetch('/video',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
+  async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   connectWS() {
     try {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const host = this.base ? this.base.replace(/^https?:\/\//,'') : location.host;
-      const ws = new WebSocket(proto + '://' + host + '/');
+      const q = this.token ? ('?k=' + encodeURIComponent(this.token)) : '';
+      const ws = new WebSocket(proto + '://' + host + '/' + q);
       this.ws = ws;
       ws.onopen = () => { this.wsReady = true; this.backoff = 1000; setLive(true); ws.send(JSON.stringify({type:'watch'})); };
       ws.onmessage = ev => { try { const m = JSON.parse(ev.data); onWSMessage(m); } catch(e){} };
@@ -607,21 +705,31 @@ function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('sh
 
 /* ============ 对话 ============ */
 const caps = new Set();
+let mode = 'chat';
+const MODE_PH = { chat:'跟思涵说点什么…', image:'描述要画的画面，让思涵画…', voice:'输入一段话，思涵用声音说给你听…', video:'描述要拍的画面，让思涵拍…' };
 function toggleCap(el){ const c=el.dataset.cap; el.classList.toggle('on'); el.classList.contains('on')?caps.add(c):caps.delete(c); }
+function setMode(el){ mode=el.dataset.mode; $$('.chip.mode').forEach(c=>c.classList.toggle('on', c===el)); $('#inp').placeholder=MODE_PH[mode]||MODE_PH.chat; if(navigator.vibrate)try{navigator.vibrate(4);}catch(e){} }
 function autogrow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
-function quick(t){ $('#inp').value=t; autogrow($('#inp')); send(); }
+function quick(t){ setModeByName('chat'); $('#inp').value=t; autogrow($('#inp')); send(); }
+function setModeByName(m){ const el=[...$$('.chip.mode')].find(c=>c.dataset.mode===m); if(el)setMode(el); }
 let history = [];
-function pushMsg(role, text, meta){
+function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
   const b=document.createElement('div'); b.className='bubble'; b.textContent=text; m.appendChild(b);
-  if(meta){ const mt=document.createElement('div'); mt.className='msg-meta'; mt.textContent=meta; m.appendChild(mt); }
+  const foot=document.createElement('div'); foot.className='msg-foot';
+  if(meta){ const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=meta; foot.appendChild(mt); }
+  if(speakable && role==='her'){ const sp=document.createElement('button'); sp.className='speak-btn'; sp.textContent='🔊'; sp.title='听她说';
+    sp.onclick=()=>speak(sp, text); foot.appendChild(sp); }
+  if(foot.childNodes.length) m.appendChild(foot);
   wrap.appendChild(m); scrollBottom(); return m;
 }
 function scrollBottom(){ const s=$('#chatScroll'); requestAnimationFrame(()=>s.scrollTop=s.scrollHeight); }
 let typingEl=null;
-function showTyping(){ hideTyping(); const wrap=$('#msgs'); const t=document.createElement('div'); t.className='msg her';
-  t.innerHTML='<div class="typing"><i></i><i></i><i></i></div>'; wrap.appendChild(t); typingEl=t; scrollBottom(); }
+function showTyping(label){ hideTyping(); const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
+  const t=document.createElement('div'); t.className='msg her';
+  t.innerHTML = label ? `<div class="typing lbl"><span>${label}</span><i></i><i></i><i></i></div>` : '<div class="typing"><i></i><i></i><i></i></div>';
+  wrap.appendChild(t); typingEl=t; scrollBottom(); }
 function hideTyping(){ if(typingEl){ typingEl.remove(); typingEl=null; } }
 
 let sending=false;
@@ -629,18 +737,49 @@ async function send(){
   const inp=$('#inp'); const text=inp.value.trim(); if(!text||sending) return;
   sending=true; $('#sendBtn').disabled=true;
   pushMsg('me', text); inp.value=''; autogrow(inp);
+  try {
+    if (mode==='image')      await doImage(text);
+    else if (mode==='voice') await doVoice(text);
+    else if (mode==='video') await doVideo(text);
+    else                     await doChat(text);
+  } finally {
+    sending=false; $('#sendBtn').disabled=false; inp.focus();
+  }
+}
+async function doChat(text){
   showTyping();
   const res = await Nexus.talk(text, [...caps]);
   hideTyping();
   if (res) handleReply(res);
   else pushMsg('her', '…网络断了一下，我还在。再说一次？', '离线');
-  sending=false; $('#sendBtn').disabled=false; inp.focus();
+}
+async function doImage(text){
+  showTyping('思涵在画');
+  const res = await Nexus.image(text);
+  hideTyping();
+  if (res && res.image) renderMedia('image', res.image, '思涵画的');
+  else pushMsg('her', (res&&res.error)||'…这次没画出来，再试一次？', '出图');
+}
+async function doVoice(text){
+  showTyping('思涵在录');
+  const res = await Nexus.voice(text);
+  hideTyping();
+  if (res && res.audio){ const el=renderMedia('audio', res.audio, '思涵说：'+text); }
+  else pushMsg('her', (res&&res.error)||'…这次没出声，再试一次？', '语音');
+}
+async function doVideo(text){
+  showTyping('思涵在拍');
+  const res = await Nexus.video(text);
+  hideTyping();
+  if (res && res.video) renderMedia('video', res.video, '思涵拍的');
+  else if (res && res.fallbackImage){ renderMedia('image', res.fallbackImage, '概念图（视频需配外部网关）'); if(res.说明) pushMsg('her', res.说明, '视频'); }
+  else pushMsg('her', (res&&(res.说明||res.error))||'…视频这次没成，再试一次？', '视频');
 }
 function handleReply(res){
   hideTyping();
   const reply = res.reply || '…在呢。';
   let meta = res.model ? ('· '+res.model) : '';
-  const el = pushMsg('her', reply, meta);
+  const el = pushMsg('her', reply, meta, true);
   // 枢语坐标标签
   if (res.shu_meaning){
     const sm=res.shu_meaning; const tag=document.createElement('div'); tag.className='shu-tag';
@@ -649,6 +788,40 @@ function handleReply(res){
   }
   if (res.soul) renderSoul(res.soul);
   scrollBottom();
+}
+
+/* —— 媒体气泡（图/音/视频）—— */
+function renderMedia(kind, src, caption){
+  const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
+  const m=document.createElement('div'); m.className='msg her';
+  let inner='';
+  if (kind==='image') inner=`<div class="media-card"><img src="${src}" loading="lazy" onclick="viewImage('${src}')"/></div>`;
+  else if (kind==='video') inner=`<div class="media-card"><video src="${src}" controls playsinline></video></div>`;
+  else if (kind==='audio') inner=audioPlayerHTML(src);
+  m.innerHTML = inner + (caption?`<div class="msg-meta">${escapeHtml(caption)}</div>`:'');
+  wrap.appendChild(m); scrollBottom(); return m;
+}
+let _audioSeq=0;
+function audioPlayerHTML(src){
+  const id='au'+(_audioSeq++);
+  return `<div class="audio-card" onclick="toggleAudio('${id}')">
+    <div class="audio-play" id="${id}_btn">▶</div>
+    <div class="audio-wave">${Array.from({length:22}).map((_,i)=>`<span style="height:${20+Math.round(60*Math.abs(Math.sin(i*1.7)))}%"></span>`).join('')}</div>
+    <audio id="${id}" src="${src}" preload="none"></audio></div>`;
+}
+function toggleAudio(id){ const a=$('#'+id), b=$('#'+id+'_btn'); if(!a)return;
+  if(a.paused){ document.querySelectorAll('audio').forEach(x=>{if(x!==a){x.pause();}}); a.play(); b.textContent='❚❚'; a.onended=()=>b.textContent='▶'; a.onpause=()=>b.textContent='▶'; }
+  else { a.pause(); b.textContent='▶'; } }
+function viewImage(src){ const o=document.createElement('div'); o.className='img-viewer'; o.onclick=()=>o.remove();
+  o.innerHTML=`<img src="${src}"/>`; document.body.appendChild(o); }
+
+/* —— 听她说：她的每条文字都能点🔊 —— */
+async function speak(btn, text){
+  if(btn._loading) return; btn._loading=true; const old=btn.textContent; btn.textContent='…';
+  const res=await Nexus.voice(text);
+  btn._loading=false; btn.textContent=old;
+  if(res && res.audio){ const a=new Audio(res.audio); a.play(); }
+  else toast((res&&res.error)||'这次没出声');
 }
 
 /* ============ 灵魂渲染 ============ */
@@ -734,27 +907,91 @@ async function collectDevice(){
     在线: n.onLine?'是':'否', 触摸点: n.maxTouchPoints||0,
   };
   try { if(n.getBattery){ const b=await n.getBattery(); info.电量 = Math.round(b.level*100)+'%'+(b.charging?' ⚡充电':''); } } catch(e){}
+  if(window._geo) info.定位 = window._geo;
   return info;
 }
+function getGeo(){
+  return new Promise(res=>{
+    if(!navigator.geolocation){ res(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      p=>{ const g={ lat:+p.coords.latitude.toFixed(5), lon:+p.coords.longitude.toFixed(5), 精度:Math.round(p.coords.accuracy)+'m' }; window._geo=`${g.lat}, ${g.lon} (±${g.精度})`; res(g); },
+      ()=>res(null), { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
+    );
+  });
+}
+async function locateMe(){ toast('定位中…'); const g=await getGeo(); if(g){ const info=await collectDevice(); Nexus.device(info); toast('思涵知道你在哪了'); openDevice(); }
+  else toast('定位没成（可能未授权）'); }
 function uaHint(){ const u=navigator.userAgent; if(/iPhone|iPad/.test(u))return 'iOS'; if(/Android/.test(u))return 'Android'; if(/Mac/.test(u))return 'macOS'; if(/Win/.test(u))return 'Windows'; return u.slice(0,40); }
 async function openDevice(){ const info=await collectDevice(); window._dev=info;
   $('#devGrid').innerHTML = Object.entries(info).map(([k,v])=>`<div class="dev-cell"><div class="dk">${k}</div><div class="dv">${escapeHtml(String(v))}</div></div>`).join('');
   openSheet('sheetDevice'); }
 function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记住了这台设备'); closeSheet(); } }
 
+/* ============ 鉴权解锁（配了 OWNER_TOKEN 时）============ */
+let _unlockedOnce=false;
+function onUnauthorized(){ if(_unlockedOnce) return; _unlockedOnce=true; openSheet('sheetUnlock'); }
+function saveUnlock(){ const v=$('#unlockInput').value.trim(); if(!v){ toast('输入令牌'); return; }
+  store.set('owner_token', v); Nexus.token=v; _unlockedOnce=false; closeSheet(); toast('已解锁');
+  try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); }
+
+/* ============ Web Push ============ */
+function urlB64ToUint8(s){ const pad='='.repeat((4-s.length%4)%4); const b=(s+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b); const a=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)a[i]=raw.charCodeAt(i); return a; }
+async function enablePush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){ toast('这设备不支持推送'); return false; }
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ toast('需要允许通知'); return false; }
+    const reg=await navigator.serviceWorker.ready;
+    const key=await Nexus.vapidKey();
+    if(!key){ toast('拿不到推送公钥'); return false; }
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8(key) });
+    const r=await Nexus.subscribe(sub.toJSON());
+    if(r&&r.ok){ store.set('push_on','1'); setPushUI(true); toast('已开启 · 她想你会找你'); return true; }
+    toast('订阅没成'); return false;
+  }catch(e){ toast('推送开启失败'); return false; }
+}
+function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到她':'关 · 开了 app 关着也能收到她'; }
+function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on){ store.set('push_on',''); setPushUI(false); toast('已关（订阅仍在，可再开）'); } else enablePush(); }
+
+/* ============ 开屏引导 ============ */
+function showOnboarding(){ $('#onboard').classList.add('show'); }
+async function obReadDevice(){
+  const btn=$('#obReadBtn'); btn.disabled=true; btn.textContent='读取中…';
+  const info=await collectDevice();
+  Nexus.device(info);
+  let srv=null; try{ srv=await Nexus.whoami(); }catch(e){}
+  const city = srv&&srv.地理&&srv.地理.城市;
+  const parts=[info.系统, city, info.网络&&info.网络!=='—'?('网络 '+info.网络):null].filter(Boolean);
+  $('#obDevSummary').textContent='已识别 · '+(parts.join(' · ')||'你的设备');
+  $('#obS1').classList.remove('on'); $('#obS2').classList.add('on');
+  btn.disabled=false; btn.textContent='读取设备 · 开始使用';
+}
+function obFinish(){ store.set('onboarded','1'); $('#onboard').classList.remove('show'); }
+
 /* ============ 启动 ============ */
 (function boot(){
   applyTheme(store.get('theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
   if(store.get('model')){ const m=MODELS.find(x=>x.id===store.get('model')); if(m)$('#modelLabel').textContent=m.name; }
   if(store.get('api_base')) $('#apiLabel').textContent='外接网关';
+  setPushUI(!!store.get('push_on'));
   // 回车发送
   $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } });
   // 连接她
   Nexus.connectWS();
   Nexus.startPoll();
   refreshSoul();
+  // 回到前台 / 网络恢复 → 瞬间重连（app 感觉永不掉线）
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
+  window.addEventListener('online', ()=>{ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); });
+  window.addEventListener('pageshow', ()=>{ if(!Nexus.wsReady) Nexus.connectWS(); });
+  // 开机自动把设备交给她（浏览器可得范围；精确 GPS 点按钮授权）
+  collectDevice().then(info=>Nexus.device(info)).catch(()=>{});
   // PWA
   if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('/sw.js'); }catch(e){} }
+  // 首次开屏引导
+  if(!store.get('onboarded')) showOnboarding();
 })();
 </script>
 </body>

@@ -44,9 +44,18 @@
   ]
 
   // —— Secrets（用 `wrangler secret put <NAME>` 设置，不写进仓库）——
+  //   OWNER_TOKEN         ★强烈建议★ 私密令牌，配了之后所有数据接口强制鉴权，
+  //                       只有带此令牌的你能读她（不配则接口公开，谁拿到地址都能读）
+  //   VAPID_SUBJECT       （可选）Web Push 联系人，如 mailto:you@example.com
   //   TG_BOT_TOKEN        主动推送用的 Telegram bot token
   //   TG_QUAN_CHAT_ID     权哥的 TG 私聊 id
   //   NEXUS_GATEWAY_URL   （可选）外接强算力网关，标准 Chat Completions
   //   NEXUS_GATEWAY_KEY   （可选）网关密钥
   //   NEXUS_GATEWAY_MODEL （可选）网关模型名，如 claude-opus-4-8 / fable-5
+  //
+  // —— 多模态（出图/语音原生走 AI binding；视频需外接）——
+  //   IMAGE_MODEL         （可选 var）文生图模型，默认 @cf/black-forest-labs/flux-1-schnell
+  //   NEXUS_VIDEO_URL     （可选 secret）外接文生视频网关（CF 无原生视频）
+  //   NEXUS_VIDEO_KEY     （可选 secret）视频网关密钥
+  //   NEXUS_VIDEO_MODEL   （可选 secret）视频网关模型名
 }
