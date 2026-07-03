@@ -11,9 +11,6 @@ routes = [
 name = "SHENSHU"
 class_name = "ShenshuCore"
 
-[[migrations]]
-tag = "v1"
-new_classes = ["ShenshuCore"]
 
 [[kv_namespaces]]
 binding = "SOUL_KV"
