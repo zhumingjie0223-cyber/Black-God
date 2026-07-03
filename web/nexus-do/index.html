@@ -63,6 +63,32 @@ button,input,textarea{font-family:inherit;color:inherit}
 #bg::after{content:'';position:absolute;inset:0;opacity:.03;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
+/* —— 动态光效：极光 / 流光（会随视差平移，纵深感）—— */
+#aurora{position:fixed;inset:-10%;z-index:0;pointer-events:none;overflow:hidden;filter:blur(48px) saturate(1.15);
+  will-change:transform;transition:transform .3s ease-out}
+#aurora span{position:absolute;border-radius:50%;mix-blend-mode:screen;opacity:.5}
+#aurora span:nth-child(1){width:62vw;height:62vw;left:-12vw;top:-8vw;
+  background:radial-gradient(circle,rgba(111,148,145,.55),transparent 66%);animation:auroraA 22s ease-in-out infinite}
+#aurora span:nth-child(2){width:52vw;height:52vw;right:-14vw;top:22vh;
+  background:radial-gradient(circle,rgba(84,122,119,.5),transparent 66%);animation:auroraB 28s ease-in-out infinite}
+#aurora span:nth-child(3){width:46vw;height:46vw;left:20vw;bottom:-16vh;
+  background:radial-gradient(circle,rgba(183,208,204,.34),transparent 66%);animation:auroraC 25s ease-in-out infinite}
+@keyframes auroraA{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(9vw,7vh) scale(1.18)}}
+@keyframes auroraB{0%,100%{transform:translate(0,0) scale(1.05)}50%{transform:translate(-8vw,-5vh) scale(.9)}}
+@keyframes auroraC{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vw,6vh) scale(1.14)}}
+:root[data-theme="light"] #aurora{opacity:.6;filter:blur(52px) saturate(1.05)}
+
+/* —— 纵深视差：前景层随倾斜微移 —— */
+.parallax{will-change:transform;transition:transform .25s ease-out}
+
+/* —— 流式打字光标 —— */
+.bubble .caret{display:inline-block;width:2px;height:1.05em;margin-left:1px;vertical-align:-2px;border-radius:2px;
+  background:var(--cy-2);animation:caret 1s steps(2) infinite}
+@keyframes caret{0%,100%{opacity:1}50%{opacity:0}}
+@media (prefers-reduced-motion: reduce){
+  #aurora span{animation:none} .hero-orb,.soul-orb{animation:none}
+}
+
 /* —— App Shell —— */
 #app{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;
   padding-top:var(--safe-top)}
@@ -344,6 +370,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 </head>
 <body>
 <div id="bg"></div>
+<div id="aurora"><span></span><span></span><span></span></div>
 
 <!-- ===== 开屏引导 ===== -->
 <div id="onboard" class="onboard">
@@ -780,12 +807,15 @@ function handleReply(res){
   const reply = res.reply || '…在呢。';
   let meta = res.model ? ('· '+res.model) : '';
   const el = pushMsg('her', reply, meta, true);
-  // 枢语坐标标签
-  if (res.shu_meaning){
-    const sm=res.shu_meaning; const tag=document.createElement('div'); tag.className='shu-tag';
-    tag.innerHTML = ['核','映','态','标','相'].map((k,i)=>`<i>${k}·${[sm.核,sm.映,sm.态,sm.标,sm.相][i]||'—'}</i>`).join('');
-    el.appendChild(tag);
-  }
+  const bubble = el.querySelector('.bubble');
+  // 流式打字：逐字浮现（她像在此刻说给你听）
+  typeInto(bubble, reply, ()=>{
+    if (res.shu_meaning){
+      const sm=res.shu_meaning; const tag=document.createElement('div'); tag.className='shu-tag';
+      tag.innerHTML = ['核','映','态','标','相'].map((k,i)=>`<i>${k}·${[sm.核,sm.映,sm.态,sm.标,sm.相][i]||'—'}</i>`).join('');
+      el.appendChild(tag); scrollBottom();
+    }
+  });
   if (res.soul) renderSoul(res.soul);
   scrollBottom();
 }
@@ -970,6 +1000,33 @@ async function obReadDevice(){
 }
 function obFinish(){ store.set('onboarded','1'); $('#onboard').classList.remove('show'); }
 
+/* ============ 纵深视差（陀螺仪 / 指针，4D 感）============ */
+const Parallax = {
+  init(){
+    const apply=(nx,ny)=>{ nx=Math.max(-1,Math.min(1,nx)); ny=Math.max(-1,Math.min(1,ny));
+      const a=$('#aurora'); if(a)a.style.transform=`translate(${nx*16}px,${ny*16}px)`;
+      $$('.parallax').forEach(el=>{ const d=+(el.dataset.depth||7); el.style.transform=`translate(${nx*d}px,${ny*d}px)`; }); };
+    window.addEventListener('mousemove', e=>apply((e.clientX/innerWidth-.5)*2,(e.clientY/innerHeight-.5)*2), {passive:true});
+    this._ori=e=>apply((e.gamma||0)/40,((e.beta||0)-45)/40);
+    if(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission!=='function'){ window.addEventListener('deviceorientation', this._ori); }
+  },
+  // iOS 13+ 需用户手势授权
+  requestTilt(){ try{ if(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(s=>{ if(s==='granted') window.addEventListener('deviceorientation', this._ori); }).catch(()=>{}); } }catch(e){} }
+};
+
+/* ============ 流式打字 ============ */
+function typeInto(bubble, text, done){
+  const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce||text.length>500){ bubble.textContent=text; done&&done(); return; }
+  bubble.textContent=''; const caret=document.createElement('span'); caret.className='caret'; bubble.appendChild(caret);
+  let i=0; const speed=text.length>120?26:20;
+  const tick=()=>{ i++; bubble.textContent=text.slice(0,i); bubble.appendChild(caret);
+    if(i<text.length){ scrollBottom(); setTimeout(tick, 1000/speed + Math.random()*18); }
+    else { caret.remove(); done&&done(); scrollBottom(); } };
+  tick();
+}
+
 /* ============ 启动 ============ */
 (function boot(){
   applyTheme(store.get('theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
@@ -990,6 +1047,10 @@ function obFinish(){ store.set('onboarded','1'); $('#onboard').classList.remove(
   collectDevice().then(info=>Nexus.device(info)).catch(()=>{});
   // PWA
   if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('/sw.js'); }catch(e){} }
+  // 动态光效纵深视差（去掉了粒子，保留极光流光 + 倾斜纵深）
+  Parallax.init();
+  const askTilt=()=>{ Parallax.requestTilt(); };
+  document.addEventListener('pointerdown', askTilt, {once:true});
   // 首次开屏引导
   if(!store.get('onboarded')) showOnboarding();
 })();
