@@ -42,6 +42,8 @@
   --safe-top:env(safe-area-inset-top,0px); --safe-bot:env(safe-area-inset-bottom,0px);
   --ease:cubic-bezier(.32,.72,0,1); --spring:cubic-bezier(.34,1.4,.5,1);
   --tab-h:64px;
+  /* 传承世家 · 考究衬线（文脉感，无外部依赖）*/
+  --serif:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman",serif;
 }
 :root[data-theme="light"]{
   --bg:#EDEFF2; --bg-1:#F4F6F8; --bg-2:#FFFFFF; --bg-3:#FFFFFF;
@@ -102,6 +104,8 @@ button,input,textarea{font-family:inherit;color:inherit}
   background:color-mix(in srgb,var(--bg) 72%,transparent);
   backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);
   border-bottom:1px solid var(--line);position:relative;z-index:20}
+.topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(201,169,97,.5) 22%,rgba(201,169,97,.5) 78%,transparent)}
 .brand{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
 .brand-glyph{width:30px;height:30px;flex-shrink:0;position:relative;display:grid;place-items:center;
   border-radius:9px;border:1px solid var(--line-2);
@@ -109,8 +113,9 @@ button,input,textarea{font-family:inherit;color:inherit}
   box-shadow:0 0 12px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.06)}
 :root[data-theme="light"] .brand-glyph{background:linear-gradient(145deg,#fff,#e6eaee)}
 .brand-glyph svg{width:20px;height:20px}
-.wordmark{font-size:19px;font-weight:800;letter-spacing:.16em;line-height:1;white-space:nowrap;
-  background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.wordmark{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:.24em;line-height:1;white-space:nowrap;padding-left:.12em;
+  background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
 .top-status{display:flex;align-items:center;gap:6px;height:30px;padding:0 11px;flex-shrink:0;
   background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-pill);
   font-size:12px;color:var(--text-2);font-weight:600;cursor:pointer;transition:.15s}
@@ -128,8 +133,8 @@ button,input,textarea{font-family:inherit;color:inherit}
   -webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-bot) + 8px)}
 .page-inner{padding:18px 16px}
 .page-head{padding:14px 18px 6px}
-.page-eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-3);font-weight:700}
-.page-h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:3px}
+.page-eyebrow{font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--chrome-2);font-weight:600}
+.page-h1{font-family:var(--serif);font-size:29px;font-weight:600;letter-spacing:.02em;margin-top:5px}
 
 /* ============ 对话页 ============ */
 #chat{display:flex;flex-direction:column;padding-bottom:0;overflow:hidden}
@@ -149,11 +154,12 @@ button,input,textarea{font-family:inherit;color:inherit}
 @keyframes orbBreath{0%,100%{transform:scale(1);box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 55px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08)}
   50%{transform:scale(1.045);box-shadow:0 14px 60px rgba(0,0,0,.6),0 0 82px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.1)}}
 @keyframes orbSpin{to{transform:rotate(360deg)}}
-.hero-name{font-size:29px;font-weight:800;letter-spacing:.02em;
+.hero-name{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:.08em;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .hero-sub{font-size:14px;color:var(--text-2);margin-top:8px;line-height:1.6}
-.hero-line{width:44px;height:2px;margin:16px auto;border-radius:2px;
-  background:linear-gradient(90deg,transparent,var(--cy-2),transparent)}
+.hero-line{display:flex;align-items:center;justify-content:center;gap:9px;margin:18px auto;color:var(--chrome-2);font-size:8px}
+.hero-line::before,.hero-line::after{content:"";width:42px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,169,97,.75))}
+.hero-line::after{transform:scaleX(-1)}
 .quicks{display:grid;gap:10px;width:100%;max-width:380px;margin-top:22px}
 .qcard{display:flex;align-items:center;gap:13px;padding:14px 15px;text-align:left;cursor:pointer;
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);transition:.18s var(--ease)}
@@ -165,13 +171,13 @@ button,input,textarea{font-family:inherit;color:inherit}
 
 .msgs{display:flex;flex-direction:column;gap:14px;padding:14px 16px}
 .msg{max-width:86%;display:flex;flex-direction:column;gap:5px;animation:msgIn .4s var(--spring)}
-@keyframes msgIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes msgIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 .msg.me{align-self:flex-end;align-items:flex-end}
 .msg.her{align-self:flex-start;align-items:flex-start}
 .bubble{padding:11px 15px;border-radius:19px;font-size:15.5px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
 .msg.me .bubble{background:var(--cy-grad);color:#08120F;font-weight:520;border-bottom-right-radius:6px;
   box-shadow:0 4px 18px var(--cy-glow)}
-.msg.her .bubble{background:var(--surface-2);border:1px solid var(--line);border-bottom-left-radius:6px}
+.msg.her .bubble{background:var(--surface-2);border:1px solid var(--line);border-bottom-left-radius:6px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 6px 20px rgba(0,0,0,.22)}
 .msg-meta{font-size:10.5px;color:var(--text-3);letter-spacing:.04em;padding:0 4px;
   font-variant-numeric:tabular-nums}
 .shu-tag{display:inline-flex;gap:6px;flex-wrap:wrap;padding:0 4px}
@@ -216,20 +222,21 @@ button,input,textarea{font-family:inherit;color:inherit}
 .chip:active{transform:scale(.94)}
 .chip.on{background:var(--cy-glow);border-color:var(--cy-3);color:var(--cy-hi)}
 .input-row{display:flex;align-items:flex-end;gap:9px}
-.in-box{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:22px;
+.in-box{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:22px;transition:.3s var(--spring);
   padding:9px 15px;transition:.2s}
-.in-box:focus-within{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
+.in-box:focus-within{border-color:var(--chrome-3);box-shadow:0 0 0 3px var(--chrome-glow),0 4px 20px rgba(0,0,0,.25)}
 textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;font-size:15.5px;
   max-height:130px;line-height:1.45}
 .send{width:42px;height:42px;flex-shrink:0;border:none;border-radius:50%;cursor:pointer;
   display:grid;place-items:center;background:var(--cy-grad);box-shadow:0 4px 16px var(--cy-glow);transition:.18s var(--spring)}
 .send:active{transform:scale(.88)}
+.send{box-shadow:0 4px 16px var(--cy-glow),0 0 0 1px rgba(201,169,97,.25)}
 .send:disabled{opacity:.4;box-shadow:none}
 .send svg{width:20px;height:20px;fill:#08120F}
 
 /* ============ 记忆页 / 她 / 设置 通用卡 ============ */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:13px}
-.card-title{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-bottom:12px;
+.card-title{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--chrome-2);font-weight:600;margin-bottom:13px;
   display:flex;justify-content:space-between;align-items:center}
 .mem-item{padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.55}
 .mem-item:last-child{border:none;padding-bottom:0}
@@ -247,7 +254,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .soul-orb::before{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:-1;
   background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.55;filter:blur(9px);
   animation:orbSpin 8s linear infinite}
-.soul-orb .glyph{font-size:46px;font-weight:800;
+.soul-orb .glyph{font-family:var(--serif);font-size:50px;font-weight:600;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .soul-mood{margin-top:16px;font-size:15px;color:var(--text-2);text-align:center;line-height:1.6;max-width:300px}
 .bars{display:flex;flex-direction:column;gap:13px;margin-top:4px}
@@ -294,7 +301,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:radial-gradient(circle at 38% 32%,var(--orb-hi,#3a4148),#0c0e11 74%);border:1px solid var(--line-2);
   box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 34px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);animation:orbBreath 4.6s ease-in-out infinite;transition:background 1.2s}
 .hub-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(6px);animation:orbSpin 7s linear infinite}
-.hub-orb .glyph{font-size:26px;font-weight:800;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hub-orb .glyph{font-family:var(--serif);font-size:29px;font-weight:600;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .hub-p-right{flex:1;min-width:0}
 .hub-p-right .hub-live{font-size:15px;font-weight:600;color:var(--cy-1)}
 .hub-p-right .hub-decl{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.6}
@@ -397,7 +404,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .sheet.show{transform:translateY(0)}
 .sheet.dragging{transition:none}
 .grab{width:38px;height:5px;border-radius:3px;background:var(--line-2);margin:2px auto 14px}
-.sheet-title{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.sheet-title{font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:.03em}
 .sheet-sub{font-size:13px;color:var(--text-2);margin-top:4px;line-height:1.5;margin-bottom:16px}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12px;color:var(--text-2);margin-bottom:6px;font-weight:600}
@@ -435,7 +442,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   box-shadow:0 10px 50px rgba(0,0,0,.5),0 0 55px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);animation:orbBreath 4.6s ease-in-out infinite}
 .lock-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(7px);animation:orbSpin 7s linear infinite}
 .lock-orb svg{width:44px;height:44px}
-.lock-title{font-size:30px;font-weight:800;letter-spacing:.14em;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.lock-title{font-family:var(--serif);font-size:31px;font-weight:600;letter-spacing:.2em;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .lock-sub{font-size:14px;color:var(--text-2);margin-top:12px;line-height:1.7;margin-bottom:26px}
 .lock-input{width:100%;text-align:center;background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:15px;font-size:16px;outline:none;transition:.2s;letter-spacing:.05em}
 .lock-input:focus{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
@@ -452,7 +459,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   padding:calc(var(--safe-top) + 44px) 30px calc(var(--safe-bot) + 40px)}
 .ob-screen.on{display:flex;animation:obIn .6s var(--ease)}
 @keyframes obIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-.ob-wordmark{font-size:40px;font-weight:800;letter-spacing:.03em;
+.ob-wordmark{font-family:var(--serif);font-size:41px;font-weight:600;letter-spacing:.1em;
   background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 2px 10px rgba(201,169,97,.22))}
 .ob-tag{font-size:16px;color:var(--text-2);margin-top:14px;line-height:1.6}
@@ -466,7 +473,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .ob-orb.big{width:122px;height:122px;margin-bottom:24px}
 .ob-orb.big span{font-size:54px;font-weight:800;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .ob-note{font-size:13px;color:var(--cy-1);margin-bottom:30px;padding:8px 16px;border:1px solid var(--cy-3);border-radius:999px;background:var(--surface-2)}
-.ob-welcome{font-size:27px;font-weight:800;letter-spacing:.02em;
+.ob-welcome{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:.06em;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .ob-note2{font-size:15px;color:var(--text-2);margin-top:12px;margin-bottom:26px;line-height:1.6}
 .ob-dev{font-size:12.5px;color:var(--cy-1);margin-bottom:22px;min-height:17px;font-variant-numeric:tabular-nums}
