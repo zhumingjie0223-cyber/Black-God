@@ -35,13 +35,12 @@
   // —— Cron：兜底心跳（alarm 链是主，cron 是保险，绝不掉线）——
   "triggers": {
     "crons": ["*/5 * * * *"]
-  },
+  }
 
-  // —— 路由：aquan.lufei.uk（与 CF 面板已有路由一致：aquan.lufei.uk/* → nexus-do）——
-  // 用 zone route 而非 custom_domain，避免与已存在的 DNS 记录/路由冲突。
-  "routes": [
-    { "pattern": "aquan.lufei.uk/*", "zone_name": "lufei.uk" }
-  ]
+  // —— 域名 aquan.lufei.uk 由 CF 面板里已有的路由（aquan.lufei.uk/* → nexus-do）负责，
+  //     部署不在这里动路由，好让 API 令牌只需账户级 Workers 权限、无需 Zone 权限。
+  //     （如需用 wrangler 自动绑域名，改回 "routes":[{"pattern":"aquan.lufei.uk/*","zone_name":"lufei.uk"}]
+  //      并给令牌加 Zone·Workers Routes·Edit 权限。）
 
   // —— Secrets（用 `wrangler secret put <NAME>` 设置，不写进仓库）——
   //   OWNER_TOKEN         ★强烈建议★ 私密令牌，配了之后所有数据接口强制鉴权，
