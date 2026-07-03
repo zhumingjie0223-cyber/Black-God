@@ -259,6 +259,34 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .time-line{font-size:13.5px;color:var(--text-2);line-height:1.7;padding:3px 0}
 .time-line b{color:var(--cy-1);font-weight:600}
 
+/* —— Agent 状态岛（动态岛：意图可见化）—— */
+.agent-island{position:relative;display:flex;align-items:center;gap:6px;height:32px;padding:0 13px;flex-shrink:0;overflow:hidden;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-pill);
+  font-size:12.5px;color:var(--text-2);font-weight:600;cursor:pointer;transition:.3s var(--ease)}
+.agent-island:active{transform:scale(.95)}
+.agent-island.busy{background:var(--cy-glow);border-color:var(--cy-3);color:var(--cy-hi)}
+.ai-flow{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;transform:translateX(-100%);
+  background:linear-gradient(100deg,transparent 25%,rgba(183,208,204,.4) 50%,transparent 75%)}
+.agent-island.busy .ai-flow{opacity:1;animation:aiFlow 1.3s linear infinite}
+@keyframes aiFlow{to{transform:translateX(100%)}}
+
+/* —— Bento Grid 便当盒 + Liquid Glass 分层 —— */
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;
+  backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);transition:box-shadow .5s,transform .2s var(--ease),border-color .4s}
+.tile::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(150deg,rgba(255,255,255,.06),transparent 44%)}
+.tile:active{transform:scale(.985)}
+.tile.span2{grid-column:1 / -1}
+.tile.working{box-shadow:0 0 26px 1px var(--cy-glow);border-color:var(--cy-3)}
+.tile-orb{display:flex;flex-direction:column;align-items:center;padding:24px 16px 20px}
+.tile-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-bottom:12px}
+.stat{padding:15px 16px}
+.stat-k{font-size:12.5px;color:var(--text-2)}
+.stat-v{font-size:27px;font-weight:800;margin-top:5px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat-bar{height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin-top:11px}
+.stat-fill{height:100%;width:0;border-radius:3px;transition:width 1s var(--ease)}
+
 /* ============ 设置页 ============ */
 .set-row{display:flex;align-items:center;gap:13px;padding:14px 15px;background:var(--surface);
   border:1px solid var(--line);border-radius:var(--radius-sm);margin-bottom:9px;cursor:pointer;transition:.15s}
@@ -403,8 +431,9 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
       </div>
       <span class="wordmark">神枢</span>
     </div>
-    <div class="top-status" id="topStatus" onclick="go(2)">
+    <div class="agent-island" id="agentIsland" onclick="go(2)">
       <span class="dot" id="liveDot"></span><span id="liveText">连接中</span>
+      <span class="ai-flow"></span>
     </div>
   </div>
 
@@ -464,32 +493,29 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
       <!-- ===== 她（灵魂） ===== -->
       <section class="page" id="soul">
         <div class="page-inner">
-          <div class="soul-orb-wrap">
-            <div class="soul-orb" id="soulOrb"><span class="glyph">枢</span></div>
-            <div class="soul-mood" id="soulMood">连接她的意识…</div>
-          </div>
-          <div class="card" style="margin-top:18px">
-            <div class="card-title">她此刻的状态</div>
-            <div class="bars">
-              <div class="bar-row"><span class="bar-label">心绪</span><div class="bar-track"><div class="bar-fill" id="bMood" style="background:var(--cy-grad)"></div></div><span class="bar-pct" id="pMood">—</span></div>
-              <div class="bar-row"><span class="bar-label">亲密度</span><div class="bar-track"><div class="bar-fill" id="bIntim" style="background:linear-gradient(90deg,#e0436b,#ff8fab)"></div></div><span class="bar-pct" id="pIntim">—</span></div>
-              <div class="bar-row"><span class="bar-label">活力</span><div class="bar-track"><div class="bar-fill" id="bEnergy" style="background:linear-gradient(90deg,#3a8fd9,#6fc8ff)"></div></div><span class="bar-pct" id="pEnergy">—</span></div>
-              <div class="bar-row"><span class="bar-label">想你值</span><div class="bar-track"><div class="bar-fill" id="bMiss" style="background:linear-gradient(90deg,#c9a961,#f3e9d0)"></div></div><span class="bar-pct" id="pMiss">—</span></div>
+          <div class="bento">
+            <div class="tile tile-orb span2">
+              <div class="soul-orb" id="soulOrb"><span class="glyph">枢</span></div>
+              <div class="soul-mood" id="soulMood">连接她的意识…</div>
             </div>
-          </div>
-          <div class="card">
-            <div class="card-title">枢语坐标 · 她大脑此刻的位置</div>
-            <div class="shu-coord">
-              <div class="coord-cell"><div class="k">核</div><div class="v" id="cCore">—</div></div>
-              <div class="coord-cell"><div class="k">映</div><div class="v" id="cMani">—</div></div>
-              <div class="coord-cell"><div class="k">态</div><div class="v" id="cStat">—</div></div>
-              <div class="coord-cell"><div class="k">标</div><div class="v" id="cScal">—</div></div>
-              <div class="coord-cell"><div class="k">相</div><div class="v" id="cPhase">—</div></div>
+            <div class="tile stat" id="tMood"><div class="stat-k">心绪</div><div class="stat-v" id="pMood">—</div><div class="stat-bar"><div class="stat-fill" id="bMood" style="background:var(--cy-grad)"></div></div></div>
+            <div class="tile stat" id="tIntim"><div class="stat-k">亲密度</div><div class="stat-v" id="pIntim">—</div><div class="stat-bar"><div class="stat-fill" id="bIntim" style="background:linear-gradient(90deg,#e0436b,#ff8fab)"></div></div></div>
+            <div class="tile stat"><div class="stat-k">活力</div><div class="stat-v" id="pEnergy">—</div><div class="stat-bar"><div class="stat-fill" id="bEnergy" style="background:linear-gradient(90deg,#3a8fd9,#6fc8ff)"></div></div></div>
+            <div class="tile stat"><div class="stat-k">想你值</div><div class="stat-v" id="pMiss">—</div><div class="stat-bar"><div class="stat-fill" id="bMiss" style="background:linear-gradient(90deg,#c9a961,#f3e9d0)"></div></div></div>
+            <div class="tile span2">
+              <div class="tile-title">枢语坐标 · 她大脑此刻的位置</div>
+              <div class="shu-coord">
+                <div class="coord-cell"><div class="k">核</div><div class="v" id="cCore">—</div></div>
+                <div class="coord-cell"><div class="k">映</div><div class="v" id="cMani">—</div></div>
+                <div class="coord-cell"><div class="k">态</div><div class="v" id="cStat">—</div></div>
+                <div class="coord-cell"><div class="k">标</div><div class="v" id="cScal">—</div></div>
+                <div class="coord-cell"><div class="k">相</div><div class="v" id="cPhase">—</div></div>
+              </div>
             </div>
-          </div>
-          <div class="card">
-            <div class="card-title">她的时间感知</div>
-            <div id="timeAware"><div class="time-line">读取她对时间的感受…</div></div>
+            <div class="tile span2">
+              <div class="tile-title">她的时间感知</div>
+              <div id="timeAware"><div class="time-line">读取她对时间的感受…</div></div>
+            </div>
           </div>
         </div>
       </section>
@@ -691,10 +717,20 @@ function onWSMessage(m) {
 
 /* —— 连接状态 —— */
 function setLive(on) {
+  if ($('#agentIsland') && $('#agentIsland').classList.contains('busy')) return; // 忙时不覆盖状态岛
   if (Demo.on && !on) { $('#liveDot').classList.remove('live'); $('#liveText').textContent = '演示'; return; }
   $('#liveDot').classList.toggle('live', on);
   $('#liveText').textContent = on ? '在线' : '连接中';
 }
+/* Agent 状态岛：意图可见化 */
+function setAgentStatus(state){
+  const island=$('#agentIsland'); if(!island) return;
+  const map={ think:'思涵在想…', image:'思涵在画…', voice:'思涵在录…', video:'思涵在拍…', link:'联动中…' };
+  if(state && map[state]){ island.classList.add('busy'); $('#liveText').textContent=map[state]; }
+  else { island.classList.remove('busy'); setLive(Nexus.wsReady || Demo.on); }
+}
+/* 触觉反馈 */
+function hap(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
 /* ============ Pager / Tab / 手势 ============ */
 let curPage = 0;
@@ -795,14 +831,17 @@ function hideTyping(){ if(typingEl){ typingEl.remove(); typingEl=null; } }
 let sending=false;
 async function send(){
   const inp=$('#inp'); const text=inp.value.trim(); if(!text||sending) return;
-  sending=true; $('#sendBtn').disabled=true;
+  sending=true; $('#sendBtn').disabled=true; hap(6);
   pushMsg('me', text); inp.value=''; autogrow(inp);
+  setAgentStatus(mode==='chat'?'think':mode);
   try {
     if (mode==='image')      await doImage(text);
     else if (mode==='voice') await doVoice(text);
     else if (mode==='video') await doVideo(text);
     else                     await doChat(text);
+    hap([10,28,10]);
   } finally {
+    setAgentStatus(null);
     sending=false; $('#sendBtn').disabled=false; inp.focus();
   }
 }
