@@ -39,12 +39,19 @@
 black-god/
 ├── brand/                    ← 品牌形象
 │   └── brand_logo.png        ← 神字 Logo（黑金浮雕）
-├── handover/                 ← 完整交接档案（给 Fable 5 接手用）
-│   ├── BLACK_GOD_COMPLETE_HANDOVER.md
-│   ├── nexus.mjs             ← 神枢主逻辑 147K/2601行
-│   ├── lexicon.js            ← 枢语造词引擎 JS 版
-│   ├── lexicon_data.js       ← 51 层 10063 词能力空间
-│   └── deploy.py             ← CF Workers 一键部署脚本
+├── web/
+│   └── nexus-do/             ← ★ 神枢 v4 主体（部署这个）
+│       ├── index.html        ← iOS 级 SPA（水泥青签名版）— UI 源码
+│       ├── nexus_do.core.mjs ← 核心逻辑源码（大脑/情绪/记忆/DO）
+│       ├── nexus_do.mjs      ← 构建产物（部署用，勿手改）
+│       ├── build.mjs         ← index.html 注入核心的构建脚本
+│       ├── lexicon.js        ← 枢语造词引擎
+│       ├── lexicon_data.js   ← 51 层能力空间 · 29.5 亿语义
+│       ├── wrangler.jsonc    ← 部署配置（DO/AI/KV/cron/域名）
+│       ├── selftest.mjs      ← 纯逻辑自测
+│       └── DEPLOY.md         ← 部署指南
+├── handover/                 ← 历史交接档案（存档）
+│   └── BLACK_GOD_COMPLETE_HANDOVER.md
 ├── ui-spec/                  ← UI 设计规格
 │   ├── UI_V2_SPEC.md         ← 配色/动态/字体规范
 │   └── design_reference_10sets.html  ← 10 套高端设计参考
@@ -71,23 +78,31 @@ black-god/
 
 ---
 
-## 部署（简要）
+## 部署（神枢 v4 · wrangler 一键）
 
 ```bash
-# 1. 备份
-cp handover/nexus.mjs handover/nexus.mjs.bak
-
-# 2. 修改
-vim handover/nexus.mjs
-
-# 3. 语法校验
-node --check handover/nexus.mjs
-
-# 4. 部署（需 CF Token）
-python3 handover/deploy.py
+cd web/nexus-do
+npm install
+npm run build          # index.html + core → nexus_do.mjs
+npx wrangler deploy     # DO(SQLite migration) + AI + KV + cron + 自定义域名
 ```
 
-详细部署流程见 [handover/BLACK_GOD_COMPLETE_HANDOVER.md](handover/BLACK_GOD_COMPLETE_HANDOVER.md) 第八章。
+首次部署前设置密钥（不写进仓库）：
+
+```bash
+npx wrangler secret put TG_BOT_TOKEN        # 主动推送 bot token
+npx wrangler secret put TG_QUAN_CHAT_ID     # 权哥 TG 私聊 id
+# 可选：外接强算力大脑
+npx wrangler secret put NEXUS_GATEWAY_URL
+npx wrangler secret put NEXUS_GATEWAY_KEY
+npx wrangler secret put NEXUS_GATEWAY_MODEL
+```
+
+- 自定义域名 `aquan.lufei.uk` 已配在 `wrangler.jsonc`，部署时自动绑定。
+- 推送到 `main` 且改动 `web/nexus-do/**` 会触发 GitHub Actions 自动部署
+  （需在仓库 Secrets 里加 `CLOUDFLARE_API_TOKEN`）。
+
+详细见 [web/nexus-do/DEPLOY.md](web/nexus-do/DEPLOY.md)。
 
 ---
 

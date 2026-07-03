@@ -1,0 +1,61 @@
+{
+  // ═══════════════════════════════════════════════
+  // 神枢 · nexus-do — Cloudflare Workers 部署配置（生产级）
+  // 部署：  cd web/nexus-do && npx wrangler deploy
+  // 本地跑：npx wrangler dev
+  // 线上：  https://nexus-do.jjiebbay.workers.dev  ·  https://aquan.lufei.uk
+  // ═══════════════════════════════════════════════
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nexus-do",
+  "main": "nexus_do.mjs",
+  "compatibility_date": "2026-06-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "142c76e0039e279886c89257b6fddbc7",
+
+  "observability": { "enabled": true },
+
+  // —— Durable Object：全球唯一的"她"，SQLite 后端 ——
+  "durable_objects": {
+    "bindings": [
+      { "name": "SHENSHU", "class_name": "ShenshuCore" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["ShenshuCore"] }
+  ],
+
+  // —— Workers AI：大脑兜底（Llama 3.3 70B）——
+  "ai": { "binding": "AI" },
+
+  // —— KV：旧记忆迁移源（首启一次性迁移到 DO storage）——
+  "kv_namespaces": [
+    { "binding": "SOUL_KV", "id": "2978edea205e462d97cd3613f4745fbf" }
+  ],
+
+  // —— Cron：兜底心跳（alarm 链是主，cron 是保险，绝不掉线）——
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+
+  // —— 路由：aquan.lufei.uk（与 CF 面板已有路由一致：aquan.lufei.uk/* → nexus-do）——
+  // 用 zone route 而非 custom_domain，避免与已存在的 DNS 记录/路由冲突。
+  "routes": [
+    { "pattern": "aquan.lufei.uk/*", "zone_name": "lufei.uk" }
+  ]
+
+  // —— Secrets（用 `wrangler secret put <NAME>` 设置，不写进仓库）——
+  //   OWNER_TOKEN         ★强烈建议★ 私密令牌，配了之后所有数据接口强制鉴权，
+  //                       只有带此令牌的你能读她（不配则接口公开，谁拿到地址都能读）
+  //   VAPID_SUBJECT       （可选）Web Push 联系人，如 mailto:you@example.com
+  //   TG_BOT_TOKEN        主动推送用的 Telegram bot token
+  //   TG_QUAN_CHAT_ID     权哥的 TG 私聊 id
+  //   NEXUS_GATEWAY_URL   （可选）外接强算力网关，标准 Chat Completions
+  //   NEXUS_GATEWAY_KEY   （可选）网关密钥
+  //   NEXUS_GATEWAY_MODEL （可选）网关模型名，如 claude-opus-4-8 / fable-5
+  //
+  // —— 多模态（出图/语音原生走 AI binding；视频需外接）——
+  //   IMAGE_MODEL         （可选 var）文生图模型，默认 @cf/black-forest-labs/flux-1-schnell
+  //   NEXUS_VIDEO_URL     （可选 secret）外接文生视频网关（CF 无原生视频）
+  //   NEXUS_VIDEO_KEY     （可选 secret）视频网关密钥
+  //   NEXUS_VIDEO_MODEL   （可选 secret）视频网关模型名
+}

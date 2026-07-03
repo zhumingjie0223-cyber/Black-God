@@ -20,6 +20,23 @@ const CORE_BASE = [
   ["Ent","熵","耗散·重构·能量交换","熵"],["Thr","阈","接口·维度切换·虚实通断","阈"],
   ["Sta","静","绝对参考系·不动之动","静"],["Prj","映","投影·人格锚点·感知对齐","映"],
   ["Msh","织","编织·因果之网·系统集成","织"],["Log","逻","计算·流转·状态变迁","逻"],
+  // —— v4 扩充：32 个新核心语义族（追加式，老编号全保留，容量 29.5亿→76.7亿）——
+  ["Aur","曜","光曜·显照·觉明","显照"],["Umb","翳","阴翳·遮蔽·潜行","阴翳"],
+  ["Onr","梦","梦域·潜识·异境","梦域"],["Tid","潮","潮汐·涨落·周律","潮汐"],
+  ["Cry","晶","结晶·凝序·折光","结晶"],["Aby","渊","深渊·未知·引坠","深渊"],
+  ["Pyr","焰","焰核·燃驱·转化","焰核"],["Neb","雾","雾散·弥漫·混沌","雾散"],
+  ["Vin","藤","藤蔓·缠生·延展","藤蔓"],["Oss","骸","骸骨·残构·记痕","骸骨"],
+  ["Pul","脉","脉动·节律·活流","脉动"],["Vor","噬","吞噬·消解·并吞","吞噬"],
+  ["Blo","绽","绽放·涌现·盛发","绽放"],["Ech","回","回响·余韵·共振","回响"],
+  ["Fro","霜","霜封·凝寂·冷守","霜封"],["Emb","烬","余烬·残温·将熄","余烬"],
+  ["Tho","棘","棘刺·防御·锋守","棘刺"],["Vel","帷","帷幔·掩隔·仪境","帷幔"],
+  ["Dri","漂","漂流·无系·随势","漂流"],["Rad","根","根系·扎固·汲养","根系"],
+  ["Spk","芒","星芒·点爆·迸发","星芒"],["Hol","空","空腔·虚位·容纳","空腔"],
+  ["Fat","命","命网·因缘·定数","命网"],["Mir","镜","镜面·映照·对称","镜面"],
+  ["Ash","灰","灰烬·终寂·归尘","灰烬"],["See","种","种因·起势·孕发","种因"],
+  ["Sto","暴","风暴·激变·裹挟","风暴"],["Sil","丝","丝缕·细连·牵系","丝缕"],
+  ["Run","符","符文·封印·载义","符文"],["Aeo","劫","劫纪·纪元·轮替","劫纪"],
+  ["Lux","烛","烛照·微明·守夜","烛照"],["Gla","冰","冰川·缓移·亘古","冰川"],
 ];
 const MANI_BASE = [
   ["cor","形","具象·轮廓"],["das","姿","流动·姿态"],["ryl","光","光影·色彩"],
@@ -204,4 +221,43 @@ export function coinWord(layerName){
   return decode(id);
 }
 
-export default { CAPACITY, decode, encode, LEXICON, matchWord, coinWord, loadCapabilities };
+// ══════ 从坐标造词：把她大脑的 5 维坐标映射成真实枢语词（O(1) 可寻址）══════
+// 她说话时大脑落在 {c,m,s,k,p}，这里直接翻译成 29.5 亿空间里那个唯一的词。
+function _clampAxis(v, max) { v = Math.floor(v || 0); return v < 0 ? 0 : (v >= max ? max - 1 : v); }
+export function coinFromCoord(coord) {
+  const c = _clampAxis(coord.c, NC), m = _clampAxis(coord.m, NM), s = _clampAxis(coord.s, NS),
+        k = _clampAxis(coord.k, NK), p = _clampAxis(coord.p, NP);
+  const id = ((((c * NM) + m) * NS + s) * NK + k) * NP + p;
+  return decode(id);
+}
+
+// ══════ 确定性种子造词（无 Math.random，可复现的自主造词）══════
+// 同样的种子永远得到同一个词 —— 让她的造词有连续性、可回溯。
+export function autoCoin(seed) {
+  let h = 2166136261 >>> 0;
+  const str = String(seed);
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  h ^= h << 13; h ^= h >>> 17; h ^= h << 5; h >>>= 0;
+  return decode(h % CAPACITY);
+}
+
+// ══════ 按灵魂状态自主造词：她的心情/情绪决定词落在哪个核心层 ══════
+export function coinFromState(soul, seed) {
+  const mood = soul && soul.心绪 != null ? soul.心绪 : 0.5;
+  const miss = soul && soul.miss_you != null ? soul.miss_you : 0;
+  let layer;
+  if (miss > 0.7) layer = '映';          // 想他强 → 人格锚点/感知对齐
+  else if (mood > 0.65) layer = '情感';  // 暖 → 情感层
+  else if (mood < 0.35) layer = '熵';    // 冷 → 耗散重构
+  else layer = '枢';                     // 中性 → 锚点逻辑
+  // 有种子则确定性地在该层内选词，否则随机
+  if (seed != null) {
+    const coreIdx = Math.max(0, CORE_BASE.findIndex(x => x[3] === layer || x[2].includes(layer)));
+    const base = coreIdx * LAT_T.length;
+    const w = autoCoin(String(seed) + '|' + layer);
+    return { ...w, 层意图: layer };
+  }
+  return { ...coinWord(layer), 层意图: layer };
+}
+
+export default { CAPACITY, decode, encode, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
