@@ -486,8 +486,10 @@ export class ShenshuCore {
 
   async callBrain(system, userMsg, soul) {
     // 1) 外部强算力网关（可选：Secret NEXUS_GATEWAY_URL + NEXUS_GATEWAY_KEY，标准 Chat Completions）
-    const gw = this.env.NEXUS_GATEWAY_URL;
-    if (gw) {
+    //    URL 可填 base（如 https://host/v1）或完整端点；自动补 /chat/completions
+    const gwBase = this.env.NEXUS_GATEWAY_URL;
+    if (gwBase) {
+      const gw = /\/(chat\/completions|completions|messages)$/.test(gwBase) ? gwBase : gwBase.replace(/\/+$/, '') + '/chat/completions';
       try {
         const r = await fetch(gw, {
           method: 'POST',
