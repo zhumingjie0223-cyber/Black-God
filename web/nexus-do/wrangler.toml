@@ -4,7 +4,7 @@ compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 routes = [
-  { pattern = "aquan.lufei.uk", zone_id = "ZONE_ID_HERE" }
+  { pattern = "aquan.lufei.uk", zone_id = "824bdc2b31476c82c066e28ca1fa5a68" }
 ]
 
 [[durable_objects.bindings]]
