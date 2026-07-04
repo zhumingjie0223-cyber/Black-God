@@ -52,9 +52,13 @@
 
 ## 🟡 P2 — 打磨 / 收尾
 
-- [ ] **挑定唯一前门**：`web/`（静态站）、`web/nexus-do/`（Worker，真主体）、
-  `server/`（Python 内核，孤儿未接线）、`ios-app/`（半成品原生 App）四门并存。
-  留一个权威可部署入口，其余归档。
+- [x] **部署去重（已办一半）**：删掉了 root `wrangler.jsonc` —— 它把旧静态 `web/`
+  站当资源部署成另一个 worker `blackgod88`，和真正的产品 `nexus-do` 并行跑。
+  **仍需在 Cloudflare 面板手动关掉 `blackgod88` 的 Git 集成**（Workers → blackgod88 →
+  Settings → Builds → 断开 Git），否则每次 push 那条 Workers Build 会因找不到配置而变红。
+- [ ] **挑定唯一前门 / 归档旧壳**：`web/`（旧静态站，已弃用，改由 `web/nexus-do/` 内嵌
+  UI 提供）、`server/`（Python 内核，孤儿未接线）、`ios-app/`（半成品原生 App）。
+  确认 `nexus-do` 为唯一前门后，把 `web/` 旧静态文件与其余半成品归档。
 - [ ] **iOS 原生 App 取舍**：`build.yml` 产 unsigned IPA，无 Apple 开发者账号 + 签名
   无法分发。当前实际路线是 PWA —— native 那套要么补齐要么砍掉（顺带停掉每次
   push 都跑的 macOS 构建，省 Actions 额度）。
