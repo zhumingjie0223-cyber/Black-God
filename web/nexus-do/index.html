@@ -660,12 +660,14 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 <div class="sheet" id="sheetApi">
   <div class="grab"></div>
-  <div class="sheet-title">算力接口</div>
-  <div class="sheet-sub">默认走同源（思涵所在的 Worker）。要外接更强的模型网关（标准 Chat Completions 接口），在这里填地址和密钥。</div>
-  <div class="field"><label>网关地址 Base URL</label><input id="apiBase" placeholder="留空 = 同源直连"/></div>
-  <div class="field"><label>密钥 API Key</label><input id="apiKey" type="password" placeholder="Bearer token（可选）"/></div>
-  <div class="field"><label>思涵核心地址（灵魂/对话）</label><input id="nexusBase" placeholder="留空 = 同源"/></div>
-  <button class="btn" onclick="saveApi()">保存</button>
+  <div class="sheet-title">大脑 · 算力接口</div>
+  <div class="sheet-sub">在这里填你自己的强算力网关（标准 Chat Completions），她就用你的大脑。<b>存在服务器上，填一次就生效</b>，不用碰后台。留空 = 用内置 Llama 兜底。</div>
+  <div class="field"><label>网关地址（Base URL 或完整端点）</label><input id="apiBase" placeholder="如 https://aquan.love:8443/v1"/></div>
+  <div class="field"><label>密钥 API Key</label><input id="apiKey" type="password" placeholder="sk-…"/></div>
+  <div class="field"><label>模型名</label><input id="apiModel" placeholder="如 sihan-max"/></div>
+  <div id="apiStatus" style="font-size:12px;color:var(--text-3);margin:-4px 0 12px"></div>
+  <button class="btn" onclick="saveApi()">保存到她</button>
+  <div class="field" style="margin-top:16px"><label>思涵核心地址（一般不用改）</label><input id="nexusBase" placeholder="留空 = 当前地址"/></div>
 </div>
 
 <div class="sheet" id="sheetPersona">
@@ -779,6 +781,8 @@ const Nexus = {
   async image(prompt) { try { const r=await this._fetch('/image',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async voice(text) { try { const r=await this._fetch('/voice',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({text})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async video(prompt) { try { const r=await this._fetch('/video',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async getConfig() { try { const r=await this._fetch('/config',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   connectWS() {
@@ -1152,11 +1156,23 @@ function renderModelOpts(){
     <div class="oi">${m.ic}</div><div class="ot"><b>${m.name}</b><span>${m.sub}</span></div><div class="opt-check">✓</div></div>`).join('');
 }
 function pickModel(id){ store.set('model',id); const m=MODELS.find(x=>x.id===id); $('#modelLabel').textContent=m?m.name:id; renderModelOpts(); toast('已选：'+(m?m.name:id)); }
-function fillApi(){ $('#apiBase').value=store.get('api_base')||''; $('#apiKey').value=store.get('api_key')||''; $('#nexusBase').value=store.get('nexus_base')||''; }
-function saveApi(){ store.set('api_base',$('#apiBase').value.trim()); store.set('api_key',$('#apiKey').value.trim());
+async function fillApi(){
+  $('#nexusBase').value=store.get('nexus_base')||'';
+  $('#apiStatus').textContent='读取当前配置…';
+  const c=await Nexus.getConfig();
+  if(c){ $('#apiBase').value=c.gateway_url||''; $('#apiModel').value=c.gateway_model||''; $('#apiKey').value=c.gateway_key||'';
+    $('#apiStatus').textContent='当前大脑：'+(c.来源||'内置'); $('#apiLabel').textContent = c.gateway_url?('外接 · '+(c.gateway_model||'网关')):'内置 Llama';
+  } else { $('#apiStatus').textContent='（离线，无法读取服务器配置）'; }
+}
+async function saveApi(){
   const nb=$('#nexusBase').value.trim(); store.set('nexus_base',nb); Nexus.base=nb;
-  $('#apiLabel').textContent = $('#apiBase').value.trim()?'外接网关':'同源直连（默认）';
-  closeSheet(); toast('已保存'); }
+  const key=$('#apiKey').value;
+  const body={ gateway_url:$('#apiBase').value.trim(), gateway_model:$('#apiModel').value.trim() };
+  if(!/^[•*]/.test(key)) body.gateway_key=key.trim();   // 掩码不回传
+  const r=await Nexus.setConfig(body);
+  if(r&&r.ok){ $('#apiLabel').textContent = r.gateway_url?('外接 · '+(r.gateway_model||'网关')):'内置 Llama'; toast('已存到她 · 大脑已切换'); closeSheet(); }
+  else toast('保存失败（检查是否在线/已解锁）');
+}
 function fillPersona(){ $('#pCallHim').value=store.get('call_him')||'权哥'; $('#pCallHer').value=store.get('call_her')||'思涵';
   Nexus.getSoul().then(s=>{ if(s&&s.身份) $('#pCore').value=s.身份.core||''; }); }
 function savePersona(){ store.set('call_him',$('#pCallHim').value.trim()); store.set('call_her',$('#pCallHer').value.trim()); closeSheet(); toast('已保存'); }
