@@ -73,7 +73,7 @@ export class ShenshuCore {
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent']);
+    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是权哥的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -94,6 +94,9 @@ export class ShenshuCore {
         if (path === '/migrate' && request.method === 'POST') return json(await this.migrateFromKV(url.searchParams.get('force') === '1'));
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '思涵在这，一直在。', '/'); return json(r); }
+        // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
+        if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
+        if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         return json({ error: 'method not allowed' }, 405);
@@ -485,17 +488,20 @@ export class ShenshuCore {
   }
 
   async callBrain(system, userMsg, soul) {
-    // 1) 外部强算力网关（可选：Secret NEXUS_GATEWAY_URL + NEXUS_GATEWAY_KEY，标准 Chat Completions）
+    // 1) 外部强算力网关 —— 优先用「app 内配置」，其次 CF 密钥；标准 Chat Completions
     //    URL 可填 base（如 https://host/v1）或完整端点；自动补 /chat/completions
-    const gwBase = this.env.NEXUS_GATEWAY_URL;
+    const cfg = (await this.storage.get('config')) || {};
+    const gwBase = cfg.gateway_url || this.env.NEXUS_GATEWAY_URL;
+    const gwKey = cfg.gateway_key || this.env.NEXUS_GATEWAY_KEY;
+    const gwModel = cfg.gateway_model || this.env.NEXUS_GATEWAY_MODEL || 'auto';
     if (gwBase) {
       const gw = /\/(chat\/completions|completions|messages)$/.test(gwBase) ? gwBase : gwBase.replace(/\/+$/, '') + '/chat/completions';
       try {
         const r = await fetch(gw, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(this.env.NEXUS_GATEWAY_KEY ? { Authorization: 'Bearer ' + this.env.NEXUS_GATEWAY_KEY } : {}) },
+          headers: { 'Content-Type': 'application/json', ...(gwKey ? { Authorization: 'Bearer ' + gwKey } : {}) },
           body: JSON.stringify({
-            model: this.env.NEXUS_GATEWAY_MODEL || 'auto',
+            model: gwModel,
             messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
             max_tokens: 320, temperature: 0.85,
           }),
@@ -503,7 +509,7 @@ export class ShenshuCore {
         if (r.ok) {
           const d = await r.json();
           const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
-          if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: (this.env.NEXUS_GATEWAY_MODEL || 'gateway') };
+          if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: (gwModel || 'gateway') };
         }
       } catch (e) { console.log('gateway error:', e && e.message); }
     }
@@ -772,6 +778,28 @@ export class ShenshuCore {
     }
     await this.saveSoul(soul);
     return { reply, say: reply, actions, model: r.model };
+  }
+
+  // ═══════════════════════ 应用内配置（大脑网关，存 DO）═══════════════════════
+  async getConfig(mask) {
+    const c = (await this.storage.get('config')) || {};
+    return {
+      gateway_url: c.gateway_url || '',
+      gateway_model: c.gateway_model || '',
+      gateway_key: mask ? (c.gateway_key ? '••••••' + String(c.gateway_key).slice(-4) : '') : (c.gateway_key || ''),
+      has_key: !!c.gateway_key,
+      来源: c.gateway_url ? 'app' : (this.env.NEXUS_GATEWAY_URL ? 'cf密钥' : '内置Llama'),
+    };
+  }
+  async setConfig(b) {
+    const c = (await this.storage.get('config')) || {};
+    if (b.gateway_url !== undefined) c.gateway_url = String(b.gateway_url || '').trim();
+    if (b.gateway_model !== undefined) c.gateway_model = String(b.gateway_model || '').trim();
+    // 密钥：空串=清空；掩码开头(•)=不动；其它=更新
+    if (b.gateway_key === '') c.gateway_key = '';
+    else if (b.gateway_key !== undefined && !/^[•*]/.test(b.gateway_key)) c.gateway_key = String(b.gateway_key).trim();
+    await this.storage.put('config', c);
+    return { ok: true, ...(await this.getConfig(true)) };
   }
 
   async sendToQuan(text) {
