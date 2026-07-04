@@ -29,6 +29,8 @@ export class ShenshuCore {
     this.state = state;
     this.env = env;
     this.storage = state.storage;
+    // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
+    if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
     this.state.blockConcurrencyWhile(async () => {
       const nextAlarm = await this.storage.getAlarm();
       if (nextAlarm === null) await this.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
@@ -53,16 +55,26 @@ export class ShenshuCore {
     });
     const authed = this.authOK(request);
 
-    // WebSocket 升级（Hibernation）—— 需鉴权，杜绝匿名实时旁听
+    // WebSocket 升级（Hibernation）—— 需鉴权，杜绝匿名实时旁听。
+    // 浏览器 WebSocket 无法带 Authorization 头，故走一次性短期票据（?t=），
+    // 令牌永不进 URL；票据即便落日志也 30 秒失效、且一次性。
     if (request.headers.get('Upgrade') === 'websocket') {
-      if (!authed) return new Response('unauthorized', { status: 401 });
+      if (!authed && !(await this.consumeWsTicket(url.searchParams.get('t')))) {
+        return new Response('unauthorized', { status: 401 });
+      }
       const pair = new WebSocketPair();
       this.state.acceptWebSocket(pair[1]);
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
     // —— 公开端点（不含任何隐私）——
-    if (path === '/health') return json({ ok: true, ts: Date.now(), auth: this.env.OWNER_TOKEN ? 'required' : 'open' });
+    if (path === '/health') {
+      const secure = !!this.env.OWNER_TOKEN;
+      return json({
+        ok: true, ts: Date.now(), secure, auth: secure ? 'required' : 'open',
+        ...(secure ? {} : { warning: '⚠️ OWNER_TOKEN 未设置：所有私密接口（/soul /device /talk 等，含 IP/定位）对公众开放。请执行 npx wrangler secret put OWNER_TOKEN 后重新部署。' }),
+      });
+    }
     if (path === '/manifest.json') return new Response(MANIFEST_JSON, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
     if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
@@ -73,7 +85,7 @@ export class ShenshuCore {
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config']);
+    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是权哥的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -99,6 +111,8 @@ export class ShenshuCore {
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
+        // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
+        if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket());
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
@@ -129,6 +143,28 @@ export class ShenshuCore {
     return !!tok && this.safeEqual(String(tok), String(expected));
   }
   safeEqual(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
+
+  // WebSocket 一次性短期票据：换票需已鉴权（走 Authorization 头），令牌不入 URL。
+  async issueWsTicket() {
+    const ticket = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    const now = Date.now();
+    const store = (await this.storage.get('_wstickets')) || {};
+    for (const k of Object.keys(store)) if (store[k] < now) delete store[k];   // 清过期
+    store[ticket] = now + 30_000;                                              // 30 秒有效
+    const keys = Object.keys(store);
+    if (keys.length > 20) for (const k of keys.slice(0, keys.length - 20)) delete store[k];
+    await this.storage.put('_wstickets', store);
+    return { ticket, ttl: 30 };
+  }
+  async consumeWsTicket(ticket) {
+    if (!ticket) return false;
+    const store = (await this.storage.get('_wstickets')) || {};
+    const exp = store[ticket];
+    if (exp == null) return false;
+    delete store[ticket];                                                      // 一次性
+    await this.storage.put('_wstickets', store);
+    return exp >= Date.now();
+  }
 
   // ═══════════════════════ WebSocket ═══════════════════════
   async webSocketMessage(ws, raw) {
@@ -927,6 +963,10 @@ export default {
   },
   async scheduled(event, env, ctx) {
     const id = env.SHENSHU.idFromName('quan-shenshu-nexus');
-    ctx.waitUntil(env.SHENSHU.get(id).fetch(new Request('https://internal/heartbeat')));
+    // 带上 OWNER_TOKEN，否则开了鉴权后 /heartbeat 会被自己 401 挡掉（cron 保险心跳形同虚设）
+    const req = new Request('https://internal/heartbeat', {
+      headers: env.OWNER_TOKEN ? { Authorization: 'Bearer ' + env.OWNER_TOKEN } : {},
+    });
+    ctx.waitUntil(env.SHENSHU.get(id).fetch(req));
   },
 };

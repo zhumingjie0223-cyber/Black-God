@@ -785,11 +785,18 @@ const Nexus = {
   async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
-  connectWS() {
+  async connectWS() {
     try {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const host = this.base ? this.base.replace(/^https?:\/\//,'') : location.host;
-      const q = this.token ? ('?k=' + encodeURIComponent(this.token)) : '';
+      // 令牌不进 URL：先用 Authorization 头换一张一次性短期票据（?t=），
+      // 票据即便落日志也 30 秒失效、且一次性，不再暴露长期 OWNER_TOKEN。
+      let q = '';
+      if (this.token) {
+        try { const tr = await this._fetch('/wsticket', { method:'POST', headers: this.hdr() });
+          const tj = tr && tr.ok ? await tr.json() : null;
+          if (tj && tj.ticket) q = '?t=' + encodeURIComponent(tj.ticket); } catch(e){}
+      }
       const ws = new WebSocket(proto + '://' + host + '/' + q);
       this.ws = ws;
       ws.onopen = () => { this.wsReady = true; this.backoff = 1000; setLive(true); ws.send(JSON.stringify({type:'watch'})); };
