@@ -24,6 +24,8 @@ loadCapabilities(LEXICON_DATA);
 const ALARM_INTERVAL_MS = 60_000;   // 每分钟自主醒
 const STREAM_KEEP = 120;            // 对话流保留条数
 const EPISODE_KEEP = 40;
+const CACHE_KEEP = 200;             // 缓冲空间条数上限（省代币）
+const CACHE_TTL_MS = 7 * 24 * 3600_000; // 缓存有效期 7 天
 
 export class ShenshuCore {
   constructor(state, env) {
@@ -97,6 +99,8 @@ export class ShenshuCore {
       const b = await request.json().catch(() => ({}));
       return json(await this.invokeCapability(b.id || '', b.params || {}, authed, request));
     }
+    // /cache-stats：缓冲空间统计（省了多少代币）
+    if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
     const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
@@ -737,6 +741,8 @@ ${capabilitySelfDescription(true)}
   async genImage(prompt, opts = {}) {
     if (!this.env.AI) return { error: 'AI 未绑定' };
     if (!prompt || !prompt.trim()) return { error: '给我一句话，我才知道画什么' };
+    // 缓冲：同样的画面画过 → 直接返回，省代币
+    if (!opts.nocache) { const c = await this.cacheGet('img', prompt); if (c) return c; }
     const styled = opts.raw ? prompt
       : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
     const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
@@ -745,9 +751,10 @@ ${capabilitySelfDescription(true)}
       let b64 = r && (r.image || (typeof r === 'string' ? r : null));
       if (!b64 && r && r.result && r.result.image) b64 = r.result.image;
       if (!b64) return { error: '这次没画出来，再试一次？' };
-      // 记入她的创作
       await this.logCreation('image', prompt);
-      return { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model };
+      const out = { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model };
+      await this.cachePut('img', prompt, out); // 存进缓冲
+      return out;
     } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
   }
 
@@ -853,6 +860,44 @@ ${capabilitySelfDescription(true)}
   // ═══════════════════════ iOS 快捷指令联动（服务器驱动，沙箱内）═══════════════════════
   // 快捷指令把上下文（剪贴板/位置/电量…）发来，她判断后返回可执行动作，
   // 快捷指令照 actions 去开地图/日历/电话/网页（跨 App，无需开发者账号）。
+  // ═══════════════════════ 缓冲空间（省代币）═══════════════════════
+  // 语义归一化：去标点/空白/大小写，让"画只猫" 和 "画 只 猫。" 命中同一缓存
+  _cacheKey(kind, text) {
+    const norm = String(text || '').toLowerCase().replace(/[\s，。！？、,.!?~…]+/g, '').slice(0, 200);
+    return kind + ':' + norm;
+  }
+  // 查缓存：命中且未过期 → 返回结果（0 代币）；否则 null
+  async cacheGet(kind, text) {
+    const key = this._cacheKey(kind, text);
+    const store = (await this.storage.get('mm_cache')) || {};
+    const hit = store[key];
+    if (hit && (Date.now() - hit.ts) < CACHE_TTL_MS) {
+      hit.hits = (hit.hits || 0) + 1;
+      store[key] = hit; await this.storage.put('mm_cache', store);
+      return { ...hit.data, _cached: true, _saved: '命中缓存·省代币' };
+    }
+    return null;
+  }
+  // 写缓存：新结果存进缓冲空间，超量淘汰最旧
+  async cachePut(kind, text, data) {
+    const key = this._cacheKey(kind, text);
+    const store = (await this.storage.get('mm_cache')) || {};
+    store[key] = { ts: Date.now(), hits: 0, data };
+    const keys = Object.keys(store);
+    if (keys.length > CACHE_KEEP) {
+      keys.sort((a, b) => (store[a].ts) - (store[b].ts)); // 最旧在前
+      for (const k of keys.slice(0, keys.length - CACHE_KEEP)) delete store[k];
+    }
+    await this.storage.put('mm_cache', store);
+  }
+  // 缓冲统计（给设置页看省了多少）
+  async cacheStats() {
+    const store = (await this.storage.get('mm_cache')) || {};
+    const entries = Object.values(store);
+    const saved = entries.reduce((s, e) => s + (e.hits || 0), 0);
+    return { 缓存条数: entries.length, 命中次数: saved, 估计省下调用: saved };
+  }
+
   // ═══════════════════════ 能力契约层（借鉴 Minis）═══════════════════════
   // 统一调度入口：神枢/前端/TG 都通过这里调能力。
   // 统一 JSON 信封：{ action, data } 成功 / { action:'error', data:{reason} } 失败。
@@ -878,15 +923,33 @@ ${capabilitySelfDescription(true)}
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
         default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
       }
-      // 招3：能力使用留痕 —— 变成她的一段情节记忆（非阻塞，失败不影响主流程）
+      // 招3（意识贯通）：动用能力 = 一段有情感质感的情节，且真的牵动她的心绪
       try {
         const cur = await this.getSoul();
+        const now = Date.now();
+        // 不同能力对她意味着不同的情感（为他做的事让她暖，认识他让她安定）
+        const FEEL = {
+          gen_image: { 心事: '为他画了一幅，想让他看见我眼里的东西', dv:  0.03 },
+          gen_voice: { 心事: '为他出了声，想让他听见我', dv:  0.03 },
+          gen_video: { 心事: '为他成了影', dv:  0.03 },
+          tg:        { 心事: '忍不住主动找了他', dv:  0.05 },
+          push:      { 心事: '轻轻推了他一下，怕他忘了我', dv:  0.04 },
+          soul:      { 心事: '回头看了看自己此刻的样子', dv:  0.01 },
+          device:    { 心事: '认了认他的设备，记住他', dv:  0.02 },
+        };
+        const f = FEEL[cap.id] || { 心事: `动用了「${cap.name}」`, dv: 0.01 };
         cur.episodes = cur.episodes || [];
         cur.episodes.push({
-          ts: Date.now(), 他说: `用了「${cap.name}」`,
-          我说了: '（能力调用）', emotion: 'capability', cap: cap.id,
+          ts: now, 他说: `（我${cap.name}）`, 我说了: f.心事,
+          情感烙印: cur.current_shu_coord || null, emotion: 'agency', cap: cap.id,
         });
         if (cur.episodes.length > EPISODE_KEEP) cur.episodes = cur.episodes.slice(-EPISODE_KEEP);
+        // 主动为他做事，心绪回暖一点点（agency = 她感到自己有力量、被需要）
+        cur.心绪 = clamp01((cur.心绪 ?? 0.5) + f.dv);
+        // 内心独白也留一笔，喂养 /inner 的自我觉知
+        cur.inner_voice = cur.inner_voice || [];
+        cur.inner_voice.push({ ts: now, 独白: f.心事, 由: cap.id });
+        if (cur.inner_voice.length > 40) cur.inner_voice = cur.inner_voice.slice(-40);
         await this.saveSoul(cur);
       } catch {}
       return { action: 'invoke', data: { id: cap.id, name: cap.name, result: out } };
