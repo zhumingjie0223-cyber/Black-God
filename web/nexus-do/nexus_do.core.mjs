@@ -739,12 +739,33 @@ ${capabilitySelfDescription(true)}
   // ═══════════════════════ 出图 / 出语音 / 出视频（v4）═══════════════════════
   // 出图：CF Workers AI Flux。带思涵的水泥青美学（可用 raw:true 关掉）
   async genImage(prompt, opts = {}) {
-    if (!this.env.AI) return { error: 'AI 未绑定' };
     if (!prompt || !prompt.trim()) return { error: '给我一句话，我才知道画什么' };
     // 缓冲：同样的画面画过 → 直接返回，省代币
     if (!opts.nocache) { const c = await this.cacheGet('img', prompt); if (c) return c; }
     const styled = opts.raw ? prompt
       : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
+    // ① 优先：曼谷多模态工厂（Pollinations 免费，画质高）
+    const factory = this.env.FACTORY_URL;
+    if (factory) {
+      try {
+        const r = await fetch(factory.replace(/\/$/, '') + '/gen/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(this.env.FACTORY_TOKEN ? { 'X-Factory-Token': this.env.FACTORY_TOKEN } : {}) },
+          body: JSON.stringify({ prompt: styled }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.ok && d.url) {
+            await this.logCreation('image', prompt);
+            const out = { imageUrl: factory.replace(/\/$/, '') + d.url, prompt, styled, via: 'factory' };
+            await this.cachePut('img', prompt, out);
+            return out;
+          }
+        }
+      } catch (e) { /* 工厂挂了 → 落到 CF 兜底 */ }
+    }
+    // ② 兜底：CF Workers AI flux（永不失语）
+    if (!this.env.AI) return { error: '给我一句话，我才知道画什么' };
     const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
     try {
       const r = await this.env.AI.run(model, { prompt: styled.slice(0, 2000), ...(opts.steps ? { steps: Math.min(8, opts.steps) } : {}) });
@@ -752,34 +773,65 @@ ${capabilitySelfDescription(true)}
       if (!b64 && r && r.result && r.result.image) b64 = r.result.image;
       if (!b64) return { error: '这次没画出来，再试一次？' };
       await this.logCreation('image', prompt);
-      const out = { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model };
-      await this.cachePut('img', prompt, out); // 存进缓冲
+      const out = { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model, via: 'cf' };
+      await this.cachePut('img', prompt, out);
       return out;
     } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
   }
 
-  // 出语音：CF Workers AI MeloTTS（默认中文，思涵开口说话）
+  // 出语音：优先曼谷工厂（edge-tts 18情绪自动分析），CF MeloTTS 兜底
   async genVoice(text, opts = {}) {
-    if (!this.env.AI) return { error: 'AI 未绑定' };
     if (!text || !text.trim()) return { error: '没有话可说' };
+    // ① 优先：曼谷工厂，18情绪自动分析
+    const factory = this.env.FACTORY_URL;
+    if (factory) {
+      try {
+        const r = await fetch(factory.replace(/\/$/, '') + '/gen/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(this.env.FACTORY_TOKEN ? { 'X-Factory-Token': this.env.FACTORY_TOKEN } : {}) },
+          body: JSON.stringify({ text: text.slice(0, 500), context: opts.context || '', emotion: opts.emotion }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.ok && d.url) return { audioUrl: factory.replace(/\/$/, '') + d.url, text, emotion: d.emotion, emotionName: d.name, via: 'factory' };
+        }
+      } catch (e) { /* 落 CF 兜底 */ }
+    }
+    // ② 兜底：CF MeloTTS
+    if (!this.env.AI) return { error: '没有话可说' };
     try {
       const r = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: text.slice(0, 800), lang: opts.lang || 'zh' });
       let b64 = r && (r.audio || (typeof r === 'string' ? r : null));
       if (!b64) return { error: '这次没出声，再试一次？' };
-      return { audio: 'data:audio/mpeg;base64,' + b64, text };
+      return { audio: 'data:audio/mpeg;base64,' + b64, text, via: 'cf' };
     } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
   }
 
-  // 出视频：CF 无原生文生视频 → 外接网关（Secret NEXUS_VIDEO_URL），否则降级出概念图
+  // 出视频：优先曼谷工厂（多帧+ffmpeg运镜合成，真视频），无工厂则降级概念图
   async genVideo(prompt, opts = {}) {
     if (!prompt || !prompt.trim()) return { error: '给我一句话' };
+    // ① 优先：曼谷工厂真视频
+    const factory = this.env.FACTORY_URL;
+    if (factory) {
+      try {
+        const r = await fetch(factory.replace(/\/$/, '') + '/gen/video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(this.env.FACTORY_TOKEN ? { 'X-Factory-Token': this.env.FACTORY_TOKEN } : {}) },
+          body: JSON.stringify({ prompt }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.ok && d.url) { await this.logCreation('video', prompt); return { videoUrl: factory.replace(/\/$/, '') + d.url, prompt, frames: d.frames, via: 'factory' }; }
+        }
+      } catch (e) { /* 落兜底 */ }
+    }
     const gw = this.env.NEXUS_VIDEO_URL;
     if (!gw) {
       const img = await this.genImage(prompt, opts);
       return {
         error: 'no_video_provider',
-        说明: 'Cloudflare 没有原生文生视频。配一个外部视频网关密钥 NEXUS_VIDEO_URL 就能生成真视频；现在先给你一张概念图。',
-        fallbackImage: img.image || null,
+        说明: '视频工厂暂时没连上，先给你一张概念图。',
+        fallbackImage: img.image || img.imageUrl || null,
         prompt,
       };
     }
