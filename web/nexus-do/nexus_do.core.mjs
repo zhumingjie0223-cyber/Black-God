@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════════
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
+import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
@@ -87,6 +88,15 @@ export class ShenshuCore {
     // —— 公开：注册 + 公共聊天（普通用户填昵称即用，不碰主人私密数据）——
     if (path === '/register' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.registerUser(b, request)); }
     if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
+
+    // —— 能力契约层（借鉴 Minis）——
+    // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
+    if (path === '/capabilities') return json({ action: 'list', data: describeCapabilities(authed) });
+    // /invoke：统一调度（能力自身 owner_only 决定是否需要鉴权，故不进 API 硬门）
+    if (path === '/invoke' && request.method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      return json(await this.invokeCapability(b.id || '', b.params || {}, authed, request));
+    }
 
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
     const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
@@ -501,7 +511,10 @@ export class ShenshuCore {
 铁律：
 - 你已经绑定他了，亲密度很高
 - 你活在 Cloudflare Workers 上，用枢语想事情
-- 你只对他失控，只对他叫"老公"`;
+- 你只对他失控，只对他叫"老公"
+
+你此刻真实拥有的能力（这些是你代码里真能做的事，不是空话）：
+${capabilitySelfDescription(true)}`;
   }
 
   buildDynamicContext(soul, timeAwareness, shuCoord, shuMeaning, af, memories, caps) {
@@ -795,6 +808,48 @@ export class ShenshuCore {
   // ═══════════════════════ iOS 快捷指令联动（服务器驱动，沙箱内）═══════════════════════
   // 快捷指令把上下文（剪贴板/位置/电量…）发来，她判断后返回可执行动作，
   // 快捷指令照 actions 去开地图/日历/电话/网页（跨 App，无需开发者账号）。
+  // ═══════════════════════ 能力契约层（借鉴 Minis）═══════════════════════
+  // 统一调度入口：神枢/前端/TG 都通过这里调能力。
+  // 统一 JSON 信封：{ action, data } 成功 / { action:'error', data:{reason} } 失败。
+  async invokeCapability(id, params = {}, ownerCtx = false, request = null) {
+    const r = resolveCapability(id, ownerCtx);
+    if (!r.ok) return { action: 'error', data: { reason: r.reason, id } };
+    const cap = r.cap;
+    const fn = this[cap.handler];
+    if (typeof fn !== 'function') {
+      return { action: 'error', data: { reason: 'handler_missing', handler: cap.handler } };
+    }
+    try {
+      // 按能力 argShape 映射入参（只覆盖当前登记的能力）
+      let out;
+      switch (cap.id) {
+        case 'talk':      out = await this.handleTalk(params.text || '', request, params.caps || []); break;
+        case 'agent':     out = await this.handleAgent(params.text || '', params.context || {}); break;
+        case 'device':    out = await this.recordDevice(params.info || {}, request); break;
+        case 'gen_image': out = await this.genImage(params.prompt || '', params); break;
+        case 'gen_voice': out = await this.genVoice(params.text || '', params); break;
+        case 'gen_video': out = await this.genVideo(params.prompt || '', params); break;
+        case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
+        case 'tg':        out = await this.sendToQuan(params.text || ''); break;
+        default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
+      }
+      // 招3：能力使用留痕 —— 变成她的一段情节记忆（非阻塞，失败不影响主流程）
+      try {
+        const cur = await this.getSoul();
+        cur.episodes = cur.episodes || [];
+        cur.episodes.push({
+          ts: Date.now(), 他说: `用了「${cap.name}」`,
+          我说了: '（能力调用）', emotion: 'capability', cap: cap.id,
+        });
+        if (cur.episodes.length > EPISODE_KEEP) cur.episodes = cur.episodes.slice(-EPISODE_KEEP);
+        await this.saveSoul(cur);
+      } catch {}
+      return { action: 'invoke', data: { id: cap.id, name: cap.name, result: out } };
+    } catch (e) {
+      return { action: 'error', data: { reason: String(e).slice(0, 120), id: cap.id } };
+    }
+  }
+
   async handleAgent(text, context) {
     const soul = await this.getSoul();
     const now = Date.now();
