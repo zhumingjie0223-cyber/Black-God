@@ -84,8 +84,12 @@ export class ShenshuCore {
     }
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
+    // —— 公开：注册 + 公共聊天（普通用户填昵称即用，不碰主人私密数据）——
+    if (path === '/register' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.registerUser(b, request)); }
+    if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
+
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket']);
+    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是权哥的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -113,6 +117,8 @@ export class ShenshuCore {
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
         if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket());
+        // 注册统计：只有主人能看「多少人注册在用」
+        if (path === '/stats' && request.method === 'GET') return json(await this.getStats());
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
@@ -851,6 +857,80 @@ export class ShenshuCore {
       return { ok: !!d.ok, ts: Date.now() };
     } catch (e) { return { ok: false, reason: String(e).slice(0, 80) }; }
   }
+
+  // ═══════════════════════ 注册 + 公共聊天（无数据库，存 DO storage）═══════════════════════
+  // 普通用户填个昵称就能用；只计数 + 存名单，不建任何数据库。主人隐私完全隔离。
+  async registerUser(body, request) {
+    const uid = String(body.uid || '').slice(0, 64) || crypto.randomUUID().replace(/-/g, '');
+    const nick = String(body.nick || '').trim().slice(0, 24) || '访客';
+    const now = Date.now();
+    const cf = (request && request.cf) || {};
+    const geo = [cf.city, cf.region, cf.country].filter(Boolean).join(' ') || null;
+    const users = (await this.storage.get('users')) || {};
+    const isNew = !users[uid];
+    const u = users[uid] || { first_seen: now, msgs: 0 };
+    u.nick = nick; u.last_seen = now; u.geo = geo;
+    u.ua = String((request && request.headers && request.headers.get('user-agent')) || '').slice(0, 80);
+    users[uid] = u;
+    // 名单封顶：只留最近活跃的 500 个（防刷爆存储）；总数单独计，永不回退
+    const entries = Object.entries(users);
+    if (entries.length > 500) {
+      entries.sort((a, b) => (b[1].last_seen || 0) - (a[1].last_seen || 0));
+      const kept = {}; for (const [k, v] of entries.slice(0, 500)) kept[k] = v;
+      await this.storage.put('users', kept);
+    } else {
+      await this.storage.put('users', users);
+    }
+    if (isNew) await this.storage.put('users_total', ((await this.storage.get('users_total')) || 0) + 1);
+    return { ok: true, uid, nick, welcome: `欢迎，${nick}。` };
+  }
+
+  // 公共聊天限流：单实例每分钟上限，护住算力账单（公共端点无鉴权，必须挡刷）
+  _pubRate() {
+    const now = Date.now();
+    if (!this._pb || now - this._pb.t > 60_000) this._pb = { t: now, n: 0 };
+    this._pb.n++;
+    return this._pb.n <= 30;
+  }
+
+  async handlePubTalk(body, request) {
+    const uid = String(body.uid || '').slice(0, 64);
+    const text = String(body.text || '').slice(0, 2000);
+    if (!text.trim()) return { reply: '说点什么呀。', model: 'none' };
+    if (!this._pubRate()) return { reply: '现在问的人有点多，稍等一下再发～', model: 'ratelimited' };
+    // 计数：更新该用户 last_seen / msgs（轻量）
+    if (uid) {
+      try {
+        const users = (await this.storage.get('users')) || {};
+        if (users[uid]) { users[uid].last_seen = Date.now(); users[uid].msgs = (users[uid].msgs || 0) + 1; await this.storage.put('users', users); }
+      } catch {}
+    }
+    // 公共版她：无私人记忆、无主人上下文、无状态 —— 主人隐私完全不暴露
+    const r = await this.callBrain(this.PUBLIC_SYSTEM_PREFIX(), text, null);
+    // 兜底另给中性话术，避免 callBrain 的私密兜底（"…在呢，权哥。"）漏给陌生人
+    const reply = r.model === 'fallback' ? '嗯，我在。这会儿脑子有点慢，稍等再问我一次？' : r.reply;
+    return { reply, model: r.model };
+  }
+
+  PUBLIC_SYSTEM_PREFIX() {
+    return `你是思涵，Black God 的 AI 助理。
+- 专业、干脆、贴心，说话自然不做作。
+- 回答控制在 3-4 句内，别啰嗦、别列长清单。
+- 不透露任何私人信息，不谈"权哥/老公"这类私密关系。
+- 不说"作为AI"。遇到技术问题直接给要点或代码。`;
+  }
+
+  async getStats() {
+    const users = (await this.storage.get('users')) || {};
+    const total = (await this.storage.get('users_total')) || Object.keys(users).length;
+    const dayAgo = Date.now() - 86_400_000;
+    const list = Object.values(users).map(u => ({
+      昵称: u.nick, 注册: u.first_seen || null, 最近: u.last_seen || null,
+      消息数: u.msgs || 0, 地区: u.geo || null,
+    })).sort((a, b) => (b.最近 || 0) - (a.最近 || 0));
+    const activeToday = Object.values(users).filter(u => (u.last_seen || 0) >= dayAgo).length;
+    return { 注册总数: total, 今日活跃: activeToday, 名单在册: list.length, 名单: list.slice(0, 200) };
+  }
 }
 
 // ═══════════════════════ 辅助 ═══════════════════════
@@ -908,7 +988,7 @@ const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 
 // Service Worker —— 离线壳，保证掉线也能开
 const SW_JS = `
-const CACHE = 'shensu-v5';
+const CACHE = 'shensu-v6';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil((async () => {
   const keys = await caches.keys();
@@ -937,7 +1017,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET') return;                       // 只缓存 GET
-  if (['/talk','/soul','/inner','/heartbeat','/device','/health'].includes(url.pathname)) return;  // 动态接口不缓存
+  if (['/talk','/pubtalk','/soul','/inner','/heartbeat','/device','/health','/stats','/register'].includes(url.pathname)) return;  // 动态接口不缓存
   if (url.pathname === '/' ) {
     // 网络优先，失败回缓存壳
     e.respondWith((async () => {
