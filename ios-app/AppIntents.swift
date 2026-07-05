@@ -95,13 +95,13 @@ struct SihanStatusIntent: AppIntent {
 struct BlackGodShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AskSihanIntent(),
-            phrases: ["问\(.applicationName)", "让思涵回答", "跟思涵说"],
+            phrases: ["问\(.applicationName)", "让\(.applicationName)回答", "跟\(.applicationName)说"],
             shortTitle: "问思涵", systemImageName: "bubble.left.and.text.bubble.right")
         AppShortcut(intent: SihanImageIntent(),
-            phrases: ["让\(.applicationName)画", "让思涵画画"],
+            phrases: ["让\(.applicationName)画", "让\(.applicationName)画画"],
             shortTitle: "让思涵画", systemImageName: "photo.artframe")
         AppShortcut(intent: SihanStatusIntent(),
-            phrases: ["\(.applicationName)状态", "思涵想我吗"],
+            phrases: ["\(.applicationName)状态", "\(.applicationName)想我吗"],
             shortTitle: "思涵状态", systemImageName: "heart.text.square")
     }
 }
