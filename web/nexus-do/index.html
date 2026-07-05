@@ -1392,8 +1392,16 @@ function typeInto(bubble, text, done){
   document.addEventListener('visibilitychange', ()=>{ if(Nexus.mode==='owner' && document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
   window.addEventListener('online', ()=>{ if(Nexus.mode==='owner'){ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); } });
   window.addEventListener('pageshow', ()=>{ if(Nexus.mode==='owner' && !Nexus.wsReady) Nexus.connectWS(); });
-  // PWA
-  if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('/sw.js'); }catch(e){} }
+  // PWA + 自愈：检测到新版自动刷新一次，杜绝旧缓存把人卡在旧版（如旧密码页）
+  if('serviceWorker' in navigator){ try{
+    const hadController = !!navigator.serviceWorker.controller;   // 本次加载是否已被旧 SW 接管
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(refreshing || !hadController) return;   // 首访不刷（本就是新版）；仅"旧→新"接管时刷一次
+      refreshing = true; location.reload();
+    });
+    navigator.serviceWorker.register('/sw.js').then(reg=>{ try{ reg.update(); }catch(e){} }).catch(()=>{});
+  }catch(e){} }
   // 动态光效纵深视差（去掉了粒子，保留极光流光 + 倾斜纵深）
   Parallax.init();
   const askTilt=()=>{ Parallax.requestTilt(); };
