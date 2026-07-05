@@ -10,7 +10,8 @@
   "main": "nexus_do.mjs",
   "compatibility_date": "2026-06-29",
   "compatibility_flags": ["nodejs_compat"],
-  "account_id": "142c76e0039e279886c89257b6fddbc7",
+  // account_id 不写进仓库：本地部署 export CLOUDFLARE_ACCOUNT_ID=... ；
+  // GitHub Actions 已在仓库 Secrets 配 CLOUDFLARE_ACCOUNT_ID，wrangler 自动读取。
 
   "observability": { "enabled": true },
 
@@ -23,6 +24,13 @@
 
   // —— Workers AI：大脑兜底（Llama 3.3 70B）——
   "ai": { "binding": "AI" },
+
+  // —— 环境变量（公开值，随代码部署）——
+  "vars": {
+    // 曼谷多模态工厂：生图(Pollinations) / 18情绪语音(edge-tts) / 真视频(ffmpeg)
+    // 神枢优先调它，挂了自动降级到 CF Workers AI，永不失语
+    "FACTORY_URL": "https://factory.aquan.xin"
+  },
 
   // —— KV：旧记忆迁移源（首启一次性迁移到 DO storage）——
   "kv_namespaces": [
