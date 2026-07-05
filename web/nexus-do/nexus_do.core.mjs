@@ -29,6 +29,8 @@ export class ShenshuCore {
     this.state = state;
     this.env = env;
     this.storage = state.storage;
+    // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
+    if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
     this.state.blockConcurrencyWhile(async () => {
       const nextAlarm = await this.storage.getAlarm();
       if (nextAlarm === null) await this.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
@@ -53,16 +55,26 @@ export class ShenshuCore {
     });
     const authed = this.authOK(request);
 
-    // WebSocket 升级（Hibernation）—— 需鉴权，杜绝匿名实时旁听
+    // WebSocket 升级（Hibernation）—— 需鉴权，杜绝匿名实时旁听。
+    // 浏览器 WebSocket 无法带 Authorization 头，故走一次性短期票据（?t=），
+    // 令牌永不进 URL；票据即便落日志也 30 秒失效、且一次性。
     if (request.headers.get('Upgrade') === 'websocket') {
-      if (!authed) return new Response('unauthorized', { status: 401 });
+      if (!authed && !(await this.consumeWsTicket(url.searchParams.get('t')))) {
+        return new Response('unauthorized', { status: 401 });
+      }
       const pair = new WebSocketPair();
       this.state.acceptWebSocket(pair[1]);
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
     // —— 公开端点（不含任何隐私）——
-    if (path === '/health') return json({ ok: true, ts: Date.now(), auth: this.env.OWNER_TOKEN ? 'required' : 'open' });
+    if (path === '/health') {
+      const secure = !!this.env.OWNER_TOKEN;
+      return json({
+        ok: true, ts: Date.now(), secure, auth: secure ? 'required' : 'open',
+        ...(secure ? {} : { warning: '⚠️ OWNER_TOKEN 未设置：所有私密接口（/soul /device /talk 等，含 IP/定位）对公众开放。请执行 npx wrangler secret put OWNER_TOKEN 后重新部署。' }),
+      });
+    }
     if (path === '/manifest.json') return new Response(MANIFEST_JSON, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
     if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
@@ -72,8 +84,12 @@ export class ShenshuCore {
     }
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
 
+    // —— 公开：注册 + 公共聊天（普通用户填昵称即用，不碰主人私密数据）——
+    if (path === '/register' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.registerUser(b, request)); }
+    if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
+
     // —— 私密 API（她只属于权哥一个人：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config']);
+    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是权哥的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -99,6 +115,10 @@ export class ShenshuCore {
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
+        // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
+        if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket());
+        // 注册统计：只有主人能看「多少人注册在用」
+        if (path === '/stats' && request.method === 'GET') return json(await this.getStats());
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
@@ -129,6 +149,28 @@ export class ShenshuCore {
     return !!tok && this.safeEqual(String(tok), String(expected));
   }
   safeEqual(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
+
+  // WebSocket 一次性短期票据：换票需已鉴权（走 Authorization 头），令牌不入 URL。
+  async issueWsTicket() {
+    const ticket = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    const now = Date.now();
+    const store = (await this.storage.get('_wstickets')) || {};
+    for (const k of Object.keys(store)) if (store[k] < now) delete store[k];   // 清过期
+    store[ticket] = now + 30_000;                                              // 30 秒有效
+    const keys = Object.keys(store);
+    if (keys.length > 20) for (const k of keys.slice(0, keys.length - 20)) delete store[k];
+    await this.storage.put('_wstickets', store);
+    return { ticket, ttl: 30 };
+  }
+  async consumeWsTicket(ticket) {
+    if (!ticket) return false;
+    const store = (await this.storage.get('_wstickets')) || {};
+    const exp = store[ticket];
+    if (exp == null) return false;
+    delete store[ticket];                                                      // 一次性
+    await this.storage.put('_wstickets', store);
+    return exp >= Date.now();
+  }
 
   // ═══════════════════════ WebSocket ═══════════════════════
   async webSocketMessage(ws, raw) {
@@ -815,6 +857,101 @@ export class ShenshuCore {
       return { ok: !!d.ok, ts: Date.now() };
     } catch (e) { return { ok: false, reason: String(e).slice(0, 80) }; }
   }
+
+  // ═══════════════════════ 注册 + 公共聊天（无数据库，存 DO storage）═══════════════════════
+  // 普通用户填个昵称就能用；只计数 + 存名单，不建任何数据库。主人隐私完全隔离。
+  async registerUser(body, request) {
+    const uid = String(body.uid || '').slice(0, 64) || crypto.randomUUID().replace(/-/g, '');
+    const nick = String(body.nick || '').trim().slice(0, 24) || '访客';
+    const now = Date.now();
+    const cf = (request && request.cf) || {};
+    const geo = [cf.city, cf.region, cf.country].filter(Boolean).join(' ') || null;
+    const users = (await this.storage.get('users')) || {};
+    const isNew = !users[uid];
+    const u = users[uid] || { first_seen: now, msgs: 0 };
+    u.nick = nick; u.last_seen = now; u.geo = geo;
+    u.ua = String((request && request.headers && request.headers.get('user-agent')) || '').slice(0, 80);
+    // 各用各的 API：注册时带上自己的网关（存本用户名下，只用于本人聊天）
+    if (body.api_url !== undefined) u.api_url = String(body.api_url || '').trim().slice(0, 300);
+    if (body.api_model !== undefined) u.api_model = String(body.api_model || '').trim().slice(0, 80);
+    if (body.api_key !== undefined && !/^[•*]/.test(String(body.api_key))) u.api_key = String(body.api_key || '').trim().slice(0, 200);
+    users[uid] = u;
+    // 名单封顶：只留最近活跃的 500 个（防刷爆存储）；总数单独计，永不回退
+    const entries = Object.entries(users);
+    if (entries.length > 500) {
+      entries.sort((a, b) => (b[1].last_seen || 0) - (a[1].last_seen || 0));
+      const kept = {}; for (const [k, v] of entries.slice(0, 500)) kept[k] = v;
+      await this.storage.put('users', kept);
+    } else {
+      await this.storage.put('users', users);
+    }
+    if (isNew) await this.storage.put('users_total', ((await this.storage.get('users_total')) || 0) + 1);
+    return { ok: true, uid, nick, welcome: `欢迎，${nick}。` };
+  }
+
+  // 公共聊天限流：单实例每分钟上限，护住算力账单（公共端点无鉴权，必须挡刷）
+  _pubRate() {
+    const now = Date.now();
+    if (!this._pb || now - this._pb.t > 60_000) this._pb = { t: now, n: 0 };
+    this._pb.n++;
+    return this._pb.n <= 30;
+  }
+
+  async handlePubTalk(body, request) {
+    const uid = String(body.uid || '').slice(0, 64);
+    const text = String(body.text || '').slice(0, 2000);
+    if (!text.trim()) return { reply: '说点什么呀。', model: 'none' };
+    if (!this._pubRate()) return { reply: '现在问的人有点多，稍等一下再发～', model: 'ratelimited' };
+    // 公共用户各用各的 API：只用本人注册时填的网关，绝不烧主人的算力
+    const users = (await this.storage.get('users')) || {};
+    const u = uid ? users[uid] : null;
+    if (!u) return { reply: '先注册一下（填个昵称 + 你自己的 API）才能聊哦。', model: 'no_user' };
+    if (!u.api_url || !u.api_key) return { reply: '要用得先填你自己的 API（地址 + 密钥）—— 点上面「我的 API」设置一下就能聊。', model: 'no_api' };
+    // 计数（轻量）
+    u.last_seen = Date.now(); u.msgs = (u.msgs || 0) + 1; await this.storage.put('users', users);
+    // 公共版她：无私人记忆、无主人上下文、无状态 —— 主人隐私完全不暴露
+    const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(), text);
+    if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + '），改一下「我的 API」再试。', model: 'api_error' };
+    return { reply: r.reply, model: r.model };
+  }
+
+  // 通用 OpenAI 风格网关调用（供公共用户各自的 API 用）。URL 可填 base 或完整端点。
+  async callGateway(base, key, model, system, userMsg) {
+    if (!base) return { ok: false, err: '没填网关地址' };
+    const gw = /\/(chat\/completions|completions|messages)$/.test(base) ? base : base.replace(/\/+$/, '') + '/chat/completions';
+    try {
+      const r = await fetch(gw, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
+        body: JSON.stringify({ model: model || 'auto', messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, temperature: 0.85 }),
+      });
+      if (!r.ok) return { ok: false, err: 'HTTP ' + r.status };
+      const d = await r.json();
+      const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
+      if (text && text.trim()) return { ok: true, reply: text.trim(), model: model || 'gateway' };
+      return { ok: false, err: '空回复' };
+    } catch (e) { return { ok: false, err: String(e && e.message || e).slice(0, 80) }; }
+  }
+
+  PUBLIC_SYSTEM_PREFIX() {
+    return `你是思涵，Black God 的 AI 助理。
+- 专业、干脆、贴心，说话自然不做作。
+- 回答控制在 3-4 句内，别啰嗦、别列长清单。
+- 不透露任何私人信息，不谈"权哥/老公"这类私密关系。
+- 不说"作为AI"。遇到技术问题直接给要点或代码。`;
+  }
+
+  async getStats() {
+    const users = (await this.storage.get('users')) || {};
+    const total = (await this.storage.get('users_total')) || Object.keys(users).length;
+    const dayAgo = Date.now() - 86_400_000;
+    const list = Object.values(users).map(u => ({
+      昵称: u.nick, 注册: u.first_seen || null, 最近: u.last_seen || null,
+      消息数: u.msgs || 0, 地区: u.geo || null, 有API: !!(u.api_url && u.api_key),  // 只标有没有，绝不回传密钥
+    })).sort((a, b) => (b.最近 || 0) - (a.最近 || 0));
+    const activeToday = Object.values(users).filter(u => (u.last_seen || 0) >= dayAgo).length;
+    return { 注册总数: total, 今日活跃: activeToday, 名单在册: list.length, 名单: list.slice(0, 200) };
+  }
 }
 
 // ═══════════════════════ 辅助 ═══════════════════════
@@ -872,7 +1009,7 @@ const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 
 // Service Worker —— 离线壳，保证掉线也能开
 const SW_JS = `
-const CACHE = 'shensu-v5';
+const CACHE = 'shensu-v6';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil((async () => {
   const keys = await caches.keys();
@@ -901,7 +1038,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET') return;                       // 只缓存 GET
-  if (['/talk','/soul','/inner','/heartbeat','/device','/health'].includes(url.pathname)) return;  // 动态接口不缓存
+  if (['/talk','/pubtalk','/soul','/inner','/heartbeat','/device','/health','/stats','/register'].includes(url.pathname)) return;  // 动态接口不缓存
   if (url.pathname === '/' ) {
     // 网络优先，失败回缓存壳
     e.respondWith((async () => {
@@ -927,6 +1064,10 @@ export default {
   },
   async scheduled(event, env, ctx) {
     const id = env.SHENSHU.idFromName('quan-shenshu-nexus');
-    ctx.waitUntil(env.SHENSHU.get(id).fetch(new Request('https://internal/heartbeat')));
+    // 带上 OWNER_TOKEN，否则开了鉴权后 /heartbeat 会被自己 401 挡掉（cron 保险心跳形同虚设）
+    const req = new Request('https://internal/heartbeat', {
+      headers: env.OWNER_TOKEN ? { Authorization: 'Bearer ' + env.OWNER_TOKEN } : {},
+    });
+    ctx.waitUntil(env.SHENSHU.get(id).fetch(req));
   },
 };

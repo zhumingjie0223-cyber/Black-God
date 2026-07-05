@@ -1,12 +1,13 @@
 name: Deploy 神枢 nexus-do
 
 # 一 push 到 main（且改动了 web/nexus-do/）就自动构建 + 部署 nexus-do。
-# 域名 aquan.lufei.uk 由 wrangler.jsonc 的 routes 配置绑定。
+# 域名 aquan.lufei.uk 由 CF 面板里已有的路由负责（wrangler.jsonc 不再管路由，见 PR #4）。
 #
 # 需要在仓库 Settings → Secrets and variables → Actions 里加一个密钥：
-#   CLOUDFLARE_API_TOKEN   （权限：Workers Scripts:Edit + Workers Routes:Edit + Zone DNS:Edit）
+#   CLOUDFLARE_API_TOKEN   （只需账户级 Workers Scripts:Edit，无需 Zone 权限）
 # 账号 id 已写在 wrangler.jsonc，无需再配。
 # 没配密钥时：只构建+自测，跳过部署（不报错）。
+# 部署后会校验线上 /health 的 secure 标志：没设 OWNER_TOKEN 就让部署失败。
 
 on:
   push:
@@ -45,6 +46,27 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy
+
+      # 上线安全闸：部署后校验线上 /health 的 secure 标志。
+      # 没设 OWNER_TOKEN → 私密接口(含 IP/定位)对公众开放 → 让部署失败，逼你设密钥。
+      - name: Verify OWNER_TOKEN is set (security gate)
+        if: ${{ env.CF_TOKEN != '' }}
+        run: |
+          echo "校验线上 /health 的 secure 标志…"
+          for i in 1 2 3 4 5; do
+            body=$(curl -fsS https://nexus-do.jjiebbay.workers.dev/health || true)
+            echo "  /health → $body"
+            if echo "$body" | grep -q '"secure":true'; then
+              echo "✅ OWNER_TOKEN 已设置，私密接口受保护。"; exit 0
+            fi
+            if echo "$body" | grep -q '"secure":false'; then
+              echo "❌ 线上 OWNER_TOKEN 未设置 —— 私密接口(含 IP/定位)对公众开放！"
+              echo "   修复：cd web/nexus-do && npx wrangler secret put OWNER_TOKEN，然后重跑部署。"
+              exit 1
+            fi
+            sleep 6
+          done
+          echo "⚠️ 无法读取 /health（首次部署域名可能尚未生效），跳过本次安全校验。"
 
       - name: Skip notice
         if: ${{ env.CF_TOKEN == '' }}

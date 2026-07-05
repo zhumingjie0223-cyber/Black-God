@@ -446,10 +446,13 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .lock-sub{font-size:14px;color:var(--text-2);margin-top:12px;line-height:1.7;margin-bottom:26px}
 .lock-input{width:100%;text-align:center;background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:15px;font-size:16px;outline:none;transition:.2s;letter-spacing:.05em}
 .lock-input:focus{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
+.lock-input + .lock-input{margin-top:10px}
 .lock-err{font-size:13px;color:var(--err);min-height:18px;margin:10px 0 4px}
 .lock-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;
   background:var(--cy-grad);color:#08120F;box-shadow:0 8px 28px var(--cy-glow);transition:.15s var(--spring)}
 .lock-btn:active{transform:scale(.97)} .lock-btn:disabled{opacity:.6}
+.lock-switch{margin-top:16px;font-size:12.5px;color:var(--text-2);opacity:.62;cursor:pointer;letter-spacing:.02em}
+.lock-switch:active{opacity:.9}
 
 /* —— 开屏引导 —— */
 .onboard{position:fixed;inset:0;z-index:500;display:none;
@@ -488,15 +491,32 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 <div id="bg"></div>
 <div id="aurora"><span></span><span></span><span></span></div>
 
-<!-- ===== 锁屏门（私密 · 只认你）===== -->
+<!-- ===== 门（公共注册 / 主人私密，二选一）===== -->
 <div id="lockgate" class="lockgate">
   <div class="lock-inner">
     <div class="lock-orb"></div>
     <div class="lock-title">Black God</div>
-    <div class="lock-sub">她只属于你一个人<br>输入你的私密密码解锁</div>
-    <input id="lockInput" class="lock-input" type="password" placeholder="OWNER_TOKEN" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')tryUnlock()"/>
-    <div id="lockErr" class="lock-err"></div>
-    <button id="lockBtn" class="lock-btn" onclick="tryUnlock()">解锁</button>
+
+    <!-- 公共注册模式：填昵称 + 自己的 API，即用；无需密码 -->
+    <div id="regMode">
+      <div class="lock-sub">起个名字 + 填你自己的 API，进来聊</div>
+      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的昵称" autocomplete="off"/>
+      <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
+      <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
+      <input id="regApiModel" class="lock-input" type="text" placeholder="模型（可留空 = auto）" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')doRegister()"/>
+      <div id="regErr" class="lock-err"></div>
+      <button id="regBtn" class="lock-btn" onclick="doRegister()">进入</button>
+      <div class="lock-switch" onclick="setGateMode('owner')">我是主人 · 私密登录</div>
+    </div>
+
+    <!-- 主人私密模式：OWNER_TOKEN 解锁 -->
+    <div id="ownerMode" style="display:none">
+      <div class="lock-sub">她只属于你一个人<br>输入你的私密密码解锁</div>
+      <input id="lockInput" class="lock-input" type="password" placeholder="OWNER_TOKEN" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')tryUnlock()"/>
+      <div id="lockErr" class="lock-err"></div>
+      <button id="lockBtn" class="lock-btn" onclick="tryUnlock()">解锁</button>
+      <div class="lock-switch" onclick="setGateMode('public')">← 返回</div>
+    </div>
   </div>
 </div>
 
@@ -763,8 +783,13 @@ const Demo = {
 const Nexus = {
   base: store.get('nexus_base') || '',        // 同源默认
   token: store.get('owner_token') || '',       // 私密令牌（配了 OWNER_TOKEN 才需要）
+  // 模式：owner=主人（私密全功能）｜public=注册用户（公共聊天，不碰主人数据）｜none=未进
+  mode: store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none'),
+  uid: store.get('reg_uid') || '',
   ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
   hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; return h; },
+  async register(nick, api) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, nick, api_url:(api&&api.url)||'', api_key:(api&&api.key)||'', api_model:(api&&api.model)||'' }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async stats() { try { const r = await this._fetch('/stats', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async _fetch(path, opts) {
     const r = await fetch(this.base + path, opts);
     if (r.status === 401) { onUnauthorized(); return null; }
@@ -773,6 +798,11 @@ const Nexus = {
   async getSoul() { try { const r = await this._fetch('/soul', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.getSoul(); } catch(e){ return Demo.getSoul(); } },
   async getInner() { try { const r = await this._fetch('/inner', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.inner(); } catch(e){ return Demo.inner(); } },
   async talk(text, caps) {
+    // 公共用户走 /pubtalk（无鉴权、无状态、不碰主人数据）
+    if (this.mode === 'public') {
+      try { const r = await fetch(this.base + '/pubtalk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, text }) });
+        return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
+    }
     try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
       return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
   },
@@ -785,11 +815,19 @@ const Nexus = {
   async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
-  connectWS() {
+  async connectWS() {
+    if (this.mode === 'public') return;   // 公共用户不连实时旁听通道
     try {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const host = this.base ? this.base.replace(/^https?:\/\//,'') : location.host;
-      const q = this.token ? ('?k=' + encodeURIComponent(this.token)) : '';
+      // 令牌不进 URL：先用 Authorization 头换一张一次性短期票据（?t=），
+      // 票据即便落日志也 30 秒失效、且一次性，不再暴露长期 OWNER_TOKEN。
+      let q = '';
+      if (this.token) {
+        try { const tr = await this._fetch('/wsticket', { method:'POST', headers: this.hdr() });
+          const tj = tr && tr.ok ? await tr.json() : null;
+          if (tj && tj.ticket) q = '?t=' + encodeURIComponent(tj.ticket); } catch(e){}
+      }
       const ws = new WebSocket(proto + '://' + host + '/' + q);
       this.ws = ws;
       ws.onopen = () => { this.wsReady = true; this.backoff = 1000; setLive(true); ws.send(JSON.stringify({type:'watch'})); };
@@ -807,6 +845,7 @@ const Nexus = {
     this.backoff = Math.min(this.backoff * 1.7, 20000);
   },
   startPoll() {
+    if (this.mode === 'public') return;   // 公共用户不轮询主人私密灵魂
     if (this.pollT) return;
     const tick = async () => { const s = await this.getSoul(); if (s) { setLive(true); renderSoul(s); } };
     tick();
@@ -1209,8 +1248,53 @@ async function openDevice(){ const info=await collectDevice(); window._dev=info;
   openSheet('sheetDevice'); }
 function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记住了这台设备'); closeSheet(); } }
 
-/* ============ 鉴权解锁 · 全屏锁屏门（配了 OWNER_TOKEN 时）============ */
-function onUnauthorized(){ showLock(); }
+/* ============ 门 · 公共注册 / 主人私密 ============ */
+function onUnauthorized(){ if(Nexus.mode==='public') return; setGateMode('owner'); showLock(); }
+function setGateMode(m){ const rg=$('#regMode'), om=$('#ownerMode'); if(rg&&om){ rg.style.display=(m==='owner')?'none':''; om.style.display=(m==='owner')?'':'none'; } }
+function ensureUid(){ let u=store.get('reg_uid'); if(!u){ u=(self.crypto&&crypto.randomUUID)?crypto.randomUUID().replace(/-/g,''):(Date.now().toString(36)+Math.random().toString(36).slice(2)); store.set('reg_uid',u); } Nexus.uid=u; return u; }
+function prefillReg(){ const g=(id,k)=>{ const el=$('#'+id); if(el&&store.get(k)!=null) el.value=store.get(k); };
+  g('regNick','reg_nick'); g('regApiUrl','reg_api_url'); g('regApiKey','reg_api_key'); g('regApiModel','reg_api_model'); }
+async function doRegister(){
+  const nick=($('#regNick').value||'').trim();
+  const url=($('#regApiUrl').value||'').trim(), key=($('#regApiKey').value||'').trim(), model=($('#regApiModel').value||'').trim();
+  const err=$('#regErr'), btn=$('#regBtn');
+  if(!nick){ err.textContent='起个名字吧'; return; }
+  if(!url||!key){ err.textContent='要填你自己的 API（地址 + 密钥）才能用'; return; }
+  ensureUid(); btn.disabled=true; btn.textContent='进入中…'; err.textContent='';
+  const r=await Nexus.register(nick,{url,key,model}); btn.disabled=false; btn.textContent='进入';
+  if(r&&r.ok){ store.set('reg_nick',nick); store.set('reg_api_url',url); store.set('reg_api_key',key); store.set('reg_api_model',model);
+    Nexus.mode='public'; hideLock(); hap([10,30,10]); initPublicMode(); }
+  else { err.textContent='网络不太顺，再试一次'; }
+}
+function initPublicMode(){
+  Nexus.mode='public'; document.body.classList.add('public-mode');
+  try{ setLive(true); }catch(e){}
+  ensurePubApiBtn();
+  try{ toast('欢迎，'+(store.get('reg_nick')||'')); }catch(e){}
+}
+// 公共模式：左上角「⚙︎ 我的 API」随时改自己的网关
+function ensurePubApiBtn(){
+  if(Nexus.mode!=='public') return;
+  let b=$('#pubApiBtn');
+  if(!b){ b=document.createElement('div'); b.id='pubApiBtn';
+    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#B7D0CC;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    b.textContent='⚙︎ 我的 API'; b.onclick=openApiEditor; document.body.appendChild(b); }
+}
+function openApiEditor(){ setGateMode('public'); prefillReg(); showLock(); }
+async function loadOwnerStats(){
+  if(Nexus.mode!=='owner') return;
+  const s=await Nexus.stats(); if(!s) return; window._stats=s;
+  let pill=$('#statsPill');
+  if(!pill){ pill=document.createElement('div'); pill.id='statsPill';
+    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#B7D0CC;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    pill.onclick=showStatsSheet; document.body.appendChild(pill); }
+  pill.textContent='👥 '+(s.注册总数||0)+' 注册 · '+(s.今日活跃||0)+' 今日';
+}
+function showStatsSheet(){
+  const s=window._stats; if(!s) return;
+  const rows=(s.名单||[]).slice(0,60).map(u=>`· ${u.昵称||'—'}　${u.地区||'—'}　${u.消息数||0}条　${fmtTs(u.最近)}`).join('\n')||'（还没有人注册）';
+  alert('注册总数：'+(s.注册总数||0)+'\n今日活跃：'+(s.今日活跃||0)+'\n名单在册：'+(s.名单在册||0)+'\n\n'+rows);
+}
 function showLock(){ const g=$('#lockgate'); if(!g) return; g.classList.add('show'); setTimeout(()=>{ const i=$('#lockInput'); if(i) i.focus(); }, 220); }
 function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
 async function tryUnlock(){
@@ -1220,8 +1304,8 @@ async function tryUnlock(){
   let ok=false;
   try{ const r=await fetch(Nexus.base+'/soul',{headers:{Authorization:'Bearer '+v}}); ok=r.ok; }catch(e){ ok=false; }
   btn.disabled=false; btn.textContent='解锁';
-  if(ok){ store.set('owner_token',v); Nexus.token=v; hideLock(); hap([10,30,10]);
-    try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub();
+  if(ok){ store.set('owner_token',v); Nexus.token=v; Nexus.mode='owner'; document.body.classList.remove('public-mode'); hideLock(); hap([10,30,10]);
+    try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub(); loadOwnerStats();
   } else { err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30); }
 }
 
@@ -1292,31 +1376,40 @@ function typeInto(bubble, text, done){
 (function boot(){
   // 最先设分页数（哪怕后面出错，布局也不会错位/漏页）
   try{ $('#pages').style.setProperty('--pages', PAGES); }catch(e){}
-  // 连接她 + 拉数据（最关键，放最前且各自独立，绝不因其它出错而不跑）
-  try{ Nexus.connectWS(); }catch(e){}
-  try{ Nexus.startPoll(); }catch(e){}
-  try{ refreshSoul(); }catch(e){}
-  try{ loadHub(); }catch(e){}
+  // —— 模式无关的 UI 初始化 ——
   try{ applyTheme(store.get('theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')); }catch(e){}
   try{ if(store.get('model')){ const m=MODELS.find(x=>x.id===store.get('model')); if(m)$('#modelLabel').textContent=m.name; } }catch(e){}
   try{ if(store.get('api_base')) $('#apiLabel').textContent='外接网关'; }catch(e){}
   try{ setPushUI(!!store.get('push_on')); }catch(e){}
   try{ $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } }); }catch(e){}
-  // 回到前台 / 网络恢复 → 瞬间重连（app 感觉永不掉线）
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
-  window.addEventListener('online', ()=>{ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); });
-  window.addEventListener('pageshow', ()=>{ if(!Nexus.wsReady) Nexus.connectWS(); });
-  // 开机自动把设备交给她（浏览器可得范围；精确 GPS 点按钮授权）
-  collectDevice().then(info=>Nexus.device(info)).catch(()=>{});
+  try{ ensureUid(); }catch(e){}
+  // —— 进哪个门：主人 / 已注册公共用户 / 未进（默认公共注册门）——
+  Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none');
+  if(Nexus.mode==='owner') bootOwner();
+  else if(Nexus.mode==='public') initPublicMode();
+  else { setGateMode('public'); prefillReg(); showLock(); }
+  // 回到前台 / 网络恢复 → 瞬间重连（仅主人；公共用户无 WS，不触发私密接口）
+  document.addEventListener('visibilitychange', ()=>{ if(Nexus.mode==='owner' && document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
+  window.addEventListener('online', ()=>{ if(Nexus.mode==='owner'){ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); } });
+  window.addEventListener('pageshow', ()=>{ if(Nexus.mode==='owner' && !Nexus.wsReady) Nexus.connectWS(); });
   // PWA
   if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('/sw.js'); }catch(e){} }
   // 动态光效纵深视差（去掉了粒子，保留极光流光 + 倾斜纵深）
   Parallax.init();
   const askTilt=()=>{ Parallax.requestTilt(); };
   document.addEventListener('pointerdown', askTilt, {once:true});
-  // 首次开屏引导
-  if(!store.get('onboarded')) showOnboarding();
 })();
+// 主人模式：连实时通道 + 拉私密数据 + 注册统计 + 设备 + 首次引导
+function bootOwner(){
+  Nexus.mode='owner'; document.body.classList.remove('public-mode');
+  try{ Nexus.connectWS(); }catch(e){}
+  try{ Nexus.startPoll(); }catch(e){}
+  try{ refreshSoul(); }catch(e){}
+  try{ loadHub(); }catch(e){}
+  try{ loadOwnerStats(); }catch(e){}
+  try{ collectDevice().then(info=>Nexus.device(info)).catch(()=>{}); }catch(e){}
+  if(!store.get('onboarded')) showOnboarding();
+}
 </script>
 </body>
 </html>
