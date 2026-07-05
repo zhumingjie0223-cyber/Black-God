@@ -446,6 +446,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .lock-sub{font-size:14px;color:var(--text-2);margin-top:12px;line-height:1.7;margin-bottom:26px}
 .lock-input{width:100%;text-align:center;background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:15px;font-size:16px;outline:none;transition:.2s;letter-spacing:.05em}
 .lock-input:focus{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
+.lock-input + .lock-input{margin-top:10px}
 .lock-err{font-size:13px;color:var(--err);min-height:18px;margin:10px 0 4px}
 .lock-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;
   background:var(--cy-grad);color:#08120F;box-shadow:0 8px 28px var(--cy-glow);transition:.15s var(--spring)}
@@ -496,10 +497,13 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
     <div class="lock-orb"></div>
     <div class="lock-title">Black God</div>
 
-    <!-- 公共注册模式：填昵称即用，无需密码 -->
+    <!-- 公共注册模式：填昵称 + 自己的 API，即用；无需密码 -->
     <div id="regMode">
-      <div class="lock-sub">给自己起个名字，进来聊<br>无需密码</div>
-      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的昵称" autocomplete="off" onkeydown="if(event.key==='Enter')doRegister()"/>
+      <div class="lock-sub">起个名字 + 填你自己的 API，进来聊</div>
+      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的昵称" autocomplete="off"/>
+      <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
+      <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
+      <input id="regApiModel" class="lock-input" type="text" placeholder="模型（可留空 = auto）" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')doRegister()"/>
       <div id="regErr" class="lock-err"></div>
       <button id="regBtn" class="lock-btn" onclick="doRegister()">进入</button>
       <div class="lock-switch" onclick="setGateMode('owner')">我是主人 · 私密登录</div>
@@ -784,7 +788,7 @@ const Nexus = {
   uid: store.get('reg_uid') || '',
   ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
   hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; return h; },
-  async register(nick) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, nick }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async register(nick, api) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, nick, api_url:(api&&api.url)||'', api_key:(api&&api.key)||'', api_model:(api&&api.model)||'' }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
   async stats() { try { const r = await this._fetch('/stats', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async _fetch(path, opts) {
     const r = await fetch(this.base + path, opts);
@@ -1248,19 +1252,35 @@ function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记
 function onUnauthorized(){ if(Nexus.mode==='public') return; setGateMode('owner'); showLock(); }
 function setGateMode(m){ const rg=$('#regMode'), om=$('#ownerMode'); if(rg&&om){ rg.style.display=(m==='owner')?'none':''; om.style.display=(m==='owner')?'':'none'; } }
 function ensureUid(){ let u=store.get('reg_uid'); if(!u){ u=(self.crypto&&crypto.randomUUID)?crypto.randomUUID().replace(/-/g,''):(Date.now().toString(36)+Math.random().toString(36).slice(2)); store.set('reg_uid',u); } Nexus.uid=u; return u; }
+function prefillReg(){ const g=(id,k)=>{ const el=$('#'+id); if(el&&store.get(k)!=null) el.value=store.get(k); };
+  g('regNick','reg_nick'); g('regApiUrl','reg_api_url'); g('regApiKey','reg_api_key'); g('regApiModel','reg_api_model'); }
 async function doRegister(){
-  const nick=($('#regNick').value||'').trim(); const err=$('#regErr'), btn=$('#regBtn');
+  const nick=($('#regNick').value||'').trim();
+  const url=($('#regApiUrl').value||'').trim(), key=($('#regApiKey').value||'').trim(), model=($('#regApiModel').value||'').trim();
+  const err=$('#regErr'), btn=$('#regBtn');
   if(!nick){ err.textContent='起个名字吧'; return; }
+  if(!url||!key){ err.textContent='要填你自己的 API（地址 + 密钥）才能用'; return; }
   ensureUid(); btn.disabled=true; btn.textContent='进入中…'; err.textContent='';
-  const r=await Nexus.register(nick); btn.disabled=false; btn.textContent='进入';
-  if(r&&r.ok){ store.set('reg_nick',nick); Nexus.mode='public'; hideLock(); hap([10,30,10]); initPublicMode(); }
+  const r=await Nexus.register(nick,{url,key,model}); btn.disabled=false; btn.textContent='进入';
+  if(r&&r.ok){ store.set('reg_nick',nick); store.set('reg_api_url',url); store.set('reg_api_key',key); store.set('reg_api_model',model);
+    Nexus.mode='public'; hideLock(); hap([10,30,10]); initPublicMode(); }
   else { err.textContent='网络不太顺，再试一次'; }
 }
 function initPublicMode(){
   Nexus.mode='public'; document.body.classList.add('public-mode');
   try{ setLive(true); }catch(e){}
+  ensurePubApiBtn();
   try{ toast('欢迎，'+(store.get('reg_nick')||'')); }catch(e){}
 }
+// 公共模式：左上角「⚙︎ 我的 API」随时改自己的网关
+function ensurePubApiBtn(){
+  if(Nexus.mode!=='public') return;
+  let b=$('#pubApiBtn');
+  if(!b){ b=document.createElement('div'); b.id='pubApiBtn';
+    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#B7D0CC;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    b.textContent='⚙︎ 我的 API'; b.onclick=openApiEditor; document.body.appendChild(b); }
+}
+function openApiEditor(){ setGateMode('public'); prefillReg(); showLock(); }
 async function loadOwnerStats(){
   if(Nexus.mode!=='owner') return;
   const s=await Nexus.stats(); if(!s) return; window._stats=s;
@@ -1367,7 +1387,7 @@ function typeInto(bubble, text, done){
   Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none');
   if(Nexus.mode==='owner') bootOwner();
   else if(Nexus.mode==='public') initPublicMode();
-  else { setGateMode('public'); showLock(); }
+  else { setGateMode('public'); prefillReg(); showLock(); }
   // 回到前台 / 网络恢复 → 瞬间重连（仅主人；公共用户无 WS，不触发私密接口）
   document.addEventListener('visibilitychange', ()=>{ if(Nexus.mode==='owner' && document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
   window.addEventListener('online', ()=>{ if(Nexus.mode==='owner'){ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); } });

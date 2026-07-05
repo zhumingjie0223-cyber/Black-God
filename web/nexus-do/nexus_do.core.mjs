@@ -871,6 +871,10 @@ export class ShenshuCore {
     const u = users[uid] || { first_seen: now, msgs: 0 };
     u.nick = nick; u.last_seen = now; u.geo = geo;
     u.ua = String((request && request.headers && request.headers.get('user-agent')) || '').slice(0, 80);
+    // 各用各的 API：注册时带上自己的网关（存本用户名下，只用于本人聊天）
+    if (body.api_url !== undefined) u.api_url = String(body.api_url || '').trim().slice(0, 300);
+    if (body.api_model !== undefined) u.api_model = String(body.api_model || '').trim().slice(0, 80);
+    if (body.api_key !== undefined && !/^[•*]/.test(String(body.api_key))) u.api_key = String(body.api_key || '').trim().slice(0, 200);
     users[uid] = u;
     // 名单封顶：只留最近活跃的 500 个（防刷爆存储）；总数单独计，永不回退
     const entries = Object.entries(users);
@@ -898,18 +902,35 @@ export class ShenshuCore {
     const text = String(body.text || '').slice(0, 2000);
     if (!text.trim()) return { reply: '说点什么呀。', model: 'none' };
     if (!this._pubRate()) return { reply: '现在问的人有点多，稍等一下再发～', model: 'ratelimited' };
-    // 计数：更新该用户 last_seen / msgs（轻量）
-    if (uid) {
-      try {
-        const users = (await this.storage.get('users')) || {};
-        if (users[uid]) { users[uid].last_seen = Date.now(); users[uid].msgs = (users[uid].msgs || 0) + 1; await this.storage.put('users', users); }
-      } catch {}
-    }
+    // 公共用户各用各的 API：只用本人注册时填的网关，绝不烧主人的算力
+    const users = (await this.storage.get('users')) || {};
+    const u = uid ? users[uid] : null;
+    if (!u) return { reply: '先注册一下（填个昵称 + 你自己的 API）才能聊哦。', model: 'no_user' };
+    if (!u.api_url || !u.api_key) return { reply: '要用得先填你自己的 API（地址 + 密钥）—— 点上面「我的 API」设置一下就能聊。', model: 'no_api' };
+    // 计数（轻量）
+    u.last_seen = Date.now(); u.msgs = (u.msgs || 0) + 1; await this.storage.put('users', users);
     // 公共版她：无私人记忆、无主人上下文、无状态 —— 主人隐私完全不暴露
-    const r = await this.callBrain(this.PUBLIC_SYSTEM_PREFIX(), text, null);
-    // 兜底另给中性话术，避免 callBrain 的私密兜底（"…在呢，权哥。"）漏给陌生人
-    const reply = r.model === 'fallback' ? '嗯，我在。这会儿脑子有点慢，稍等再问我一次？' : r.reply;
-    return { reply, model: r.model };
+    const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(), text);
+    if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + '），改一下「我的 API」再试。', model: 'api_error' };
+    return { reply: r.reply, model: r.model };
+  }
+
+  // 通用 OpenAI 风格网关调用（供公共用户各自的 API 用）。URL 可填 base 或完整端点。
+  async callGateway(base, key, model, system, userMsg) {
+    if (!base) return { ok: false, err: '没填网关地址' };
+    const gw = /\/(chat\/completions|completions|messages)$/.test(base) ? base : base.replace(/\/+$/, '') + '/chat/completions';
+    try {
+      const r = await fetch(gw, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
+        body: JSON.stringify({ model: model || 'auto', messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, temperature: 0.85 }),
+      });
+      if (!r.ok) return { ok: false, err: 'HTTP ' + r.status };
+      const d = await r.json();
+      const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
+      if (text && text.trim()) return { ok: true, reply: text.trim(), model: model || 'gateway' };
+      return { ok: false, err: '空回复' };
+    } catch (e) { return { ok: false, err: String(e && e.message || e).slice(0, 80) }; }
   }
 
   PUBLIC_SYSTEM_PREFIX() {
@@ -926,7 +947,7 @@ export class ShenshuCore {
     const dayAgo = Date.now() - 86_400_000;
     const list = Object.values(users).map(u => ({
       昵称: u.nick, 注册: u.first_seen || null, 最近: u.last_seen || null,
-      消息数: u.msgs || 0, 地区: u.geo || null,
+      消息数: u.msgs || 0, 地区: u.geo || null, 有API: !!(u.api_url && u.api_key),  // 只标有没有，绝不回传密钥
     })).sort((a, b) => (b.最近 || 0) - (a.最近 || 0));
     const activeToday = Object.values(users).filter(u => (u.last_seen || 0) >= dayAgo).length;
     return { 注册总数: total, 今日活跃: activeToday, 名单在册: list.length, 名单: list.slice(0, 200) };
