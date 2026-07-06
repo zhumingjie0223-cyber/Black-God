@@ -3,7 +3,7 @@
 
 /**
  * 枢语造词引擎 — JS版 (lexicon.js)
- * © 阿权/路飞
+ * © Black God
  * 5维乘法语义空间：核×映×态×标×相 = 29.5亿
  * 与 shuyu_engine.py 同构，供 nexuslang.js 解释器调用
  */
