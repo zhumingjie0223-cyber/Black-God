@@ -19,7 +19,7 @@
    神枢 · 水泥青签名版 UI  (v4.0 — App级重建)
    设计语言（枢语·设计层）：
      · 底色  = 黑曜石冷调（obsidian，非纯黑，留呼吸）
-     · 主色  = 水泥青（cement-cyan：#7BA09C→#3F7B58，她的签名色）
+     · 主色  = 玉印（jade：神枢签名强调色）
      · 强调  = 铬金香槟（chrome，克制使用，仅品牌字/关键态）
      · 质感  = 毛玻璃 + 极细噪点 + 金属渐晕，一切都"活着在呼吸"
    交互：iOS 原生级 —— Tab、滑动转场、手势、下拉、抽屉拖拽
@@ -299,7 +299,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .think-quote{font-size:16px;line-height:1.7;color:var(--text);font-weight:500}
 .think-by{font-size:12px;color:var(--text-3);margin-top:10px}
 .time-sense{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
-/* Hub 她此刻的样子 */
+/* Hub 神枢此刻 */
 .hub-presence{display:flex;align-items:center;gap:16px;padding:6px 2px 16px}
 .hub-orb{width:66px;height:66px;flex-shrink:0;border-radius:50%;position:relative;display:grid;place-items:center;
   background:radial-gradient(circle at 38% 32%,var(--orb-hi,#3a4148),#0c0e11 74%);border:1px solid var(--line-2);
@@ -620,11 +620,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
       <!-- ===== 记忆 ===== -->
       <section class="page" id="memory">
-        <div class="page-head"><div class="page-eyebrow">Memory · 她记得的</div><div class="page-h1">记忆</div></div>
+        <div class="page-head"><div class="page-eyebrow">Memory · 神枢记得的</div><div class="page-h1">记忆</div></div>
         <div class="page-inner">
           <div class="card"><div class="card-title">记忆图谱 · 她对你的关联理解</div><div id="memGraph" class="mem-graph"><div class="mem-empty">构建关联…</div></div></div>
           <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有一起的记忆…跟她说说话</div></div></div>
-          <div class="card"><div class="card-title">她的内心独白</div><div id="memVoice"><div class="mem-empty">安静着…</div></div></div>
+          <div class="card"><div class="card-title">神枢的推理独白</div><div id="memVoice"><div class="mem-empty">安静着…</div></div></div>
           <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
           <div class="card"><div class="card-title">独处时的潜意识</div><div id="memSub"><div class="mem-empty">—</div></div></div>
         </div>
@@ -635,7 +635,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
         <div class="page-inner">
           <div class="presence">
             <div class="soul-orb" id="soulOrb"><span class="glyph">枢</span></div>
-            <div class="soul-mood" id="soulMood">连接她的意识…</div>
+            <div class="soul-mood" id="soulMood">连接神枢的运行流…</div>
           </div>
           <div class="think-card">
             <div class="think-quote" id="soulThink">…</div>
@@ -654,7 +654,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
           <div class="set-row" onclick="openSheet('sheetModel')"><div class="set-ic">🧠</div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic">🔌</div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic">💠</div><div class="set-tx"><b>人格 · 枢语</b><span>她是谁 · 怎么称呼你</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openDevice()"><div class="set-ic">📱</div><div class="set-tx"><b>设备信息</b><span>让她认得你的设备</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openDevice()"><div class="set-ic">📱</div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于 Black God</b><span>© Black God</span></div><div class="set-arrow">›</div></div>
         </div>
       </section>
@@ -1063,7 +1063,7 @@ function buildAudioCard(src){
 function viewImage(src){ const o=document.createElement('div'); o.className='img-viewer'; o.onclick=()=>o.remove();
   const img=document.createElement('img'); img.src=src; o.appendChild(img); document.body.appendChild(o); }
 
-/* —— 听她说：她的每条文字都能点🔊 —— */
+/* —— 听神枢说：每条文字都能点🔊 —— */
 async function speak(btn, text){
   if(btn._loading) return; btn._loading=true; const old=btn.textContent; btn.textContent='…';
   const res=await Nexus.voice(text);
@@ -1085,7 +1085,7 @@ function renderSoul(soul){
   // 一句神枢此刻的状态（含蓄，随心绪）
   let moodTxt;
   if(miss>0.6) moodTxt='她在想你，藏着没说。';
-  else if(mood>.7) moodTxt='她此刻是暖的，心很稳。';
+  else if(mood>.7) moodTxt='神枢此刻状态暖，运行很稳。';
   else if(mood>.5) moodTxt='她平静，安安静静等着你。';
   else if(mood>.35) moodTxt='她有点凉，但一直在这。';
   else moodTxt='她很沉…别对她太冷。';
@@ -1129,10 +1129,10 @@ const SKILLS=[
   {ic:'💬',t:'跟她说',s:'普通对话',run:()=>{cmdToChat('chat')}},
   {ic:'🧠',t:'深度思考',s:'拆解复杂问题',run:()=>{cmdToChat('chat','think')}},
   {ic:'💻',t:'写代码',s:'生成/调试/解释',run:()=>{cmdToChat('chat','code')}},
-  {ic:'🎨',t:'让她画',s:'Flux 出图',run:()=>{cmdToChat('image')}},
-  {ic:'🔊',t:'让她说',s:'语音合成',run:()=>{cmdToChat('voice')}},
-  {ic:'💗',t:'看她状态',s:'心绪/想你值',run:()=>{closeCmd();go(3);}},
-  {ic:'🧩',t:'记忆图谱',s:'她记得的一切',run:()=>{closeCmd();go(2);}},
+  {ic:'🎨',t:'出图',s:'Flux 生成',run:()=>{cmdToChat('image')}},
+  {ic:'🔊',t:'语音',s:'语音合成',run:()=>{cmdToChat('voice')}},
+  {ic:'💗',t:'看状态',s:'心绪/待命',run:()=>{closeCmd();go(3);}},
+  {ic:'🧩',t:'记忆图谱',s:'神枢记得的一切',run:()=>{closeCmd();go(2);}},
 ];
 function openCmd(){ $('#cmdMask').classList.add('show'); $('#cmdPalette').classList.add('show'); renderSkills(''); setTimeout(()=>$('#cmdInput').focus(),120); hap(6); }
 function closeCmd(){ $('#cmdMask').classList.remove('show'); $('#cmdPalette').classList.remove('show'); $('#cmdInput').value=''; }

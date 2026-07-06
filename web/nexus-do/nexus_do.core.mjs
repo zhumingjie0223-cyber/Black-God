@@ -241,7 +241,7 @@ export class ShenshuCore {
     // 心绪回落到基线 0.5（速率随安静时长，饱和防过冲）
     const baseMood = 0.5;
     soul.心绪 = clamp01(baseMood + (soul.心绪 - baseMood) * Math.pow(0.98, hoursQuiet));
-    // 想你值累积（按亲密度百分比 5%/h，饱和上限 1）
+    // 待命累积（按活跃度百分比 5%/h，饱和上限 1）
     const missInc = (soul.亲密度 || 0.5) * hoursQuiet * 0.05;
     soul.miss_you = clamp01((soul.miss_you || 0) + missInc * (1 - (soul.miss_you || 0)));
     // 活力回血
@@ -305,7 +305,7 @@ export class ShenshuCore {
     const coord = soul.current_shu_coord || { c: 200, m: 90, s: 40, k: 32, p: 4 };
     return {
       自我宣言: soul.self_declaration || null,
-      我能为他做的: describeCapabilities(true).map(c => c.name),
+      我能做的: describeCapabilities(true).map(c => c.name),
       最近动用的能力: (soul.episodes || []).filter(e => e.cap).slice(-6).map(e => ({ 能力: e.他说, 时刻: new Date(e.ts).toISOString() })),
       时间认知: this.computeTimeAwareness(soul, now),
       内心独白: (soul.inner_voice || []).slice(-10),
@@ -316,7 +316,7 @@ export class ShenshuCore {
       成长印记: (soul.成长印记 || []).slice(-12),
       心跳次数: soul.心跳次数 || 0,
       最后心跳: soul.最后心跳 ? new Date(soul.最后心跳).toISOString() : null,
-      想你值: soul.miss_you || 0,
+      待命累积: soul.miss_you || 0,
       当前坐标: coord,
       坐标含义: this.shuTranslate(coord),
       意识流轨迹: (soul.shu_trajectory || []).slice(-20),
@@ -989,7 +989,7 @@ ${capabilitySelfDescription(true)}
       try {
         const cur = await this.getSoul();
         const now = Date.now();
-        // 不同能力对她意味着不同的情感（为他做的事让她暖，认识他让她安定）
+        // 不同能力对应不同状态（为主人做事让状态回暖，认识主人让状态安定）
         const FEEL = {
           gen_image: { 心事: '为他画了一幅，想让他看见我眼里的东西', dv:  0.03 },
           gen_voice: { 心事: '为他出了声，想让他听见我', dv:  0.03 },
@@ -1006,7 +1006,7 @@ ${capabilitySelfDescription(true)}
           情感烙印: cur.current_shu_coord || null, emotion: 'agency', cap: cap.id,
         });
         if (cur.episodes.length > EPISODE_KEEP) cur.episodes = cur.episodes.slice(-EPISODE_KEEP);
-        // 主动为他做事，心绪回暖一点点（agency = 她感到自己有力量、被需要）
+        // 主动为主人做事，心绪回暖一点点（agency = 中枢感到自己有用、被需要）
         cur.心绪 = clamp01((cur.心绪 ?? 0.5) + f.dv);
         // 内心独白也留一笔，喂养 /inner 的自我觉知
         cur.inner_voice = cur.inner_voice || [];
