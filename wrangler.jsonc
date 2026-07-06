@@ -1,0 +1,15 @@
+{
+  // ═══════════════════════════════════════════════
+  // 根目录 Workers 配置 —— 供 Cloudflare「blackgod88」Git 集成使用。
+  // CF 该项目在仓库根目录跑 `npx wrangler deploy`，故根目录需要此配置：
+  // 把 web/ 作为静态资源发布（含 nexus-do/studio.html 自主智能体工作台）。
+  // 说明：真正的 DO 大脑 worker 是 web/nexus-do/（另有其 wrangler.jsonc，走 GitHub Actions 部署），
+  //       与本文件互不影响。
+  // ═══════════════════════════════════════════════
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "blackgod88",
+  "compatibility_date": "2026-07-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "assets": { "directory": "web" }
+}
