@@ -44,8 +44,11 @@
 
 - **工作台 UI**：`web/nexus-do/studio.html`（黑金单文件 SPA，内核 `/studio` 直达）
 - **流式端点**：`POST /api/agent/stream`（SSE 逐事件推流，前端实时渲染计划清单与执行时间线）
-- **时间线回放**：`GET /api/task/<id>`（计划 / 每步工具调用 / 用量 / 交付物全部落库，可点历史回放）
-- **离线可跑**：无真实 API Key 时用内置 `mock_gateway.py` 走通「规划→工具→交付」全链路
+- **真 token 流式**：模型回复逐字流出（`token` 事件），交付物边生成边显示（上游不支持流式自动回退）
+- **可下载产物**：`write_deliverable` 工具把成果写成文件（`report.md` 等），`artifact` 事件 + `GET /api/artifact/<id>/<file>` 直接下载
+- **随时停止**：工作台「停止」按钮中断执行（客户端 abort，服务端优雅收尾）
+- **时间线回放**：`GET /api/task/<id>`（计划 / 每步工具调用 / 用量 / 产物 / 交付物全部落库，可点历史回放）
+- **离线可跑**：无真实 API Key 时用内置 `mock_gateway.py` 走通「规划→流式→工具→产物→交付」全链路
 
 **本地起 & 自测：**
 

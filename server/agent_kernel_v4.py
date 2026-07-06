@@ -12,8 +12,10 @@ from typing import Optional, Dict, List, Any
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 MEMORY_DIR = ROOT / "memory"
+ARTIFACT_DIR = DATA_DIR / "artifacts"
 DATA_DIR.mkdir(exist_ok=True)
 MEMORY_DIR.mkdir(exist_ok=True)
+ARTIFACT_DIR.mkdir(exist_ok=True)
 
 # ═══════════════════════════════════════════
 # 第 7 层：人格 / 系统宪法（中性助手）
@@ -312,6 +314,21 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "write_deliverable",
+            "description": "把最终交付物写成一个可下载的文件（如 report.md / result.py / data.json）。用于产出用户可直接拿走的成果。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {"type": "string", "description": "文件名，如 report.md、solution.py"},
+                    "content": {"type": "string", "description": "文件完整内容"}
+                },
+                "required": ["filename", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "task_create",
             "description": "创建并跟踪任务。用于长时间运行的操作。",
             "parameters": {
@@ -441,7 +458,82 @@ class AgentLoop:
         )
         with urllib.request.urlopen(req, timeout=120) as resp:
             return json.loads(resp.read().decode('utf-8'))
-    
+
+    def stream_model(self, messages: List[Dict], tools: List[Dict] = None):
+        """流式调用模型（OpenAI 兼容 SSE），作为生成器：
+          - 逐段 yield {"type":"token","text": delta}
+          - 结束 yield {"type":"final","message": {...}, "usage": {...}}
+        上游不支持流式时整体回退到非流式，一次性把内容作为单个 token 发出。"""
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
+        req = urllib.request.Request(
+            f"{self.base_url}/chat/completions",
+            data=json.dumps(payload).encode('utf-8'),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {self.api_key}"})
+
+        try:
+            resp = urllib.request.urlopen(req, timeout=120)
+        except Exception:
+            full = self._call_model(messages, tools)
+            msg = full["choices"][0]["message"]
+            if msg.get("content"):
+                yield {"type": "token", "text": msg["content"]}
+            yield {"type": "final", "message": msg, "usage": full.get("usage", {})}
+            return
+
+        content = ""
+        tool_calls: Dict[int, Dict] = {}
+        usage = {}
+        with resp:
+            for raw in resp:
+                line = raw.decode('utf-8', 'replace').strip()
+                if not line or not line.startswith('data:'):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                except Exception:
+                    continue
+                if chunk.get("usage"):
+                    usage = chunk["usage"]
+                choices = chunk.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                if delta.get("content"):
+                    content += delta["content"]
+                    yield {"type": "token", "text": delta["content"]}
+                for tc in (delta.get("tool_calls") or []):
+                    idx = tc.get("index", 0)
+                    slot = tool_calls.setdefault(
+                        idx, {"id": "", "type": "function",
+                              "function": {"name": "", "arguments": ""}})
+                    if tc.get("id"):
+                        slot["id"] = tc["id"]
+                    fn = tc.get("function") or {}
+                    if fn.get("name"):
+                        slot["function"]["name"] += fn["name"]
+                    if fn.get("arguments"):
+                        slot["function"]["arguments"] += fn["arguments"]
+
+        message = {"role": "assistant", "content": content}
+        if tool_calls:
+            message["tool_calls"] = [tool_calls[i] for i in sorted(tool_calls)]
+        yield {"type": "final", "message": message, "usage": usage}
+
     def run(self, user_message: str, context: List[Dict] = None) -> Dict:
         """执行 Agent Loop：多步推理 + 工具调用 + 自我反思"""
         # 第 1 层：System Prompt 注入
@@ -608,22 +700,28 @@ class AutonomousAgent:
         messages.append({"role": "user", "content": goal})
         memory.save_session("user", goal)
 
+        art_dir = ARTIFACT_DIR / task_id
         events: List[Dict] = []
+        artifacts: List[Dict] = []
         usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         final = ""
 
         for step in range(self.loop.max_steps):
+            # 流式一步：token 实时推流，最终拿到聚合 message + usage
+            msg, u = {}, {}
             try:
-                resp = self.loop._call_model(messages, TOOLS)
+                for chunk in self.loop.stream_model(messages, TOOLS):
+                    if chunk["type"] == "token":
+                        yield {"event": "token", "task_id": task_id,
+                               "step": step + 1, "text": chunk["text"]}
+                    elif chunk["type"] == "final":
+                        msg, u = chunk["message"], chunk.get("usage") or {}
             except Exception as e:
                 yield {"event": "error", "task_id": task_id, "message": f"模型调用失败: {e}"}
                 break
 
-            u = resp.get("usage") or {}
             for k in usage:
                 usage[k] += int(u.get(k, 0) or 0)
-
-            msg = resp["choices"][0]["message"]
 
             if msg.get("tool_calls"):
                 if msg.get("content"):
@@ -639,7 +737,14 @@ class AutonomousAgent:
                         args = {}
                     yield {"event": "tool_call", "task_id": task_id, "step": step + 1,
                            "tool": name, "args": args}
-                    result = execute_tool(name, args)
+                    # write_deliverable 产出可下载文件，其它工具正常执行
+                    if name == "write_deliverable":
+                        result, art = self._save_artifact(art_dir, task_id, args)
+                        if art:
+                            artifacts.append(art)
+                            yield {"event": "artifact", "task_id": task_id, **art}
+                    else:
+                        result = execute_tool(name, args)
                     ev = {"step": step + 1, "tool": name, "args": args,
                           "result": result[:1500]}
                     events.append(ev)
@@ -656,14 +761,31 @@ class AutonomousAgent:
             final = f"已执行 {len(events)} 步工具调用（达到步数上限 {self.loop.max_steps}），未生成总结。"
 
         elapsed = round(time.time() - started, 2)
-        meta = {"plan": plan, "events": events, "usage": usage,
+        meta = {"plan": plan, "events": events, "artifacts": artifacts, "usage": usage,
                 "elapsed_sec": elapsed, "model": self.loop.model}
         memory.save_task_full(task_id, goal, "completed", final, meta)
         memory.save_session("assistant", final[:500])
 
-        yield {"event": "deliverable", "task_id": task_id, "content": final}
+        yield {"event": "deliverable", "task_id": task_id, "content": final,
+               "artifacts": artifacts}
         yield {"event": "done", "task_id": task_id, "steps_used": len(events),
-               "usage": usage, "elapsed_sec": elapsed}
+               "usage": usage, "elapsed_sec": elapsed, "artifacts": artifacts}
+
+    @staticmethod
+    def _save_artifact(art_dir: Path, task_id: str, args: dict):
+        """把交付文件写进任务专属产物目录，返回 (工具结果文本, 产物元数据)。"""
+        raw = str(args.get("filename", "") or "deliverable.txt")
+        name = os.path.basename(raw).strip() or "deliverable.txt"  # 防目录穿越
+        content = args.get("content", "") or ""
+        try:
+            art_dir.mkdir(parents=True, exist_ok=True)
+            path = art_dir / name
+            path.write_text(content, encoding="utf-8")
+            art = {"name": name, "bytes": len(content.encode("utf-8")),
+                   "url": f"/api/artifact/{task_id}/{name}"}
+            return f"已产出可下载交付文件：{name}（{art['bytes']} 字节）", art
+        except Exception as e:
+            return f"写交付文件失败: {e}", None
 
 
 # ═══════════════════════════════════════════
@@ -781,6 +903,23 @@ class AgentHandler(BaseHTTPRequestHandler):
                 self._json(task)
             else:
                 self._json({"error": "task not found", "task_id": task_id}, 404)
+
+        elif path.startswith("/api/artifact/"):
+            # /api/artifact/<task_id>/<filename> —— 下载任务产出的交付文件
+            parts = path[len("/api/artifact/"):].split("/", 1)
+            if len(parts) == 2 and parts[0] and parts[1]:
+                tid = os.path.basename(parts[0])
+                fname = os.path.basename(parts[1])  # 防目录穿越
+                fpath = ARTIFACT_DIR / tid / fname
+                if fpath.is_file():
+                    ct = "text/markdown" if fname.endswith(".md") else \
+                         "application/json" if fname.endswith(".json") else \
+                         "text/plain; charset=utf-8"
+                    self._serve_file(fpath, ct)
+                else:
+                    self._json({"error": "artifact not found"}, 404)
+            else:
+                self._json({"error": "bad artifact path"}, 400)
         
         elif path == "/api/memory":
             self._json({"memories": memory.get_daily()})

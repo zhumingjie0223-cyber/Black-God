@@ -83,17 +83,32 @@ def main():
     evs = sse_events("写一个能跑的示例并自测")
     kinds = [e.get("event") for e in evs]
     passed &= check("plan" in kinds, "收到执行计划 plan")
+    passed &= check("token" in kinds, "收到流式 token")
     passed &= check("tool_call" in kinds, "触发工具调用 tool_call")
     passed &= check("tool_result" in kinds, "返回工具结果 tool_result")
+    passed &= check("artifact" in kinds, "产出可下载交付文件 artifact")
     passed &= check("deliverable" in kinds, "产出交付物 deliverable")
     passed &= check(kinds[-1] == "done", "以 done 收尾")
 
     plan_ev = next((e for e in evs if e.get("event") == "plan"), {})
     passed &= check(len(plan_ev.get("steps", [])) >= 1, "计划含可执行步骤")
 
+    tokens = [e["text"] for e in evs if e.get("event") == "token"]
+    passed &= check(len(tokens) >= 2, f"token 分多段流式（{len(tokens)} 段）")
+
+    art_ev = next((e for e in evs if e.get("event") == "artifact"), {})
+    art_url = art_ev.get("url")
+    passed &= check(bool(art_url), "artifact 带下载 URL")
+
     done_ev = next((e for e in evs if e.get("event") == "done"), {})
     task_id = done_ev.get("task_id")
     passed &= check(bool(task_id), "拿到 task_id")
+
+    # 下载交付文件
+    if art_url:
+        with urllib.request.urlopen(f"{BASE}{art_url}", timeout=5) as r:
+            body = r.read().decode("utf-8", "replace")
+        passed &= check(len(body) > 0 and r.status == 200, "交付文件可下载")
 
     # 时间线回放
     with urllib.request.urlopen(f"{BASE}/api/task/{task_id}", timeout=5) as r:
@@ -101,6 +116,7 @@ def main():
     passed &= check(task.get("status") == "completed", "任务落库为 completed")
     passed &= check(bool(task.get("result")), "交付物已持久化")
     passed &= check(bool(task.get("meta", {}).get("events")), "执行时间线已持久化")
+    passed &= check(bool(task.get("meta", {}).get("artifacts")), "交付文件已持久化")
 
     # 任务列表
     with urllib.request.urlopen(f"{BASE}/api/tasks", timeout=5) as r:

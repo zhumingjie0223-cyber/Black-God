@@ -46,6 +46,26 @@
     background:linear-gradient(145deg,var(--goldsoft),var(--gold2)); transition:.2s; box-shadow:0 4px 16px rgba(201,155,78,.25)}
   .run:hover{filter:brightness(1.05); transform:translateY(-1px)}
   .run:disabled{opacity:.5; cursor:not-allowed; transform:none}
+  .run.stop{background:linear-gradient(145deg,#e08b8b,#c15a5a); box-shadow:0 4px 16px rgba(193,90,90,.25)}
+
+  /* 流式生成中 */
+  .streaming{margin-top:6px; background:var(--panel); border:1px solid var(--gold2); border-radius:11px;
+    padding:12px 14px; font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; color:var(--txt)}
+  .streaming .cursor{display:inline-block; width:7px; height:15px; background:var(--gold); margin-left:2px;
+    vertical-align:text-bottom; animation:blink .9s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+  /* 产物下载 */
+  .arts{margin-top:12px; display:flex; flex-wrap:wrap; gap:8px}
+  .art{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--goldsoft);
+    background:var(--panel2); border:1px solid var(--gold2); padding:7px 12px; border-radius:9px;
+    text-decoration:none; transition:.15s}
+  .art:hover{filter:brightness(1.12)}
+  .art .sz{color:var(--mut2); font-family:var(--mono); font-size:11px}
+  /* 交付物内的 markdown */
+  .content h1,.content h2,.content h3{color:var(--goldsoft); margin:10px 0 6px; font-size:15px}
+  .content code{font-family:var(--mono); background:var(--panel2); padding:1px 5px; border-radius:5px; font-size:12.5px; color:var(--goldsoft)}
+  .content strong{color:var(--goldsoft)}
+  .content ul{margin:6px 0 6px 18px}
 
   .examples{padding:6px 18px 14px; display:flex; flex-wrap:wrap; gap:7px}
   .chip{font-size:12px; color:var(--mut); background:var(--panel); border:1px solid var(--line);
@@ -146,6 +166,7 @@
       <label>给它一个目标</label>
       <textarea id="goal" placeholder="例如：调研 2026 年边缘 AI 部署方案，产出一页可执行选型建议…"></textarea>
       <button class="run" id="run">▶ 自主执行</button>
+      <button class="run stop" id="stop" style="display:none">■ 停止</button>
     </div>
     <div class="examples" id="examples"></div>
     <div class="hist" id="hist">
@@ -200,6 +221,22 @@ function setState(mode, txt){
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 let planSteps = [], curStep = 0, timeline = null, delivEl = null;
+let abortCtl = null, streamEl = null, streamBuf = '', artifacts = [];
+
+// 极简 markdown 渲染（标题/加粗/行内代码/无序列表），够交付物用
+function md(s){
+  let h = esc(s);
+  h = h.replace(/^### (.*)$/gm,'<h3>$1</h3>')
+       .replace(/^## (.*)$/gm,'<h2>$1</h2>')
+       .replace(/^# (.*)$/gm,'<h2>$1</h2>')
+       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+       .replace(/`([^`]+)`/g,'<code>$1</code>');
+  h = h.replace(/(?:^|\n)((?:- .*(?:\n|$))+)/g, m=>{
+    const items = m.trim().split('\n').map(l=>'<li>'+l.replace(/^- /,'')+'</li>').join('');
+    return '<ul>'+items+'</ul>';
+  });
+  return h.replace(/\n/g,'<br>');
+}
 
 function renderPlan(steps, deliverable){
   planSteps = steps; curStep = 0;
@@ -235,12 +272,17 @@ function addEvent(kind, tag, headExtra, body, isCode){
   return el;
 }
 
-function renderDeliverable(content, meta){
+function clearStream(){ if(streamEl){ streamEl.remove(); streamEl=null; } streamBuf=''; }
+
+function renderDeliverable(content, meta, arts){
+  clearStream();
   delivEl = document.createElement('div');
   delivEl.className = 'deliverable';
   const m = meta ? `${meta.steps_used||0} 步 · ${meta.usage?.total_tokens||0} token · ${meta.elapsed_sec||0}s` : '';
+  const artHtml = (arts&&arts.length) ? `<div class="arts">` + arts.map(a=>
+    `<a class="art" href="${a.url}" download>⬇ ${esc(a.name)} <span class="sz">${a.bytes}B</span></a>`).join('') + `</div>` : '';
   delivEl.innerHTML = `<h2>★ 交付物</h2><div class="meta">${m}</div>` +
-    `<div class="content">${esc(content)}</div>` +
+    `<div class="content">${md(content)}</div>` + artHtml +
     `<div class="acts"><button class="btn2" id="cpy">复制</button><button class="btn2" id="dl">下载 .md</button></div>`;
   stage.appendChild(delivEl);
   stage.scrollTop = stage.scrollHeight;
@@ -255,18 +297,20 @@ function renderDeliverable(content, meta){
 async function runGoal(goal){
   if(running || !goal.trim()) return;
   running = true;
-  $('#run').disabled = true;
+  $('#run').style.display='none'; $('#stop').style.display='block';
   empty.style.display = 'none';
   stage.innerHTML = '';
+  streamEl=null; streamBuf=''; artifacts=[];
   sSteps.textContent='0'; sTok.textContent='0'; sTime.textContent='0.0s';
   setState('busy','规划中…');
   t0 = Date.now();
   timer = setInterval(()=> sTime.textContent = ((Date.now()-t0)/1000).toFixed(1)+'s', 100);
+  abortCtl = new AbortController();
 
   try{
     const resp = await fetch('/api/agent/stream', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({goal})
+      body: JSON.stringify({goal}), signal: abortCtl.signal
     });
     if(!resp.ok || !resp.body) throw new Error('服务不可用 ('+resp.status+')');
     const reader = resp.body.getReader();
@@ -285,11 +329,19 @@ async function runGoal(goal){
       }
     }
   }catch(err){
-    if(!timeline){ empty.style.display='none'; stage.innerHTML=''; timeline=document.createElement('div'); timeline.className='timeline'; stage.appendChild(timeline); }
-    addEvent('error','错误','', esc(err.message));
-    setState('','出错');
+    if(err.name === 'AbortError'){
+      clearStream();
+      if(timeline) addEvent('error','已停止','', '任务被手动停止');
+      setState('','已停止');
+    }else{
+      if(!timeline){ empty.style.display='none'; stage.innerHTML=''; timeline=document.createElement('div'); timeline.className='timeline'; stage.appendChild(timeline); }
+      addEvent('error','错误','', esc(err.message));
+      setState('','出错');
+    }
   }finally{
-    running=false; $('#run').disabled=false; clearInterval(timer);
+    running=false; abortCtl=null;
+    $('#run').style.display='block'; $('#stop').style.display='none';
+    clearInterval(timer);
     if(dot.className.includes('busy')) setState('on','完成');
     loadHistory();
   }
@@ -302,10 +354,22 @@ function handleEvent(ev){
       renderPlan(ev.steps, ev.deliverable); markActive();
       setState('busy','执行中…');
       break;
+    case 'token':
+      if(!streamEl){
+        streamEl = document.createElement('div');
+        streamEl.className = 'streaming';
+        stage.appendChild(streamEl);
+      }
+      streamBuf += ev.text;
+      streamEl.innerHTML = esc(streamBuf) + '<span class="cursor"></span>';
+      stage.scrollTop = stage.scrollHeight;
+      break;
     case 'thought':
+      clearStream();  // 流出来的前言归入「思考」卡片
       addEvent('thought','思考','', esc(ev.text));
       break;
     case 'tool_call': {
+      clearStream();
       sSteps.textContent = ev.step;
       const args = esc(JSON.stringify(ev.args, null, 2));
       addEvent('tool','调用工具', `<span style="color:var(--goldsoft);font-weight:600">${esc(ev.tool)}</span>`, args, true);
@@ -315,8 +379,12 @@ function handleEvent(ev){
       addEvent('result','工具结果', `<span class="k">${esc(ev.tool)}</span>`, esc(ev.result), true);
       advanceStep();
       break;
+    case 'artifact':
+      artifacts.push({name:ev.name, bytes:ev.bytes, url:ev.url});
+      break;
     case 'deliverable':
       window.__deliv = ev.content;
+      if(ev.artifacts) artifacts = ev.artifacts;
       break;
     case 'done':
       sSteps.textContent = ev.steps_used;
@@ -324,10 +392,12 @@ function handleEvent(ev){
       sTime.textContent = (ev.elapsed_sec||0)+'s';
       stage.querySelectorAll('.plan .step').forEach(s=>s.classList.add('done'));
       renderDeliverable(window.__deliv || '（无交付内容）',
-        {steps_used:ev.steps_used, usage:ev.usage, elapsed_sec:ev.elapsed_sec});
+        {steps_used:ev.steps_used, usage:ev.usage, elapsed_sec:ev.elapsed_sec},
+        ev.artifacts || artifacts);
       setState('on','完成');
       break;
     case 'error':
+      clearStream();
       addEvent('error','错误','', esc(ev.message));
       setState('','出错');
       break;
@@ -335,6 +405,7 @@ function handleEvent(ev){
 }
 
 $('#run').onclick = ()=> runGoal($('#goal').value);
+$('#stop').onclick = ()=>{ if(abortCtl) abortCtl.abort(); };
 $('#goal').addEventListener('keydown', e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') runGoal($('#goal').value); });
 
 async function loadHistory(){
@@ -361,7 +432,7 @@ async function replay(id){
       addEvent('result','工具结果', `<span class="k">${esc(e.tool)}</span>`, esc(e.result||''), true);
     });
     stage.querySelectorAll('.plan .step').forEach(s=>s.classList.add('done'));
-    renderDeliverable(t.result||'', {steps_used:(m.events||[]).length, usage:m.usage, elapsed_sec:m.elapsed_sec});
+    renderDeliverable(t.result||'', {steps_used:(m.events||[]).length, usage:m.usage, elapsed_sec:m.elapsed_sec}, m.artifacts||[]);
     setState('on','已回放');
     $('#side').classList.remove('open');
   }catch(e){}
