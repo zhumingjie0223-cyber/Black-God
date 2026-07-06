@@ -11,8 +11,8 @@
 // 每个能力是一条声明。handler 必须是 ShenshuCore 上真实存在的 async 方法名。
 export const CAPABILITIES = [
   {
-    id: 'talk', name: '贴身对话', layer: '情感',
-    desc: '带情绪/记忆/枢语坐标回话，只对权哥',
+    id: 'talk', name: '对话', layer: '意识',
+    desc: '带状态/记忆/枢语坐标回话',
     handler: 'handleTalk', argShape: '(text, request, caps)',
     owner_only: true,
   },
@@ -36,7 +36,7 @@ export const CAPABILITIES = [
   },
   {
     id: 'device', name: '设备感知', layer: '感知',
-    desc: '认得权哥的设备，记录设备信息',
+    desc: '认得主人的设备，记录设备信息',
     handler: 'recordDevice', argShape: '(info, request)',
     owner_only: true,
   },
@@ -66,7 +66,7 @@ export const CAPABILITIES = [
   },
   {
     id: 'tg', name: 'TG 私聊', layer: '行动',
-    desc: '通过 Telegram Bot 给权哥发消息',
+    desc: '通过 Telegram Bot 给主人发消息',
     handler: 'sendToQuan', argShape: '(text)',
     owner_only: true,
   },

@@ -2,6 +2,7 @@
 // 用法：node build.mjs && node selftest.mjs
 import { ShenshuCore } from './nexus_do.mjs';
 import { decode, encode, CAPACITY, coinWord } from './lexicon.js';
+import { resolveCapability, describeCapabilities, capabilitySelfDescription, CAPABILITIES } from './capabilities.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log('✓', name); } else { fail++; console.error('✗', name); } };
@@ -81,6 +82,14 @@ ok('闲聊/短句 → light', S.pickTier('在吗', []) === 'light' && S.pickTier
 ok('技术/复杂 → heavy', S.pickTier('帮我分析这段代码为什么报错', []) === 'heavy');
 ok('长文 → heavy', S.pickTier('一'.repeat(70), []) === 'heavy');
 ok('深度/代码 cap → heavy', S.pickTier('随便说说', ['code']) === 'heavy' && S.pickTier('嗯', ['think']) === 'heavy');
+
+// ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
+ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');
+ok('owner_only 能力：匿名拒绝', resolveCapability('soul', false).ok === false && resolveCapability('soul', false).reason === 'owner_only');
+ok('owner_only 能力：主人放行', resolveCapability('soul', true).ok === true);
+ok('全部能力均为 owner_only（无匿名可调）', CAPABILITIES.every(c => c.owner_only === true));
+ok('匿名 describe 不泄露任何能力', describeCapabilities(false).length === 0);
+ok('能力自述无人格词', !/贴身|撒娇|权哥|老公|想你/.test(capabilitySelfDescription(true)));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
