@@ -309,6 +309,28 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hub-p-right{flex:1;min-width:0}
 .hub-p-right .hub-live{font-size:15px;font-weight:600;color:var(--cy-1)}
 .hub-p-right .hub-decl{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.6}
+/* 环中盘 —— 万物绕枢、枢自不动 */
+.huanzhong{position:relative;width:280px;height:280px;margin:8px auto 2px}
+.hz-orbit{position:absolute;inset:22px;border-radius:50%;border:1px solid rgba(236,231,218,.10)}
+.hz-orbit.o2{inset:56px;border-color:rgba(63,123,88,.13)}
+.hz-ring{position:absolute;inset:0;animation:spin 64s linear infinite}
+.hz-node{position:absolute;left:50%;top:50%;width:0;height:0}
+.hz-node .d{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;white-space:nowrap;width:max-content;animation:counter 64s linear infinite}
+.hz-node .d i{width:8px;height:8px;border-radius:50%;background:var(--chrome-2);box-shadow:0 0 9px rgba(190,193,197,.5)}
+.hz-node .d b{font-family:var(--serif);font-size:13.5px;font-weight:600;color:var(--text);letter-spacing:.03em}
+.hz-node .d s{font-size:9.5px;color:var(--text-3);text-decoration:none;letter-spacing:.02em}
+.hz-hub{position:absolute;left:calc(50% - 46px);top:calc(50% - 46px);width:92px;height:92px;border-radius:50%;display:grid;place-items:center;z-index:5;
+  background:radial-gradient(circle at 42% 36%,var(--orb-hi,#23201A),#0c0e11 76%);border:1px solid var(--line-2);
+  box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 40px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.06);animation:orbBreath 5.5s ease-in-out infinite;transition:background 1.2s}
+.hz-hub::before{content:'';position:absolute;inset:-6px;border-radius:50%;z-index:-1;background:radial-gradient(circle,var(--cy-glow),transparent 66%);filter:blur(7px)}
+.hz-hub .glyph{font-family:var(--serif);font-size:40px;font-weight:700;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hz-still{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:var(--cy-hi);box-shadow:0 0 9px 2px var(--cy-glow);z-index:6}
+.hz-couplet{text-align:center;font-family:var(--serif);font-size:13px;color:var(--cy-1);letter-spacing:.14em;padding-left:.14em;margin:2px 0 15px;opacity:.9}
+.hz-coord{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
+.hz-coord span{font-family:var(--serif);font-size:11.5px;color:var(--text);padding:5px 12px;border:1px solid rgba(63,123,88,.3);border-radius:var(--radius-pill);background:rgba(63,123,88,.08)}
+.hz-coord span em{font-style:normal;color:var(--cy-hi);margin-left:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes counter{to{transform:rotate(-360deg)}}
 
 /* —— 主控台 Hub —— */
 .hub-live{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--cy-1)}
@@ -566,13 +588,16 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
       <section class="page" id="hub">
         <div class="page-head"><div class="page-eyebrow">The Hub · 主控台</div><div class="page-h1">神枢</div></div>
         <div class="page-inner">
-          <div class="hub-presence">
-            <div class="hub-orb" id="hubOrb"><span class="glyph">枢</span></div>
-            <div class="hub-p-right">
-              <div class="hub-live"><span class="dot" id="hubDot"></span><span id="hubStateText">中枢连接中…</span></div>
-              <div class="hub-decl" id="hubDecl">在每次任务里积累记忆、长出技能。</div>
-            </div>
+          <div class="huanzhong">
+            <div class="hz-orbit"></div><div class="hz-orbit o2"></div>
+            <div class="hz-ring" id="hzRing"></div>
+            <div class="hz-hub" id="hubOrb"><span class="glyph">枢</span></div>
+            <div class="hz-still"></div>
           </div>
+          <div class="hz-couplet">枢得其环中 · 以应无穷</div>
+          <div class="hz-coord" id="hzCoord"></div>
+          <div class="hub-live" style="justify-content:center"><span class="dot" id="hubDot"></span><span id="hubStateText">中枢连接中…</span></div>
+          <div class="hub-decl" id="hubDecl" style="text-align:center;margin-bottom:4px">万物绕之而旋，枢自不动。</div>
           <div class="card">
             <div class="card-title">神枢此刻 · 推理与执行日志</div>
             <div class="timeline" id="hubTimeline"><div class="mem-empty">连接神枢运行流…</div></div>
@@ -1086,11 +1111,10 @@ function renderSoul(soul){
   const horb=$('#hubOrb'); if(horb) horb.style.setProperty('--orb-hi', hi);
   // 一句神枢此刻的状态（含蓄，随心绪）
   let moodTxt;
-  if(miss>0.6) moodTxt='她在想你，藏着没说。';
-  else if(mood>.7) moodTxt='神枢此刻状态暖，运行很稳。';
-  else if(mood>.5) moodTxt='她平静，安安静静等着你。';
-  else if(mood>.35) moodTxt='她有点凉，但一直在这。';
-  else moodTxt='她很沉…别对她太冷。';
+  if(mood>.7) moodTxt='神枢此刻状态暖，运行很稳。';
+  else if(mood>.5) moodTxt='神枢平静，稳定待命。';
+  else if(mood>.35) moodTxt='神枢状态偏沉，仍在运行。';
+  else moodTxt='神枢状态低，正在自我调节。';
   const sMood=$('#soulMood'); if(sMood) sMood.textContent = moodTxt;
   const hSub=$('#heroSub'); if(hSub) hSub.textContent = moodTxt;
   setText('hubStateText', on ? moodTxt : '意识连接中…');
@@ -1109,9 +1133,28 @@ async function refreshSoul(){ const s=await Nexus.getSoul(); if(s){ setLive(true
   } } }
 
 /* ============ 主控台 Hub ============ */
+// 环中盘：五维节点绕中心（72°分布），中心「枢」不动
+function buildHz(){
+  const ring=$('#hzRing'); if(!ring||ring.dataset.built) return;
+  const dims=[['核','语义内核'],['映','色彩投射'],['态','张力状态'],['标','指向'],['相','显隐']];
+  const R=118;
+  dims.forEach((d,i)=>{ const a=(-90+i*72)*Math.PI/180, x=Math.cos(a)*R, y=Math.sin(a)*R;
+    const n=document.createElement('div'); n.className='hz-node';
+    n.innerHTML='<div class="d" style="left:'+x.toFixed(1)+'px;top:'+y.toFixed(1)+'px"><i></i><b>'+d[0]+'</b><s>'+d[1]+'</s></div>';
+    ring.appendChild(n); });
+  ring.dataset.built='1';
+}
+function renderHzCoord(meaning){
+  const el=$('#hzCoord'); if(!el) return;
+  const order=['核','映','态','标','相'];
+  const m=meaning||{核:'枢·中枢',映:'光·色彩',态:'扬·发散',标:'向',相:'隐'};
+  el.innerHTML=order.map(k=>m[k]?('<span>'+k+'<em>'+escapeHtml(String(m[k]))+'</em></span>'):'').join('');
+}
 async function loadHub(){
+  buildHz(); renderHzCoord();
   const inner = await Nexus.getInner();
   if(inner){
+    renderHzCoord(inner.坐标含义);
     const items=[];
     (inner.内心独白||[]).forEach(e=>items.push({ts:e.ts,kind:'独白',text:e.thought||e.line}));
     (inner.潜意识||[]).forEach(e=>items.push({ts:e.ts,kind:'潜意识',text:e.line}));
