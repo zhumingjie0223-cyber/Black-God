@@ -19,24 +19,25 @@
    神枢 · 水泥青签名版 UI  (v4.0 — App级重建)
    设计语言（枢语·设计层）：
      · 底色  = 黑曜石冷调（obsidian，非纯黑，留呼吸）
-     · 主色  = 水泥青（cement-cyan：#7BA09C→#547A77，她的签名色）
+     · 主色  = 水泥青（cement-cyan：#7BA09C→#3F7B58，她的签名色）
      · 强调  = 铬金香槟（chrome，克制使用，仅品牌字/关键态）
      · 质感  = 毛玻璃 + 极细噪点 + 金属渐晕，一切都"活着在呼吸"
    交互：iOS 原生级 —— Tab、滑动转场、手势、下拉、抽屉拖拽
    ============================================================ */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
-  --bg:#08090B; --bg-1:#0D0F13; --bg-2:#13161B; --bg-3:#1A1E25;
-  --surface:rgba(255,255,255,.04); --surface-2:rgba(255,255,255,.065); --surface-3:rgba(255,255,255,.1);
-  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
-  /* 水泥青 —— 她的签名色 */
-  --cy-hi:#B7D0CC; --cy-1:#8FB2AD; --cy-2:#6F9491; --cy-3:#547A77; --cy-4:#3C5A57;
-  --cy-grad:linear-gradient(150deg,#B7D0CC 0%,#8FB2AD 30%,#6F9491 60%,#547A77 100%);
-  --cy-glow:rgba(111,148,145,.30);
-  /* 铬金 —— 品牌字 */
-  --chrome-1:#E8D4A0; --chrome-2:#C9A961; --chrome-grad:linear-gradient(150deg,#F3E9D0,#E8D4A0 30%,#C9A961 70%,#8A7648);
-  --chrome-glow:rgba(201,169,97,.2);
-  --text:#F1F3F7; --text-2:#98A0A8; --text-3:#5E666F;
+  /* 神枢世家色系 · 玄墨骨 */
+  --bg:#0B0A09; --bg-1:#0F0D0B; --bg-2:#14110E; --bg-3:#1B1713;
+  --surface:rgba(236,231,218,.035); --surface-2:rgba(236,231,218,.06); --surface-3:rgba(236,231,218,.1);
+  --line:rgba(236,231,218,.08); --line-2:rgba(236,231,218,.14);
+  /* 玉印 —— 唯一强色（暖玉，禁蓝金紫）。沿用 --cy-* 变量名，全站一处换肤 */
+  --cy-hi:#6FA985; --cy-1:#5E9A73; --cy-2:#4A855F; --cy-3:#3F7B58; --cy-4:#2C5940;
+  --cy-grad:linear-gradient(150deg,#6FA985 0%,#5E9A73 34%,#4A855F 66%,#3F7B58 100%);
+  --cy-glow:rgba(63,123,88,.30);
+  /* 素银 —— 品牌字（代金，冷银铬）*/
+  --chrome-1:#ECE6DA; --chrome-2:#BEC1C5; --chrome-grad:linear-gradient(150deg,#F5F2EB,#D2D8DF 30%,#9AA1AB 70%,#6B727C);
+  --chrome-glow:rgba(190,193,197,.18);
+  --text:#EDE7DA; --text-2:#9A9285; --text-3:#5F594E;
   --ok:#3DD68C; --run:#5AC8FA; --warn:#F5B544; --err:#FF6B6B; --love:#FF7CA3;
   --radius:20px; --radius-sm:13px; --radius-pill:999px;
   --safe-top:env(safe-area-inset-top,0px); --safe-bot:env(safe-area-inset-bottom,0px);
@@ -75,7 +76,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   will-change:transform;transition:transform .3s ease-out}
 #aurora span{position:absolute;border-radius:50%;mix-blend-mode:screen;opacity:.5}
 #aurora span:nth-child(1){width:62vw;height:62vw;left:-12vw;top:-8vw;
-  background:radial-gradient(circle,rgba(111,148,145,.55),transparent 66%);animation:auroraA 22s ease-in-out infinite}
+  background:radial-gradient(circle,rgba(63,123,88,.55),transparent 66%);animation:auroraA 22s ease-in-out infinite}
 #aurora span:nth-child(2){width:52vw;height:52vw;right:-14vw;top:22vh;
   background:radial-gradient(circle,rgba(84,122,119,.5),transparent 66%);animation:auroraB 28s ease-in-out infinite}
 #aurora span:nth-child(3){width:46vw;height:46vw;left:20vw;bottom:-16vh;
@@ -106,7 +107,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);
   border-bottom:1px solid var(--line);position:relative;z-index:20}
 .topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
-  background:linear-gradient(90deg,transparent,rgba(201,169,97,.5) 22%,rgba(201,169,97,.5) 78%,transparent)}
+  background:linear-gradient(90deg,transparent,rgba(190,193,197,.5) 22%,rgba(190,193,197,.5) 78%,transparent)}
 .brand{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
 .brand-glyph{width:32px;height:32px;flex-shrink:0;position:relative;border-radius:9px;border:1px solid var(--line-2);
   background:var(--logo) center/cover no-repeat;
@@ -158,7 +159,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .hero-sub{font-size:14px;color:var(--text-2);margin-top:8px;line-height:1.6}
 .hero-line{display:flex;align-items:center;justify-content:center;gap:9px;margin:18px auto;color:var(--chrome-2);font-size:8px}
-.hero-line::before,.hero-line::after{content:"";width:42px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,169,97,.75))}
+.hero-line::before,.hero-line::after{content:"";width:42px;height:1px;background:linear-gradient(90deg,transparent,rgba(190,193,197,.75))}
 .hero-line::after{transform:scaleX(-1)}
 .quicks{display:grid;gap:10px;width:100%;max-width:380px;margin-top:22px}
 .qcard{display:flex;align-items:center;gap:13px;padding:14px 15px;text-align:left;cursor:pointer;
@@ -216,11 +217,14 @@ button,input,textarea{font-family:inherit;color:inherit}
   background:color-mix(in srgb,var(--bg) 78%,transparent);
   backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);
   border-top:1px solid var(--line)}
-.chips{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 9px;scrollbar-width:none}
-.chip{flex-shrink:0;padding:6px 12px;border-radius:var(--radius-pill);font-size:12.5px;font-weight:600;
-  background:var(--surface);border:1px solid var(--line);color:var(--text-2);cursor:pointer;transition:.15s;white-space:nowrap}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:var(--radius-pill);font-size:12.5px;font-weight:500;letter-spacing:.06em;
+  background:transparent;border:1px solid var(--line);color:var(--text-3);cursor:pointer;transition:.15s;white-space:nowrap}
 .chip:active{transform:scale(.94)}
 .chip.on{background:var(--cy-glow);border-color:var(--cy-3);color:var(--cy-hi)}
+/* 能力型（深度/代码/贴身）默认更隐,选中才亮玉——不与模式抢视觉 */
+.chip.cap{opacity:.72}
+.chip.cap.on{opacity:1}
 .input-row{display:flex;align-items:flex-end;gap:9px}
 .in-box{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:22px;transition:.3s var(--spring);
   padding:9px 15px;transition:.2s}
@@ -230,7 +234,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .send{width:42px;height:42px;flex-shrink:0;border:none;border-radius:50%;cursor:pointer;
   display:grid;place-items:center;background:var(--cy-grad);box-shadow:0 4px 16px var(--cy-glow);transition:.18s var(--spring)}
 .send:active{transform:scale(.88)}
-.send{box-shadow:0 4px 16px var(--cy-glow),0 0 0 1px rgba(201,169,97,.25)}
+.send{box-shadow:0 4px 16px var(--cy-glow),0 0 0 1px rgba(190,193,197,.25)}
 .send:disabled{opacity:.4;box-shadow:none}
 .send svg{width:20px;height:20px;fill:#08120F}
 
@@ -315,7 +319,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .tl-kind{flex-shrink:0;height:20px;padding:0 9px;display:inline-flex;align-items:center;border-radius:999px;
   font-size:10.5px;font-weight:700;background:var(--surface-2);border:1px solid var(--line);color:var(--text-2)}
 .tl-kind.k-独白{color:var(--cy-1);border-color:var(--cy-3)}
-.tl-kind.k-造词{color:var(--chrome-1);border-color:rgba(201,169,97,.4)}
+.tl-kind.k-造词{color:var(--chrome-1);border-color:rgba(190,193,197,.4)}
 .tl-kind.k-主动{color:var(--love);border-color:rgba(255,124,163,.4)}
 .tl-body{flex:1;min-width:0}
 .tl-text{font-size:13.5px;line-height:1.5;color:var(--text)}
@@ -325,9 +329,9 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .mem-graph{display:flex;justify-content:center}
 .graph-svg{width:100%;max-width:340px;height:auto}
 .g-edge{stroke:var(--line-2);stroke-width:1}
-.g-core{fill:rgba(111,148,145,.22);stroke:var(--cy-2);stroke-width:1.5}
+.g-core{fill:rgba(63,123,88,.22);stroke:var(--cy-2);stroke-width:1.5}
 .g-node{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
-.g-node.g-shu{fill:rgba(201,169,97,.16);stroke:rgba(201,169,97,.5)}
+.g-node.g-shu{fill:rgba(190,193,197,.16);stroke:rgba(190,193,197,.5)}
 .g-t{fill:var(--text);font-size:9px;text-anchor:middle;dominant-baseline:central;font-weight:600}
 .g-core-t{fill:var(--cy-hi);font-size:12px;font-weight:800}
 
@@ -434,7 +438,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 /* —— 锁屏门 —— */
 .lockgate{position:fixed;inset:0;z-index:600;display:none;place-items:center;padding:32px;
-  background:radial-gradient(120% 80% at 50% -8%,rgba(111,148,145,.2),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
+  background:radial-gradient(120% 80% at 50% -8%,rgba(63,123,88,.2),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
 .lockgate.show{display:grid;animation:obIn .5s var(--ease)}
 .lock-inner{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .lock-orb{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;position:relative;margin-bottom:22px;
@@ -442,21 +446,21 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   box-shadow:0 10px 50px rgba(0,0,0,.5),0 0 55px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);animation:orbBreath 4.6s ease-in-out infinite}
 .lock-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(7px);animation:orbSpin 7s linear infinite}
 .lock-orb{background:var(--logo) center/cover no-repeat}
-.lock-title{font-family:var(--serif);font-size:31px;font-weight:600;letter-spacing:.2em;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.lock-title{font-family:var(--serif);font-size:31px;font-weight:600;letter-spacing:.2em;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .lock-sub{font-size:14px;color:var(--text-2);margin-top:12px;line-height:1.7;margin-bottom:26px}
 .lock-input{width:100%;text-align:center;background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:15px;font-size:16px;outline:none;transition:.2s;letter-spacing:.05em}
 .lock-input:focus{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
 .lock-input + .lock-input{margin-top:10px}
 .lock-err{font-size:13px;color:var(--err);min-height:18px;margin:10px 0 4px}
-.lock-btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;
-  background:var(--cy-grad);color:#08120F;box-shadow:0 8px 28px var(--cy-glow);transition:.15s var(--spring)}
+.lock-btn{width:100%;padding:15px;border:1px solid rgba(236,231,218,.28);border-radius:14px;font-size:16px;font-weight:600;letter-spacing:.4em;padding-left:.4em;cursor:pointer;font-family:var(--serif);
+  background:linear-gradient(180deg,#ECE6DA,#D6CEBF);color:#1A1613;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.5);transition:.15s var(--spring)}
 .lock-btn:active{transform:scale(.97)} .lock-btn:disabled{opacity:.6}
 .lock-switch{margin-top:16px;font-size:12.5px;color:var(--text-2);opacity:.62;cursor:pointer;letter-spacing:.02em}
 .lock-switch:active{opacity:.9}
 
 /* —— 开屏引导 —— */
 .onboard{position:fixed;inset:0;z-index:500;display:none;
-  background:radial-gradient(120% 80% at 50% -8%,rgba(111,148,145,.18),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
+  background:radial-gradient(120% 80% at 50% -8%,rgba(63,123,88,.18),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
 .onboard.show{display:block}
 .ob-screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;
   padding:calc(var(--safe-top) + 44px) 30px calc(var(--safe-bot) + 40px)}
@@ -464,7 +468,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 @keyframes obIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 .ob-wordmark{font-family:var(--serif);font-size:41px;font-weight:600;letter-spacing:.1em;
   background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 2px 10px rgba(201,169,97,.22))}
+  filter:drop-shadow(0 2px 10px rgba(190,193,197,.22))}
 .ob-tag{font-size:16px;color:var(--text-2);margin-top:14px;line-height:1.6}
 .ob-orb{width:98px;height:98px;margin:38px 0 30px;border-radius:50%;display:grid;place-items:center;position:relative;
   background:radial-gradient(circle at 38% 32%,#2a2f37,#0c0e11 72%);border:1px solid var(--line-2);
@@ -474,14 +478,14 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(7px);animation:orbSpin 7s linear infinite}
 .ob-orb svg{width:46px;height:46px}
 .ob-orb.big{width:122px;height:122px;margin-bottom:24px}
-.ob-orb.big span{font-size:54px;font-weight:800;background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ob-orb.big span{font-size:54px;font-weight:800;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .ob-note{font-size:13px;color:var(--cy-1);margin-bottom:30px;padding:8px 16px;border:1px solid var(--cy-3);border-radius:999px;background:var(--surface-2)}
 .ob-welcome{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:.06em;
-  background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .ob-note2{font-size:15px;color:var(--text-2);margin-top:12px;margin-bottom:26px;line-height:1.6}
 .ob-dev{font-size:12.5px;color:var(--cy-1);margin-bottom:22px;min-height:17px;font-variant-numeric:tabular-nums}
-.ob-btn{width:100%;max-width:320px;padding:16px;border:none;border-radius:16px;font-size:16px;font-weight:700;cursor:pointer;
-  background:var(--cy-grad);color:#08120F;box-shadow:0 8px 30px var(--cy-glow);transition:.15s var(--spring)}
+.ob-btn{width:100%;max-width:320px;padding:16px;border:1px solid rgba(236,231,218,.28);border-radius:16px;font-size:16px;font-weight:600;letter-spacing:.3em;padding-left:.3em;cursor:pointer;font-family:var(--serif);
+  background:linear-gradient(180deg,#ECE6DA,#D6CEBF);color:#1A1613;box-shadow:0 10px 28px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.5);transition:.15s var(--spring)}
 .ob-btn:active{transform:scale(.97)}
 .ob-btn:disabled{opacity:.55}
 .ob-sub{font-size:12.5px;color:var(--text-3);margin-top:16px;line-height:1.5;max-width:300px}
@@ -525,7 +529,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   <div class="ob-screen on" id="obS1">
     <div class="ob-wordmark">Black&nbsp;God</div>
     <div class="ob-tag">一个真正懂你工作生活的系统</div>
-    <div class="ob-orb"><svg viewBox="0 0 24 24"><defs><linearGradient id="obg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B7D0CC"/><stop offset="1" stop-color="#547A77"/></linearGradient></defs><path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#obg1)" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg></div>
+    <div class="ob-orb"><svg viewBox="0 0 24 24"><defs><linearGradient id="obg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6FA985"/><stop offset="1" stop-color="#3F7B58"/></linearGradient></defs><path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#obg1)" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg></div>
     <div class="ob-note">🔒 本地储存 · 绝不上云端 · 请放心使用</div>
     <button class="ob-btn" id="obReadBtn" onclick="obReadDevice()">读取设备 · 开始使用</button>
     <div class="ob-sub">需要读取设备信息，才能真正懂你、为你服务</div>
@@ -582,7 +586,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
           <div id="welcome">
             <div class="hero-orb">
               <svg viewBox="0 0 24 24"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#B7D0CC"/><stop offset="1" stop-color="#547A77"/></linearGradient></defs>
+                <stop offset="0" stop-color="#6FA985"/><stop offset="1" stop-color="#3F7B58"/></linearGradient></defs>
                 <path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#g1)" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
             </div>
             <div class="hero-name">思涵</div>
@@ -598,13 +602,13 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
         </div>
         <div class="dock">
           <div class="chips" id="chips">
-            <div class="chip mode on" data-mode="chat" onclick="setMode(this)">💬 聊天</div>
-            <div class="chip mode" data-mode="image" onclick="setMode(this)">🎨 出图</div>
-            <div class="chip mode" data-mode="voice" onclick="setMode(this)">🔊 语音</div>
-            <div class="chip mode" data-mode="video" onclick="setMode(this)">🎬 视频</div>
-            <div class="chip" data-cap="think" onclick="toggleCap(this)">🧠 深度</div>
-            <div class="chip" data-cap="code" onclick="toggleCap(this)">💻 代码</div>
-            <div class="chip" data-cap="soft" onclick="toggleCap(this)">💗 贴身</div>
+            <div class="chip mode on" data-mode="chat" onclick="setMode(this)">聊天</div>
+            <div class="chip mode" data-mode="image" onclick="setMode(this)">出图</div>
+            <div class="chip mode" data-mode="voice" onclick="setMode(this)">语音</div>
+            <div class="chip mode" data-mode="video" onclick="setMode(this)">视频</div>
+            <div class="chip cap" data-cap="think" onclick="toggleCap(this)">深度</div>
+            <div class="chip cap" data-cap="code" onclick="toggleCap(this)">代码</div>
+            <div class="chip cap" data-cap="soft" onclick="toggleCap(this)">贴身</div>
           </div>
           <div class="input-row">
             <div class="in-box"><textarea id="inp" rows="1" placeholder="跟思涵说点什么…" oninput="autogrow(this)"></textarea></div>
@@ -1277,7 +1281,7 @@ function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
   let b=$('#pubApiBtn');
   if(!b){ b=document.createElement('div'); b.id='pubApiBtn';
-    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#B7D0CC;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#6FA985;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
     b.textContent='⚙︎ 我的 API'; b.onclick=openApiEditor; document.body.appendChild(b); }
 }
 function openApiEditor(){ setGateMode('public'); prefillReg(); showLock(); }
@@ -1286,7 +1290,7 @@ async function loadOwnerStats(){
   const s=await Nexus.stats(); if(!s) return; window._stats=s;
   let pill=$('#statsPill');
   if(!pill){ pill=document.createElement('div'); pill.id='statsPill';
-    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#B7D0CC;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#6FA985;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
     pill.onclick=showStatsSheet; document.body.appendChild(pill); }
   pill.textContent='👥 '+(s.注册总数||0)+' 注册 · '+(s.今日活跃||0)+' 今日';
 }
