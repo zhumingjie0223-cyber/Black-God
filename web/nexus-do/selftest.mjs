@@ -37,5 +37,31 @@ const w = decode(123456789);
 ok('decode→encode 往返一致', encode(w.词) === 123456789);
 ok('coinWord 产出合法词', !!coinWord('情感').词);
 
+// ── #1 枢语坐标真影响回话：坐标 → 生成参数 + 语气令 ──
+const gLow = S.shuToGen({ c: 200, m: 90, s: 10, k: 32, p: 4 });
+const gHigh = S.shuToGen({ c: 200, m: 90, s: 110, k: 32, p: 4 });
+ok('shuToGen 返回温度+语气令', typeof gLow.temperature === 'number' && /枢语令回话/.test(gLow.directive));
+ok('态高→更高温（发散）', gHigh.temperature > gLow.temperature);
+ok('温度在合理区间 0.5..1.1', gLow.temperature >= 0.5 && gHigh.temperature <= 1.1);
+ok('语气令随态切换', /发散/.test(gHigh.directive) && /深邃/.test(gLow.directive));
+
+// ── #2 造词沉淀成可检索词典：去重、计数、检索 ──
+let dict = { 词条: {}, 总数: 0 };
+dict = S.lexiconUpsert(dict, { 词: '维辰', 罗: 'Veana', 义: '情感场', 由: '第一次', ts: 1 });
+dict = S.lexiconUpsert(dict, { 词: '维辰', 罗: 'Veana', 义: '情感场', 由: '第二次', ts: 2 });
+dict = S.lexiconUpsert(dict, { 词: '枢寂', 罗: 'Shuki', 义: '中枢静默', 由: '部署', ts: 3 });
+ok('词典去重（同词只一条）', Object.keys(dict.词条).length === 2);
+ok('同词命中计数累加', dict.词条['维辰'].count === 2);
+ok('留最早/最近时刻', dict.词条['维辰'].first_ts === 1 && dict.词条['维辰'].last_ts === 2);
+const sr = S.searchLexicon(dict, '情感');
+ok('词典可检索（按义命中）', sr.命中 === 1 && sr.词条[0].词 === '维辰');
+ok('检索按 count 降序', S.searchLexicon(dict, '').词条[0].词 === '维辰');
+
+// ── #3 Agent 动作抽取（确定性，可测）──
+ok('从回复抽 URL 动作', S.extractAgentActions('', '给你导航 https://maps.apple.com/?q=故宫 走起').some(a => a.url.includes('maps.apple.com')));
+ok('抽电话动作', S.extractAgentActions('', '拨 tel:+8613800138000').some(a => a.url.startsWith('tel:')));
+ok('无链接时按原文兜底导航', S.extractAgentActions('带我去外滩', '好的').some(a => a.url.startsWith('maps://?q=')));
+ok('兜底拨号', S.extractAgentActions('打电话给 13800138000', '好').some(a => a.url === 'tel:13800138000'));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

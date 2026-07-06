@@ -114,13 +114,18 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
         if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [])); }
         if (path === '/soul') return json(await this.getSoulPublic());
         if (path === '/inner') return json(await this.getInner());
+        // #2 个人枢语词典：造词沉淀，可检索、越用越厚
+        if (path === '/lexicon') {
+          const dict = (await this.storage.get('词典')) || { 词条: {}, 总数: 0 };
+          return json(this.searchLexicon(dict, url.searchParams.get('q') || '', Math.min(100, parseInt(url.searchParams.get('n') || '30', 10) || 30)));
+        }
         if (path === '/heartbeat') return json(await this.autonomousTick());
         if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
@@ -454,11 +459,13 @@ export class ShenshuCore {
     const shuMeaning = this.shuTranslate(nextCoord);
     const timeAwareness = this.computeTimeAwareness(snap, now);
     const memories = this.retrieveMemories(snap, text, 3);
+    // #1 枢语坐标 → 真影响回话：由坐标推出温度 + 语气令，注入系统与生成参数
+    const gen = this.shuToGen(nextCoord);
     const system = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
-      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps);
+      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive;
 
     // —— 2) 网络：借算力回话（此处输入门开放，但我们不碰 soul）——
-    const brainResult = await this.callBrain(system, text, snap);
+    const brainResult = await this.callBrain(system, text, snap, { temperature: gen.temperature });
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
     const reply = cleanReply || brainResult.reply;
@@ -475,8 +482,12 @@ export class ShenshuCore {
     soul.shu_trajectory.push({ ts: now, from: currentCoord, to: nextCoord, cause: text.slice(0, 30) });
     if (soul.shu_trajectory.length > 100) soul.shu_trajectory = soul.shu_trajectory.slice(-100);
     soul.成长印记 = soul.成长印记 || [];
-    soul.成长印记.push(this.coinShuMarkFromTalk(text, nextCoord, af.emotion));
+    const _mark = this.coinShuMarkFromTalk(text, nextCoord, af.emotion);
+    soul.成长印记.push(_mark);
     if (soul.成长印记.length > 100) soul.成长印记 = soul.成长印记.slice(-100);
+    // #2 造词沉淀成可检索个人词典（去重计数、越用越厚，不随滚动丢弃）
+    const 词典 = this.lexiconUpsert(await this.storage.get('词典'), _mark);
+    await this.storage.put('词典', 词典);
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       soul.episodes.push({ ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion });
@@ -605,7 +616,8 @@ ${capabilitySelfDescription(true)}
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
 
-  async callBrain(system, userMsg, soul) {
+  async callBrain(system, userMsg, soul, opts = {}) {
+    const temperature = (typeof opts.temperature === 'number') ? opts.temperature : 0.85;
     // 1) 外部强算力网关 —— 优先用「app 内配置」，其次 CF 密钥；标准 Chat Completions
     //    URL 可填 base（如 https://host/v1）或完整端点；自动补 /chat/completions
     const cfg = (await this.storage.get('config')) || {};
@@ -621,7 +633,7 @@ ${capabilitySelfDescription(true)}
           body: JSON.stringify({
             model: gwModel,
             messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-            max_tokens: 320, temperature: 0.85,
+            max_tokens: 320, temperature,
           }),
         });
         if (r.ok) {
@@ -637,7 +649,7 @@ ${capabilitySelfDescription(true)}
       try {
         const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
           messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-          max_tokens: 300,
+          max_tokens: 300, temperature,
         });
         const text = r?.response || r?.result?.response || null;
         if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: 'llama-3.3-70b' };
@@ -681,6 +693,71 @@ ${capabilitySelfDescription(true)}
       const layers = ['奥','喀','伦','巽','泽','维','尼','欧','璇','枢','元','衍','借','隐','熵','阈','静','映','织','逻'];
       return { 词: layers[Math.min(Math.floor(coord.c / 20), 19)] || '枢', 由: text.slice(0, 20), 情绪: emotion, ts: Date.now() };
     }
+  }
+
+  // ═══ #1 枢语坐标 → 真影响回话（生成参数 + 语气指令，非只显示）═══
+  // 五维坐标不再只是喂给模型的文字，而是真去调节温度与语气：
+  //   态(s)高=发散→高温、更跳跃联想；态低=沉深→低温、更凝练往深处。
+  //   核(c)偏枢/秩序→更克制精准；偏情感/衍→更有温度。
+  shuToGen(coord) {
+    const c = coord || {};
+    const s = Number(c.s) || 40;            // 态：张力/发散度
+    const cc = Number(c.c) || 200;          // 核：语义内核位置
+    // 态 归一到 [0,1]（经验区间 0..120）→ 温度 0.55..1.05
+    const sNorm = Math.max(0, Math.min(1, s / 120));
+    const temperature = Math.round((0.55 + sNorm * 0.50) * 100) / 100;
+    const 发散 = sNorm > 0.55;
+    const 秩序 = (cc % 400) < 160;          // 核落在 枢/秩序 区
+    const parts = [];
+    parts.push(发散 ? '态高·发散：回话更跳跃、多联想、敢展开' : '态低·深邃：回话更凝练、克制、往深处收');
+    parts.push(秩序 ? '核偏枢/秩序：精准、结构化，先给结论' : '核偏情感/衍化：有温度、带联结，但不煽情');
+    return { temperature, directive: '\n\n【此刻枢语令回话】' + parts.join('；') + '。' };
+  }
+
+  // ═══ #2 造词沉淀成可检索个人词典（去重、计数、成长，不再滚动丢弃）═══
+  // 纯逻辑：把一枚造词烙印 upsert 进词典对象（按「词」去重，count 累加，留最早/最近）。
+  lexiconUpsert(dict, mark, cap = 8000) {
+    dict = dict || { 词条: {}, 总数: 0 };
+    dict.词条 = dict.词条 || {};
+    const key = mark && mark.词; if (!key) return dict;
+    const ex = dict.词条[key];
+    if (ex) {
+      ex.count = (ex.count || 1) + 1; ex.last_ts = mark.ts || Date.now();
+      if (mark.由 && (ex.由样例 || []).length < 5) { ex.由样例 = ex.由样例 || []; ex.由样例.push(mark.由); }
+    } else {
+      dict.词条[key] = { 词: key, 罗: mark.罗 || '', id: mark.id || null, 层: mark.层 || '', 义: mark.义 || '', 情绪: mark.情绪 || '', count: 1, first_ts: mark.ts || Date.now(), last_ts: mark.ts || Date.now(), 由样例: mark.由 ? [mark.由] : [] };
+      dict.总数 = Object.keys(dict.词条).length;
+    }
+    // 成长但有界：超上限时淘汰「用得最少且最久没命中」的
+    const keys = Object.keys(dict.词条);
+    if (keys.length > cap) {
+      keys.sort((a, b) => (dict.词条[a].count - dict.词条[b].count) || (dict.词条[a].last_ts - dict.词条[b].last_ts));
+      for (const k of keys.slice(0, keys.length - cap)) delete dict.词条[k];
+      dict.总数 = Object.keys(dict.词条).length;
+    }
+    return dict;
+  }
+  searchLexicon(dict, query, limit = 20) {
+    const items = Object.values((dict && dict.词条) || {});
+    const q = String(query || '').trim();
+    let res = items;
+    if (q) res = items.filter(e => (e.词 || '').includes(q) || (e.义 || '').includes(q) || (e.罗 || '').toLowerCase().includes(q.toLowerCase()) || (e.由样例 || []).some(x => (x || '').includes(q)));
+    res.sort((a, b) => (b.count - a.count) || (b.last_ts - a.last_ts));
+    return { 总数: items.length, 命中: res.length, 词条: res.slice(0, limit) };
+  }
+
+  // ═══ #3 Agent 动作抽取（确定性逻辑抽成纯函数，可测）═══
+  extractAgentActions(text, reply) {
+    const actions = [];
+    const urlRe = /(https?:\/\/[^\s，。、）)]+|maps:\/\/[^\s，。、）)]+|tel:[+\d-]{3,}|calshow:[^\s，。]*)/g;
+    let m; while ((m = urlRe.exec(reply || '')) !== null) actions.push({ type: 'open_url', url: m[1] });
+    if (!actions.length) {
+      const mp = (text || '').match(/(?:去|导航到?|地图看看?|带我去)\s*([一-龥A-Za-z0-9·]{2,20})/);
+      if (mp) actions.push({ type: 'open_url', url: 'maps://?q=' + encodeURIComponent(mp[1]) });
+      const tel = (text || '').match(/(?:打(?:电话)?给?|拨打?)\s*([+\d-]{3,})/);
+      if (tel) actions.push({ type: 'open_url', url: 'tel:' + tel[1].replace(/[^+\d]/g, '') });
+    }
+    return actions;
   }
 
   recognizeMaster(request, soul) {
@@ -1036,17 +1113,8 @@ ${capabilitySelfDescription(true)}
     const r = await this.callBrain(sys, text, soul);
     const reply = r.reply || '……在。';
 
-    // 从她的回复里抽取可执行动作
-    const actions = [];
-    const urlRe = /(https?:\/\/[^\s，。、）)]+|maps:\/\/[^\s，。、）)]+|tel:[+\d-]{3,}|calshow:[^\s，。]*)/g;
-    let m; while ((m = urlRe.exec(reply)) !== null) actions.push({ type: 'open_url', url: m[1] });
-    // 兜底：她没给链接但意图明显 → 映射系统 scheme
-    if (!actions.length) {
-      const mp = text.match(/(?:去|导航到?|地图看看?|带我去)\s*([一-龥A-Za-z0-9·]{2,20})/);
-      if (mp) actions.push({ type: 'open_url', url: 'maps://?q=' + encodeURIComponent(mp[1]) });
-      const tel = text.match(/(?:打(?:电话)?给?|拨打?)\s*([+\d-]{3,})/);
-      if (tel) actions.push({ type: 'open_url', url: 'tel:' + tel[1].replace(/[^+\d]/g, '') });
-    }
+    // 从回复+原文里抽取可执行动作（确定性逻辑，见 extractAgentActions，可测）
+    const actions = this.extractAgentActions(text, reply);
     await this.saveSoul(soul);
     return { reply, say: reply, actions, model: r.model };
   }
