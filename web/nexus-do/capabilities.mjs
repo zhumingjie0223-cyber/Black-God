@@ -72,15 +72,15 @@ export const CAPABILITIES = [
   },
   {
     id: 'stats', name: '自我统计', layer: '元认知',
-    desc: '返回她自己的运行/成长统计',
+    desc: '返回注册用户名单/用量统计（含昵称/地区，仅主人可看）',
     handler: 'getStats', argShape: '()',
-    owner_only: false,
+    owner_only: true,   // 与 /stats 私密路由语义一致：含用户 PII，绝不公开
   },
   {
     id: 'soul', name: '灵魂快照', layer: '意识',
-    desc: '返回可公开的灵魂状态（心绪/亲密度/活力）',
+    desc: '返回灵魂状态（心绪/亲密度/设备与地理信息，仅主人可看）',
     handler: 'getSoulPublic', argShape: '()',
-    owner_only: false,
+    owner_only: true,   // 与 /soul 私密路由语义一致：含设备/地理等隐私字段，绝不公开
   },
 ];
 
