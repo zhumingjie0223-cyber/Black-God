@@ -85,6 +85,10 @@ class MemorySystem:
         c.execute('''CREATE TABLE IF NOT EXISTS tasks
             (id TEXT PRIMARY KEY, message TEXT, status TEXT, result TEXT,
              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMP)''')
+        # 迁移：为自主智能体补充 meta 列（计划/事件时间线/用量）
+        cols = [r[1] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
+        if "meta" not in cols:
+            c.execute("ALTER TABLE tasks ADD COLUMN meta TEXT DEFAULT ''")
         conn.commit()
         conn.close()
     
@@ -135,6 +139,32 @@ class MemorySystem:
         rows = conn.execute("SELECT id, message, status, result, created_at FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         conn.close()
         return [{"id": r[0], "message": r[1], "status": r[2], "result": r[3], "created_at": r[4]} for r in rows]
+
+    def save_task_full(self, task_id: str, message: str, status: str, result: str, meta: dict):
+        """保存自主智能体任务全记录（含计划、执行时间线、用量）。"""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute(
+            "INSERT OR REPLACE INTO tasks (id, message, status, result, created_at, completed_at, meta) "
+            "VALUES (?,?,?,?,COALESCE((SELECT created_at FROM tasks WHERE id=?),?),?,?)",
+            (task_id, message, status, result, task_id, datetime.now().isoformat(),
+             datetime.now().isoformat() if status == "completed" else None,
+             json.dumps(meta, ensure_ascii=False)))
+        conn.commit(); conn.close()
+
+    def get_task(self, task_id: str) -> Optional[Dict]:
+        conn = sqlite3.connect(str(self.db_path))
+        row = conn.execute(
+            "SELECT id, message, status, result, created_at, completed_at, meta FROM tasks WHERE id=?",
+            (task_id,)).fetchone()
+        conn.close()
+        if not row:
+            return None
+        try:
+            meta = json.loads(row[6]) if row[6] else {}
+        except Exception:
+            meta = {}
+        return {"id": row[0], "message": row[1], "status": row[2], "result": row[3],
+                "created_at": row[4], "completed_at": row[5], "meta": meta}
 
 memory = MemorySystem()
 
@@ -492,6 +522,151 @@ class AgentLoop:
         }
 
 # ═══════════════════════════════════════════
+# 第 3.5 层：自主智能体（Manus 级：规划 → 执行 → 流式 → 交付）
+# ═══════════════════════════════════════════
+def _extract_json(text: str) -> dict:
+    """从模型回复中鲁棒地提取 JSON（容忍 ```json 代码块与前后噪声）。"""
+    if not text:
+        return {}
+    t = text.strip()
+    # 去掉 ``` 代码围栏
+    fence = re.search(r"```(?:json)?\s*(.+?)```", t, re.S)
+    if fence:
+        t = fence.group(1).strip()
+    # 截取第一个 { 到最后一个 }
+    start, end = t.find("{"), t.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        t = t[start:end + 1]
+    try:
+        return json.loads(t)
+    except Exception:
+        return {}
+
+
+class AutonomousAgent:
+    """自主智能体：先把目标拆成计划，再按计划边执行边流式汇报，最后产出交付物。
+
+    与 AgentLoop 的区别：
+      - 显式规划阶段（plan）——像 Manus 一样先给出可见的任务清单
+      - 全过程流式事件（plan / thought / tool_call / tool_result / deliverable / done）
+      - 完整时间线与用量落库，支持 /api/task/<id> 回放
+    """
+
+    def __init__(self, loop: "AgentLoop"):
+        self.loop = loop
+
+    def _plan(self, goal: str) -> Dict[str, Any]:
+        """让模型把目标拆成 3–7 个可执行步骤。失败时优雅降级为单步。"""
+        planner_sys = (
+            CONSTITUTION
+            + "\n\n## 当前角色：自主任务规划器\n"
+            "把用户目标拆解成 3–7 个具体、可执行、有先后顺序的步骤，并说明最终交付物。\n"
+            "只输出 JSON，不要任何多余文字：\n"
+            '{"steps": ["步骤1", "步骤2", "..."], "deliverable": "最终交付物的一句话描述"}'
+        )
+        try:
+            resp = self.loop._call_model(
+                [{"role": "system", "content": planner_sys},
+                 {"role": "user", "content": goal}])
+            content = resp["choices"][0]["message"].get("content", "")
+            data = _extract_json(content)
+        except Exception:
+            data = {}
+        steps = [str(s).strip() for s in (data.get("steps") or []) if str(s).strip()]
+        deliverable = str(data.get("deliverable", "")).strip()
+        if not steps:
+            steps = [f"理解目标并直接完成：{goal[:60]}"]
+        return {"steps": steps[:7], "deliverable": deliverable}
+
+    def _new_task_id(self) -> str:
+        return hashlib.md5(f"{time.time()}:{os.urandom(4).hex()}".encode()).hexdigest()[:12]
+
+    def run_stream(self, goal: str, context: List[Dict] = None):
+        """执行自主任务，逐事件 yield（供 SSE 推流）。"""
+        task_id = self._new_task_id()
+        started = time.time()
+        yield {"event": "task", "task_id": task_id, "goal": goal,
+               "timestamp": datetime.now().isoformat()}
+
+        # ── 规划阶段 ──
+        plan = self._plan(goal)
+        memory.save_task_full(task_id, goal, "running", "", {"plan": plan, "events": []})
+        yield {"event": "plan", "task_id": task_id, "steps": plan["steps"],
+               "deliverable": plan["deliverable"]}
+
+        # ── 执行阶段 ──
+        skills_txt = "\n".join(f"- {k}: {v}" for k, v in SKILLS.items())
+        plan_txt = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(plan["steps"]))
+        exec_sys = (
+            CONSTITUTION + "\n\n## 可用技能\n" + skills_txt
+            + "\n\n## 当前任务计划（请按序推进，善用工具，逐步落地）\n" + plan_txt
+            + "\n\n完成后请给出一份结构清晰、可直接使用的最终交付物。")
+
+        messages = [{"role": "system", "content": exec_sys}]
+        if context:
+            messages.extend(context)
+        messages.append({"role": "user", "content": goal})
+        memory.save_session("user", goal)
+
+        events: List[Dict] = []
+        usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        final = ""
+
+        for step in range(self.loop.max_steps):
+            try:
+                resp = self.loop._call_model(messages, TOOLS)
+            except Exception as e:
+                yield {"event": "error", "task_id": task_id, "message": f"模型调用失败: {e}"}
+                break
+
+            u = resp.get("usage") or {}
+            for k in usage:
+                usage[k] += int(u.get(k, 0) or 0)
+
+            msg = resp["choices"][0]["message"]
+
+            if msg.get("tool_calls"):
+                if msg.get("content"):
+                    yield {"event": "thought", "task_id": task_id, "step": step + 1,
+                           "text": msg["content"]}
+                messages.append({"role": "assistant", "content": msg.get("content", ""),
+                                 "tool_calls": msg["tool_calls"]})
+                for tc in msg["tool_calls"]:
+                    name = tc["function"]["name"]
+                    try:
+                        args = json.loads(tc["function"].get("arguments") or "{}")
+                    except Exception:
+                        args = {}
+                    yield {"event": "tool_call", "task_id": task_id, "step": step + 1,
+                           "tool": name, "args": args}
+                    result = execute_tool(name, args)
+                    ev = {"step": step + 1, "tool": name, "args": args,
+                          "result": result[:1500]}
+                    events.append(ev)
+                    yield {"event": "tool_result", "task_id": task_id, "step": step + 1,
+                           "tool": name, "result": result[:1500]}
+                    messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                     "content": result})
+            else:
+                final = msg.get("content", "")
+                messages.append({"role": "assistant", "content": final})
+                break
+
+        if not final:
+            final = f"已执行 {len(events)} 步工具调用（达到步数上限 {self.loop.max_steps}），未生成总结。"
+
+        elapsed = round(time.time() - started, 2)
+        meta = {"plan": plan, "events": events, "usage": usage,
+                "elapsed_sec": elapsed, "model": self.loop.model}
+        memory.save_task_full(task_id, goal, "completed", final, meta)
+        memory.save_session("assistant", final[:500])
+
+        yield {"event": "deliverable", "task_id": task_id, "content": final}
+        yield {"event": "done", "task_id": task_id, "steps_used": len(events),
+               "usage": usage, "elapsed_sec": elapsed}
+
+
+# ═══════════════════════════════════════════
 # 第 2 层：API 路由（RESTful）
 # ═══════════════════════════════════════════
 def create_agent(api_key: str = None, base_url: str = None, model: str = None):
@@ -513,7 +688,7 @@ def get_agent() -> AgentLoop:
 # ═══════════════════════════════════════════
 # 第 1 层：HTTP 服务器
 # ═══════════════════════════════════════════
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 class AgentHandler(BaseHTTPRequestHandler):
     """Black God Agent HTTP 处理器"""
@@ -536,7 +711,24 @@ class AgentHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length', 0))
         if length == 0:
             return {}
-        return json.loads(self.rfile.read(length).decode('utf-8'))
+        try:
+            return json.loads(self.rfile.read(length).decode('utf-8'))
+        except Exception:
+            return {}
+
+    def _sse_start(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        # 注意：HTTP/1.0 下不发 keep-alive，靠连接关闭标记流结束，避免客户端苦等 Content-Length
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('X-Accel-Buffering', 'no')  # 关闭 nginx 缓冲，实时推流
+        self.end_headers()
+
+    def _sse_send(self, obj):
+        payload = f"data: {json.dumps(obj, ensure_ascii=False)}\n\n".encode('utf-8')
+        self.wfile.write(payload)
+        self.wfile.flush()
     
     def do_OPTIONS(self):
         self._json({"ok": True})
@@ -548,6 +740,8 @@ class AgentHandler(BaseHTTPRequestHandler):
         web_root = ROOT.parent / "web"
         if path == "/" or path == "/index.html":
             self._serve_file(web_root / "index.html", "text/html")
+        elif path == "/studio" or path == "/studio.html":
+            self._serve_file(web_root / "nexus-do" / "studio.html", "text/html")
         elif path.startswith("/web/") or path.startswith("/assets/"):
             file_path = web_root / path.lstrip("/")
             if file_path.is_file():
@@ -579,6 +773,14 @@ class AgentHandler(BaseHTTPRequestHandler):
         
         elif path == "/api/tasks":
             self._json({"tasks": memory.get_tasks(50)})
+
+        elif path.startswith("/api/task/"):
+            task_id = path.rsplit("/", 1)[-1]
+            task = memory.get_task(task_id)
+            if task:
+                self._json(task)
+            else:
+                self._json({"error": "task not found", "task_id": task_id}, 404)
         
         elif path == "/api/memory":
             self._json({"memories": memory.get_daily()})
@@ -587,7 +789,7 @@ class AgentHandler(BaseHTTPRequestHandler):
             self._json({
                 "tools": [t["function"]["name"] for t in TOOLS],
                 "skills": list(SKILLS.keys()),
-                "features": ["agent_loop", "memory_system", "skill_system", "tool_system", "function_calling", "system_prompt"]
+                "features": ["autonomous_agent", "task_planning", "streaming_sse", "agent_loop", "memory_system", "skill_system", "tool_system", "function_calling", "system_prompt"]
             })
         
         elif path == "/api/tool-matrix":
@@ -621,7 +823,29 @@ class AgentHandler(BaseHTTPRequestHandler):
             agent = get_agent()
             result = agent.run(message, context)
             self._json(result)
-        
+
+        elif path == "/api/agent/stream":
+            # 自主智能体流式端点：规划 → 执行 → 交付，全过程 SSE 推流
+            goal = body.get("goal") or body.get("message", "")
+            if not goal:
+                self._json({"error": "goal is required"}, 400)
+                return
+            base = get_agent()
+            auto_loop = AgentLoop(api_key=base.api_key, base_url=base.base_url,
+                                  model=base.model, max_steps=12)
+            agent = AutonomousAgent(auto_loop)
+            self._sse_start()
+            try:
+                for ev in agent.run_stream(goal, body.get("context")):
+                    self._sse_send(ev)
+            except (BrokenPipeError, ConnectionResetError):
+                return  # 客户端断开，静默收尾
+            except Exception as e:
+                try:
+                    self._sse_send({"event": "error", "message": str(e)})
+                except Exception:
+                    pass
+
         elif path == "/api/confirm":
             task_id = body.get("task_id", "")
             self._json({"confirmed": True, "task_id": task_id, "message": "任务已确认"})
@@ -667,14 +891,15 @@ class AgentHandler(BaseHTTPRequestHandler):
 
 def start_server(host: str = "0.0.0.0", port: int = 8765):
     """启动 Black God Agent 服务器"""
-    server = HTTPServer((host, port), AgentHandler)
+    server = ThreadingHTTPServer((host, port), AgentHandler)
     print(f"🚀 Black God 888 Agent 已启动")
     print(f"📡 地址: http://{host}:{port}")
+    print(f"🎛️ 工作台: http://{host}:{port}/studio （自主智能体 · 流式执行）")
     print(f"🧠 模型: {get_agent().model}")
     print(f"🛠️ 工具: {len(TOOLS)} 个")
     print(f"🎯 技能: {len(SKILLS)} 个")
     print(f"💾 记忆: SQLite ({memory.db_path})")
-    print(f"✅ 本地优先 · 安全沙箱 · 已就绪")
+    print(f"✅ 本地优先 · 安全沙箱 · 自主规划 · 已就绪")
     print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     try:
         server.serve_forever()

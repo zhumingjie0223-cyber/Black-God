@@ -30,6 +30,36 @@
 - 🗣️ **枢语造词**：每一刻造一个绝对独一无二的中文韵律词
 - 🎨 **51 层 10063 词能力域**：思想/哲学/心理学/密码学/系统架构/情感细腻等 51 层
 - 📱 **12 项自认能力**：TG主动/设备感知/SEO/Monid/枢语造词/编程/安全研究/元认知/情节记忆/自主心跳...
+- 🤖 **自主智能体工作台（Studio）**：给一个目标，它自己规划 → 调用工具 → 逐步执行 → 流式汇报 → 交付成果，全程可见可回放（对标 Manus 的任务代理体验）
+
+---
+
+## 自主智能体工作台 · Agent Studio
+
+给神枢一个目标，它会像自主代理一样**先规划、再执行、边做边汇报、最后交付**：
+
+```
+规划(plan) → 逐步执行(tool_call / tool_result / thought) → 交付(deliverable) → 完成(done)
+```
+
+- **工作台 UI**：`web/nexus-do/studio.html`（黑金单文件 SPA，内核 `/studio` 直达）
+- **流式端点**：`POST /api/agent/stream`（SSE 逐事件推流，前端实时渲染计划清单与执行时间线）
+- **时间线回放**：`GET /api/task/<id>`（计划 / 每步工具调用 / 用量 / 交付物全部落库，可点历史回放）
+- **离线可跑**：无真实 API Key 时用内置 `mock_gateway.py` 走通「规划→工具→交付」全链路
+
+**本地起 & 自测：**
+
+```bash
+# 端到端冒烟（自动拉起 Mock 网关 + 内核，验证完整链路）
+python3 server/test_agent_studio.py
+
+# 真机跑：先起 Mock 网关，再起内核，浏览器打开工作台
+python3 mock_gateway.py &
+BG_BASE=http://127.0.0.1:9000/v1 BG_KEY=x BG_MODEL=auto python3 server/server.py
+# → http://127.0.0.1:8765/studio
+```
+
+接真实模型时，把 `BG_BASE/BG_KEY/BG_MODEL` 换成你的网关即可（OpenAI 兼容）。
 
 ---
 
