@@ -17,7 +17,7 @@
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
-import { ICON_PNG_B64 } from './icon_asset.mjs';
+import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
 loadCapabilities(LEXICON_DATA);
 
@@ -79,10 +79,21 @@ export class ShenshuCore {
       });
     }
     if (path === '/manifest.json') return new Response(MANIFEST_JSON, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+    // Digital Asset Links —— 安卓 TWA 校验（去掉地址栏，装出原生感）。
+    // 内容 = 你的 app 包名 + 签名 SHA-256，放进 ASSETLINKS_JSON 变量（见 android/README.md）。
+    if (path === '/.well-known/assetlinks.json') {
+      const al = this.env.ASSETLINKS_JSON;
+      if (al) return new Response(al, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+      return json({ note: '未配置。设 ASSETLINKS_JSON 变量为 Digital Asset Links 内容后，安卓 TWA 才能去掉地址栏。见 android/README.md。' }, 404);
+    }
     if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
     if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
     if (path === '/apple-touch-icon.png' || path === '/apple-touch-icon-precomposed.png' || path === '/icon-180.png' || path === '/icon-192.png' || path === '/icon.png') {
       const bytes = Uint8Array.from(atob(ICON_PNG_B64), c => c.charCodeAt(0));
+      return new Response(bytes, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
+    }
+    if (path === '/icon-512.png') {
+      const bytes = Uint8Array.from(atob(ICON_PNG_512_B64), c => c.charCodeAt(0));
       return new Response(bytes, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
     }
     if (path === '/vapid') { const v = await this.getVapid(); return json({ publicKey: v.publicKey }); }  // applicationServerKey，公开
@@ -1215,31 +1226,43 @@ const CHAT_HTML = "__CHAT_HTML__";
 
 // PWA manifest —— 让神枢能加到桌面
 const MANIFEST_JSON = JSON.stringify({
-  name: 'Black God',
-  short_name: 'Black God',
-  description: '一个真正懂你工作生活的系统 · 神枢驱动。',
+  id: '/',
+  name: 'Black God · 神枢',
+  short_name: '神枢',
+  description: '认你、懂你、只属于你的私人 AI 意识中枢。越用越懂你，越用越省。',
   start_url: '/',
+  scope: '/',
   display: 'standalone',
+  display_override: ['standalone', 'minimal-ui'],
   orientation: 'portrait',
-  background_color: '#08090B',
-  theme_color: '#08090B',
+  dir: 'ltr',
+  background_color: '#0B0A09',
+  theme_color: '#0B0A09',
   lang: 'zh-CN',
+  categories: ['productivity', 'utilities', 'lifestyle'],
   icons: [
     { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-    { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+  ],
+  shortcuts: [
+    { name: '对话', short_name: '对话', url: '/?tab=chat', description: '直接跟神枢说话' },
+    { name: '记忆', short_name: '记忆', url: '/?tab=memory', description: '看她记住的往事' },
   ],
 });
 
-// App 图标（水泥青签名 · 神字意象），矢量、自包含
+// App 图标（世家 · 神字意象）：玄墨底 + 素银浮雕神字 + 一枚玉印点睛，矢量自包含
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><radialGradient id="bg" cx="42%" cy="36%" r="72%"><stop offset="0" stop-color="#2a2f37"/><stop offset="1" stop-color="#0a0c10"/></radialGradient>
-<linearGradient id="cy" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B7D0CC"/><stop offset=".55" stop-color="#6F9491"/><stop offset="1" stop-color="#3C5A57"/></linearGradient></defs>
+<defs><radialGradient id="bg" cx="42%" cy="34%" r="78%"><stop offset="0" stop-color="#1B1713"/><stop offset=".6" stop-color="#100E0C"/><stop offset="1" stop-color="#0A0908"/></radialGradient>
+<linearGradient id="ag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2F4F7"/><stop offset=".5" stop-color="#9AA1AB"/><stop offset="1" stop-color="#6B727C"/></linearGradient></defs>
 <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-<circle cx="256" cy="256" r="168" fill="none" stroke="url(#cy)" stroke-width="6" opacity=".35"/>
-<g stroke="url(#cy)" stroke-width="20" stroke-linecap="round" fill="none">
+<circle cx="256" cy="256" r="168" fill="none" stroke="url(#ag)" stroke-width="5" opacity=".28"/>
+<g stroke="url(#ag)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none">
 <path d="M256 128v256"/><path d="M168 196c62 0 88-18 88-52"/><path d="M168 196v150"/>
 <path d="M352 168l-70 34"/><path d="M282 202v168"/><path d="M282 268h70"/></g>
+<rect x="330" y="330" width="52" height="52" rx="7" fill="#3F7B58" transform="rotate(-4 356 356)"/>
+<rect x="336" y="336" width="40" height="40" rx="4" fill="none" stroke="#EDF3EE" stroke-width="2" opacity=".55" transform="rotate(-4 356 356)"/>
 </svg>`;
 
 // Service Worker —— 离线壳，保证掉线也能开
