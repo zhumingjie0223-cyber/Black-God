@@ -1104,19 +1104,30 @@ ${capabilitySelfDescription(true)}
     return { ok: true, uid, nick, welcome: `欢迎，${nick}。` };
   }
 
-  // 公共聊天限流：单实例每分钟上限，护住算力账单（公共端点无鉴权，必须挡刷）
-  _pubRate() {
+  // 公共聊天限流：按 uid 各自限流（各花各的算力，不该互相挤占彼此配额）
+  // + 全局背压兜底（防大量伪造 uid 刷 Workers 请求量，这个账单是主人出的）
+  _pubRateOk(uid) {
     const now = Date.now();
     if (!this._pb || now - this._pb.t > 60_000) this._pb = { t: now, n: 0 };
     this._pb.n++;
-    return this._pb.n <= 30;
+    if (this._pb.n > 120) return false;   // 全局背压：护 Workers 请求量账单
+    if (!this._pbu) this._pbu = new Map();
+    const key = uid || 'anon';
+    let b = this._pbu.get(key);
+    if (!b || now - b.t > 60_000) { b = { t: now, n: 0 }; this._pbu.set(key, b); }
+    b.n++;
+    if (this._pbu.size > 2000) {   // 防内存无限增长：超量清最旧的桶
+      const oldest = [...this._pbu.entries()].sort((a, b2) => a[1].t - b2[1].t).slice(0, this._pbu.size - 2000);
+      for (const [k] of oldest) this._pbu.delete(k);
+    }
+    return b.n <= 20;   // 单个 uid 每分钟上限
   }
 
   async handlePubTalk(body, request) {
     const uid = String(body.uid || '').slice(0, 64);
     const text = String(body.text || '').slice(0, 2000);
     if (!text.trim()) return { reply: '说点什么呀。', model: 'none' };
-    if (!this._pubRate()) return { reply: '现在问的人有点多，稍等一下再发～', model: 'ratelimited' };
+    if (!this._pubRateOk(uid)) return { reply: '你发太快啦，喘口气再问～', model: 'ratelimited' };
     // 公共用户各用各的 API：只用本人注册时填的网关，绝不烧主人的算力
     const users = (await this.storage.get('users')) || {};
     const u = uid ? users[uid] : null;
@@ -1131,21 +1142,30 @@ ${capabilitySelfDescription(true)}
   }
 
   // 通用 OpenAI 风格网关调用（供公共用户各自的 API 用）。URL 可填 base 或完整端点。
+  // 带超时（20s）：用户填的第三方网关卡住不回时，别把请求一起拖死，给清晰的超时提示。
   async callGateway(base, key, model, system, userMsg) {
     if (!base) return { ok: false, err: '没填网关地址' };
     const gw = /\/(chat\/completions|completions|messages)$/.test(base) ? base : base.replace(/\/+$/, '') + '/chat/completions';
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 20_000);
     try {
       const r = await fetch(gw, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
         body: JSON.stringify({ model: model || 'auto', messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, temperature: 0.85 }),
+        signal: ac.signal,
       });
       if (!r.ok) return { ok: false, err: 'HTTP ' + r.status };
       const d = await r.json();
       const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
       if (text && text.trim()) return { ok: true, reply: text.trim(), model: model || 'gateway' };
       return { ok: false, err: '空回复' };
-    } catch (e) { return { ok: false, err: String(e && e.message || e).slice(0, 80) }; }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return { ok: false, err: '网关响应超时(20s)' };
+      return { ok: false, err: String(e && e.message || e).slice(0, 80) };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   PUBLIC_SYSTEM_PREFIX() {
