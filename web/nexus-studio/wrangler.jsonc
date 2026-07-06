@@ -1,0 +1,19 @@
+{
+  // ═══════════════════════════════════════════════
+  // 神枢 · 自主智能体工作台 —— 线上可跑版（Worker + 静态资源）
+  // 部署：cd web/nexus-studio && npx wrangler deploy
+  // UI 在 public/index.html，后端在 worker.mjs，同源提供 /api/*。
+  // ═══════════════════════════════════════════════
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nexus-studio",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-06-29",
+  "compatibility_flags": ["nodejs_compat"],
+  // account_id 写死（非机密），最小权限 token 也能部署，避免 /memberships 9106
+  "account_id": "142c76e0039e279886c89257b6fddbc7",
+  "observability": { "enabled": true },
+  // Workers AI：线上大脑（Llama 3.3 70B）
+  "ai": { "binding": "AI" },
+  // 静态资源：工作台 UI；非资源请求（/api/*）落到 Worker
+  "assets": { "directory": "public", "binding": "ASSETS" }
+}

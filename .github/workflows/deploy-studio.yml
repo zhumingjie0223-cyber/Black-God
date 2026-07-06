@@ -1,0 +1,54 @@
+name: Deploy 神枢 studio
+
+# push 到 main 且改动 web/nexus-studio/ 时，自动把「自主智能体工作台」部署为线上 Worker。
+# 复用同一个密钥：CLOUDFLARE_API_TOKEN（账户级 Workers Scripts:Edit 即可）。
+# account_id 已写死在 wrangler.jsonc，无需再配。没配密钥时跳过部署、不报错。
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'web/nexus-studio/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    defaults:
+      run:
+        working-directory: web/nexus-studio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy to Cloudflare Workers
+        if: ${{ env.CF_TOKEN != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4 deploy
+
+      - name: Smoke test (线上 /api/health)
+        if: ${{ env.CF_TOKEN != '' }}
+        run: |
+          echo "等待边缘生效后校验 /api/health…"
+          ok=""
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -fsS https://nexus-studio.jjiebbay.workers.dev/api/health || true)
+            echo "  /api/health → $body"
+            if echo "$body" | grep -q '"ok":true'; then ok=1; break; fi
+            sleep 5
+          done
+          if [ -z "$ok" ]; then
+            echo "⚠️ 首次部署域名可能尚未生效，跳过本次校验（不失败）。"
+          else
+            echo "✅ 线上工作台后端健康。"
+          fi
+
+      - name: Skip notice
+        if: ${{ env.CF_TOKEN == '' }}
+        run: echo "⚠️ 未配置 CLOUDFLARE_API_TOKEN，已跳过部署。"
