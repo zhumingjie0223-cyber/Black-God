@@ -63,5 +63,18 @@ ok('抽电话动作', S.extractAgentActions('', '拨 tel:+8613800138000').some(a
 ok('无链接时按原文兜底导航', S.extractAgentActions('带我去外滩', '好的').some(a => a.url.startsWith('maps://?q=')));
 ok('兜底拨号', S.extractAgentActions('打电话给 13800138000', '好').some(a => a.url === 'tel:13800138000'));
 
+// ── 记忆召回做深：时间衰减 + 重要度加权 ──
+const NOW = 1000 * 86400000;
+const soulRecent = { episodes: [
+  { 他说: '部署项目到服务器', 我说了: '好', ts: NOW - 1 * 86400000 },
+  { 他说: '部署项目到服务器', 我说了: '好', ts: NOW - 300 * 86400000 },
+] };
+ok('召回：相关度相同则新近优先', S.retrieveMemories(soulRecent, '服务器部署项目', 2, NOW)[0].ts === NOW - 1 * 86400000);
+const soulImp = { episodes: [
+  { 他说: '服务器随便看看', 我说了: '好', ts: NOW },
+  { 他说: '服务器 重要 密钥 部署 记住', 我说了: '好', ts: NOW },
+] };
+ok('召回：新近相同则重要度优先', S.retrieveMemories(soulImp, '服务器', 2, NOW)[0].他说.includes('重要'));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

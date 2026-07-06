@@ -391,16 +391,26 @@ export class ShenshuCore {
 
   // ═══════════════════════ 记忆检索（v4 语义召回）═══════════════════════
   // 从情节记忆里按关键词重叠召回最相关的 N 条
-  retrieveMemories(soul, text, n = 3) {
+  // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
+  // 纯函数（now 可注入，便于测试）。
+  retrieveMemories(soul, text, n = 3, now = Date.now()) {
     const eps = soul.episodes || [];
     if (!eps.length || !text) return [];
     const toks = this._tokens(text);
     if (!toks.size) return [];
+    const IMPORTANT = /重要|记住|永远|密钥|部署|项目|禁|别碰|生产/g;
     const scored = eps.map(e => {
       const hay = this._tokens((e.他说 || '') + '　' + (e.我说了 || ''));
-      let score = 0;
-      for (const tk of toks) if (hay.has(tk)) score += tk.length >= 2 ? 2 : 1;
-      return { e, score };
+      let rel = 0;
+      for (const tk of toks) if (hay.has(tk)) rel += tk.length >= 2 ? 2 : 1;
+      if (rel <= 0) return { e, score: 0 };
+      // 时间衰减：14 天半衰（越新权重越高，最低不为 0）
+      const ageDays = Math.max(0, (now - (e.ts || now)) / 86400000);
+      const recency = 1 + 1 / (1 + ageDays / 14);
+      // 重要度：命中「重要/密钥/部署…」这类词越多，越该被记住
+      const impMatches = ((e.他说 || '').match(IMPORTANT) || []).length;
+      const importance = 1 + Math.min(impMatches, 4) * 0.35;
+      return { e, score: rel * recency * importance };
     }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, n);
     return scored.map(x => x.e);
   }
