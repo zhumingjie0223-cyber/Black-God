@@ -10,8 +10,10 @@
   "main": "nexus_do.mjs",
   "compatibility_date": "2026-06-29",
   "compatibility_flags": ["nodejs_compat"],
-  // account_id 不写进仓库：本地部署 export CLOUDFLARE_ACCOUNT_ID=... ；
-  // GitHub Actions 已在仓库 Secrets 配 CLOUDFLARE_ACCOUNT_ID，wrangler 自动读取。
+  // account_id 写死在此（非机密，就在面板 URL 里）：
+  // 这样 wrangler 不必调 /memberships 自动找账号，最小权限 token（仅 Workers Scripts:Edit，
+  // 不含 membership 读权限）也能直接部署，避免 CI 报 “/memberships … 9106 认证失败”。
+  "account_id": "142c76e0039e279886c89257b6fddbc7",
 
   "observability": { "enabled": true },
 
