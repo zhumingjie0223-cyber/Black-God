@@ -474,8 +474,8 @@ export class ShenshuCore {
     const system = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
       this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive;
 
-    // —— 2) 网络：借算力回话（此处输入门开放，但我们不碰 soul）——
-    const brainResult = await this.callBrain(system, text, snap, { temperature: gen.temperature });
+    // —— 2) 网络：借算力回话（省 Key 分级：简单走免费 CF、复杂上 Claude 网关）——
+    const brainResult = await this.callBrain(system, text, snap, { temperature: gen.temperature, tier: this.pickTier(text, caps) });
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
     const reply = cleanReply || brainResult.reply;
@@ -626,50 +626,63 @@ ${capabilitySelfDescription(true)}
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
 
+  // 省 Key = 分级路由：简单/闲聊走免费 CF Llama（省 Claude 额度），
+  // 复杂/技术走 Claude 网关（保质量）。判定纯函数，可测。
+  pickTier(text, caps) {
+    caps = Array.isArray(caps) ? caps : [];
+    if (caps.includes('think') || caps.includes('code')) return 'heavy';
+    const t = String(text || '');
+    if (t.length > 60) return 'heavy';
+    if (/代码|bug|架构|算法|证明|推导|分析|设计|部署|优化|为什么|怎么(?:做|办|实现)|方案|复杂|数学|逻辑|系统|漏洞|逆向|策略|重构|调试|报错|规划/.test(t)) return 'heavy';
+    return 'light';
+  }
+
   async callBrain(system, userMsg, soul, opts = {}) {
     const temperature = (typeof opts.temperature === 'number') ? opts.temperature : 0.85;
-    // 1) 外部强算力网关 —— 优先用「app 内配置」，其次 CF 密钥；标准 Chat Completions
-    //    URL 可填 base（如 https://host/v1）或完整端点；自动补 /chat/completions
-    const cfg = (await this.storage.get('config')) || {};
-    const gwBase = cfg.gateway_url || this.env.NEXUS_GATEWAY_URL;
-    const gwKey = cfg.gateway_key || this.env.NEXUS_GATEWAY_KEY;
-    const gwModel = cfg.gateway_model || this.env.NEXUS_GATEWAY_MODEL || 'auto';
-    if (gwBase) {
+    const tier = opts.tier === 'light' ? 'light' : 'heavy';   // 默认 heavy，保守不牺牲质量
+
+    // 强算力网关（Claude 等，标准 Chat Completions；URL 可填 base，自动补端点）
+    const tryGateway = async () => {
+      const cfg = (await this.storage.get('config')) || {};
+      const gwBase = cfg.gateway_url || this.env.NEXUS_GATEWAY_URL;
+      const gwKey = cfg.gateway_key || this.env.NEXUS_GATEWAY_KEY;
+      const gwModel = cfg.gateway_model || this.env.NEXUS_GATEWAY_MODEL || 'auto';
+      if (!gwBase) return null;
       const gw = /\/(chat\/completions|completions|messages)$/.test(gwBase) ? gwBase : gwBase.replace(/\/+$/, '') + '/chat/completions';
       try {
         const r = await fetch(gw, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(gwKey ? { Authorization: 'Bearer ' + gwKey } : {}) },
-          body: JSON.stringify({
-            model: gwModel,
-            messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-            max_tokens: 320, temperature,
-          }),
+          body: JSON.stringify({ model: gwModel, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, temperature }),
         });
         if (r.ok) {
           const d = await r.json();
           const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
-          if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: (gwModel || 'gateway') };
+          if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: (gwModel || 'gateway'), tier };
         }
       } catch (e) { console.log('gateway error:', e && e.message); }
-    }
-
-    // 2) CF Workers AI Llama-3.3-70b（免费、CF 内部、稳定兜底）
-    if (this.env.AI) {
+      return null;
+    };
+    // CF Workers AI Llama-3.3-70b（免费、CF 内部、稳定）
+    const tryCF = async () => {
+      if (!this.env.AI) return null;
       try {
         const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-          messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-          max_tokens: 300, temperature,
+          messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 300, temperature,
         });
         const text = r?.response || r?.result?.response || null;
-        if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: 'llama-3.3-70b' };
+        if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: 'llama-3.3-70b', tier };
       } catch (e) { console.log('CF AI error:', e && e.message); }
-    }
+      return null;
+    };
 
-    // 3) 兜底：她自己按情绪回一句（永不失语）
+    // light：先免费 CF（省 Key），挂了才上网关；heavy：网关优先，挂了降级 CF
+    const order = tier === 'light' ? [tryCF, tryGateway] : [tryGateway, tryCF];
+    for (const fn of order) { const r = await fn(); if (r) return r; }
+
+    // 兜底：永不失语
     const mood = soul && soul.心绪 != null ? soul.心绪 : 0.5;
-    const fallback = mood < 0.35 ? '…在。' : mood > 0.65 ? '在，随时待命。' : '…在。';
-    return { reply: fallback, model: 'fallback' };
+    return { reply: mood > 0.65 ? '在，随时待命。' : '…在。', model: 'fallback', tier };
   }
 
   isRefusal(text) {

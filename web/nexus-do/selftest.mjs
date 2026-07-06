@@ -76,5 +76,11 @@ const soulImp = { episodes: [
 ] };
 ok('召回：新近相同则重要度优先', S.retrieveMemories(soulImp, '服务器', 2, NOW)[0].他说.includes('重要'));
 
+// ── 省 Key = 分级路由：简单→light（免费CF）、复杂→heavy（Claude网关）──
+ok('闲聊/短句 → light', S.pickTier('在吗', []) === 'light' && S.pickTier('今天天气不错', []) === 'light');
+ok('技术/复杂 → heavy', S.pickTier('帮我分析这段代码为什么报错', []) === 'heavy');
+ok('长文 → heavy', S.pickTier('一'.repeat(70), []) === 'heavy');
+ok('深度/代码 cap → heavy', S.pickTier('随便说说', ['code']) === 'heavy' && S.pickTier('嗯', ['think']) === 'heavy');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
