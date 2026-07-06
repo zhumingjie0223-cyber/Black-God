@@ -16,6 +16,7 @@ Hermes 自进化循环 — Black God 内核强化 #3
   - 完全本地化（无需云端，隐私安全）
 """
 import json
+import re
 import hashlib
 import time
 from typing import List, Dict, Any
@@ -73,6 +74,14 @@ JSON 格式：
             raw = self.call_fn(messages)
             skill = _parse_json(raw)
             if skill:
+                # 规范化技能名：模型可能返回 name/title 或干脆不给，
+                # 统一落到 skill_name，杜绝下游 skill_library[...] KeyError。
+                if not skill.get("skill_name"):
+                    skill["skill_name"] = (
+                        skill.get("name")
+                        or skill.get("title")
+                        or f"skill_{hashlib.md5(task.encode()).hexdigest()[:8]}"
+                    )
                 skill["success_rate"] = 1.0  # 初始成功率 100%
                 skill["created_at"] = time.time()
                 skill["usage_count"] = 0
@@ -177,12 +186,27 @@ class VectorMemory:
         return [mem for mem, _ in scored[:top_k]]
     
     def _simple_vectorize(self, text: str) -> Dict[str, float]:
-        """简化的向量化：关键词频率"""
-        words = text.lower().split()
-        vector = {}
-        for word in words:
-            if len(word) > 2:  # 过滤短词
+        """简化的向量化：拉丁词频 + CJK 字符 bigram。
+
+        中文没有空格分词，纯 split() 会把「写排序算法」整块当一个词，
+        和「排序算法实现」零重叠 → 相似度恒为 0，向量记忆形同虚设。
+        这里对连续汉字取字符 bigram（不足 2 字取单字），拉丁/数字仍按词，
+        使中文任务也能按「排序/序算/算法」这类子串命中相关往事。
+        """
+        text = text.lower()
+        vector: Dict[str, float] = {}
+        # 拉丁/数字词（保留原有 >2 长度过滤）
+        for word in re.findall(r"[a-z0-9]+", text):
+            if len(word) > 2:
                 vector[word] = vector.get(word, 0) + 1
+        # 连续汉字段 → 字符 bigram
+        for run in re.findall(r"[一-鿿]+", text):
+            if len(run) == 1:
+                vector[run] = vector.get(run, 0) + 1
+            else:
+                for i in range(len(run) - 1):
+                    bg = run[i:i + 2]
+                    vector[bg] = vector.get(bg, 0) + 1
         return vector
     
     def _cosine_similarity(self, v1: Dict, v2: Dict) -> float:
