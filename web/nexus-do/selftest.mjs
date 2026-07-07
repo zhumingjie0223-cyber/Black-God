@@ -91,5 +91,18 @@ ok('全部能力均为 owner_only（无匿名可调）', CAPABILITIES.every(c =>
 ok('匿名 describe 不泄露任何能力', describeCapabilities(false).length === 0);
 ok('能力自述无人格词', !/贴身|撒娇|权哥|老公|想你/.test(capabilitySelfDescription(true)));
 
+// ── 内在「越用越懂你」回路：蒸馏用户模型 + 喂回 ──
+let um = { topics: {}, style: {}, entities: {}, count: 0 };
+um = S.distillUserModel(um, '帮我看下这段 python 代码为什么报错', '');
+um = S.distillUserModel(um, '再帮我调试下部署脚本的 bug', '');
+um = S.distillUserModel(um, '嗯', '');
+ok('用户模型累计话题（代码）', um.topics.代码 >= 2);
+ok('用户模型识别风格（短句→简短）', um.style.简短 >= 1);
+um = S.distillUserModel(um, '把 blackgod 项目的服务器配置发我', '');
+ok('用户模型抓在意实体', Object.keys(um.entities).some(k => /blackgod/i.test(k)));
+const umSum = S.summarizeUserModel(um);
+ok('用户模型能喂回上下文（生成认知摘要）', /越用越懂/.test(umSum) && /代码/.test(umSum));
+ok('空模型不产生噪音', S.summarizeUserModel({ count: 0 }) === '');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

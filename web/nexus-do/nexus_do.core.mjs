@@ -498,6 +498,8 @@ export class ShenshuCore {
     // #2 造词沉淀成可检索个人词典（去重计数、越用越厚，不随滚动丢弃）
     const 词典 = this.lexiconUpsert(await this.storage.get('词典'), _mark);
     await this.storage.put('词典', 词典);
+    // 内在「越用越懂你」：把这次交互蒸馏进用户模型（下次回话会用到）
+    soul.user_model = this.distillUserModel(soul.user_model, text, reply);
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       soul.episodes.push({ ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion });
@@ -621,7 +623,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -781,6 +783,39 @@ ${capabilitySelfDescription(true)}
       if (tel) actions.push({ type: 'open_url', url: 'tel:' + tel[1].replace(/[^+\d]/g, '') });
     }
     return actions;
+  }
+
+  // ═══ 内在「越用越懂你」回路：从对话蒸馏对主人的认知，再喂回决策（非显示）═══
+  // 纯逻辑：把一次交互沉淀进用户模型（话题频次 / 风格偏好 / 在意的实体）。
+  distillUserModel(model, text, reply) {
+    model = model || { topics: {}, style: {}, entities: {}, count: 0 };
+    model.topics = model.topics || {}; model.style = model.style || {}; model.entities = model.entities || {};
+    const t = String(text || '');
+    model.count = (model.count || 0) + 1;
+    const TOPICS = {
+      代码: /代码|bug|函数|报错|python|js|部署|调试|接口|脚本/i,
+      架构: /架构|系统|设计|方案|数据库|分布式|重构|性能/,
+      安全: /安全|漏洞|渗透|逆向|加密|鉴权|攻防/,
+      写作: /写(?:作|文|篇)|文案|文章|润色|翻译|标题/,
+      生活: /吃|睡|累|心情|天气|休息|锻炼|情绪/,
+      商业: /产品|市场|运营|增长|成本|变现|用户|定价/,
+    };
+    for (const [k, re] of Object.entries(TOPICS)) if (re.test(t)) model.topics[k] = (model.topics[k] || 0) + 1;
+    if (t.length <= 12) model.style.简短 = (model.style.简短 || 0) + 1;
+    else if (t.length >= 40) model.style.详细 = (model.style.详细 || 0) + 1;
+    const ent = t.match(/[A-Za-z0-9_\-]{3,20}(?=\s*(?:项目|服务器|仓库|repo|库|系统))/g);
+    if (ent) ent.forEach(e => { const key = e.trim(); if (key) model.entities[key] = (model.entities[key] || 0) + 1; });
+    return model;
+  }
+  summarizeUserModel(model) {
+    if (!model || !model.count) return '';
+    const top = (o, n) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]);
+    const topics = top(model.topics, 3), style = top(model.style, 1), ent = top(model.entities, 2);
+    const parts = [];
+    if (topics.length) parts.push('常聊：' + topics.join('、'));
+    if (style.length) parts.push('偏好：' + style[0]);
+    if (ent.length) parts.push('在意：' + ent.join('、'));
+    return parts.length ? ('\n【我对主人的认知·越用越懂】' + parts.join('；') + '。回话时自然贴合，别点破。') : '';
   }
 
   recognizeMaster(request, soul) {
