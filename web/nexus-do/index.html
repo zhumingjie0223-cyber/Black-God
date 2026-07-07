@@ -798,6 +798,7 @@ body::before{
           <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关 · 关着 app 也能收到消息</span></div><div class="switch" id="pushSw"><i></i></div></div>
           <div class="set-row" onclick="openSheet('sheetModel')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于 Black God</b><span>© Black God</span></div><div class="set-arrow">›</div></div>
@@ -835,6 +836,19 @@ body::before{
   <div id="apiStatus" style="font-size:12px;color:var(--text-3);margin:-4px 0 12px"></div>
   <button class="btn" onclick="saveApi()">保存</button>
   <div class="field" style="margin-top:16px"><label>神枢核心地址（一般不用改）</label><input id="nexusBase" placeholder="留空 = 当前地址"/></div>
+</div>
+
+<div class="sheet" id="sheetExec">
+  <div class="grab"></div>
+  <div class="sheet-title">执行脑 · 连接器</div>
+  <div class="sheet-sub">连上你自己服务器的执行脑，神枢就能<b>真跑命令/代码/开沙箱</b>。留空 = 断开，只会研究不动手。<br>先在服务器起 <code>exec_brain.py</code>（见 server/执行脑上线.md）。</div>
+  <div class="field"><label>服务器地址</label><input id="execUrl" placeholder="如 http://你的IP:8765" autocapitalize="off" autocorrect="off"/></div>
+  <div class="field"><label>连接密钥 token（与服务器一致）</label><input id="execToken" type="password" placeholder="你在服务器设的 NEXUS_EXEC_TOKEN"/></div>
+  <div id="execStatus" style="font-size:12.5px;margin:-2px 0 14px;min-height:18px"></div>
+  <div style="display:flex;gap:10px">
+    <button class="btn" onclick="saveExec()">保存并连接</button>
+    <button class="btn ghost" onclick="testExec()">测试连通</button>
+  </div>
 </div>
 
 <div class="sheet" id="sheetPersona">
@@ -959,6 +973,7 @@ const Nexus = {
   async video(prompt) { try { const r=await this._fetch('/video',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async getConfig() { try { const r=await this._fetch('/config',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async testExec() { try { const r=await this._fetch('/exec-test',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:'{}'}); return r&&r.ok?await r.json():{ok:false,detail:'服务器无响应'}; } catch(e){ return {ok:false,detail:String(e).slice(0,80)}; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async connectWS() {
@@ -1086,7 +1101,7 @@ function go(i) {
 /* ============ Sheet（抽屉 + 拖拽关闭）============ */
 let openS = null;
 function openSheet(id){ const s=$('#'+id); if(!s)return; $('#mask').classList.add('show'); s.classList.add('show'); openS=s; initSheetDrag(s);
-  if(id==='sheetModel') renderModelOpts(); if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); }
+  if(id==='sheetModel') renderModelOpts(); if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); }
 function closeSheet(){ if(openS){ openS.classList.remove('show'); openS=null; } $('#mask').classList.remove('show'); }
 function initSheetDrag(s){
   if (s._drag) return; s._drag = true;
@@ -1442,6 +1457,32 @@ async function saveApi(){
   const r=await Nexus.setConfig(body);
   if(r&&r.ok){ $('#apiLabel').textContent = r.gateway_url?('外接 · '+(r.gateway_model||'网关')):'内置 Llama'; toast('已保存 · 大脑已切换'); closeSheet(); }
   else toast('保存失败（检查是否在线/已解锁）');
+}
+/* 执行脑连接器：App 内一键连，不碰命令行 */
+function _execStat(msg,color){ const el=$('#execStatus'); if(el){ el.textContent=msg; el.style.color=color||'var(--text-3)'; } }
+function _execLabel(on){ const el=$('#execLabel'); if(el) el.textContent = on?'已连接 · 真能动手':'未连接 · 只会研究'; }
+async function fillExec(){
+  _execStat('读取当前配置…');
+  const c=await Nexus.getConfig();
+  if(c){ $('#execUrl').value=c.exec_url||''; $('#execToken').value=c.exec_has_token?'••••••••':'';
+    _execLabel(c.exec_on); _execStat(c.exec_on?'已连接 · 点「测试连通」验一下':'未连接 · 填地址和密钥后保存'); }
+  else _execStat('（离线，无法读取服务器配置）','var(--err)');
+}
+async function saveExec(){
+  const tok=$('#execToken').value;
+  const body={ exec_url:$('#execUrl').value.trim() };
+  if(!/^[•*]/.test(tok)) body.exec_token=tok.trim();   // 掩码不回传
+  _execStat('保存中…');
+  const r=await Nexus.setConfig(body);
+  if(r&&r.ok){ _execLabel(r.exec_on); _execStat(r.exec_on?'已保存 · 正在测试连通…':'已断开（地址留空）'); toast(r.exec_on?'连接器已保存':'已断开执行脑');
+    if(r.exec_on){ await testExec(); } }
+  else _execStat('保存失败（检查是否在线/已解锁）','var(--err)');
+}
+async function testExec(){
+  _execStat('测试连通中…');
+  const r=await Nexus.testExec();
+  if(r&&r.ok){ _execStat('✓ 连通 · 执行脑真跑成功：'+(r.detail||'ok'),'var(--ok)'); _execLabel(true); }
+  else _execStat('✗ 未连通：'+((r&&r.detail)||'检查服务器是否已起、地址/token 是否一致、端口是否放行'),'var(--err)');
 }
 function fillPersona(){ $('#pCallHim').value=store.get('call_him')||'主人'; $('#pCallHer').value=store.get('call_her')||'神枢';
   Nexus.getSoul().then(s=>{ if(s&&s.身份) $('#pCore').value=s.身份.core||''; }); }

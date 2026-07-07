@@ -101,7 +101,9 @@ ok('解析 exec 工具调用', (() => { const c = S.parseToolCalls('⟨工具:ex
 // ── 执行脑（真沙箱的手）：owner 门 + 未接入如实告知（不许假）──
 ok('exec 能力 owner_only（匿名拒绝）', resolveCapability('exec', false).ok === false && resolveCapability('exec', false).reason === 'owner_only');
 ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
-{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('ls'); ok('未配 NEXUS_EXEC_URL → 如实说未接入、不假装', r.ok === false && /未接入/.test(r.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('ls'); ok('未配执行脑 → 如实说未接入、不假装', r.ok === false && /未接入/.test(r.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => ({ exec_url: 'http://x:8765', exec_token: 't' }) };
+  const c = await T.getConfig(true); ok('连接器：配了 exec_url → exec_on=true 且不回传 token', c.exec_on === true && c.exec_has_token === true && c.exec_token === undefined); }
 
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');

@@ -114,7 +114,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -143,6 +143,8 @@ export class ShenshuCore {
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
         if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
+        // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
+        if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
@@ -732,9 +734,11 @@ ${capabilitySelfDescription(true)}
   // 执行脑 · 真沙箱的手：把命令送到主人自有服务器上真跑（exec_brain）。
   // 未配 NEXUS_EXEC_URL → 如实告知「未接入」，绝不假装能跑（红线：不许假）。
   async execRemote(cmd) {
-    const url = this.env.NEXUS_EXEC_URL;
-    const token = this.env.NEXUS_EXEC_TOKEN;
-    if (!url) return { ok: false, note: '执行脑未接入：在 Worker 配 NEXUS_EXEC_URL + NEXUS_EXEC_TOKEN，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
+    // 连接器优先读 App 内配置（设置里一键填），回落到环境变量
+    const cfg = (this.storage ? await this.storage.get('config') : null) || {};
+    const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
+    const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
+    if (!url) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
     try {
       const r = await fetch(url.replace(/\/+$/, '') + '/exec', {
         method: 'POST',
@@ -753,7 +757,8 @@ ${capabilitySelfDescription(true)}
   // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
   // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
   async runAgentLoop(baseSystem, text, soul, opts = {}) {
-    const hasExec = !!this.env.NEXUS_EXEC_URL;
+    const _cfg = (await this.storage.get('config')) || {};
+    const hasExec = !!(_cfg.exec_url || this.env.NEXUS_EXEC_URL);
     const TOOL_SPEC = `
 
 【你能自主调用的工具（作答前可多轮使用，最多 3 轮）】
@@ -1363,6 +1368,10 @@ ${capabilitySelfDescription(true)}
       gateway_key: mask ? (c.gateway_key ? '••••••' + String(c.gateway_key).slice(-4) : '') : (c.gateway_key || ''),
       has_key: !!c.gateway_key,
       来源: c.gateway_url ? 'app' : (this.env.NEXUS_GATEWAY_URL ? 'cf密钥' : '内置Llama'),
+      // 执行脑连接器（真沙箱的手）：只回地址与「是否已配 token」，token 本身永不回传
+      exec_url: c.exec_url || '',
+      exec_has_token: !!c.exec_token,
+      exec_on: !!(c.exec_url || this.env.NEXUS_EXEC_URL),
     };
   }
   async setConfig(b) {
@@ -1372,6 +1381,10 @@ ${capabilitySelfDescription(true)}
     // 密钥：空串=清空；掩码开头(•)=不动；其它=更新
     if (b.gateway_key === '') c.gateway_key = '';
     else if (b.gateway_key !== undefined && !/^[•*]/.test(b.gateway_key)) c.gateway_key = String(b.gateway_key).trim();
+    // 执行脑连接器
+    if (b.exec_url !== undefined) c.exec_url = String(b.exec_url || '').trim();
+    if (b.exec_token === '') c.exec_token = '';
+    else if (b.exec_token !== undefined && !/^[•*]/.test(b.exec_token)) c.exec_token = String(b.exec_token).trim();
     await this.storage.put('config', c);
     return { ok: true, ...(await this.getConfig(true)) };
   }
