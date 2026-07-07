@@ -167,10 +167,13 @@ button,input,textarea{font-family:inherit;color:inherit}
 .wc-item i{font-style:normal;color:var(--text-3);font-size:17px;opacity:.6}
 
 .msgs{display:flex;flex-direction:column;gap:14px;padding:14px 16px}
-.msg{max-width:86%;display:flex;flex-direction:column;gap:5px;animation:msgIn .4s var(--spring)}
-@keyframes msgIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
-.msg.me{align-self:flex-end;align-items:flex-end}
+.msg{max-width:86%;display:flex;flex-direction:column;gap:5px;animation:leafIn .55s cubic-bezier(.2,.9,.25,1) both}
+/* 叶子飘落：轻轻浮起 + 侧向微飘 + 微旋落定 */
+@keyframes leafIn{0%{opacity:0;transform:translateY(20px) translateX(-5px) rotate(-2deg) scale(.96)}55%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes leafInMe{0%{opacity:0;transform:translateY(20px) translateX(5px) rotate(2deg) scale(.96)}55%{opacity:1}100%{opacity:1;transform:none}}
+.msg.me{align-self:flex-end;align-items:flex-end;animation-name:leafInMe}
 .msg.her{align-self:flex-start;align-items:flex-start}
+@media (prefers-reduced-motion:reduce){.msg{animation-duration:.2s}}
 .bubble{padding:11px 15px;border-radius:19px;font-size:15.5px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
 .msg.me .bubble{background:var(--cy-grad);color:#08120F;font-weight:520;border-bottom-right-radius:6px;
   box-shadow:0 4px 18px var(--cy-glow)}
@@ -254,6 +257,29 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .dock.plus-open .pp-tile:nth-child(1){--d:.02s}.dock.plus-open .pp-tile:nth-child(2){--d:.05s}.dock.plus-open .pp-tile:nth-child(3){--d:.08s}.dock.plus-open .pp-tile:nth-child(4){--d:.11s}
 .dock.plus-open .pp-tile:nth-child(5){--d:.14s}.dock.plus-open .pp-tile:nth-child(6){--d:.17s}.dock.plus-open .pp-tile:nth-child(7){--d:.20s}.dock.plus-open .pp-tile:nth-child(8){--d:.23s}
 @media (prefers-reduced-motion:reduce){.plus-panel,.pp-tile,.plus-btn{transition:opacity .15s !important}}
+/* —— 全屏语音 · 呼吸球 —— */
+.voice-scrim{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  background:radial-gradient(120% 90% at 50% 30%,#EBFBF1 0%,#DFF6E7 45%,#CFEFDB 100%);
+  opacity:0;pointer-events:none;transform:scale(1.02);transition:opacity .35s var(--ease),transform .4s var(--ease)}
+.voice-scrim.show{opacity:1;pointer-events:auto;transform:none}
+.vs-x{position:absolute;top:calc(var(--safe-top) + 18px);right:20px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
+  background:rgba(255,255,255,.6);color:var(--text-2);font-size:16px;cursor:pointer;display:grid;place-items:center}
+.vs-stage{position:relative;width:260px;height:260px;display:grid;place-items:center}
+.vs-ball{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;position:relative;z-index:2;
+  background:radial-gradient(circle at 38% 32%,#EBFCF1,#7FDCA6 55%,#2FB96B);
+  box-shadow:0 12px 40px rgba(47,185,107,.4),inset 0 2px 6px rgba(255,255,255,.7),0 0 60px rgba(61,220,132,.5);
+  transform:scale(calc(1 + var(--amp,0) * .22));
+  animation:vsBreathe 3s ease-in-out infinite;transition:transform .08s linear}
+.vs-ball span{font-family:var(--serif);font-size:52px;font-weight:800;color:#0F3D2E;opacity:.9}
+@keyframes vsBreathe{0%,100%{box-shadow:0 12px 40px rgba(47,185,107,.36),inset 0 2px 6px rgba(255,255,255,.7),0 0 46px rgba(61,220,132,.42)}
+  50%{box-shadow:0 16px 52px rgba(47,185,107,.48),inset 0 2px 6px rgba(255,255,255,.8),0 0 76px rgba(61,220,132,.6)}}
+.vs-ripple{position:absolute;left:50%;top:50%;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;
+  border:2px solid rgba(47,185,107,.4);opacity:0;animation:vsRipple 3s ease-out infinite}
+.vs-ripple:nth-child(2){animation-delay:1s}.vs-ripple:nth-child(3){animation-delay:2s}
+@keyframes vsRipple{0%{transform:scale(1);opacity:.55}100%{transform:scale(2.3);opacity:0}}
+.vs-hint{margin-top:40px;font-size:19px;font-weight:600;color:var(--text)}
+.vs-sub{margin-top:10px;font-size:13px;color:var(--text-3)}
+@media (prefers-reduced-motion:reduce){.vs-ball,.vs-ripple{animation:none}}
 
 /* ============ 记忆页 / 她 / 设置 通用卡 ============ */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:13px}
@@ -753,6 +779,17 @@ body::before{
         <div class="plus-mask" id="plusMask" onclick="togglePlus()"></div>
       </section>
 
+      <!-- ===== 全屏语音 · 呼吸球（会呼吸 · 水波 · 随真实声音起伏）===== -->
+      <div class="voice-scrim" id="voiceScrim" aria-hidden="true">
+        <button class="vs-x" onclick="closeVoice()" aria-label="退出语音">✕</button>
+        <div class="vs-stage">
+          <span class="vs-ripple"></span><span class="vs-ripple"></span><span class="vs-ripple"></span>
+          <div class="vs-ball" id="vsBall"><span>枢</span></div>
+        </div>
+        <div class="vs-hint" id="vsHint">在听 · 说出你要的</div>
+        <div class="vs-sub" id="vsSub">球随你的声音起伏 · 也可直接打字</div>
+      </div>
+
       <!-- ===== 设置 ===== -->
       <section class="page" id="settings">
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
@@ -1084,7 +1121,30 @@ function togglePlus(){ const d=$('.dock'); if(!d) return; const open=d.classList
 function closePlus(){ const d=$('.dock'); if(d) d.classList.remove('plus-open'); }
 function pickMode(el){ setMode(el); closePlus(); }
 function syncSend(){ const c=$('#composer'); if(c) c.classList.toggle('typing', !!($('#inp').value||'').trim()); }
-function micOrSend(){ if(($('#inp').value||'').trim()){ send(); } else { setModeByName('voice'); $('#inp').focus(); toast('语音模式 · 说出来或直接打字'); } }
+function micOrSend(){ if(($('#inp').value||'').trim()){ send(); } else { openVoice(); } }
+/* 全屏语音呼吸球：球随「真实麦克风声强」起伏（getUserMedia+Analyser，纯前端真反应）。
+   把语音转成文字需后端 STT——没接就不装，如实告知，用户仍可打字。*/
+let _vs={ctx:null,stream:null,raf:0};
+function openVoice(){ const s=$('#voiceScrim'); if(!s) return; s.classList.add('show'); s.setAttribute('aria-hidden','false'); startMicViz(); if(navigator.vibrate)try{navigator.vibrate(6);}catch(e){} }
+function closeVoice(){ const s=$('#voiceScrim'); if(!s) return; s.classList.remove('show'); s.setAttribute('aria-hidden','true'); stopMicViz(); }
+async function startMicViz(){
+  const ball=$('#vsBall'), hint=$('#vsHint'), sub=$('#vsSub');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ if(sub) sub.textContent='此设备不支持麦克风 · 直接打字也行'; return; }
+  try{
+    _vs.stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    _vs.ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=_vs.ctx.createMediaStreamSource(_vs.stream);
+    const an=_vs.ctx.createAnalyser(); an.fftSize=512; src.connect(an);
+    const buf=new Uint8Array(an.frequencyBinCount);
+    if(hint) hint.textContent='在听 · 说出你要的';
+    const tick=()=>{ an.getByteTimeDomainData(buf); let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
+      const rms=Math.sqrt(sum/buf.length); const amp=Math.min(1, rms*4.2);
+      if(ball) ball.style.setProperty('--amp', amp.toFixed(3));
+      _vs.raf=requestAnimationFrame(tick); };
+    tick();
+  }catch(e){ if(hint) hint.textContent='没拿到麦克风权限'; if(sub) sub.textContent='去设置允许麦克风 · 或直接打字'; }
+}
+function stopMicViz(){ try{ cancelAnimationFrame(_vs.raf); }catch(e){} try{ _vs.stream&&_vs.stream.getTracks().forEach(t=>t.stop()); }catch(e){} try{ _vs.ctx&&_vs.ctx.close(); }catch(e){} _vs={ctx:null,stream:null,raf:0}; const b=$('#vsBall'); if(b) b.style.setProperty('--amp','0'); }
 /* 文件：真读文本类文件内容进上下文（不许假；二进制/图片交后端时再扩展）*/
 function pickFile(){ closePlus(); const f=$('#fileInput'); if(f) f.click(); }
 async function onFilePicked(input){ const files=[...(input.files||[])]; input.value=''; if(!files.length) return;
