@@ -142,7 +142,7 @@ button,input,textarea{font-family:inherit;color:inherit}
 .page-h1{font-family:var(--serif);font-size:29px;font-weight:600;letter-spacing:.02em;margin-top:5px}
 
 /* ============ 对话页 ============ */
-#chat{display:flex;flex-direction:column;padding-bottom:0;overflow:hidden}
+#chat{display:flex;flex-direction:column;padding-bottom:calc(var(--tab-h) + var(--safe-bot));overflow:hidden}
 .chat-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 12px}
 #welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:100%;padding:20px 22px;text-align:center}
@@ -220,7 +220,7 @@ button,input,textarea{font-family:inherit;color:inherit}
 .img-viewer img{max-width:100%;max-height:100%;border-radius:12px}
 
 /* —— 输入坞 —— */
-.dock{flex-shrink:0;padding:8px 12px calc(8px + var(--safe-bot));
+.dock{flex-shrink:0;padding:10px 12px 10px;
   background:color-mix(in srgb,var(--bg) 78%,transparent);
   backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);
   border-top:1px solid var(--line)}
