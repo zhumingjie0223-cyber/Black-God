@@ -153,12 +153,13 @@ button,input,textarea{font-family:inherit;color:inherit}
   box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 60px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);
   animation:orbBreath 4.6s ease-in-out infinite}
 .hero-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;
-  background:conic-gradient(from 0deg,transparent,var(--live),transparent 55%);
-  opacity:.4;filter:blur(6px);animation:orbSpin 7s linear infinite}
-.hero-orb svg{width:52px;height:52px}
-/* 核心呼吸：唯一透出活体绿的地方——中枢在此，它活着 */
-@keyframes orbBreath{0%,100%{transform:scale(1);box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 46px var(--live-glow),inset 0 1px 0 rgba(255,255,255,.08)}
-  50%{transform:scale(1.045);box-shadow:0 14px 60px rgba(0,0,0,.6),0 0 72px var(--live-glow),inset 0 1px 0 rgba(255,255,255,.1)}}
+  background:conic-gradient(from 0deg,transparent,var(--cy-1),transparent 55%);
+  opacity:.28;filter:blur(6px);animation:orbSpin 7s linear infinite}
+.hero-glyph{font-family:var(--serif);font-size:46px;font-weight:700;line-height:1;
+  background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+/* 核心呼吸：银色微光，克制而稳定（绿只留给"在线"状态点）*/
+@keyframes orbBreath{0%,100%{transform:scale(1);box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 44px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08)}
+  50%{transform:scale(1.04);box-shadow:0 14px 60px rgba(0,0,0,.6),0 0 66px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.1)}}
 @keyframes orbSpin{to{transform:rotate(360deg)}}
 .hero-name{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:.08em;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -170,8 +171,9 @@ button,input,textarea{font-family:inherit;color:inherit}
 .qcard{display:flex;align-items:center;gap:13px;padding:14px 15px;text-align:left;cursor:pointer;
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);transition:.18s var(--ease)}
 .qcard:active{transform:scale(.975);background:var(--surface-2)}
-.qcard .qi{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;font-size:18px;
+.qcard .qi{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;color:var(--chrome-2);
   background:var(--surface-2);border:1px solid var(--line)}
+.qcard .qi svg{width:20px;height:20px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .qcard b{display:block;font-size:14.5px;font-weight:650}
 .qcard span{display:block;font-size:12px;color:var(--text-3);margin-top:2px}
 
@@ -261,7 +263,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   box-shadow:0 14px 60px rgba(0,0,0,.55),0 0 70px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.09);
   animation:orbBreath 4.6s ease-in-out infinite;transition:background 1.2s}
 .soul-orb::before{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:-1;
-  background:conic-gradient(from 0deg,transparent,var(--live),transparent 55%);opacity:.42;filter:blur(9px);
+  background:conic-gradient(from 0deg,transparent,var(--cy-1),transparent 55%);opacity:.3;filter:blur(9px);
   animation:orbSpin 8s linear infinite}
 .soul-orb .glyph{font-family:var(--serif);font-size:50px;font-weight:600;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -689,18 +691,14 @@ body::before{
       <section class="page" id="chat">
         <div class="chat-scroll" id="chatScroll">
           <div id="welcome">
-            <div class="hero-orb">
-              <svg viewBox="0 0 24 24"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#6FA985"/><stop offset="1" stop-color="#3F7B58"/></linearGradient></defs>
-                <path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#g1)" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
-            </div>
+            <div class="hero-orb"><span class="hero-glyph">枢</span></div>
             <div class="hero-name">神枢</div>
             <div class="hero-sub" id="heroSub">说出你要的，我来做。</div>
             <div class="hero-line"></div>
             <div class="quicks">
-              <div class="qcard" onclick="quick('用枢语报一下你此刻的运行状态')"><div class="qi">◈</div><div><b>枢语状态</b><span>五维语义坐标 · 神枢自己的语言</span></div></div>
-              <div class="qcard" onclick="quick('帮我写一段 Python，并解释思路')"><div class="qi">⟡</div><div><b>写 & 调代码</b><span>工程级 · 直接给完整可运行代码</span></div></div>
-              <div class="qcard" onclick="quick('接着上次的进度，我们做到哪了？')"><div class="qi">❖</div><div><b>接续进度</b><span>记得你的项目与上下文</span></div></div>
+              <div class="qcard" onclick="quick('用枢语报一下你此刻的运行状态')"><div class="qi"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div><b>枢语状态</b><span>五维语义坐标 · 神枢自己的语言</span></div></div>
+              <div class="qcard" onclick="quick('帮我写一段 Python，并解释思路')"><div class="qi"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg></div><div><b>写 & 调代码</b><span>工程级 · 直接给完整可运行代码</span></div></div>
+              <div class="qcard" onclick="quick('接着上次的进度，我们做到哪了？')"><div class="qi"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg></div><div><b>接续进度</b><span>记得你的项目与上下文</span></div></div>
             </div>
           </div>
           <div class="msgs" id="msgs" style="display:none"></div>
