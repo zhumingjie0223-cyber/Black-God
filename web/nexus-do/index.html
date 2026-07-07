@@ -30,10 +30,13 @@
   --bg:#1C1E1F; --bg-1:#212425; --bg-2:#26292A; --bg-3:#2E3234;
   --surface:rgba(230,232,234,.045); --surface-2:rgba(230,232,234,.075); --surface-3:rgba(230,232,234,.12);
   --line:rgba(230,232,234,.10); --line-2:rgba(230,232,234,.18);
-  /* 玉绿 —— 唯一强色（禁蓝金紫）。沿用 --cy-* 变量名，全站一处换肤 */
-  --cy-hi:#6FA985; --cy-1:#5E9A73; --cy-2:#4A855F; --cy-3:#3F7B58; --cy-4:#2C5940;
-  --cy-grad:linear-gradient(150deg,#6FA985 0%,#5E9A73 34%,#4A855F 66%,#3F7B58 100%);
-  --cy-glow:rgba(94,154,115,.28);
+  /* 系统银 —— 结构强色（去彩，冷银铬）。沿用 --cy-* 变量名，全站一处换肤。
+     彩色一律不做装饰：绿只留作「活体信号」，见 --live */
+  --cy-hi:#F3F5F7; --cy-1:#CBD0D4; --cy-2:#AAB0B4; --cy-3:#868D92; --cy-4:#5C6367;
+  --cy-grad:linear-gradient(160deg,#F4F6F8 0%,#DBDFE3 42%,#B0B6BA 100%);
+  --cy-glow:rgba(226,229,232,.20);
+  /* 活体信号 —— 全站唯一留存的彩色，仅用于「在线 / 思考 / 核心呼吸」等生命迹象，非装饰 */
+  --live:#5E9A73; --live-hi:#6FA985; --live-glow:rgba(94,154,115,.5);
   /* 素银 —— 品牌字（冷银铬）*/
   --chrome-1:#E6E7E9; --chrome-2:#9AA0A3; --chrome-grad:linear-gradient(150deg,#F2F4F7,#D6DADF 30%,#9AA0A3 70%,#6B7176);
   --chrome-glow:rgba(230,232,234,.16);
@@ -74,13 +77,14 @@ button,input,textarea{font-family:inherit;color:inherit}
 /* —— 动态光效：极光 / 流光（会随视差平移，纵深感）—— */
 #aurora{position:fixed;inset:-10%;z-index:0;pointer-events:none;overflow:hidden;filter:blur(48px) saturate(1.15);
   will-change:transform;transition:transform .3s ease-out}
-#aurora span{position:absolute;border-radius:50%;mix-blend-mode:screen;opacity:.5}
+/* 去彩：极光改中性银灰微光，只给石墨一点纵深，不再有绿色光晕 */
+#aurora span{position:absolute;border-radius:50%;mix-blend-mode:screen;opacity:.3}
 #aurora span:nth-child(1){width:62vw;height:62vw;left:-12vw;top:-8vw;
-  background:radial-gradient(circle,rgba(63,123,88,.55),transparent 66%);animation:auroraA 22s ease-in-out infinite}
+  background:radial-gradient(circle,rgba(210,214,218,.22),transparent 66%);animation:auroraA 30s ease-in-out infinite}
 #aurora span:nth-child(2){width:52vw;height:52vw;right:-14vw;top:22vh;
-  background:radial-gradient(circle,rgba(84,122,119,.5),transparent 66%);animation:auroraB 28s ease-in-out infinite}
+  background:radial-gradient(circle,rgba(150,157,162,.18),transparent 66%);animation:auroraB 36s ease-in-out infinite}
 #aurora span:nth-child(3){width:46vw;height:46vw;left:20vw;bottom:-16vh;
-  background:radial-gradient(circle,rgba(183,208,204,.34),transparent 66%);animation:auroraC 25s ease-in-out infinite}
+  background:radial-gradient(circle,rgba(120,127,132,.16),transparent 66%);animation:auroraC 33s ease-in-out infinite}
 @keyframes auroraA{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(9vw,7vh) scale(1.18)}}
 @keyframes auroraB{0%,100%{transform:translate(0,0) scale(1.05)}50%{transform:translate(-8vw,-5vh) scale(.9)}}
 @keyframes auroraC{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vw,6vh) scale(1.14)}}
@@ -122,7 +126,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   font-size:12px;color:var(--text-2);font-weight:600;cursor:pointer;transition:.15s}
 .top-status:active{transform:scale(.95)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--text-3);transition:.3s;flex-shrink:0}
-.dot.live{background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2s infinite}
+.dot.live{background:var(--live);box-shadow:0 0 8px var(--live-glow);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* —— 页面容器（横向 pager）—— */
@@ -149,11 +153,12 @@ button,input,textarea{font-family:inherit;color:inherit}
   box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 60px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);
   animation:orbBreath 4.6s ease-in-out infinite}
 .hero-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;
-  background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);
-  opacity:.5;filter:blur(6px);animation:orbSpin 7s linear infinite}
+  background:conic-gradient(from 0deg,transparent,var(--live),transparent 55%);
+  opacity:.4;filter:blur(6px);animation:orbSpin 7s linear infinite}
 .hero-orb svg{width:52px;height:52px}
-@keyframes orbBreath{0%,100%{transform:scale(1);box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 55px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08)}
-  50%{transform:scale(1.045);box-shadow:0 14px 60px rgba(0,0,0,.6),0 0 82px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.1)}}
+/* 核心呼吸：唯一透出活体绿的地方——中枢在此，它活着 */
+@keyframes orbBreath{0%,100%{transform:scale(1);box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 46px var(--live-glow),inset 0 1px 0 rgba(255,255,255,.08)}
+  50%{transform:scale(1.045);box-shadow:0 14px 60px rgba(0,0,0,.6),0 0 72px var(--live-glow),inset 0 1px 0 rgba(255,255,255,.1)}}
 @keyframes orbSpin{to{transform:rotate(360deg)}}
 .hero-name{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:.08em;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -186,7 +191,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   background:var(--surface);border:1px solid var(--line);color:var(--cy-1);font-weight:600}
 .typing{display:inline-flex;gap:4px;padding:14px 16px;background:var(--surface-2);
   border:1px solid var(--line);border-radius:19px;border-bottom-left-radius:6px}
-.typing i{width:7px;height:7px;border-radius:50%;background:var(--cy-2);animation:blink 1.3s infinite}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--live);animation:blink 1.3s infinite}
 .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
 .typing.lbl{align-items:center;font-size:13px;color:var(--text-2)}
 .typing.lbl span{margin-right:2px}
@@ -256,7 +261,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   box-shadow:0 14px 60px rgba(0,0,0,.55),0 0 70px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.09);
   animation:orbBreath 4.6s ease-in-out infinite;transition:background 1.2s}
 .soul-orb::before{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:-1;
-  background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.55;filter:blur(9px);
+  background:conic-gradient(from 0deg,transparent,var(--live),transparent 55%);opacity:.42;filter:blur(9px);
   animation:orbSpin 8s linear infinite}
 .soul-orb .glyph{font-family:var(--serif);font-size:50px;font-weight:600;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -484,7 +489,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .lock-input + .lock-input{margin-top:10px}
 .lock-err{font-size:13px;color:var(--err);min-height:18px;margin:10px 0 4px}
 .lock-btn{width:100%;padding:15px;border:1px solid var(--cy-3);border-radius:14px;font-size:16px;font-weight:700;letter-spacing:.4em;padding-left:.4em;cursor:pointer;font-family:var(--serif);
-  background:var(--cy-grad);color:#0A140F;box-shadow:0 10px 26px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.22);transition:.15s var(--spring)}
+  background:var(--cy-grad);color:#17191A;box-shadow:0 10px 26px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.22);transition:.15s var(--spring)}
 .lock-btn:active{transform:scale(.97)} .lock-btn:disabled{opacity:.6}
 .lock-switch{margin-top:16px;font-size:12.5px;color:var(--text-2);opacity:.62;cursor:pointer;letter-spacing:.02em}
 .lock-switch:active{opacity:.9}
@@ -516,7 +521,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .ob-note2{font-size:15px;color:var(--text-2);margin-top:12px;margin-bottom:26px;line-height:1.6}
 .ob-dev{font-size:12.5px;color:var(--cy-1);margin-bottom:22px;min-height:17px;font-variant-numeric:tabular-nums}
 .ob-btn{width:100%;max-width:320px;padding:16px;border:1px solid var(--cy-3);border-radius:16px;font-size:16px;font-weight:700;letter-spacing:.3em;padding-left:.3em;cursor:pointer;font-family:var(--serif);
-  background:var(--cy-grad);color:#0A140F;box-shadow:0 10px 28px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.22);transition:.15s var(--spring)}
+  background:var(--cy-grad);color:#17191A;box-shadow:0 10px 28px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.22);transition:.15s var(--spring)}
 .ob-btn:active{transform:scale(.97)}
 .ob-btn:disabled{opacity:.55}
 .ob-sub{font-size:12.5px;color:var(--text-3);margin-top:16px;line-height:1.5;max-width:300px}
@@ -557,15 +562,16 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 }
 @keyframes shuSheen{ 0%{transform:translateX(-160%)} 26%,100%{transform:translateX(160%)} }
 /* 石墨底：一层极缓流动的经纬光晕，给静止界面注入「流」的呼吸 */
+/* 去彩 + 收敛：底纹改中性银灰微光，极慢、极淡，只给石墨一丝纵深，不喧宾 */
 body::before{
-  content:''; position:fixed; inset:-30%; z-index:0; pointer-events:none; opacity:.5;
+  content:''; position:fixed; inset:-30%; z-index:0; pointer-events:none; opacity:.32;
   background:
-    radial-gradient(38% 30% at 22% 18%, rgba(94,154,115,.14), transparent 70%),
-    radial-gradient(34% 28% at 82% 30%, rgba(120,140,150,.10), transparent 70%),
-    radial-gradient(40% 32% at 50% 92%, rgba(94,154,115,.10), transparent 72%);
-  filter:blur(40px); animation:shuFlow 26s var(--ease-flow) infinite;
+    radial-gradient(40% 32% at 20% 16%, rgba(214,218,222,.09), transparent 72%),
+    radial-gradient(36% 30% at 84% 32%, rgba(150,157,162,.07), transparent 72%),
+    radial-gradient(42% 34% at 50% 94%, rgba(120,127,132,.06), transparent 74%);
+  filter:blur(44px); animation:shuFlow 44s var(--ease-flow) infinite;
 }
-:root[data-theme="light"] body::before{ opacity:.35; }
+:root[data-theme="light"] body::before{ opacity:.22; }
 @keyframes shuFlow{
   0%,100%{ transform:translate3d(0,0,0) scale(1) }
   33%{ transform:translate3d(3%,-2%,0) scale(1.08) }
