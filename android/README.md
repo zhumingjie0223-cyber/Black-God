@@ -42,20 +42,25 @@ bubblewrap build
 
 ## 去掉地址栏（Digital Asset Links）——让它像原生
 
-TWA 默认顶部有一条地址栏，配好资产校验才会消失：
+TWA 默认顶部有一条地址栏，配好资产校验才会消失。**上传密钥的指纹已经内置进 Worker**
+（`nexus_do.core.mjs` 的 `ASSETLINKS_JSON` 常量 = `7D:DE:CA:…:DB:78`），
+`/.well-known/assetlinks.json` 会直接返回，不再 404。**代码合并部署到 `aquan.lufei.uk` 后即生效。**
 
-1. 拿签名指纹：
-   ```bash
-   keytool -list -v -keystore android.keystore -alias blackgod | grep SHA256
-   ```
-2. 把指纹填进 `assetlinks.template.json` 的 `REPLACE_WITH_YOUR_SHA256_FINGERPRINT`，得到最终 JSON。
-3. 把这段 JSON 设成 Worker 变量（Worker 已加 `/.well-known/assetlinks.json` 路由，会读它）：
-   ```bash
-   cd ../web/nexus-do
-   npx wrangler secret put ASSETLINKS_JSON   # 粘贴上一步整段 JSON
-   ```
-   > 也可用普通 var；secret 更稳。设完重新部署。
-4. 验证：`https://aquan.lufei.uk/.well-known/assetlinks.json` 返回你的指纹 JSON（不再是 404 提示）。装上 App 冷启一次，地址栏消失即成。
+启用 **Google Play App Signing**（默认开）后，用户装到的包是 Google 用「应用签名密钥」重签的，
+指纹和上传密钥不同。所以首次上传后要把 Google 的那枚指纹**追加**进去：
+
+1. Play Console → 你的应用 → 设置 → 应用完整性 → 「应用签名密钥证书」，复制 SHA-256。
+2. 两种加法（二选一）：
+   - **改代码**：把该指纹加进 `ASSETLINKS_JSON` 常量的 `sha256_cert_fingerprints` 数组，重新部署；或
+   - **不改代码**：给 Worker 设变量 `ASSETLINKS_JSON` 为含**两枚指纹**的完整 JSON（env 覆盖内置值）：
+     ```bash
+     cd ../web/nexus-do
+     npx wrangler secret put ASSETLINKS_JSON
+     ```
+3. 验证：`https://aquan.lufei.uk/.well-known/assetlinks.json` 返回含 Google 那枚指纹的 JSON。
+   装上 App 冷启一次，地址栏消失即成。
+
+> 若上架时**关闭** Play App Signing（自签），则上传密钥即最终签名密钥，内置的这枚指纹就是最终值，无需追加。
 
 ---
 

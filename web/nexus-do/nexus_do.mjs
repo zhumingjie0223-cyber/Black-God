@@ -82,9 +82,9 @@ export class ShenshuCore {
     // Digital Asset Links —— 安卓 TWA 校验（去掉地址栏，装出原生感）。
     // 内容 = 你的 app 包名 + 签名 SHA-256，放进 ASSETLINKS_JSON 变量（见 android/README.md）。
     if (path === '/.well-known/assetlinks.json') {
-      const al = this.env.ASSETLINKS_JSON;
-      if (al) return new Response(al, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
-      return json({ note: '未配置。设 ASSETLINKS_JSON 变量为 Digital Asset Links 内容后，安卓 TWA 才能去掉地址栏。见 android/README.md。' }, 404);
+      // env 覆盖优先（部署后追加 Play App Signing 指纹时用）；否则内置上传密钥指纹
+      const al = this.env.ASSETLINKS_JSON || ASSETLINKS_JSON;
+      return new Response(al, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     }
     if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
     if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
@@ -1462,6 +1462,22 @@ const MANIFEST_JSON = JSON.stringify({
     { name: '记忆', short_name: '记忆', url: '/?tab=memory', description: '看她记住的往事' },
   ],
 });
+
+// Digital Asset Links —— 安卓 TWA 校验（去地址栏，装出原生感）。
+// 内容 = 包名 + 签名 SHA-256（公开信息，非机密）。上传密钥指纹已内置；
+// 启用 Play App Signing 后，把 Google 的应用签名 SHA-256 追加进下面数组即可（或用 ASSETLINKS_JSON 变量覆盖）。
+const ASSETLINKS_JSON = JSON.stringify([
+  {
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: {
+      namespace: 'android_app',
+      package_name: 'uk.lufei.aquan.blackgod',
+      sha256_cert_fingerprints: [
+        '7D:DE:CA:72:A2:61:1B:FB:28:BE:D2:63:84:AD:C7:73:41:D3:4C:01:63:40:A2:7F:95:9B:7A:97:96:42:DB:78',
+      ],
+    },
+  },
+]);
 
 // App 图标（世家 · 神字意象）：玄墨底 + 素银浮雕神字 + 一枚玉印点睛，矢量自包含
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
