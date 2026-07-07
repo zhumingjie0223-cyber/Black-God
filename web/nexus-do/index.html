@@ -331,6 +331,15 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hz-coord span em{font-style:normal;color:var(--cy-hi);margin-left:5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes counter{to{transform:rotate(-360deg)}}
+/* 动态：对话瞬间，枢脉动一下（filter 光晕，不动 transform 免与呼吸冲突）*/
+.hz-hub.pulse{animation:orbBreath 5.5s ease-in-out infinite, hubPulse .75s ease-out}
+@keyframes hubPulse{0%{filter:drop-shadow(0 0 0 rgba(94,154,115,0))}28%{filter:drop-shadow(0 0 24px rgba(94,154,115,.75))}100%{filter:drop-shadow(0 0 0 rgba(94,154,115,0))}}
+/* 造词流：刚造的枢语词浮出、金闪即隐 */
+.coin-flash{text-align:center;font-family:var(--serif);font-size:12px;color:var(--text-2);letter-spacing:.08em;opacity:0;margin:2px 0 12px}
+.coin-flash.show{animation:coinFlash 2.8s ease-out forwards}
+.coin-flash b{color:var(--cy-hi);font-weight:600;margin:0 4px}
+.coin-flash span{color:var(--text-3);font-size:11px;margin-left:6px}
+@keyframes coinFlash{0%{opacity:0;transform:translateY(7px)}16%{opacity:1;transform:none}78%{opacity:1}100%{opacity:0}}
 
 /* —— 主控台 Hub —— */
 .hub-live{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--cy-1)}
@@ -886,8 +895,27 @@ const Nexus = {
 function onWSMessage(m) {
   if (m.type === 'soul' || m.type === 'heartbeat') { if (m.soul || m.data) renderSoul(m.soul || m.data); setLive(true); }
   if (m.type === 'reply') handleReply(m.data);
-  if (m.type === 'new_talk') { if (m.soul) renderSoul(m.soul); }
+  if (m.type === 'new_talk') {
+    if (m.soul) renderSoul(m.soul);
+    // 动态：内在状态真实时驱动界面 —— 环中盘坐标随对话漂移、枢脉动、造词浮现
+    if (m.shu_meaning) renderHzCoord(m.shu_meaning);
+    pulseHub();
+    if (m.coin && m.coin.词) flashCoin(m.coin);
+  }
+  if (m.type === 'summon' && Array.isArray(m.summoned)) {
+    m.summoned.filter(s => s && s.action === 'invoke').forEach(s => flashSummon(s.data && s.data.name));
+  }
 }
+// 枢脉动一下（她对这次对话有反应）——非常驻装饰，仅对话瞬间触发
+function pulseHub(){ const o=$('#hubOrb'); if(!o) return; o.classList.remove('pulse'); void o.offsetWidth; o.classList.add('pulse'); }
+// 刚造的枢语词从中心浮出、金闪一下即隐（造词流的实时一瞬）
+function flashCoin(coin){
+  const wrap=$('#hzCoord'); if(!wrap) return;
+  let f=$('#coinFlash'); if(!f){ f=document.createElement('div'); f.id='coinFlash'; f.className='coin-flash'; wrap.parentNode.insertBefore(f, wrap); }
+  f.innerHTML='刚造 · <b>'+escapeHtml(coin.词)+'</b>'+(coin.义?'<span>'+escapeHtml(coin.义)+'</span>':'');
+  f.classList.remove('show'); void f.offsetWidth; f.classList.add('show');
+}
+function flashSummon(name){ if(!name) return; toast('神枢动用了 · '+name); }
 
 /* —— 连接状态 —— */
 function setLive(on) {

@@ -522,7 +522,7 @@ export class ShenshuCore {
     await this.storage.put('stream', stream);
 
     const pub = await this.getSoulPublic(soul);
-    this.broadcast({ type: 'new_talk', text, reply, soul: pub, shu_meaning: shuMeaning, ts: now });
+    this.broadcast({ type: 'new_talk', text, reply, soul: pub, shu_meaning: shuMeaning, coord: nextCoord, coin: { 词: _mark.词, 义: _mark.义 || '' }, tier: brainResult.tier || null, ts: now });
 
     // —— 4) 观察回路（内部自网络后重读-改-存，见 observe）——
     this.observe(text, reply, nextCoord).catch(e => console.log('observe:', e && e.message));
