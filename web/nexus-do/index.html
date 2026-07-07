@@ -492,6 +492,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:var(--cy-grad);color:#17191A;box-shadow:0 10px 26px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.22);transition:.15s var(--spring)}
 .lock-btn:active{transform:scale(.97)} .lock-btn:disabled{opacity:.6}
 .lock-switch{margin-top:16px;font-size:12.5px;color:var(--text-2);opacity:.62;cursor:pointer;letter-spacing:.02em}
+.reg-adv-toggle{margin-top:18px;font-size:12.5px;color:var(--text-3);cursor:pointer;letter-spacing:.02em;user-select:none;transition:.2s var(--ease)}
+.reg-adv-toggle:hover{color:var(--text-2)}
+.reg-adv{margin-top:14px;display:flex;flex-direction:column;gap:12px;animation:advIn .32s var(--ease)}
+.reg-adv-hint{font-size:11.5px;color:var(--text-3);line-height:1.5;margin-top:-2px}
+@keyframes advIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .lock-switch:active{opacity:.9}
 
 /* —— 开屏引导 —— */
@@ -594,15 +599,19 @@ body::before{
     <div class="lock-orb"></div>
     <div class="lock-title">Black God</div>
 
-    <!-- 公共注册模式：填昵称 + 自己的 API，即用；无需密码 -->
+    <!-- 公共注册：起名即进，大脑内置；自带大脑为可选高级项 -->
     <div id="regMode">
-      <div class="lock-sub">起个名字 + 填你自己的 API，进来聊</div>
-      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的昵称" autocomplete="off"/>
-      <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
-      <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
-      <input id="regApiModel" class="lock-input" type="text" placeholder="模型（可留空 = auto）" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')doRegister()"/>
+      <div class="lock-sub">起个名字，进来聊</div>
+      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的名字" autocomplete="off" onkeydown="if(event.key==='Enter')doRegister()"/>
       <div id="regErr" class="lock-err"></div>
-      <button id="regBtn" class="lock-btn" onclick="doRegister()">进入</button>
+      <button id="regBtn" class="lock-btn" onclick="doRegister()">进 入</button>
+      <div class="reg-adv-toggle" id="regAdvToggle" onclick="toggleRegAdv()">自带大脑 · 可选 ▾</div>
+      <div id="regAdv" class="reg-adv" style="display:none">
+        <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
+        <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
+        <input id="regApiModel" class="lock-input" type="text" placeholder="模型（留空 = 自动）" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')doRegister()"/>
+        <div class="reg-adv-hint">不填即用内置大脑，随时可在设置里换</div>
+      </div>
       <div class="lock-switch" onclick="setGateMode('owner')">我是主人 · 私密登录</div>
     </div>
 
@@ -1388,6 +1397,8 @@ function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记
 
 /* ============ 门 · 公共注册 / 主人私密 ============ */
 function onUnauthorized(){ if(Nexus.mode==='public') return; setGateMode('owner'); showLock(); }
+function toggleRegAdv(){ const a=$('#regAdv'), t=$('#regAdvToggle'); if(!a) return; const open=a.style.display!=='none';
+  a.style.display=open?'none':'flex'; if(t) t.textContent = open ? '自带大脑 · 可选 ▾' : '自带大脑 · 可选 ▴'; }
 function setGateMode(m){ const rg=$('#regMode'), om=$('#ownerMode'); if(rg&&om){ rg.style.display=(m==='owner')?'none':''; om.style.display=(m==='owner')?'':'none'; } }
 function ensureUid(){ let u=store.get('reg_uid'); if(!u){ u=(self.crypto&&crypto.randomUUID)?crypto.randomUUID().replace(/-/g,''):(Date.now().toString(36)+Math.random().toString(36).slice(2)); store.set('reg_uid',u); } Nexus.uid=u; return u; }
 function prefillReg(){ const g=(id,k)=>{ const el=$('#'+id); if(el&&store.get(k)!=null) el.value=store.get(k); };
