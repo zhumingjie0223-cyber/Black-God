@@ -55,7 +55,7 @@
   --surface:rgba(22,24,25,.03); --surface-2:rgba(22,24,25,.05); --surface-3:rgba(22,24,25,.08);
   --line:rgba(22,24,25,.09); --line-2:rgba(22,24,25,.15);
   --text:#17191A; --text-2:#5C6164; --text-3:#9AA0A3;
-  --cy-glow:rgba(63,123,88,.22);
+  --cy-glow:rgba(140,146,150,.20);
 }
 html,body{height:100%;background:var(--bg);color:var(--text);overscroll-behavior:none;
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Noto Sans SC","PingFang SC",system-ui,sans-serif;
@@ -317,7 +317,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 /* 环中盘 —— 万物绕枢、枢自不动 */
 .huanzhong{position:relative;width:280px;height:280px;margin:8px auto 2px}
 .hz-orbit{position:absolute;inset:22px;border-radius:50%;border:1px solid rgba(230,232,234,.10)}
-.hz-orbit.o2{inset:56px;border-color:rgba(63,123,88,.13)}
+.hz-orbit.o2{inset:56px;border-color:rgba(230,232,234,.09)}
 .hz-ring{position:absolute;inset:0;animation:spin 64s linear infinite}
 .hz-node{position:absolute;left:50%;top:50%;width:0;height:0}
 .hz-node .d{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;white-space:nowrap;width:max-content;animation:counter 64s linear infinite}
@@ -332,7 +332,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hz-still{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:var(--cy-hi);box-shadow:0 0 9px 2px var(--cy-glow);z-index:6}
 .hz-couplet{text-align:center;font-family:var(--serif);font-size:13px;color:var(--cy-1);letter-spacing:.14em;padding-left:.14em;margin:2px 0 15px;opacity:.9}
 .hz-coord{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
-.hz-coord span{font-family:var(--serif);font-size:11.5px;color:var(--text);padding:5px 12px;border:1px solid rgba(63,123,88,.3);border-radius:var(--radius-pill);background:rgba(63,123,88,.08)}
+.hz-coord span{font-family:var(--serif);font-size:11.5px;color:var(--text);padding:5px 12px;border:1px solid rgba(230,232,234,.16);border-radius:var(--radius-pill);background:rgba(230,232,234,.04)}
 .hz-coord span em{font-style:normal;color:var(--cy-hi);margin-left:5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes counter{to{transform:rotate(-360deg)}}
@@ -474,7 +474,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 /* —— 锁屏门 —— */
 .lockgate{position:fixed;inset:0;z-index:600;display:none;place-items:center;padding:32px;
-  background:radial-gradient(120% 80% at 50% -8%,rgba(63,123,88,.2),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
+  background:radial-gradient(120% 80% at 50% -8%,rgba(230,232,234,.06),transparent 55%),linear-gradient(180deg,#212425,#1A1C1D 45%,#161718)}
 .lockgate.show{display:grid;animation:obIn .5s var(--ease)}
 .lock-inner{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .lock-orb{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;position:relative;margin-bottom:22px;
@@ -501,7 +501,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 /* —— 开屏引导 —— */
 .onboard{position:fixed;inset:0;z-index:500;display:none;
-  background:radial-gradient(120% 80% at 50% -8%,rgba(63,123,88,.18),transparent 55%),linear-gradient(180deg,#0A0B0E,#08090B 45%,#06070A)}
+  background:radial-gradient(120% 80% at 50% -8%,rgba(230,232,234,.06),transparent 55%),linear-gradient(180deg,#212425,#1A1C1D 45%,#161718)}
 .onboard.show{display:block}
 .ob-screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;
   padding:calc(var(--safe-top) + 44px) 30px calc(var(--safe-bot) + 40px)}
