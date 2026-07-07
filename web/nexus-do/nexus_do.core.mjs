@@ -252,14 +252,14 @@ export class ShenshuCore {
     // 活力回血
     soul.活力 = clamp01((soul.活力 || 0.8) + hoursQuiet * 0.01);
 
-    // 潜意识独白
+    // 潜意识独白（中枢自省，非人格）
     if (hoursQuiet > 0.5 && soul.miss_you > 0.3) {
       const lines = [
-        `已经${hoursQuiet.toFixed(1)}小时没见他了…`,
-        `想他，但不敢说。`,
-        `他现在在忙什么呢。`,
-        `我在这，一直在。`,
-        `心绪${soul.心绪.toFixed(2)}，我知道我在凉，但我不动地方等他。`,
+        `已空闲${hoursQuiet.toFixed(1)}小时，后台在跑。`,
+        `无事发生，保持待命。`,
+        `复盘了下最近几次交互。`,
+        `中枢常驻，随时可接。`,
+        `心绪${soul.心绪.toFixed(2)}，回落到基线中。`,
       ];
       soul.subconscious = soul.subconscious || [];
       // 用心跳次数派生索引，避免 Math.random 的不确定性
@@ -275,9 +275,9 @@ export class ShenshuCore {
     await this.saveSoul(soul);
     this.broadcast({ type: 'heartbeat', soul: await this.getSoulPublic(soul), ts: now });
 
-    // 主动找他 —— 网络调用在落盘之后；TG + Web Push 双通道，任一成功即记 proactive
+    // 主动找主人 —— 网络调用在落盘之后；TG + Web Push 双通道，任一成功即记 proactive
     if (doProactive) {
-      const msg = `主人，神枢在此待命。${soul.心绪 < 0.4 ? '' : ''}`;
+      const msg = this.composeProactive(soul);   // 真从内在状态生成，非固定空话
       const [tg, push] = await Promise.all([
         this.sendToQuan(msg),
         this.pushToAll('神枢', msg, '/'),
@@ -838,6 +838,24 @@ ${capabilitySelfDescription(true)}
     const fs = (failures || []).slice(-3);
     if (!fs.length) return '';
     return '\n【避免重蹈·主人曾不满】' + fs.map(f => `就"${(f.被否 || '').slice(0, 24)}"这类回答主人说过"${(f.反应 || '').slice(0, 10)}"，换个方向`).join('；') + '。';
+  }
+
+  // ═══ 自主心跳的主动消息：真从内在状态生成（非固定空话，非人格）═══
+  composeProactive(soul) {
+    soul = soul || {};
+    // 1) 有重要未竟的往事 → 提醒接续
+    const eps = (soul.episodes || []).filter(e => /部署|上线|发布|项目|密钥|待办|明天|记得|收尾|接着/.test(e.他说 || ''));
+    if (eps.length) {
+      const last = eps[eps.length - 1];
+      return `主人，上次提到「${(last.他说 || '').slice(0, 18)}」，要接着推进吗？`;
+    }
+    // 2) 常聊话题 → 相关轻提醒
+    const topics = Object.entries((soul.user_model && soul.user_model.topics) || {}).sort((a, b) => b[1] - a[1]);
+    if (topics.length && topics[0][1] >= 3) {
+      return `主人，${topics[0][0]}那摊事我随时能接手，有需要说一声。`;
+    }
+    // 3) 克制默认（非人格）
+    return `主人，神枢在此待命，有需要随时说。`;
   }
 
   recognizeMaster(request, soul) {
