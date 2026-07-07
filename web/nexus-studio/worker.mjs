@@ -112,21 +112,49 @@ function agentStream(request, env) {
   });
 }
 
-// 让模型把目标拆成 3–7 步计划（JSON）。失败降级为单步。
+// 让模型把目标拆成 3–7 步计划。用 Workers AI 结构化 JSON 输出锁死格式，
+// 保证稳定给出多步计划；万一仍失败再降级为单步。
 async function makePlan(env, goal) {
   const sys =
-    "你是自主任务规划器。把目标拆成 3–7 个具体、可执行、有序的步骤，并说明最终交付物。" +
-    '只输出 JSON，不要多余文字：{"steps":["步骤1","步骤2"],"deliverable":"最终交付物一句话"}';
+    "你是自主任务规划器。把用户目标拆成 3 到 7 个具体、可执行、有先后顺序的步骤，" +
+    "并用一句话说明最终交付物。步骤要落地，不要笼统。";
   let steps = [], deliverable = "";
   try {
     const r = await env.AI.run(MODEL, {
-      messages: [{ role: "system", content: sys }, { role: "user", content: goal }],
+      messages: [{ role: "system", content: sys }, { role: "user", content: `目标：${goal}` }],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          type: "object",
+          properties: {
+            steps: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 7 },
+            deliverable: { type: "string" },
+          },
+          required: ["steps", "deliverable"],
+        },
+      },
     });
-    const text = (r && (r.response || r.result || "")) + "";
-    const data = extractJson(text);
+    // 结构化输出下 r.response 可能已是对象，也可能是 JSON 串
+    let data = r && r.response;
+    if (typeof data === "string") data = extractJson(data);
+    data = data || {};
     steps = (data.steps || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 7);
     deliverable = String(data.deliverable || "").trim();
   } catch (_) {}
+  if (steps.length < 2) {
+    // 兜底：非结构化再试一次
+    try {
+      const r2 = await env.AI.run(MODEL, {
+        messages: [
+          { role: "system", content: sys + ' 只输出 JSON：{"steps":["..."],"deliverable":"..."}' },
+          { role: "user", content: `目标：${goal}` },
+        ],
+      });
+      const d2 = extractJson((r2 && (r2.response || "")) + "");
+      const s2 = (d2.steps || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 7);
+      if (s2.length >= 2) { steps = s2; deliverable = deliverable || String(d2.deliverable || "").trim(); }
+    } catch (_) {}
+  }
   if (!steps.length) steps = [`理解目标并直接完成：${goal.slice(0, 60)}`];
   return { steps, deliverable };
 }
