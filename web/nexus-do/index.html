@@ -131,10 +131,10 @@ button,input,textarea{font-family:inherit;color:inherit}
 
 /* —— 页面容器（横向 pager）—— */
 .pager{flex:1;position:relative;overflow:hidden}
-.pages{display:flex;height:100%;width:calc(var(--pages,5)*100%);
+.pages{display:flex;height:100%;width:calc(var(--pages,3)*100%);
   transition:transform .42s var(--ease)}
 .pages.dragging{transition:none}
-.page{flex:0 0 calc(100%/var(--pages,5));height:100%;overflow-y:auto;overflow-x:hidden;
+.page{flex:0 0 calc(100%/var(--pages,3));height:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-bot) + 8px)}
 .page-inner{padding:18px 16px}
 .page-head{padding:14px 18px 6px}
@@ -235,6 +235,16 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 /* ============ 记忆页 / 她 / 设置 通用卡 ============ */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:13px}
+/* —— 动态折叠分区（accordion，grid 0fr→1fr 平滑展开）—— */
+.fold{border:1px solid var(--line);border-radius:15px;margin-bottom:11px;background:var(--surface);overflow:hidden}
+.fold-h{width:100%;display:flex;align-items:center;justify-content:space-between;padding:15px 17px;cursor:pointer;
+  background:transparent;border:none;color:var(--text);font-size:15px;font-weight:600;letter-spacing:.02em;text-align:left}
+.fold-h i{font-style:normal;color:var(--text-3);font-size:16px;transition:transform .32s var(--ease)}
+.fold.open .fold-h i{transform:rotate(180deg)}
+.fold-b{display:grid;grid-template-rows:0fr;transition:grid-template-rows .34s var(--ease)}
+.fold.open .fold-b{grid-template-rows:1fr}
+.fold-in{overflow:hidden;min-height:0;padding:0 14px}
+.fold-in > .card:last-child,.fold-in > *:last-child{margin-bottom:14px}
 .card-title{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--chrome-2);font-weight:600;margin-bottom:13px;
   display:flex;justify-content:space-between;align-items:center}
 .mem-item{padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.55}
@@ -645,7 +655,7 @@ body::before{
       <span class="wordmark">Black God</span>
     </div>
     <div class="cmd-btn" onclick="openCmd()" aria-label="指令栏">⌘</div>
-    <div class="agent-island" id="agentIsland" onclick="go(3)">
+    <div class="agent-island" id="agentIsland" onclick="go(0)">
       <span class="dot" id="liveDot"></span><span id="liveText">连接中</span>
       <span class="ai-flow"></span>
     </div>
@@ -656,8 +666,8 @@ body::before{
     <div class="pages" id="pages">
 
       <!-- ===== 主控台 Hub · 神枢此刻的运行状态 ===== -->
-      <section class="page" id="hub">
-        <div class="page-head"><div class="page-eyebrow">The Hub · 主控台</div><div class="page-h1">神枢</div></div>
+      <section class="page" id="mind">
+        <div class="page-head"><div class="page-eyebrow">The Hub · 神枢</div><div class="page-h1">神枢</div></div>
         <div class="page-inner">
           <div class="huanzhong">
             <div class="hz-orbit"></div><div class="hz-orbit o2"></div>
@@ -668,10 +678,29 @@ body::before{
           <div class="hz-couplet">枢得其环中 · 以应无穷</div>
           <div class="hz-coord" id="hzCoord"></div>
           <div class="hub-live" style="justify-content:center"><span class="dot" id="hubDot"></span><span id="hubStateText">中枢连接中…</span></div>
-          <div class="hub-decl" id="hubDecl" style="text-align:center;margin-bottom:4px">万物绕之而旋，枢自不动。</div>
-          <div class="card">
-            <div class="card-title">神枢此刻 · 推理与执行日志</div>
-            <div class="timeline" id="hubTimeline"><div class="mem-empty">连接神枢运行流…</div></div>
+          <div class="hub-decl" id="hubDecl" style="text-align:center;margin-bottom:18px">万物绕之而旋，枢自不动。</div>
+
+          <div class="fold open">
+            <button class="fold-h" onclick="toggleFold(this)"><span>推理与执行日志</span><i>⌄</i></button>
+            <div class="fold-b"><div class="fold-in"><div class="timeline" id="hubTimeline"><div class="mem-empty">连接神枢运行流…</div></div></div></div>
+          </div>
+          <div class="fold">
+            <button class="fold-h" onclick="toggleFold(this)"><span>记忆</span><i>⌄</i></button>
+            <div class="fold-b"><div class="fold-in">
+              <div class="card"><div class="card-title">记忆图谱 · 关联理解</div><div id="memGraph" class="mem-graph"><div class="mem-empty">构建关联…</div></div></div>
+              <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有记忆 · 聊起来就会记下</div></div></div>
+              <div class="card"><div class="card-title">神枢的推理独白</div><div id="memVoice"><div class="mem-empty">安静着…</div></div></div>
+              <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
+              <div class="card"><div class="card-title">独处时的潜意识</div><div id="memSub"><div class="mem-empty">—</div></div></div>
+            </div></div>
+          </div>
+          <div class="fold">
+            <button class="fold-h" onclick="toggleFold(this)"><span>状态 · 时间感知</span><i>⌄</i></button>
+            <div class="fold-b"><div class="fold-in">
+              <div class="soul-mood" id="soulMood" style="text-align:center;margin:2px 0 12px">连接神枢的运行流…</div>
+              <div class="think-card"><div class="think-quote" id="soulThink">…</div><div class="think-by" id="soulThinkBy"></div></div>
+              <div class="time-sense" id="timeAware"><div class="time-line">读取时间感知…</div></div>
+            </div></div>
           </div>
         </div>
       </section>
@@ -709,33 +738,6 @@ body::before{
         </div>
       </section>
 
-      <!-- ===== 记忆 ===== -->
-      <section class="page" id="memory">
-        <div class="page-head"><div class="page-eyebrow">Memory · 神枢记得的</div><div class="page-h1">记忆</div></div>
-        <div class="page-inner">
-          <div class="card"><div class="card-title">记忆图谱 · 关联理解</div><div id="memGraph" class="mem-graph"><div class="mem-empty">构建关联…</div></div></div>
-          <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有记忆 · 聊起来就会记下</div></div></div>
-          <div class="card"><div class="card-title">神枢的推理独白</div><div id="memVoice"><div class="mem-empty">安静着…</div></div></div>
-          <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
-          <div class="card"><div class="card-title">独处时的潜意识</div><div id="memSub"><div class="mem-empty">—</div></div></div>
-        </div>
-      </section>
-
-      <!-- ===== 她（灵魂） · 内在，不凸显 ===== -->
-      <section class="page" id="soul">
-        <div class="page-inner">
-          <div class="presence">
-            <div class="soul-orb" id="soulOrb"><span class="glyph">枢</span></div>
-            <div class="soul-mood" id="soulMood">连接神枢的运行流…</div>
-          </div>
-          <div class="think-card">
-            <div class="think-quote" id="soulThink">…</div>
-            <div class="think-by" id="soulThinkBy"></div>
-          </div>
-          <div class="time-sense" id="timeAware"><div class="time-line">读取时间感知…</div></div>
-        </div>
-      </section>
-
       <!-- ===== 设置 ===== -->
       <section class="page" id="settings">
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
@@ -755,11 +757,9 @@ body::before{
 
   <!-- Tab 栏 -->
   <nav class="tabbar" id="tabbar">
-    <div class="tab on" onclick="go(0)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/></svg><span>主控台</span></div>
+    <div class="tab on" onclick="go(0)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg><span>神枢</span></div>
     <div class="tab" onclick="go(1)"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.7 8.7 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 1 1 16.1-3.9z"/></svg><span>对话</span></div>
-    <div class="tab" onclick="go(2)"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 1 6 6c0 2-1 3-2 4s-1.5 2-1.5 3.5h-5C9.5 15 9 14 8 13S6 11 6 9a6 6 0 0 1 6-6zM9.5 20h5M10 22h4"/></svg><span>记忆</span></div>
-    <div class="tab" onclick="go(3)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg><span>神枢</span></div>
-    <div class="tab" onclick="go(4)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.5-2.3 1a7 7 0 0 0-2.3-1.3L14 3h-4l-.3 2.1A7 7 0 0 0 7.4 6.4l-2.3-1-2 3.5 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 2.3 1.3L10 21h4l.3-2.1a7 7 0 0 0 2.3-1.3l2.3 1 2-3.5-2-1.5A7 7 0 0 0 19 12z"/></svg><span>设置</span></div>
+    <div class="tab" onclick="go(2)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.5-2.3 1a7 7 0 0 0-2.3-1.3L14 3h-4l-.3 2.1A7 7 0 0 0 7.4 6.4l-2.3-1-2 3.5 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 2.3 1.3L10 21h4l.3-2.1a7 7 0 0 0 2.3-1.3l2.3 1 2-3.5-2-1.5A7 7 0 0 0 19 12z"/></svg><span>设置</span></div>
   </nav>
 </div>
 
@@ -991,14 +991,13 @@ function hap(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
 /* ============ Pager / Tab / 手势 ============ */
 let curPage = 0;
-const PAGES = 5;
+const PAGES = 3;
 const STEP = 100 / PAGES;
 function go(i) {
   curPage = Math.max(0, Math.min(PAGES-1, i));
   $('#pages').style.transform = `translateX(${-curPage * STEP}%)`;
   $$('.tab').forEach((t,idx) => t.classList.toggle('on', idx === curPage));
-  if (curPage === 0) loadHub();     // 主控台
-  if (curPage === 2) loadInner();   // 记忆
+  if (curPage === 0) { loadHub(); loadInner(); }   // 神枢：环中盘 + 记忆 + 状态 同屏（折叠）
   hap(4);
 }
 /* 横向滑动切 Tab */
@@ -1070,6 +1069,7 @@ function setGreeting(){ const el=$('#wcGreet'); if(!el) return;
   const g = h<5?'夜深了' : h<11?'早上好' : h<13?'中午好' : h<18?'下午好' : h<23?'晚上好' : '夜深了';
   const nick=(store.get('reg_nick')||'').trim();
   el.textContent = nick ? (g+'，'+nick) : g; }
+function toggleFold(btn){ const f=btn && btn.closest('.fold'); if(f) f.classList.toggle('open'); }
 function quick(t){ setModeByName('chat'); $('#inp').value=t; autogrow($('#inp')); send(); }
 function setModeByName(m){ const el=[...$$('.chip.mode')].find(c=>c.dataset.mode===m); if(el)setMode(el); }
 let history = [];
@@ -1264,8 +1264,8 @@ const SKILLS=[
   {ic:'💻',t:'写代码',s:'生成/调试/解释',run:()=>{cmdToChat('chat','code')}},
   {ic:'🎨',t:'出图',s:'Flux 生成',run:()=>{cmdToChat('image')}},
   {ic:'🔊',t:'语音',s:'语音合成',run:()=>{cmdToChat('voice')}},
-  {ic:'💗',t:'看状态',s:'心绪/待命',run:()=>{closeCmd();go(3);}},
-  {ic:'🧩',t:'记忆图谱',s:'神枢记得的一切',run:()=>{closeCmd();go(2);}},
+  {ic:'💗',t:'看状态',s:'运行/待命',run:()=>{closeCmd();go(0);}},
+  {ic:'🧩',t:'记忆图谱',s:'神枢记得的一切',run:()=>{closeCmd();go(0);}},
 ];
 function openCmd(){ $('#cmdMask').classList.add('show'); $('#cmdPalette').classList.add('show'); renderSkills(''); setTimeout(()=>$('#cmdInput').focus(),120); hap(6); }
 function closeCmd(){ $('#cmdMask').classList.remove('show'); $('#cmdPalette').classList.remove('show'); $('#cmdInput').value=''; }
