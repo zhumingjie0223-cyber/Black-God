@@ -146,36 +146,24 @@ button,input,textarea{font-family:inherit;color:inherit}
 .chat-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 12px}
 #welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:100%;padding:20px 22px;text-align:center}
-.hero-orb{width:104px;height:104px;border-radius:50%;position:relative;margin-bottom:20px;
-  display:grid;place-items:center;
-  background:radial-gradient(circle at 38% 32%,#2a2f37,#0c0e11 72%);
-  border:1px solid var(--line-2);
-  box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 60px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);
-  animation:orbBreath 4.6s ease-in-out infinite}
-.hero-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;
-  background:conic-gradient(from 0deg,transparent,var(--cy-1),transparent 55%);
-  opacity:.28;filter:blur(6px);animation:orbSpin 7s linear infinite}
-.hero-glyph{font-family:var(--serif);font-size:46px;font-weight:700;line-height:1;
-  background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-/* 核心呼吸：银色微光，克制而稳定（绿只留给"在线"状态点）*/
+@keyframes orbSpin{to{transform:rotate(360deg)}}
 @keyframes orbBreath{0%,100%{transform:scale(1);box-shadow:0 10px 50px rgba(0,0,0,.55),0 0 44px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08)}
   50%{transform:scale(1.04);box-shadow:0 14px 60px rgba(0,0,0,.6),0 0 66px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.1)}}
-@keyframes orbSpin{to{transform:rotate(360deg)}}
-.hero-name{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:.08em;
-  background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.hero-sub{font-size:14px;color:var(--text-2);margin-top:8px;line-height:1.6}
-.hero-line{display:flex;align-items:center;justify-content:center;gap:9px;margin:18px auto;color:var(--chrome-2);font-size:8px}
-.hero-line::before,.hero-line::after{content:"";width:42px;height:1px;background:linear-gradient(90deg,transparent,rgba(190,193,197,.75))}
-.hero-line::after{transform:scaleX(-1)}
-.quicks{display:grid;gap:10px;width:100%;max-width:380px;margin-top:22px}
-.qcard{display:flex;align-items:center;gap:13px;padding:14px 15px;text-align:left;cursor:pointer;
-  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);transition:.18s var(--ease)}
-.qcard:active{transform:scale(.975);background:var(--surface-2)}
-.qcard .qi{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;color:var(--chrome-2);
-  background:var(--surface-2);border:1px solid var(--line)}
-.qcard .qi svg{width:20px;height:20px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.qcard b{display:block;font-size:14.5px;font-weight:650}
-.qcard span{display:block;font-size:12px;color:var(--text-3);margin-top:2px}
+/* —— 对话空态：克制、留白、工具优先 —— */
+.wc-mark{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;margin-bottom:26px;
+  background:radial-gradient(circle at 40% 34%,#2a2f37,#111318 74%);border:1px solid var(--line-2);
+  box-shadow:0 6px 22px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+.wc-mark span{font-family:var(--serif);font-size:26px;font-weight:700;line-height:1;
+  background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.wc-greet{font-size:27px;font-weight:600;letter-spacing:.01em;color:var(--text)}
+.wc-sub{font-size:14px;color:var(--text-3);margin-top:9px;letter-spacing:.02em}
+.wc-suggest{display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px;margin-top:34px}
+.wc-item{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;cursor:pointer;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  color:var(--text);font-size:14.5px;font-weight:500;letter-spacing:.01em}
+.wc-item svg{width:18px;height:18px;flex-shrink:0;stroke:var(--chrome-2);stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.wc-item span{flex:1}
+.wc-item i{font-style:normal;color:var(--text-3);font-size:17px;opacity:.6}
 
 .msgs{display:flex;flex-direction:column;gap:14px;padding:14px 16px}
 .msg{max-width:86%;display:flex;flex-direction:column;gap:5px;animation:msgIn .4s var(--spring)}
@@ -539,17 +527,17 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   --ease-flow:cubic-bezier(.22,.61,.36,1);     /* 流体缓动 */
 }
 /* 伸缩式按钮：按下即收（scale .9），抬手弹回带过冲；指针设备悬停微张浮起 */
-.send,.chip,.qcard,.tile,.agent-island,.top-status,.speak-btn,.ob-btn,.lock-btn,.hz-node,.cap-item,.cmd-item{
+.send,.chip,.wc-item,.tile,.agent-island,.top-status,.speak-btn,.ob-btn,.lock-btn,.hz-node,.cap-item,.cmd-item{
   transition:transform .36s var(--spring-lg), box-shadow .3s var(--ease-flow),
              background .28s var(--ease-flow), border-color .3s !important;
   -webkit-tap-highlight-color:transparent; touch-action:manipulation;
 }
-.send:active,.chip:active,.qcard:active,.tile:active,.agent-island:active,
+.send:active,.chip:active,.wc-item:active,.tile:active,.agent-island:active,
 .speak-btn:active,.ob-btn:active,.hz-node:active,.cap-item:active,.cmd-item:active{
   transform:scale(.9) !important;
 }
 @media (hover:hover) and (pointer:fine){
-  .chip:hover,.qcard:hover,.tile:hover,.agent-island:hover,.cap-item:hover,.cmd-item:hover{
+  .chip:hover,.wc-item:hover,.tile:hover,.agent-island:hover,.cap-item:hover,.cmd-item:hover{
     transform:translateY(-2px) scale(1.028);
     box-shadow:0 10px 30px rgba(0,0,0,.42),0 0 0 1px var(--line-2);
   }
@@ -691,14 +679,13 @@ body::before{
       <section class="page" id="chat">
         <div class="chat-scroll" id="chatScroll">
           <div id="welcome">
-            <div class="hero-orb"><span class="hero-glyph">枢</span></div>
-            <div class="hero-name">神枢</div>
-            <div class="hero-sub" id="heroSub">说出你要的，我来做。</div>
-            <div class="hero-line"></div>
-            <div class="quicks">
-              <div class="qcard" onclick="quick('用枢语报一下你此刻的运行状态')"><div class="qi"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div><b>枢语状态</b><span>五维语义坐标 · 神枢自己的语言</span></div></div>
-              <div class="qcard" onclick="quick('帮我写一段 Python，并解释思路')"><div class="qi"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg></div><div><b>写 & 调代码</b><span>工程级 · 直接给完整可运行代码</span></div></div>
-              <div class="qcard" onclick="quick('接着上次的进度，我们做到哪了？')"><div class="qi"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg></div><div><b>接续进度</b><span>记得你的项目与上下文</span></div></div>
+            <div class="wc-mark"><span>枢</span></div>
+            <div class="wc-greet" id="wcGreet">你好</div>
+            <div class="wc-sub">说出你要的，我来做。</div>
+            <div class="wc-suggest">
+              <button class="wc-item" onclick="quick('帮我写一段 Python，并解释思路')"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><span>写并调试代码</span><i>›</i></button>
+              <button class="wc-item" onclick="quick('接着上次的进度，我们做到哪了？')"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg><span>接续上次进度</span><i>›</i></button>
+              <button class="wc-item" onclick="quick('用枢语报一下你此刻的运行状态')"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg><span>报告运行状态</span><i>›</i></button>
             </div>
           </div>
           <div class="msgs" id="msgs" style="display:none"></div>
@@ -1077,6 +1064,11 @@ const MODE_PH = { chat:'对神枢说出你的目标…', image:'描述要生成�
 function toggleCap(el){ const c=el.dataset.cap; el.classList.toggle('on'); el.classList.contains('on')?caps.add(c):caps.delete(c); }
 function setMode(el){ mode=el.dataset.mode; $$('.chip.mode').forEach(c=>c.classList.toggle('on', c===el)); $('#inp').placeholder=MODE_PH[mode]||MODE_PH.chat; if(navigator.vibrate)try{navigator.vibrate(4);}catch(e){} }
 function autogrow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
+function setGreeting(){ const el=$('#wcGreet'); if(!el) return;
+  const h=new Date().getHours();
+  const g = h<5?'夜深了' : h<11?'早上好' : h<13?'中午好' : h<18?'下午好' : h<23?'晚上好' : '夜深了';
+  const nick=(store.get('reg_nick')||'').trim();
+  el.textContent = nick ? (g+'，'+nick) : g; }
 function quick(t){ setModeByName('chat'); $('#inp').value=t; autogrow($('#inp')); send(); }
 function setModeByName(m){ const el=[...$$('.chip.mode')].find(c=>c.dataset.mode===m); if(el)setMode(el); }
 let history = [];
@@ -1523,6 +1515,7 @@ function typeInto(bubble, text, done){
   try{ $('#pages').style.setProperty('--pages', PAGES); }catch(e){}
   // —— 模式无关的 UI 初始化 ——
   try{ applyTheme(store.get('theme') || 'dark'); }catch(e){}  // 石墨暗流为默认，用户可在设置里切换
+  try{ setGreeting(); }catch(e){}
   try{ if(store.get('model')){ const m=MODELS.find(x=>x.id===store.get('model')); if(m)$('#modelLabel').textContent=m.name; } }catch(e){}
   try{ if(store.get('api_base')) $('#apiLabel').textContent='外接网关'; }catch(e){}
   try{ setPushUI(!!store.get('push_on')); }catch(e){}
