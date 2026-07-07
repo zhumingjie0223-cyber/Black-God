@@ -209,30 +209,51 @@ button,input,textarea{font-family:inherit;color:inherit}
 .img-viewer img{max-width:100%;max-height:100%;border-radius:12px}
 
 /* —— 输入坞 —— */
-.dock{flex-shrink:0;padding:10px 12px 10px;
-  background:color-mix(in srgb,var(--bg) 78%,transparent);
+.dock{position:relative;flex-shrink:0;padding:10px 12px 10px;
+  background:color-mix(in srgb,var(--bg) 82%,transparent);
   backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);
   border-top:1px solid var(--line)}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none}
-.chip{flex-shrink:0;padding:6px 14px;border-radius:var(--radius-pill);font-size:12.5px;font-weight:500;letter-spacing:.06em;
-  background:transparent;border:1px solid var(--line);color:var(--text-3);cursor:pointer;transition:.15s;white-space:nowrap}
-.chip:active{transform:scale(.94)}
-.chip.on{background:var(--cy-glow);border-color:var(--cy-3);color:var(--cy-hi)}
-/* 能力型（深度/代码/枢语）默认更隐,选中才亮玉——不与模式抢视觉 */
-.chip.cap{opacity:.72}
-.chip.cap.on{opacity:1}
-.input-row{display:flex;align-items:flex-end;gap:9px}
-.in-box{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:22px;transition:.3s var(--spring);
-  padding:9px 15px;transition:.2s}
-.in-box:focus-within{border-color:var(--chrome-3);box-shadow:0 0 0 3px var(--chrome-glow),0 4px 20px rgba(0,0,0,.25)}
-textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;font-size:15.5px;
-  max-height:130px;line-height:1.45}
-.send{width:42px;height:42px;flex-shrink:0;border:none;border-radius:50%;cursor:pointer;
+/* 表面永远只 3 键：＋ / 输入 / 送出(或麦克风) */
+.composer{display:flex;align-items:flex-end;gap:9px}
+.plus-btn{width:42px;height:42px;flex-shrink:0;border:1px solid var(--line-2);border-radius:50%;cursor:pointer;
+  display:grid;place-items:center;background:var(--surface);color:var(--cy-2);
+  transition:transform .4s cubic-bezier(.2,.9,.25,1),background .25s,border-color .25s}
+.plus-btn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.plus-btn:active{transform:scale(.9)}
+.dock.plus-open .plus-btn{transform:rotate(135deg);background:var(--cy-grad);color:#0A2E1E;border-color:transparent}
+.in-box{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:22px;transition:.25s var(--spring);padding:9px 15px}
+.in-box:focus-within{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
+textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;font-size:15.5px;max-height:130px;line-height:1.45}
+.send{width:42px;height:42px;flex-shrink:0;border:none;border-radius:50%;cursor:pointer;position:relative;overflow:hidden;
   display:grid;place-items:center;background:var(--cy-grad);box-shadow:0 4px 16px var(--cy-glow);transition:.18s var(--spring)}
 .send:active{transform:scale(.88)}
-.send{box-shadow:0 4px 16px var(--cy-glow),0 0 0 1px rgba(190,193,197,.25)}
-.send:disabled{opacity:.4;box-shadow:none}
-.send svg{width:20px;height:20px;fill:#08120F}
+.send svg{width:21px;height:21px;grid-area:1/1}
+.send .ic-send{fill:#08160F}
+.send .ic-mic{fill:none;stroke:#08160F;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.composer:not(.typing) .ic-send{display:none}
+.composer.typing .ic-mic{display:none}
+/* ＋ 面板：从输入栏上方平滑滑出，图标错开浮现 */
+.plus-mask{position:fixed;inset:0;z-index:40;background:rgba(15,61,46,.14);opacity:0;pointer-events:none;transition:opacity .3s}
+.dock.plus-open ~ .plus-mask{opacity:1;pointer-events:auto}
+.plus-panel{position:absolute;left:12px;right:12px;bottom:calc(100% - 2px);z-index:50;
+  background:var(--bg-2);border:1px solid var(--line);border-radius:20px;padding:16px 14px;
+  box-shadow:0 -8px 40px rgba(15,61,46,.14),0 2px 10px rgba(15,61,46,.06);
+  opacity:0;transform:translateY(14px) scale(.98);transform-origin:20px bottom;pointer-events:none;
+  transition:opacity .38s cubic-bezier(.2,.9,.25,1),transform .42s cubic-bezier(.2,.9,.25,1)}
+.dock.plus-open .plus-panel{opacity:1;transform:none;pointer-events:auto}
+.pp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pp-tile{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px;cursor:pointer;
+  background:var(--surface-2);border:1px solid transparent;border-radius:15px;color:var(--text-2);font-size:12px;font-weight:500;
+  opacity:0;transform:translateY(8px);transition:transform .2s var(--spring),background .2s,border-color .2s,color .2s}
+.dock.plus-open .pp-tile{opacity:1;transform:none;transition:opacity .34s var(--ease) var(--d,0s),transform .34s cubic-bezier(.2,.9,.25,1) var(--d,0s),background .2s,border-color .2s}
+.pp-i{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--cy-2)}
+.pp-i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.pp-tile:active{transform:scale(.94)}
+.pp-tile.on{background:var(--cy-glow);border-color:var(--cy-3);color:var(--cy-4)}
+.pp-tile.on .pp-i{background:var(--cy-grad);color:#0A2E1E;border-color:transparent}
+.dock.plus-open .pp-tile:nth-child(1){--d:.02s}.dock.plus-open .pp-tile:nth-child(2){--d:.05s}.dock.plus-open .pp-tile:nth-child(3){--d:.08s}.dock.plus-open .pp-tile:nth-child(4){--d:.11s}
+.dock.plus-open .pp-tile:nth-child(5){--d:.14s}.dock.plus-open .pp-tile:nth-child(6){--d:.17s}.dock.plus-open .pp-tile:nth-child(7){--d:.20s}.dock.plus-open .pp-tile:nth-child(8){--d:.23s}
+@media (prefers-reduced-motion:reduce){.plus-panel,.pp-tile,.plus-btn{transition:opacity .15s !important}}
 
 /* ============ 记忆页 / 她 / 设置 通用卡 ============ */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:13px}
@@ -708,21 +729,28 @@ body::before{
           <div class="msgs" id="msgs" style="display:none"></div>
         </div>
         <div class="dock">
-          <div class="chips" id="chips">
-            <div class="chip mode on" data-mode="chat" onclick="setMode(this)">聊天</div>
-            <div class="chip mode" data-mode="image" onclick="setMode(this)">出图</div>
-            <div class="chip mode" data-mode="voice" onclick="setMode(this)">语音</div>
-            <div class="chip mode" data-mode="video" onclick="setMode(this)">视频</div>
-            <div class="chip cap" data-cap="think" onclick="toggleCap(this)">深度</div>
-            <div class="chip cap" data-cap="code" onclick="toggleCap(this)">代码</div>
-            <div class="chip cap" data-cap="shuyu" onclick="toggleCap(this)">枢语</div>
+          <!-- ＋ 功能面板：所有功能收纳于此，点＋平滑滑出（表面永远只 3 键）-->
+          <div class="plus-panel" id="plusPanel" aria-hidden="true">
+            <div class="pp-grid" id="chips">
+              <button class="pp-tile mode on" data-mode="chat" onclick="pickMode(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.7 8.7 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 1 1 16.1-3.9z"/></svg></span><span>对话</span></button>
+              <button class="pp-tile mode" data-mode="image" onclick="pickMode(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg></span><span>出图</span></button>
+              <button class="pp-tile mode" data-mode="voice" onclick="pickMode(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></span><span>语音</span></button>
+              <button class="pp-tile mode" data-mode="video" onclick="pickMode(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></span><span>视频</span></button>
+              <button class="pp-tile" onclick="pickFile()"><span class="pp-i"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5"/></svg></span><span>文件</span></button>
+              <button class="pp-tile" onclick="pickLink()"><span class="pp-i"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span><span>链接</span></button>
+              <button class="pp-tile cap" data-cap="think" onclick="toggleCap(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4 3.5 3.5 0 0 0-1 6.5V17a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-3.5A3.5 3.5 0 0 0 16 7a4 4 0 0 0-4-4zM9 21h6"/></svg></span><span>深度</span></button>
+              <button class="pp-tile cap" data-cap="code" onclick="toggleCap(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg></span><span>代码</span></button>
+              <button class="pp-tile cap" data-cap="shuyu" onclick="toggleCap(this)"><span class="pp-i"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></span><span>枢语</span></button>
+            </div>
           </div>
-          <div class="input-row">
-            <div class="in-box"><textarea id="inp" rows="1" placeholder="对神枢说出你的目标…" oninput="autogrow(this)"></textarea></div>
-            <button class="send" id="sendBtn" onclick="send()" aria-label="发送">
-              <svg viewBox="0 0 24 24"><path d="M2 21L23 12 2 3v7l15 2-15 2v7z"/></svg></button>
+          <div class="composer" id="composer">
+            <button class="plus-btn" id="plusBtn" onclick="togglePlus()" aria-label="更多功能"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            <div class="in-box"><textarea id="inp" rows="1" placeholder="对神枢说出你的目标…" oninput="autogrow(this);syncSend()"></textarea></div>
+            <button class="send" id="sendBtn" onclick="micOrSend()" aria-label="发送/语音"><svg class="ic-send" viewBox="0 0 24 24"><path d="M4 20l16-8L4 4v6l10 2-10 2z"/></svg><svg class="ic-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></button>
           </div>
+          <input type="file" id="fileInput" style="display:none" multiple onchange="onFilePicked(this)"/>
         </div>
+        <div class="plus-mask" id="plusMask" onclick="togglePlus()"></div>
       </section>
 
       <!-- ===== 设置 ===== -->
@@ -1049,8 +1077,28 @@ const caps = new Set();
 let mode = 'chat';
 const MODE_PH = { chat:'对神枢说出你的目标…', image:'描述要生成的画面…', voice:'输入要合成为语音的文字…', video:'描述要生成的视频画面…' };
 function toggleCap(el){ const c=el.dataset.cap; el.classList.toggle('on'); el.classList.contains('on')?caps.add(c):caps.delete(c); }
-function setMode(el){ mode=el.dataset.mode; $$('.chip.mode').forEach(c=>c.classList.toggle('on', c===el)); $('#inp').placeholder=MODE_PH[mode]||MODE_PH.chat; if(navigator.vibrate)try{navigator.vibrate(4);}catch(e){} }
+function setMode(el){ mode=el.dataset.mode; $$('.pp-tile.mode').forEach(c=>c.classList.toggle('on', c===el)); $('#inp').placeholder=MODE_PH[mode]||MODE_PH.chat; if(navigator.vibrate)try{navigator.vibrate(4);}catch(e){} }
 function autogrow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
+/* ＋ 面板：所有功能收纳于此，表面只 3 键 */
+function togglePlus(){ const d=$('.dock'); if(!d) return; const open=d.classList.toggle('plus-open'); const p=$('#plusPanel'); if(p) p.setAttribute('aria-hidden', open?'false':'true'); if(navigator.vibrate)try{navigator.vibrate(open?6:3);}catch(e){} }
+function closePlus(){ const d=$('.dock'); if(d) d.classList.remove('plus-open'); }
+function pickMode(el){ setMode(el); closePlus(); }
+function syncSend(){ const c=$('#composer'); if(c) c.classList.toggle('typing', !!($('#inp').value||'').trim()); }
+function micOrSend(){ if(($('#inp').value||'').trim()){ send(); } else { setModeByName('voice'); $('#inp').focus(); toast('语音模式 · 说出来或直接打字'); } }
+/* 文件：真读文本类文件内容进上下文（不许假；二进制/图片交后端时再扩展）*/
+function pickFile(){ closePlus(); const f=$('#fileInput'); if(f) f.click(); }
+async function onFilePicked(input){ const files=[...(input.files||[])]; input.value=''; if(!files.length) return;
+  let added=0, note=[];
+  for(const f of files.slice(0,3)){
+    if(f.size>200000){ note.push(f.name+'（太大，略过正文）'); continue; }
+    if(/^(text\/|application\/(json|xml|javascript)|)/.test(f.type) || /\.(txt|md|json|js|ts|py|csv|log|html?|css|xml|yaml|yml)$/i.test(f.name)){
+      try{ const t=await f.text(); const box=$('#inp'); box.value=(box.value?box.value+'\n\n':'')+`【文件 ${f.name}】\n`+t.slice(0,4000); autogrow(box); syncSend(); added++; }catch(e){ note.push(f.name+'（读取失败）'); }
+    } else note.push(f.name+'（'+(f.type||'二进制')+'，需后端解析）');
+  }
+  if(added) toast('已读入 '+added+' 个文件的正文'); if(note.length) toast(note.join('；'));
+}
+/* 链接：真交给 agent 打开读取（内核 runAgentLoop 的 open 工具）*/
+function pickLink(){ closePlus(); const url=prompt('粘贴要打开/分析的链接'); if(!url) return; const u=url.trim(); if(!/^https?:\/\//i.test(u)){ toast('请输入 http(s) 链接'); return; } const box=$('#inp'); box.value='打开并总结这个链接的要点：'+u; autogrow(box); syncSend(); box.focus(); }
 function setGreeting(){ const el=$('#wcGreet'); if(!el) return;
   const h=new Date().getHours();
   const g = h<5?'夜深了' : h<11?'早上好' : h<13?'中午好' : h<18?'下午好' : h<23?'晚上好' : '夜深了';
@@ -1058,7 +1106,7 @@ function setGreeting(){ const el=$('#wcGreet'); if(!el) return;
   el.textContent = nick ? (g+'，'+nick) : g; }
 function toggleFold(btn){ const f=btn && btn.closest('.fold'); if(f) f.classList.toggle('open'); }
 function quick(t){ setModeByName('chat'); $('#inp').value=t; autogrow($('#inp')); send(); }
-function setModeByName(m){ const el=[...$$('.chip.mode')].find(c=>c.dataset.mode===m); if(el)setMode(el); }
+function setModeByName(m){ const el=[...$$('.pp-tile.mode')].find(c=>c.dataset.mode===m); if(el)setMode(el); }
 let history = [];
 function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
@@ -1083,7 +1131,7 @@ let sending=false;
 async function send(){
   const inp=$('#inp'); const text=inp.value.trim(); if(!text||sending) return;
   sending=true; $('#sendBtn').disabled=true; hap(6);
-  pushMsg('me', text); inp.value=''; autogrow(inp);
+  pushMsg('me', text); inp.value=''; autogrow(inp); syncSend();
   setAgentStatus(mode==='chat'?'think':mode);
   try {
     if (mode==='image')      await doImage(text);
@@ -1261,7 +1309,7 @@ function renderSkills(q){ const list=SKILLS.filter(s=>!q||s.t.includes(q)||s.s.i
 function cmdInputHandler(e){ const v=e.target.value.trim();
   if(e.key==='Enter'&&v){ closeCmd(); go(1); $('#inp').value=v; autogrow($('#inp')); send(); return; }
   renderSkills(v); }
-function cmdToChat(m,cap){ closeCmd(); go(1); setModeByName(m); if(cap){ const chip=document.querySelector(`.chip[data-cap="${cap}"]`); if(chip&&!chip.classList.contains('on')) toggleCap(chip); } $('#inp').focus(); }
+function cmdToChat(m,cap){ closeCmd(); go(1); setModeByName(m); if(cap){ const chip=document.querySelector(`.pp-tile[data-cap="${cap}"]`); if(chip&&!chip.classList.contains('on')) toggleCap(chip); } $('#inp').focus(); }
 
 /* ============ 记忆图谱（可视化）============ */
 function renderMemGraph(inner){
