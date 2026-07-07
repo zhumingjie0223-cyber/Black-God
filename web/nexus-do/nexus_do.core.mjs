@@ -1447,8 +1447,8 @@ const MANIFEST_JSON = JSON.stringify({
   display_override: ['standalone', 'minimal-ui'],
   orientation: 'portrait',
   dir: 'ltr',
-  background_color: '#0B0A09',
-  theme_color: '#0B0A09',
+  background_color: '#1C1E1F',
+  theme_color: '#1C1E1F',
   lang: 'zh-CN',
   categories: ['productivity', 'utilities', 'lifestyle'],
   icons: [
@@ -1481,7 +1481,7 @@ const ASSETLINKS_JSON = JSON.stringify([
 
 // App 图标（世家 · 神字意象）：玄墨底 + 素银浮雕神字 + 一枚玉印点睛，矢量自包含
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><radialGradient id="bg" cx="42%" cy="34%" r="78%"><stop offset="0" stop-color="#1B1713"/><stop offset=".6" stop-color="#100E0C"/><stop offset="1" stop-color="#0A0908"/></radialGradient>
+<defs><radialGradient id="bg" cx="42%" cy="34%" r="78%"><stop offset="0" stop-color="#2E3234"/><stop offset=".6" stop-color="#232628"/><stop offset="1" stop-color="#1A1C1D"/></radialGradient>
 <linearGradient id="ag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2F4F7"/><stop offset=".5" stop-color="#9AA1AB"/><stop offset="1" stop-color="#6B727C"/></linearGradient></defs>
 <rect width="512" height="512" rx="112" fill="url(#bg)"/>
 <circle cx="256" cy="256" r="168" fill="none" stroke="url(#ag)" stroke-width="5" opacity=".28"/>
