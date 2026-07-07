@@ -471,8 +471,14 @@ export class ShenshuCore {
     const memories = this.retrieveMemories(snap, text, 3);
     // #1 枢语坐标 → 真影响回话：由坐标推出温度 + 语气令，注入系统与生成参数
     const gen = this.shuToGen(nextCoord);
+    // 联网：需要外部/新鲜信息时，先真实检索，把资料喂进本次回话（非事后触发，直接影响回复）
+    let webBlock = '';
+    if (this.needsWeb(text) || (Array.isArray(caps) && caps.includes('web'))) {
+      const found = await this.webSearch(text).catch(() => '');
+      if (found) webBlock = '\n\n【你刚联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
+    }
     const system = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
-      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive;
+      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive + webBlock;
 
     // —— 2) 网络：借算力回话（省 Key 分级：简单走免费 CF、复杂上 Claude 网关）——
     const brainResult = await this.callBrain(system, text, snap, { temperature: gen.temperature, tier: this.pickTier(text, caps) });
@@ -647,6 +653,42 @@ ${capabilitySelfDescription(true)}
     if (t.length > 60) return 'heavy';
     if (/代码|bug|架构|算法|证明|推导|分析|设计|部署|优化|为什么|怎么(?:做|办|实现)|方案|复杂|数学|逻辑|系统|漏洞|逆向|策略|重构|调试|报错|规划/.test(t)) return 'heavy';
     return 'light';
+  }
+
+  // ═══════════════════════ 联网 · 真实检索（DuckDuckGo，无需外部服务器）═══════════════════════
+  // 判定这句是否需要联网取外部/新鲜信息。纯函数，确定性，可测。保守触发，不滥用抓取。
+  needsWeb(text) {
+    const t = String(text || '');
+    if (t.length < 2) return false;
+    // 显式检索意图
+    if (/搜索|搜一?下|查一?下|查查|帮我查|检索|谷歌|百度|google|上网查|联网/i.test(t)) return true;
+    // 新鲜/时效性 + 事实性问句
+    const fresh = /最新|今天|现在|实时|当前|近期|今年|最近|20\d\d年?|刚刚|目前/.test(t);
+    const factual = /价格|股价|汇率|天气|新闻|多少钱|几点|发布|上市|排名|赛果|比分|结果|数据|财报|版本|谁是|哪年|哪里|是什么时候/.test(t);
+    if (fresh && factual) return true;
+    return false;
+  }
+
+  // 真实联网检索：抓 DuckDuckGo HTML 端，解析摘要。与 nexus-studio 同源实现，久经验证。
+  async webSearch(query) {
+    try {
+      const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-CN,zh;q=0.9' },
+        cf: { cacheTtl: 60 },
+      });
+      if (!resp.ok) return '';
+      const html = await resp.text();
+      const out = [];
+      const re = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+      let m;
+      while ((m = re.exec(html)) && out.length < 6) {
+        const txt = m[1].replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
+        if (txt) out.push(`${out.length + 1}. ${txt.slice(0, 220)}`);
+      }
+      return out.join('\n');
+    } catch (_) {
+      return '';
+    }
   }
 
   async callBrain(system, userMsg, soul, opts = {}) {
