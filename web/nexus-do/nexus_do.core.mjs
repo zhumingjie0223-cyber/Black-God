@@ -1555,8 +1555,8 @@ const MANIFEST_JSON = JSON.stringify({
   display_override: ['standalone', 'minimal-ui'],
   orientation: 'portrait',
   dir: 'ltr',
-  background_color: '#1C1E1F',
-  theme_color: '#1C1E1F',
+  background_color: '#F4FBF6',
+  theme_color: '#F4FBF6',
   lang: 'zh-CN',
   categories: ['productivity', 'utilities', 'lifestyle'],
   icons: [
@@ -1589,15 +1589,11 @@ const ASSETLINKS_JSON = JSON.stringify([
 
 // App 图标（世家 · 神字意象）：玄墨底 + 素银浮雕神字 + 一枚玉印点睛，矢量自包含
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><radialGradient id="bg" cx="42%" cy="34%" r="78%"><stop offset="0" stop-color="#2E3234"/><stop offset=".6" stop-color="#232628"/><stop offset="1" stop-color="#1A1C1D"/></radialGradient>
-<linearGradient id="ag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2F4F7"/><stop offset=".5" stop-color="#9AA1AB"/><stop offset="1" stop-color="#6B727C"/></linearGradient></defs>
+<defs><radialGradient id="bg" cx="40%" cy="32%" r="82%"><stop offset="0" stop-color="#5BE39A"/><stop offset=".55" stop-color="#2FB96B"/><stop offset="1" stop-color="#1B5E3F"/></radialGradient>
+<linearGradient id="ag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EAFBF0"/></linearGradient></defs>
 <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-<circle cx="256" cy="256" r="168" fill="none" stroke="url(#ag)" stroke-width="5" opacity=".28"/>
-<g stroke="url(#ag)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<path d="M256 128v256"/><path d="M168 196c62 0 88-18 88-52"/><path d="M168 196v150"/>
-<path d="M352 168l-70 34"/><path d="M282 202v168"/><path d="M282 268h70"/></g>
-<rect x="330" y="330" width="52" height="52" rx="7" fill="#3F7B58" transform="rotate(-4 356 356)"/>
-<rect x="336" y="336" width="40" height="40" rx="4" fill="none" stroke="#EDF3EE" stroke-width="2" opacity=".55" transform="rotate(-4 356 356)"/>
+<circle cx="256" cy="248" r="176" fill="none" stroke="#FFFFFF" stroke-width="4" opacity=".22"/>
+<text x="256" y="272" text-anchor="middle" dominant-baseline="central" font-family="'Songti SC','STSong','Noto Serif CJK SC','Noto Serif SC',serif" font-size="286" font-weight="700" fill="url(#ag)">神</text>
 </svg>`;
 
 // Service Worker —— 离线壳，保证掉线也能开
