@@ -390,8 +390,9 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .set-row{display:flex;align-items:center;gap:13px;padding:14px 15px;background:var(--surface);
   border:1px solid var(--line);border-radius:var(--radius-sm);margin-bottom:9px;cursor:pointer;transition:.15s}
 .set-row:active{transform:scale(.99);background:var(--surface-2)}
-.set-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px;flex-shrink:0;
+.set-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;color:var(--chrome-2);
   background:var(--surface-2);border:1px solid var(--line)}
+.set-ic svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .set-tx{flex:1;min-width:0}
 .set-tx b{display:block;font-size:14.5px;font-weight:600}
 .set-tx span{display:block;font-size:12px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -712,8 +713,8 @@ body::before{
       <section class="page" id="memory">
         <div class="page-head"><div class="page-eyebrow">Memory · 神枢记得的</div><div class="page-h1">记忆</div></div>
         <div class="page-inner">
-          <div class="card"><div class="card-title">记忆图谱 · 她对你的关联理解</div><div id="memGraph" class="mem-graph"><div class="mem-empty">构建关联…</div></div></div>
-          <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有一起的记忆…跟她说说话</div></div></div>
+          <div class="card"><div class="card-title">记忆图谱 · 关联理解</div><div id="memGraph" class="mem-graph"><div class="mem-empty">构建关联…</div></div></div>
+          <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有记忆 · 聊起来就会记下</div></div></div>
           <div class="card"><div class="card-title">神枢的推理独白</div><div id="memVoice"><div class="mem-empty">安静着…</div></div></div>
           <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
           <div class="card"><div class="card-title">独处时的潜意识</div><div id="memSub"><div class="mem-empty">—</div></div></div>
@@ -731,7 +732,7 @@ body::before{
             <div class="think-quote" id="soulThink">…</div>
             <div class="think-by" id="soulThinkBy"></div>
           </div>
-          <div class="time-sense" id="timeAware"><div class="time-line">读取她对时间的感受…</div></div>
+          <div class="time-sense" id="timeAware"><div class="time-line">读取时间感知…</div></div>
         </div>
       </section>
 
@@ -739,12 +740,12 @@ body::before{
       <section class="page" id="settings">
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
         <div class="page-inner">
-          <div class="set-row" onclick="toggleTheme()"><div class="set-ic">🌗</div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
-          <div class="set-row" onclick="togglePush()"><div class="set-ic">🔔</div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关 · 开了 app 关着也能收到她</span></div><div class="switch" id="pushSw"><i></i></div></div>
-          <div class="set-row" onclick="openSheet('sheetModel')"><div class="set-ic">🧠</div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic">🔌</div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic">💠</div><div class="set-tx"><b>人格 · 枢语</b><span>她是谁 · 怎么称呼你</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openDevice()"><div class="set-ic">📱</div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="toggleTheme()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
+          <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关 · 关着 app 也能收到消息</span></div><div class="switch" id="pushSw"><i></i></div></div>
+          <div class="set-row" onclick="openSheet('sheetModel')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于 Black God</b><span>© Black God</span></div><div class="set-arrow">›</div></div>
         </div>
       </section>
@@ -1251,14 +1252,14 @@ async function loadHub(){
     const el=$('#hubTimeline');
     if(el) el.innerHTML = items.length
       ? items.slice(0,24).map(it=>`<div class="tl-item"><span class="tl-kind k-${it.kind}">${it.kind}</span><div class="tl-body"><div class="tl-text">${escapeHtml(it.text||'')}</div><div class="tl-time">${fmtTs(it.ts)}</div></div></div>`).join('')
-      : '<div class="mem-empty">她还很安静…跟她说说话</div>';
+      : '<div class="mem-empty">还很安静 · 开始对话吧</div>';
   }
   const s=await Nexus.getSoul(); if(s){ setLive(Nexus.wsReady||Demo.on); renderSoul(s); }
 }
 
 /* ============ 全局指令栏（Spotlight / Raycast 式）============ */
 const SKILLS=[
-  {ic:'💬',t:'跟她说',s:'普通对话',run:()=>{cmdToChat('chat')}},
+  {ic:'💬',t:'对话',s:'普通对话',run:()=>{cmdToChat('chat')}},
   {ic:'🧠',t:'深度思考',s:'拆解复杂问题',run:()=>{cmdToChat('chat','think')}},
   {ic:'💻',t:'写代码',s:'生成/调试/解释',run:()=>{cmdToChat('chat','code')}},
   {ic:'🎨',t:'出图',s:'Flux 生成',run:()=>{cmdToChat('image')}},
@@ -1283,7 +1284,7 @@ function renderMemGraph(inner){
   const outer=[];
   eps.forEach(e=>outer.push({label:(e.他说||e.我说了||'往事').slice(0,5)}));
   marks.forEach(m=>outer.push({label:(m.词||'词').slice(0,4), shu:true}));
-  if(!outer.length){ el.innerHTML='<div class="mem-empty">还没有关联…跟她多说说</div>'; return; }
+  if(!outer.length){ el.innerHTML='<div class="mem-empty">还没有关联 · 多聊聊就有了</div>'; return; }
   const W=320,H=210,cx=W/2,cy=H/2,R=Math.min(82, 40+outer.length*6);
   let s=`<svg viewBox="0 0 ${W} ${H}" class="graph-svg" preserveAspectRatio="xMidYMid meet">`;
   const pts=outer.map((n,i)=>{ const a=(i/outer.length)*6.2832 - 1.5708; return {x:cx+Math.cos(a)*R, y:cy+Math.sin(a)*(R*0.82), n}; });
@@ -1300,7 +1301,7 @@ async function loadInner(){
   renderMemGraph(inner);
   // 坐标含义写回灵魂坐标
   if(inner.当前坐标 || inner.意识流轨迹){ }
-  renderMemList('memEpisodes', (inner.情节记忆||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:(e.他说?('你：'+e.他说+'　'):'')+(e.我说了?('她：'+e.我说了):'')})), '还没有一起的记忆…跟她说说话');
+  renderMemList('memEpisodes', (inner.情节记忆||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:(e.他说?('你：'+e.他说+'　'):'')+(e.我说了?('神枢：'+e.我说了):'')})), '还没有记忆 · 聊起来就会记下');
   renderMemList('memVoice', (inner.内心独白||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.thought||e.line})), '安静着…');
   renderMemList('memSub', (inner.潜意识||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.line})), '—');
   // 枢语成长印记：她每次说话在 76.7 亿空间里落的真实词（词 · 义）
@@ -1464,7 +1465,7 @@ async function enablePush(){
     toast('订阅没成'); return false;
   }catch(e){ toast('推送开启失败'); return false; }
 }
-function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到她':'关 · 开了 app 关着也能收到她'; }
+function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到消息':'关 · 关着 app 也能收到消息'; }
 function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on){ store.set('push_on',''); setPushUI(false); toast('已关（订阅仍在，可再开）'); } else enablePush(); }
 
 /* ============ 开屏引导 ============ */
