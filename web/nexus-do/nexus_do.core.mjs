@@ -448,6 +448,7 @@ export class ShenshuCore {
       gen_video: { prompt: s.arg },
       tg:        { text: s.arg },
       push:      { title: '神枢', body: s.arg || '有进展', url: '/' },
+      exec:      { command: s.arg },
     };
     const params = paramMap[s.id] || {};
     return this.invokeCapability(s.id, params, true, null);
@@ -703,7 +704,7 @@ ${capabilitySelfDescription(true)}
   // 从回话解析信息工具调用标记（确定性，可测）。
   parseToolCalls(reply) {
     const calls = [];
-    const re = /⟨\s*工具\s*[:：]\s*(web_search|open)\s*[｜|]\s*([^⟩]+)⟩/g;
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec)\s*[｜|]\s*([^⟩]+)⟩/g;
     let m;
     while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
     return calls;
@@ -728,15 +729,38 @@ ${capabilitySelfDescription(true)}
     } catch (_) { return ''; }
   }
 
+  // 执行脑 · 真沙箱的手：把命令送到主人自有服务器上真跑（exec_brain）。
+  // 未配 NEXUS_EXEC_URL → 如实告知「未接入」，绝不假装能跑（红线：不许假）。
+  async execRemote(cmd) {
+    const url = this.env.NEXUS_EXEC_URL;
+    const token = this.env.NEXUS_EXEC_TOKEN;
+    if (!url) return { ok: false, note: '执行脑未接入：在 Worker 配 NEXUS_EXEC_URL + NEXUS_EXEC_TOKEN，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
+    try {
+      const r = await fetch(url.replace(/\/+$/, '') + '/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+        body: JSON.stringify({ cmd: String(cmd || ''), timeout: 60 }),
+      });
+      if (r.status === 401) return { ok: false, note: '执行脑拒绝：token 不对' };
+      if (!r.ok) return { ok: false, note: '执行脑返回 ' + r.status };
+      const j = await r.json();
+      return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null };
+    } catch (e) {
+      return { ok: false, note: '连不上执行脑：' + String(e).slice(0, 80) };
+    }
+  }
+
   // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
   // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
   async runAgentLoop(baseSystem, text, soul, opts = {}) {
+    const hasExec = !!this.env.NEXUS_EXEC_URL;
     const TOOL_SPEC = `
 
-【你能自主调用的信息工具（作答前可多轮使用，最多 3 轮）】
+【你能自主调用的工具（作答前可多轮使用，最多 3 轮）】
 - 联网检索：⟨工具:web_search｜关键词⟩
-- 打开网页读原文：⟨工具:open｜https://完整网址⟩
-规则：需要外部/实时/事实信息时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续查或作答。资料够了就直接给最终答案、不带任何工具标记；别原地打转。`;
+- 打开网页读原文：⟨工具:open｜https://完整网址⟩${hasExec ? `
+- 在主人服务器上真跑命令/代码：⟨工具:exec｜shell 命令⟩（真执行，谨慎用；只服务主人）` : ''}
+规则：需要外部/实时/事实信息${hasExec ? '或需要真动手执行' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratch = '', toolLog = [], last = null;
     for (let step = 0; step < 3; step++) {
       const sys = baseSystem + TOOL_SPEC + (scratch ? `\n\n【你已查到的资料】\n${scratch}` : '');
@@ -749,6 +773,7 @@ ${capabilitySelfDescription(true)}
         let out = '';
         if (c.tool === 'web_search') out = await this.webSearch(c.arg).catch(() => '');
         else if (c.tool === 'open') out = await this.fetchUrl(c.arg).catch(() => '');
+        else if (c.tool === 'exec') { const e = await this.execRemote(c.arg).catch(() => null); out = e ? (e.ok ? `[退出码 ${e.code}]\n${e.stdout || ''}${e.stderr ? '\n[stderr]\n' + e.stderr : ''}` : ('执行脑：' + (e.note || e.error || '失败'))) : '执行脑无响应'; }
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }
@@ -1273,6 +1298,7 @@ ${capabilitySelfDescription(true)}
         case 'gen_video': out = await this.genVideo(params.prompt || '', params); break;
         case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
+        case 'exec':      out = await this.execRemote(params.command || ''); break;
         default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
       }
       // 招3（意识贯通）：动用能力 = 一段有情感质感的情节，且真的牵动她的心绪

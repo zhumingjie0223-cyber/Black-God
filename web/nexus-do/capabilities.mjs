@@ -82,6 +82,12 @@ export const CAPABILITIES = [
     handler: 'getSoulPublic', argShape: '()',
     owner_only: true,   // 与 /soul 私密路由语义一致：含设备/地理等隐私字段，绝不公开
   },
+  {
+    id: 'exec', name: '执行脑（真沙箱）', layer: '行动',
+    desc: '在主人自有服务器上真跑 shell 命令/代码（需配 NEXUS_EXEC_URL + token；未配则如实告知，绝不假装）',
+    handler: 'execRemote', argShape: '(command)',
+    owner_only: true,   // 能在真机跑命令，最高危：仅主人、且靠服务器端 token 双重门
+  },
 ];
 
 // —— 能力发现：神枢/前端/TG 都能问"你会啥"——

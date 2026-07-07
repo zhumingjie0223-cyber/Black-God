@@ -96,6 +96,12 @@ ok('多工具调用全部解析（兼容半角|）', S.parseToolCalls('⟨工具
 ok('无工具标记 → 空（视为最终答案）', S.parseToolCalls('这是最终答案，没有工具').length === 0);
 ok('未知工具名不误抓', S.parseToolCalls('⟨工具:rm_rf｜/⟩').length === 0);
 ok('清理残留工具标记', S.stripToolMarks('答案在此 ⟨工具:web_search｜x⟩ 结束') === '答案在此 结束');
+ok('解析 exec 工具调用', (() => { const c = S.parseToolCalls('⟨工具:exec｜ls -la⟩'); return c.length === 1 && c[0].tool === 'exec' && c[0].arg === 'ls -la'; })());
+
+// ── 执行脑（真沙箱的手）：owner 门 + 未接入如实告知（不许假）──
+ok('exec 能力 owner_only（匿名拒绝）', resolveCapability('exec', false).ok === false && resolveCapability('exec', false).reason === 'owner_only');
+ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('ls'); ok('未配 NEXUS_EXEC_URL → 如实说未接入、不假装', r.ok === false && /未接入/.test(r.note || '')); }
 
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');

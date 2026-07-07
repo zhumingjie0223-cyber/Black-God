@@ -865,6 +865,15 @@ class AgentHandler(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def _authed(self) -> bool:
+        """Token 门（加法，向后兼容）：设了 NEXUS_EXEC_TOKEN 就强制校验 Bearer，
+        没设则放行（本地开发）。公网暴露务必设 token —— 见 docker run。"""
+        token = os.environ.get("NEXUS_EXEC_TOKEN", "").strip()
+        if not token:
+            return True
+        auth = self.headers.get('Authorization', '')
+        return auth == f"Bearer {token}"
+
     def _sse_start(self):
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
@@ -978,7 +987,23 @@ class AgentHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = self.path.split('?')[0]
         body = self._read_body()
-        
+
+        # Token 门：会真跑命令/代码的端点必须过鉴权（设了 NEXUS_EXEC_TOKEN 时）
+        if path in ("/exec", "/api/tool/execute", "/api/chat", "/api/agent/stream") and not self._authed():
+            self._json({"error": "unauthorized"}, 401)
+            return
+
+        # 神枢执行脑 · 规范执行端点：{cmd, timeout?} → 真跑 shell，返回 stdout/stderr/code
+        if path == "/exec":
+            cmd = (body.get("cmd") or body.get("command") or "").strip()
+            if not cmd:
+                self._json({"error": "cmd is required"}, 400)
+                return
+            timeout = int(body.get("timeout", 60))
+            result = execute_tool("shell_execute", {"command": cmd, "timeout": timeout})
+            self._json({"ok": True, "cmd": cmd, "result": result})
+            return
+
         if path == "/api/chat":
             message = body.get("message", "")
             context = body.get("context", [])
