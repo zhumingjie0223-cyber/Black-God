@@ -104,5 +104,11 @@ const umSum = S.summarizeUserModel(um);
 ok('用户模型能喂回上下文（生成认知摘要）', /越用越懂/.test(umSum) && /代码/.test(umSum));
 ok('空模型不产生噪音', S.summarizeUserModel({ count: 0 }) === '');
 
+// ── 内在失败复盘：识别不满 + 喂回避免重蹈 ──
+ok('识别不满（开头/含否定）', S.detectDissatisfaction('不对，重来') && S.detectDissatisfaction('这答非所问') && !S.detectDissatisfaction('好的谢谢'));
+const failSum = S.summarizeFailures([{ 被否: '给你一堆没用的清单', 反应: '太啰嗦' }]);
+ok('失败复盘喂回上下文', /避免重蹈/.test(failSum) && /换个方向/.test(failSum));
+ok('无失败不产噪', S.summarizeFailures([]) === '');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

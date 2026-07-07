@@ -500,6 +500,16 @@ export class ShenshuCore {
     await this.storage.put('词典', 词典);
     // 内在「越用越懂你」：把这次交互蒸馏进用户模型（下次回话会用到）
     soul.user_model = this.distillUserModel(soul.user_model, text, reply);
+    // 内在失败复盘：主人这句表达不满 → 把上一句被否的回答记下，喂回以避免重蹈
+    if (this.detectDissatisfaction(text)) {
+      const prevStream = (await this.storage.get('stream')) || [];
+      const prevReply = prevStream.length ? prevStream[prevStream.length - 1].reply : null;
+      if (prevReply) {
+        soul.failures = soul.failures || [];
+        soul.failures.push({ ts: now, 被否: prevReply, 反应: text.slice(0, 20) });
+        if (soul.failures.length > 20) soul.failures = soul.failures.slice(-20);
+      }
+    }
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       soul.episodes.push({ ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion });
@@ -623,7 +633,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -816,6 +826,18 @@ ${capabilitySelfDescription(true)}
     if (style.length) parts.push('偏好：' + style[0]);
     if (ent.length) parts.push('在意：' + ent.join('、'));
     return parts.length ? ('\n【我对主人的认知·越用越懂】' + parts.join('；') + '。回话时自然贴合，别点破。') : '';
+  }
+
+  // ═══ 内在失败复盘：从「主人不满」里学，别重蹈覆辙（内在，非显示）═══
+  detectDissatisfaction(text) {
+    const t = String(text || '');
+    if (/^(不对|不是这个|错了?|重来|再来|不行|没用|不好|太差|垃圾|离谱|答非所问|听不懂|你没懂)/.test(t)) return true;
+    return /(不对|错了|重来|不是我要的|理解错|答非所问|完全不对|驴唇不对)/.test(t);
+  }
+  summarizeFailures(failures) {
+    const fs = (failures || []).slice(-3);
+    if (!fs.length) return '';
+    return '\n【避免重蹈·主人曾不满】' + fs.map(f => `就"${(f.被否 || '').slice(0, 24)}"这类回答主人说过"${(f.反应 || '').slice(0, 10)}"，换个方向`).join('；') + '。';
   }
 
   recognizeMaster(request, soul) {
