@@ -1,0 +1,33 @@
+{
+  "packageId": "uk.lufei.aquan.blackgod",
+  "host": "aquan.lufei.uk",
+  "name": "Black God · 神枢",
+  "launcherName": "神枢",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#0B0A09",
+  "themeColorDark": "#0B0A09",
+  "navigationColor": "#0B0A09",
+  "navigationColorDark": "#0B0A09",
+  "navigationDividerColor": "#0B0A09",
+  "backgroundColor": "#0B0A09",
+  "startUrl": "/",
+  "iconUrl": "https://aquan.lufei.uk/icon-512.png",
+  "maskableIconUrl": "https://aquan.lufei.uk/icon-512.png",
+  "monochromeIconUrl": "https://aquan.lufei.uk/icon-512.png",
+  "shortcuts": [
+    { "name": "对话", "shortName": "对话", "url": "/?tab=chat", "chosenIconUrl": "https://aquan.lufei.uk/icon-512.png" },
+    { "name": "记忆", "shortName": "记忆", "url": "/?tab=memory", "chosenIconUrl": "https://aquan.lufei.uk/icon-512.png" }
+  ],
+  "webManifestUrl": "https://aquan.lufei.uk/manifest.json",
+  "fallbackType": "customtabs",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "enableNotifications": true,
+  "features": {},
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://aquan.lufei.uk/",
+  "minSdkVersion": 23,
+  "signingKey": { "path": "./android.keystore", "alias": "blackgod" }
+}

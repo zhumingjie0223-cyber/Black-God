@@ -17,6 +17,28 @@ DATA_DIR.mkdir(exist_ok=True)
 MEMORY_DIR.mkdir(exist_ok=True)
 ARTIFACT_DIR.mkdir(exist_ok=True)
 
+# ── 情绪/场景读心（接 core/real_dialog_engine，仅用其中性检测器）──────────
+# 只借用纯启发式的 detect_user_mood/detect_scene + 中性 build_tone_hint，
+# 不引入任何人格设定，符合「公开版剥离人格」铁律。core 缺失时静默降级为无提示。
+import sys as _sys
+_sys.path.insert(0, str(ROOT / "core"))
+try:
+    from real_dialog_engine import RealDialogEngine as _RDE
+except Exception:  # 模块缺失/导入失败都不能拖垮内核
+    _RDE = None
+
+
+def build_tone_hint(user_message: str) -> str:
+    """据用户当下的情绪与场景，生成中性语气微调提示；不可用时返回空串。"""
+    if not _RDE or not user_message:
+        return ""
+    try:
+        mood = _RDE.detect_user_mood(user_message)
+        scene = _RDE.detect_scene(user_message)
+        return _RDE.build_tone_hint(mood, scene)
+    except Exception:
+        return ""
+
 # ═══════════════════════════════════════════
 # 第 7 层：人格 / 系统宪法（中性助手）
 # ═══════════════════════════════════════════
@@ -549,9 +571,14 @@ class AgentLoop:
         
         if context:
             messages.extend(context)
-        
+
+        # 读用户当下情绪/场景，动态注入中性语气微调（读懂言外之意，不改人格）
+        tone_hint = build_tone_hint(user_message)
+        if tone_hint:
+            messages.append({"role": "system", "content": tone_hint})
+
         messages.append({"role": "user", "content": user_message})
-        
+
         # 保存用户消息到会话记忆
         memory.save_session("user", user_message)
         

@@ -17,7 +17,7 @@
 
   "observability": { "enabled": true },
 
-  // —— Durable Object：全球唯一的"她"，SQLite 后端 ——
+  // —— Durable Object：全球唯一的神枢，SQLite 后端 ——
   "durable_objects": {
     "bindings": [
       { "name": "SHENSHU", "class_name": "ShenshuCore" }
@@ -32,7 +32,7 @@
     // 曼谷多模态工厂：生图(Pollinations) / 18情绪语音(edge-tts) / 真视频(ffmpeg)
     // 神枢优先调它，挂了自动降级到 CF Workers AI，永不失语
     "FACTORY_URL": "https://factory.aquan.xin",
-    // 主脑：Claude 中转网关（无需key，OpenAI兼容）→ 思涵用 Claude 思考，挂了降级内置 Llama
+    // 主脑：Claude 中转网关（无需key，OpenAI兼容）→ 神枢用 Claude 思考，挂了降级内置 Llama
     "NEXUS_GATEWAY_URL": "http://47.236.124.97:8790/v1",
     "NEXUS_GATEWAY_MODEL": "claude-sonnet-5"
   },
@@ -54,10 +54,10 @@
 
   // —— Secrets（用 `wrangler secret put <NAME>` 设置，不写进仓库）——
   //   OWNER_TOKEN         ★强烈建议★ 私密令牌，配了之后所有数据接口强制鉴权，
-  //                       只有带此令牌的你能读她（不配则接口公开，谁拿到地址都能读）
+  //                       只有带此令牌的你能读神枢（不配则接口公开，谁拿到地址都能读）
   //   VAPID_SUBJECT       （可选）Web Push 联系人，如 mailto:you@example.com
   //   TG_BOT_TOKEN        主动推送用的 Telegram bot token
-  //   TG_QUAN_CHAT_ID     权哥的 TG 私聊 id
+  //   TG_QUAN_CHAT_ID     主人的 TG 私聊 id
   //   NEXUS_GATEWAY_URL   （可选）外接强算力网关，标准 Chat Completions
   //   NEXUS_GATEWAY_KEY   （可选）网关密钥
   //   NEXUS_GATEWAY_MODEL （可选）网关模型名，如 claude-opus-4-8 / fable-5

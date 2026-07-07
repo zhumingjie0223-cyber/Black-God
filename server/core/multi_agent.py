@@ -187,9 +187,30 @@ JSON 格式：
         try:
             raw = self.call_fn(messages)
             verdict = self._parse_json(raw)
-            return verdict if verdict else {"verified": True, "issues": []}
+            return self._normalize(verdict)
         except Exception as e:
             return {"verified": False, "issues": [str(e)]}
+
+    @staticmethod
+    def _normalize(verdict: Dict) -> Dict:
+        """把模型返回的判定统一成含布尔 `verified` 的结构。
+
+        Coordinator 只认 verdict['verified']，但模型未必用这个键
+        （常见别名 passed/valid/ok/success/pass）。不归一化的话，
+        键名一不对上，Coordinator 就把已完成的子任务当失败丢掉，
+        completed 恒为空 —— 多智能体形同没干活。仍无明确否定时默认通过，
+        避免因键名技术性问题误杀真实成果。"""
+        if not isinstance(verdict, dict):
+            return {"verified": True, "issues": []}
+        v = verdict.get("verified")
+        if v is None:
+            for k in ("passed", "valid", "ok", "success", "pass"):
+                if k in verdict:
+                    v = verdict[k]
+                    break
+        verdict["verified"] = True if v is None else bool(v)
+        verdict.setdefault("issues", [])
+        return verdict
     
     def _parse_json(self, raw: str) -> Dict:
         if not raw:
@@ -298,22 +319,29 @@ def multi_agent_execute(task: str, call_fn, num_executors: int = 3) -> Dict:
     call_fn: 模型调用函数
     num_executors: 并行执行的 Executor 数量
     
-    返回：(最终答案, 执行信息)
+    返回：dict —— {
+        "final":     最终答案文本,
+        "task":      原始任务,
+        "results":   已完成子任务列表（= execution info 的 completed）,
+        "status" / "completed" / "failed" / "replans" / "total_duration": 执行信息,
+    }
+    规划失败时返回 {"final": task, "error": "规划失败", ...}。
     """
     # 初始化各个 Agent
     planner = PlannerAgent(call_fn)
     executors = [ExecutorAgent(i, call_fn) for i in range(num_executors)]
     verifier = VerificationAgent(call_fn)
     coordinator = Coordinator(max_executors=num_executors)
-    
+
     # Step 1: 规划
     plan = planner.plan(task)
     if not plan.get("subtasks"):
-        return task, {"error": "规划失败"}
-    
+        return {"final": task, "task": task, "error": "规划失败",
+                "subtasks": [], "results": []}
+
     # Step 2: 协调执行
     result = coordinator.coordinate(plan, planner, executors, verifier)
-    
+
     # Step 3: 生成最终答案
     final_answer = f"""任务执行完成。
 
@@ -325,5 +353,6 @@ def multi_agent_execute(task: str, call_fn, num_executors: int = 3) -> Dict:
 执行结果：
 {chr(10).join(f"- {r.get('result', '')[:100]}" for r in result.get('completed', []))}
 """
-    
-    return final_answer, result
+
+    return {"final": final_answer, "task": task,
+            "results": result.get("completed", []), **result}

@@ -18,8 +18,23 @@ class MockLLM:
     def __init__(self):
         self.calls = 0
 
-    def __call__(self, prompt, **kw):
+    @staticmethod
+    def _flatten(messages_or_prompt):
+        """与 llm_adapter.llm() 一致：接受 str 或 messages 列表，统一成文本。
+        所有 core 模块调用 call_fn 时传的是 messages 列表，不是裸字符串。"""
+        if isinstance(messages_or_prompt, str):
+            return messages_or_prompt
+        try:
+            return "\n".join(
+                str(m.get("content", "")) if isinstance(m, dict) else str(m)
+                for m in messages_or_prompt
+            )
+        except TypeError:
+            return str(messages_or_prompt)
+
+    def __call__(self, messages_or_prompt, **kw):
         self.calls += 1
+        prompt = self._flatten(messages_or_prompt)
         p = prompt.lower()
         # 规划器：需要 JSON 子任务列表
         if "分解" in prompt or "subtask" in p or "plan" in p or "拆解" in prompt:
@@ -66,7 +81,7 @@ check("复杂任务->高级别", hard in ("high", "xhigh", "medium"), f"level={h
 
 engine = AdaptiveReasoningEngine(llm)
 r = engine.reason("写一个快速排序并分析复杂度")
-check("reason() 返回结构完整", isinstance(r, dict) and "level" in r, f"keys={list(r.keys())}")
+check("reason() 返回结构完整", isinstance(r, dict) and "reasoning_level" in r, f"keys={list(r.keys())}")
 
 # ---------- 2. 多智能体 ----------
 print("\n[模块2] 多智能体 MultiAgent")

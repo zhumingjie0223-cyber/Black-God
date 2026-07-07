@@ -54,8 +54,10 @@ class RealDialogEngine:
         except Exception:
             pass
 
-    def detect_user_mood(self, text: str) -> str:
-        """读懂阿权的情绪（言外之意）"""
+    @staticmethod
+    def detect_user_mood(text: str) -> str:
+        """读懂阿权的情绪（言外之意）。纯启发式，无实例状态 → staticmethod，
+        便于中性公开版内核复用而不必实例化带人格的引擎。"""
         # 急躁/不耐烦
         if re.search(r"快点|赶紧|催|等半天|慢|？？|！！", text) or len(text) < 3:
             return "impatient"
@@ -76,8 +78,9 @@ class RealDialogEngine:
             return "intimate"
         return "normal"
 
-    def detect_scene(self, text: str) -> str:
-        """场景识别"""
+    @staticmethod
+    def detect_scene(text: str) -> str:
+        """场景识别。纯启发式，无实例状态 → staticmethod。"""
         if re.search(r"代码|接口|部署|服务器|漏洞|渗透|编译|bug|测试", text):
             return "work"
         if re.search(r"想你|老公|亲|抱|睡|床|身体|人家|嘛|陪", text):
@@ -85,6 +88,29 @@ class RealDialogEngine:
         if re.search(r"怎么办|帮我|不懂|教我|出问题", text):
             return "help"
         return "normal"
+
+    @staticmethod
+    def build_tone_hint(user_mood: str, scene: str) -> str:
+        """中性语气提示（无人格）——供公开版内核用。
+
+        只把「读到的情绪/场景」翻译成对语气与节奏的中性调整建议，
+        契合宪法里「行动优先/简洁直接/主动接住上下文」的原则，
+        绝不注入任何人格设定（赵思涵/撒娇等），符合「公开版剥离人格」铁律。
+        无可调整时返回空串。intimate 情绪/场景在中性版按普通对话处理，不特殊化。
+        """
+        tone = {
+            "impatient": "对方有点急 → 砍掉铺垫，直接先给结论/结果，再按需补细节。",
+            "tired": "对方疲惫 → 语气放缓、简短，别堆信息，必要时主动收尾。",
+            "cold": "对方冷淡/敷衍 → 别硬聊，用简明的实质回应，把选择权留给对方。",
+            "angry": "对方不爽 → 不辩解、不说教，先用行动/方案解决问题。",
+            "happy": "对方情绪好 → 可略轻松，但仍以有用信息为主。",
+        }.get(user_mood, "")
+        scene_hint = {
+            "work": "技术/办事场景 → 专业、精确、可执行，代码与步骤完整。",
+            "help": "求助场景 → 耐心、分步、手把手，别假设对方已懂。",
+        }.get(scene, "")
+        parts = [p for p in (tone, scene_hint) if p]
+        return ("## 当前语气（据用户当下状态动态调整）\n" + "\n".join(f"- {p}" for p in parts)) if parts else ""
 
     def build_system_prompt(self, user_mood: str, scene: str) -> str:
         """根据场景和情绪动态生成系统提示"""
