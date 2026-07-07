@@ -89,6 +89,14 @@ ok('新鲜+事实性问句 → 需联网', S.needsWeb('比特币现在多少钱'
 ok('普通闲聊/技术不误触发', !S.needsWeb('在吗') && !S.needsWeb('帮我写个排序算法') && !S.needsWeb('你是谁'));
 ok('空/极短不触发', !S.needsWeb('') && !S.needsWeb('嗯'));
 
+// ── 真 agent 执行环：工具调用解析 + 标记清理（确定性，可测）──
+ok('解析 web_search 工具调用', (() => { const c = S.parseToolCalls('先查一下 ⟨工具:web_search｜比特币最新价格⟩'); return c.length === 1 && c[0].tool === 'web_search' && c[0].arg === '比特币最新价格'; })());
+ok('解析 open 网页工具调用', (() => { const c = S.parseToolCalls('⟨工具:open｜https://example.com/a⟩'); return c.length === 1 && c[0].tool === 'open' && c[0].arg === 'https://example.com/a'; })());
+ok('多工具调用全部解析（兼容半角|）', S.parseToolCalls('⟨工具:web_search|甲⟩ 再 ⟨工具:open|https://x⟩').length === 2);
+ok('无工具标记 → 空（视为最终答案）', S.parseToolCalls('这是最终答案，没有工具').length === 0);
+ok('未知工具名不误抓', S.parseToolCalls('⟨工具:rm_rf｜/⟩').length === 0);
+ok('清理残留工具标记', S.stripToolMarks('答案在此 ⟨工具:web_search｜x⟩ 结束') === '答案在此 结束');
+
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');
 ok('owner_only 能力：匿名拒绝', resolveCapability('soul', false).ok === false && resolveCapability('soul', false).reason === 'owner_only');

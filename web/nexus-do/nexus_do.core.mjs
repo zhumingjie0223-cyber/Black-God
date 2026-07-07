@@ -471,17 +471,25 @@ export class ShenshuCore {
     const memories = this.retrieveMemories(snap, text, 3);
     // #1 枢语坐标 → 真影响回话：由坐标推出温度 + 语气令，注入系统与生成参数
     const gen = this.shuToGen(nextCoord);
-    // 联网：需要外部/新鲜信息时，先真实检索，把资料喂进本次回话（非事后触发，直接影响回复）
-    let webBlock = '';
-    if (this.needsWeb(text) || (Array.isArray(caps) && caps.includes('web'))) {
-      const found = await this.webSearch(text).catch(() => '');
-      if (found) webBlock = '\n\n【你刚联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
-    }
-    const system = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
-      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive + webBlock;
+    const baseSystem = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
+      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive;
 
-    // —— 2) 网络：借算力回话（省 Key 分级：简单走免费 CF、复杂上 Claude 网关）——
-    const brainResult = await this.callBrain(system, text, snap, { temperature: gen.temperature, tier: this.pickTier(text, caps) });
+    // —— 2) 网络：真 agent 执行环 vs 单发 ——
+    //   复杂/技术/联网/深度/代码 → runAgentLoop（自主 plan·调工具·多轮·作答，真执行）
+    //   闲聊轻量 → 单发；若是简单事实问句则预取一次检索（CF 模型对工具协议不稳，预取更可靠）
+    const tier = this.pickTier(text, caps);
+    const agentic = tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code');
+    let brainResult;
+    if (agentic) {
+      brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier });
+    } else {
+      let webBlock = '';
+      if (this.needsWeb(text)) {
+        const found = await this.webSearch(text).catch(() => '');
+        if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
+      }
+      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier });
+    }
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
     const reply = cleanReply || brainResult.reply;
@@ -689,6 +697,67 @@ ${capabilitySelfDescription(true)}
     } catch (_) {
       return '';
     }
+  }
+
+  // ═══════════════════════ 真 agent 执行环 · plan→调工具→观察→再决→作答 ═══════════════════════
+  // 从回话解析信息工具调用标记（确定性，可测）。
+  parseToolCalls(reply) {
+    const calls = [];
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open)\s*[｜|]\s*([^⟩]+)⟩/g;
+    let m;
+    while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
+    return calls;
+  }
+
+  // 去掉回话里残留的工具标记（纯函数）。
+  stripToolMarks(reply) {
+    return String(reply || '').replace(/⟨\s*工具[^⟩]*⟩/g, '').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  // 打开网页读正文（去脚本/样式/标签，取前 ~1.6k 字）——让神枢真能读原文，不只摘要。
+  async fetchUrl(url) {
+    try {
+      if (!/^https?:\/\//i.test(url)) return '';
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-CN,zh;q=0.9' }, cf: { cacheTtl: 120 } });
+      if (!r.ok) return '';
+      const html = await r.text();
+      const txt = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+      return txt.slice(0, 1600);
+    } catch (_) { return ''; }
+  }
+
+  // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
+  // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
+  async runAgentLoop(baseSystem, text, soul, opts = {}) {
+    const TOOL_SPEC = `
+
+【你能自主调用的信息工具（作答前可多轮使用，最多 3 轮）】
+- 联网检索：⟨工具:web_search｜关键词⟩
+- 打开网页读原文：⟨工具:open｜https://完整网址⟩
+规则：需要外部/实时/事实信息时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续查或作答。资料够了就直接给最终答案、不带任何工具标记；别原地打转。`;
+    let scratch = '', toolLog = [], last = null;
+    for (let step = 0; step < 3; step++) {
+      const sys = baseSystem + TOOL_SPEC + (scratch ? `\n\n【你已查到的资料】\n${scratch}` : '');
+      last = await this.callBrain(sys, text, soul, opts);
+      const calls = this.parseToolCalls(last.reply);
+      if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog };
+      const obs = [];
+      for (const c of calls.slice(0, 2)) {
+        try { this.broadcast({ type: 'agent_step', tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
+        let out = '';
+        if (c.tool === 'web_search') out = await this.webSearch(c.arg).catch(() => '');
+        else if (c.tool === 'open') out = await this.fetchUrl(c.arg).catch(() => '');
+        toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
+        obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
+      }
+      scratch += (scratch ? '\n\n' : '') + obs.join('\n\n');
+      if (scratch.length > 6000) scratch = scratch.slice(-6000);
+    }
+    // 用尽轮数：拿现有资料强制作答（撤下工具指令，避免再要工具）。
+    const fin = await this.callBrain(baseSystem + `\n\n【已查到的资料，据此作答、勿再调工具、勿编造】\n${scratch}`, text, soul, opts);
+    return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 3, tool_log: toolLog };
   }
 
   async callBrain(system, userMsg, soul, opts = {}) {
