@@ -731,6 +731,12 @@ body::before{
             </div></div>
           </div>
           <div class="fold">
+            <button class="fold-h" onclick="toggleFold(this)"><span>守望 · 自主管道</span><i>⌄</i></button>
+            <div class="fold-b"><div class="fold-in">
+              <div class="card"><div class="card-title">闭环神 · 环 <span id="watchCount" class="card-badge"></span></div><div id="memWatch"><div class="mem-empty">还没有守望 · 说一句「帮我每小时盯一下 X，变了告诉我」，她就替你守着</div></div></div>
+            </div></div>
+          </div>
+          <div class="fold">
             <button class="fold-h" onclick="toggleFold(this)"><span>执行日志</span><i>⌄</i></button>
             <div class="fold-b"><div class="fold-in">
               <div class="timeline" id="hubTimeline"><div class="mem-empty">还没有活动…</div></div>
@@ -944,6 +950,10 @@ const Demo = {
       {名:'代码·服务器真跑', 方法:'遇「代码」类需求：服务器真跑，据真实输出作答。', 用过:1, 来源:'习得', 验证:true},
     ],
     成长事件:[{ts:now-3.6e6,技能:'检索·联网检索',来源:'习得',新增:false}],
+    守望:[
+      {名:'美元汇率', 指令:'美元对人民币汇率', 每分钟:60, 状态:'active', 通知:'change', 上次结果:'7.24（较昨日 +0.02）', 跑过:14},
+      {名:'仓库新提交', 指令:'Black-God 仓库有没有新提交', 每分钟:120, 状态:'active', 通知:'change', 上次结果:'无新提交', 跑过:6},
+    ],
   }; },
 };
 
@@ -1427,6 +1437,9 @@ async function loadInner(){
   // 自演化 · 已习得技能：一次做成/受教就炼成，越用越多（她自己长大）
   const _sc=$('#skillCount'); if(_sc) _sc.textContent = inner.技能总数? ('共 '+inner.技能总数+' 门') : '';
   renderMemList('memSkills', (inner.已习得技能||[]).map(s=>({t:(s.验证?'✓已验':s.来源||''), q:'「'+(s.名||'')+'」'+(s.方法?(' · '+s.方法):'')+(s.用过>1?(' · 用过'+s.用过+'次'):'')})), '还没长出技能 · 做成一件事或教她一次，就会了');
+  // 闭环 · 守望：她替你盯着的常驻管道（到点自己跑、变化主动推）
+  const _wc=$('#watchCount'); if(_wc){ const act=(inner.守望||[]).filter(w=>w.状态==='active').length; _wc.textContent = act? ('守着 '+act+' 条'):''; }
+  renderMemList('memWatch', (inner.守望||[]).map(w=>({t:(w.状态==='active'?('每'+w.每分钟+'分'):'已停'), q:'「'+(w.名||'')+'」'+(w.上次结果?(' · 上次：'+w.上次结果):' · 还没跑')+(w.跑过?(' · 跑过'+w.跑过+'次'):'')})), '还没有守望 · 说一句「帮我每小时盯一下 X，变了告诉我」，她就替你守着');
   // 时间感知
   if(inner.时间认知){ const ta=inner.时间认知; $('#timeAware').innerHTML =
     [['主人当地时间',ta.主人当地时间],['时段',ta.时段+' · '+ta.我此刻感受],['空闲多久',ta.离开时长],['已运行',ta.我活了]]

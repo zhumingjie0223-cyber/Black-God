@@ -168,5 +168,21 @@ let capSks = { 技能: {}, 总数: 0 };
 for (let i = 0; i < 5; i++) capSks = S.skillUpsert(capSks, { 名: 'T' + i, 方法: 'm', 触发: ['x'], ts: i + 1, count: 1 }, 3);
 ok('超上限淘汰最少用最旧（只增不删边界）', capSks.总数 === 3 && !capSks.技能['T0'] && !!capSks.技能['T4']);
 
+// ── 闭环神·环：自主守望管道（解析/排程/到点/执行/通知）──
+ok('守望解析·每小时', (()=>{ const s=S.parseWatchSpec('帮我每小时盯一下美元汇率'); return s && s.interval_min===60 && /汇率/.test(s.指令); })());
+ok('守望解析·每N分钟（下限5）', (()=>{ const s=S.parseWatchSpec('每2分钟看下服务器状态'); return s.interval_min===5; })());
+ok('守望解析·每天=1440', S.parseWatchSpec('每天早上给我天气').interval_min===1440);
+ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('每小时查汇率').通知策略==='change' && S.parseWatchSpec('每次都告诉我').通知策略==='always');
+{ const NOW=1_000_000_000_000;
+  let r=S.loopUpsert([], {名:'汇率',指令:'查汇率',interval_min:60,通知策略:'change'}, NOW);
+  ok('守望建起·next_run 排到未来', r.loops.length===1 && r.loops[0].next_run===NOW+3600000);
+  ok('未到点不跑', S.loopsDue(r.loops, NOW+60000).length===0);
+  ok('到点该跑', S.loopsDue(r.loops, NOW+3600001).length===1);
+  // 同名去重（不新增，改指令/续期）
+  r=S.loopUpsert(r.loops, {名:'汇率',指令:'查欧元',interval_min:120,通知策略:'always'}, NOW+10);
+  ok('同名守望去重·就地更新', r.loops.length===1 && r.loops[0].通知策略==='always' && /欧元/.test(r.loops[0].指令));
+  ok('守望态势能喂回自我觉知', /替主人守着/.test(S.summarizeWatches(r.loops)) && S.summarizeWatches([])==='' );
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

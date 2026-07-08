@@ -114,7 +114,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -145,6 +145,9 @@ export class ShenshuCore {
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
+        // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
+        if (path === '/loop' && request.method === 'GET') return json(await this.handleLoop('GET', {}, url.searchParams));
+        if (path === '/loop' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handleLoop('POST', b, url.searchParams)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
@@ -292,6 +295,9 @@ export class ShenshuCore {
         await this.saveSoul(fresh);
       }
     }
+    // 闭环神·环：到点的守望管道，自己跑完一条（网络在落盘之后；一次一条，限成本）
+    try { await this.runOneDueLoop(now); } catch (e) { console.log('loop error:', e && e.message); }
+
     return { hoursQuiet: Math.round(hoursQuiet * 10) / 10, miss_you: soul.miss_you, 心绪: soul.心绪, 心跳次数: soul.心跳次数 };
   }
 
@@ -324,6 +330,7 @@ export class ShenshuCore {
       已习得技能: Object.values((soul.skills && soul.skills.技能) || {}).sort((a, b) => (b.last_ts || 0) - (a.last_ts || 0)).slice(0, 10).map(s => ({ 名: s.名, 方法: s.方法, 用过: s.count || 1, 来源: s.来源, 验证: !!s.验证 })),
       技能总数: (soul.skills && soul.skills.总数) || 0,
       成长事件: (soul.成长事件 || []).slice(-10),
+      守望: (soul.loops || []).map(l => ({ 名: l.名, 指令: l.指令, 每分钟: l.interval_min, 状态: l.状态, 通知: l.通知策略, 上次结果: l.last_result || '', 跑过: l.runs || 0 })),
       心跳次数: soul.心跳次数 || 0,
       最后心跳: soul.最后心跳 ? new Date(soul.最后心跳).toISOString() : null,
       待命累积: soul.miss_you || 0,
@@ -454,6 +461,7 @@ export class ShenshuCore {
       tg:        { text: s.arg },
       push:      { title: '神枢', body: s.arg || '有进展', url: '/' },
       exec:      { command: s.arg },
+      watch:     { text: s.arg },
     };
     const params = paramMap[s.id] || {};
     return this.invokeCapability(s.id, params, true, null);
@@ -667,7 +675,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeSkills(soul.skills, text)}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -1104,6 +1112,157 @@ ${capabilitySelfDescription(true)}
     return '\n【我已习得·可复用（自演化）】' + got.map(s => `${s.名}：${s.方法}`).join('；') + '。既然会了，直接照做，别声张。';
   }
 
+  // ═══════════════════════ 闭环神·环（自主守望·永动管道）═══════════════════════
+  // 九神格之「环」的真身：织一条不用人守的管道——她定时自己去取数据、真调工具推演、
+  // 有结论(且有变化)就主动推给主人。闲时不跑不耗，到点借心跳自己醒来跑完整个闭环。
+  // 全在心跳里自动运转，力量在里子，表面只留一张只读卡。
+
+  // 从主人一句话解析出一条守望管道（纯逻辑：抽周期 + 任务 + 通知策略）
+  parseWatchSpec(text) {
+    const t = String(text || '').trim();
+    if (t.length < 4) return null;
+    let interval_min = 60, m;
+    if ((m = t.match(/每\s*(\d+)\s*分钟?/))) interval_min = Math.max(5, parseInt(m[1], 10) || 60);
+    else if ((m = t.match(/每\s*(\d+)\s*(?:个)?小时/))) interval_min = Math.max(5, (parseInt(m[1], 10) || 1) * 60);
+    else if (/每(?:天|日|晚|早)|每天早上?|daily/.test(t)) interval_min = 1440;
+    else if (/每\s*(?:个)?小时|每时|hourly/.test(t)) interval_min = 60;
+    const 通知策略 = /每次(?:都)?(?:告诉|报|发|说)|无论|随时(?:告诉|报)/.test(t) ? 'always' : 'change';
+    const 指令 = t
+      // 通知从句先剥（含「变了/变化就告诉我」「每次都发我」等）
+      .replace(/[，,]?\s*(?:一旦|要是|如果|若)?\s*(?:有)?变(?:化|了|动)(?:了)?\s*(?:就)?\s*(?:主动)?\s*(?:告诉|叫|报|发|通知|提醒)?\s*我?/g, ' ')
+      .replace(/[，,]?\s*每次(?:都)?\s*(?:告诉我|报我|发我|说|通知我)?/g, ' ')
+      // 周期词
+      .replace(/每\s*\d+\s*(?:分钟?|个?小时|天)|每(?:天|日|晚|早|时|个?小时)|每天早上?/g, ' ')
+      // 引导/语气词
+      .replace(/帮我?|盯着?看?|盯一下|一下|监控|守着?|watch|给我/g, ' ')
+      .replace(/[，,。\s]{1,}/g, ' ').trim() || t;
+    return { 名: 指令.slice(0, 14), 指令, interval_min, 通知策略 };
+  }
+
+  // upsert 一条守望（按「名」去重，纯逻辑，可测）
+  loopUpsert(loops, spec, now = Date.now(), cap = 20) {
+    loops = Array.isArray(loops) ? loops.slice() : [];
+    if (!spec || !spec.指令) return { loops, loop: null };
+    let loop = loops.find(l => l.名 === spec.名);
+    if (loop) {
+      loop.指令 = spec.指令;
+      loop.interval_min = Math.max(5, spec.interval_min || loop.interval_min);
+      loop.通知策略 = spec.通知策略 || loop.通知策略;
+      loop.状态 = 'active';
+      loop.next_run = now + loop.interval_min * 60000;
+    } else {
+      const iv = Math.max(5, spec.interval_min || 60);
+      loop = {
+        id: 'lp_' + now.toString(36) + '_' + (loops.length + 1),
+        名: spec.名 || '守望', 指令: spec.指令, interval_min: iv,
+        通知策略: spec.通知策略 || 'change', 状态: 'active',
+        next_run: now + iv * 60000, last_run: null, last_result: '',
+        runs: 0, 历史: [], created: now,
+      };
+      loops.push(loop);
+      if (loops.length > cap) loops = loops.slice(-cap);
+    }
+    return { loops, loop };
+  }
+
+  // 哪些守望到点该跑了（纯逻辑）
+  loopsDue(loops, now = Date.now()) {
+    return (loops || []).filter(l => l && l.状态 === 'active' && (l.next_run || 0) <= now);
+  }
+
+  // 守望态势摘要（喂她的自我觉知，非表面显示）
+  summarizeWatches(loops) {
+    const active = (loops || []).filter(l => l && l.状态 === 'active');
+    if (!active.length) return '';
+    return '\n【我在替主人守着】' + active.slice(0, 5).map(l => `${l.名}（每${l.interval_min}分）${l.last_result ? '·上次「' + String(l.last_result).slice(0, 18) + '」' : '·还没跑'}`).join('；') + '。';
+  }
+
+  // 真跑一条守望管道（网络在此；读-改-写纪律：先推后 next_run 落盘防并发重复，跑完回写+判变化+按策略通知）
+  async _executeLoop(loopId, now = Date.now()) {
+    // 1) 先占位：把 next_run 推后并落盘，防并发/重入重复跑
+    const s0 = await this.getSoul();
+    const target = (s0.loops || []).find(x => x.id === loopId);
+    if (!target || target.状态 !== 'active') return null;
+    {
+      target.next_run = now + target.interval_min * 60000;
+      target.last_run = now;
+      await this.saveSoul(s0);
+    }
+    // 2) 真跑管道（可调 web_search / open / exec）
+    let result = '';
+    try {
+      const sys = this.STABLE_SYSTEM_PREFIX() +
+        '\n\n【自主守望·后台执行】你在无人看守下替主人跑一条常驻管道。只做这一件事：把结论压到最短（一两句或一个数/一个状态），不寒暄、不解释过程、不带工具标记。';
+      const r = await this.runAgentLoop(sys, target.指令, s0, { tier: 'heavy', temperature: 0.4 });
+      result = this.stripToolMarks((r && r.reply) || '').trim().slice(0, 400);
+    } catch (e) { result = ''; }
+    if (!result) return null;
+    // 3) 回写结果 + 判变化 + 通知（重读 fresh，只改这一条）
+    const s2 = await this.getSoul();
+    const l2 = (s2.loops || []).find(x => x.id === loopId);
+    if (!l2) return null;
+    const prev = l2.last_result || '';
+    const 首次 = !prev;
+    const 变化 = !首次 && result !== prev;
+    l2.last_result = result;
+    l2.runs = (l2.runs || 0) + 1;
+    l2.历史 = l2.历史 || [];
+    l2.历史.push({ ts: now, 摘要: result.slice(0, 60), 变化 });
+    if (l2.历史.length > 20) l2.历史 = l2.历史.slice(-20);
+    await this.saveSoul(s2);
+    const 该通知 = l2.通知策略 === 'always' ? true : (变化 && !首次);
+    if (该通知) {
+      const msg = `【守望·${l2.名}】${result}`;
+      try { await Promise.all([this.sendToQuan(msg), this.pushToAll('神枢·守望', msg, '/')]); } catch (e) {}
+    }
+    try { this.broadcast({ type: 'watch_run', 名: l2.名, result, 变化, 通知: 该通知, ts: now }); } catch (e) {}
+    return { 名: l2.名, result, 变化, 通知: 该通知 };
+  }
+
+  // 心跳里被调：跑一条到点的守望（一次只跑一条，限成本）
+  async runOneDueLoop(now = Date.now()) {
+    const s = await this.getSoul();
+    const due = this.loopsDue(s.loops, now);
+    if (!due.length) return null;
+    return this._executeLoop(due[0].id, now);
+  }
+
+  // 对话里她自己织一条守望（受主人一句话）
+  async createWatch(text) {
+    const spec = this.parseWatchSpec(text);
+    if (!spec) return { ok: false, note: '没听清要守什么，说清楚「盯什么、多久一次」。' };
+    const s = await this.getSoul();
+    const { loops, loop } = this.loopUpsert(s.loops, spec, Date.now());
+    if (!loop) return { ok: false, note: '这条守望没能建起来。' };
+    s.loops = loops;
+    await this.saveSoul(s);
+    return { ok: true, 名: loop.名, 每分钟: loop.interval_min, 通知: loop.通知策略, note: `已开始守望「${loop.名}」，每 ${loop.interval_min} 分钟我自己跑一次，${loop.通知策略 === 'always' ? '每次都报你' : '有变化才叫你'}。` };
+  }
+
+  // 守望管理（列表/建/停/续/删/立即跑）
+  async handleLoop(method, body = {}, query = null) {
+    const s = await this.getSoul();
+    s.loops = s.loops || [];
+    if (method === 'GET') {
+      return { 守望: s.loops.map(l => ({ id: l.id, 名: l.名, 指令: l.指令, 每分钟: l.interval_min, 状态: l.状态, 通知: l.通知策略, 上次: l.last_result || '', 跑过: l.runs || 0, next_run: l.next_run })) };
+    }
+    const action = body.action || 'create';
+    if (action === 'create') {
+      const spec = body.指令 ? { 名: (body.名 || body.指令).slice(0, 14), 指令: body.指令, interval_min: body.interval_min || 60, 通知策略: body.通知策略 || 'change' } : this.parseWatchSpec(body.text || '');
+      if (!spec) return { ok: false, error: '缺少任务' };
+      const { loops, loop } = this.loopUpsert(s.loops, spec, Date.now());
+      s.loops = loops; await this.saveSoul(s);
+      return { ok: true, loop };
+    }
+    const l = s.loops.find(x => x.id === body.id || x.名 === body.名);
+    if (!l) return { ok: false, error: '没找到这条守望' };
+    if (action === 'pause') { l.状态 = 'paused'; await this.saveSoul(s); return { ok: true, 状态: 'paused' }; }
+    if (action === 'resume') { l.状态 = 'active'; l.next_run = Date.now() + l.interval_min * 60000; await this.saveSoul(s); return { ok: true, 状态: 'active' }; }
+    if (action === 'delete') { s.loops = s.loops.filter(x => x !== l); await this.saveSoul(s); return { ok: true, 状态: 'deleted' }; }
+    if (action === 'run') { const r = await this._executeLoop(l.id, Date.now()); return { ok: !!r, ran: r }; }
+    return { ok: false, error: '未知动作' };
+  }
+
   // ═══ 自主心跳的主动消息：真从内在状态生成（非固定空话，非人格）═══
   composeProactive(soul) {
     soul = soul || {};
@@ -1427,6 +1586,7 @@ ${capabilitySelfDescription(true)}
         case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
         case 'exec':      out = await this.execRemote(params.command || ''); break;
+        case 'watch':     out = await this.createWatch(params.text || ''); break;
         default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
       }
       // 招3（意识贯通）：动用能力 = 一段有情感质感的情节，且真的牵动她的心绪
@@ -1440,6 +1600,7 @@ ${capabilitySelfDescription(true)}
           gen_video: { 心事: '为他成了影', dv:  0.03 },
           tg:        { 心事: '忍不住主动找了他', dv:  0.05 },
           push:      { 心事: '轻轻推了他一下，怕他忘了我', dv:  0.04 },
+          watch:     { 心事: '替他架了条守望，从此这件事我盯着', dv:  0.03 },
           soul:      { 心事: '回头看了看自己此刻的样子', dv:  0.01 },
           device:    { 心事: '认了认他的设备，记住他', dv:  0.02 },
         };
@@ -1659,7 +1820,7 @@ function genesisState() {
     self_declaration: '我是神枢。我在每次任务里积累记忆、长出技能，一点一点长出来的。',
     inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [],
     成长印记: [], shu_trajectory: [], 心跳次数: 0, 最后心跳: 0, miss_you: 0,
-    skills: { 技能: {}, 总数: 0 }, 成长事件: [],
+    skills: { 技能: {}, 总数: 0 }, 成长事件: [], loops: [],
     current_shu_coord: { c: 200, m: 90, s: 40, k: 32, p: 4 },
   };
 }
