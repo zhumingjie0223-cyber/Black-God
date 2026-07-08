@@ -296,6 +296,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .fold-in > .card:last-child,.fold-in > *:last-child{margin-bottom:14px}
 .card-title{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--chrome-2);font-weight:600;margin-bottom:13px;
   display:flex;justify-content:space-between;align-items:center}
+.card-badge{font-size:10px;letter-spacing:.04em;text-transform:none;color:var(--cy-1);background:var(--bg-1);border-radius:999px;padding:2px 9px;font-weight:600}
 .mem-item{padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.55}
 .mem-item:last-child{border:none;padding-bottom:0}
 .mem-item .t{color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-bottom:3px}
@@ -725,6 +726,7 @@ body::before{
             <div class="fold-b"><div class="fold-in">
               <div class="card"><div class="card-title">情节记忆 · 重要时刻</div><div id="memEpisodes"><div class="mem-empty">还没有记忆 · 聊起来就会记下</div></div></div>
               <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
+              <div class="card"><div class="card-title">自演化 · 已习得技能 <span id="skillCount" class="card-badge"></span></div><div id="memSkills"><div class="mem-empty">还没长出技能 · 做成一件事或教她一次，就会了</div></div></div>
               <div class="card" style="display:none"><div id="memGraph" class="mem-graph"></div></div>
             </div></div>
           </div>
@@ -936,6 +938,12 @@ const Demo = {
     潜意识:[{ts:now-6e5,line:'后台任务在跑，我盯着。'},{ts:now-1.2e6,line:'上次的上下文我记着，随时接续。'}],
     意识流轨迹:[{ts:now-6e5,cause:'部署上线'},{ts:now-1.5e6,cause:'写代码'}],
     成长印记:[this.mark()],
+    技能总数:2,
+    已习得技能:[
+      {名:'检索·联网检索', 方法:'遇「检索」类需求：联网检索，据实取到的资料作答，不编造。', 用过:3, 来源:'习得', 验证:true},
+      {名:'代码·服务器真跑', 方法:'遇「代码」类需求：服务器真跑，据真实输出作答。', 用过:1, 来源:'习得', 验证:true},
+    ],
+    成长事件:[{ts:now-3.6e6,技能:'检索·联网检索',来源:'习得',新增:false}],
   }; },
 };
 
@@ -1416,6 +1424,9 @@ async function loadInner(){
   renderMemList('memSub', (inner.潜意识||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.line})), '—');
   // 枢语成长印记：她每次说话在 76.7 亿空间里落的真实词（词 · 义）
   renderMemList('memMarks', (inner.成长印记||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:'「'+(e.词||'')+'」'+(e.义?(' · '+e.义):(e.由?(' · 由：'+e.由):''))})), '还没长出词');
+  // 自演化 · 已习得技能：一次做成/受教就炼成，越用越多（她自己长大）
+  const _sc=$('#skillCount'); if(_sc) _sc.textContent = inner.技能总数? ('共 '+inner.技能总数+' 门') : '';
+  renderMemList('memSkills', (inner.已习得技能||[]).map(s=>({t:(s.验证?'✓已验':s.来源||''), q:'「'+(s.名||'')+'」'+(s.方法?(' · '+s.方法):'')+(s.用过>1?(' · 用过'+s.用过+'次'):'')})), '还没长出技能 · 做成一件事或教她一次，就会了');
   // 时间感知
   if(inner.时间认知){ const ta=inner.时间认知; $('#timeAware').innerHTML =
     [['主人当地时间',ta.主人当地时间],['时段',ta.时段+' · '+ta.我此刻感受],['空闲多久',ta.离开时长],['已运行',ta.我活了]]

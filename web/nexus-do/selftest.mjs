@@ -138,5 +138,35 @@ ok('主动消息用常聊话题', /代码/.test(S.composeProactive({ user_model:
 ok('无状态时克制默认', S.composeProactive({}) === '主人，神枢在此待命，有需要随时说。');
 ok('主动消息无人格词', !/想你|老公|不敢说|撒娇|宝贝|等他/.test(S.composeProactive({ episodes: [{ 他说: '部署' }] })));
 
+// ── 自演化神·生：遇成事/受教 → 炼成可复用技能，只增不删，下次就会 ──
+ok('话题归类（代码/检索/通用）', S.topicOf('这段python报错') === '代码' && S.topicOf('查一下今天金价') === '检索' && S.topicOf('随便聊聊') === '通用');
+ok('识别受教信号', S.detectTeaching('以后部署都先跑一遍测试再上线') && S.detectTeaching('记住要先备份') && !S.detectTeaching('今天天气不错'));
+// 习得：一次真调工具做成 → 提炼技能
+const skLearned = S.skillDistill({ text: '查一下最新的美元汇率', reply: '当前约 7.2', toolLog: [{ tool: 'web_search', ok: true }], taught: false, model: 'llama-3.3-70b' });
+ok('习得技能：真用工具才炼（验证=真）', !!skLearned && skLearned.来源 === '习得' && skLearned.验证 === true && /联网检索/.test(skLearned.方法));
+ok('无成功工具不臆造技能', S.skillDistill({ text: '查点东西', reply: '好', toolLog: [], taught: false, model: 'llama' }) === null);
+ok('兜底/拒答不炼技能', S.skillDistill({ text: '查汇率', reply: '在，随时待命。', toolLog: [{ tool: 'web_search', ok: true }], taught: false, model: 'fallback' }) === null);
+// 受教：主人亲授 → 记成方法
+const skTaught = S.skillDistill({ text: '以后部署前都先备份数据库再执行', reply: '', toolLog: [], taught: true, model: '' });
+ok('受教技能：主人亲授即成方法', !!skTaught && skTaught.来源 === '受教' && /备份/.test(skTaught.方法));
+// upsert：只增不删 + 同名累加
+let sks = { 技能: {}, 总数: 0 };
+sks = S.skillUpsert(sks, skLearned);
+sks = S.skillUpsert(sks, skTaught);
+const n2 = sks.总数;
+sks = S.skillUpsert(sks, S.skillDistill({ text: '再查下欧元汇率', reply: '约 7.8', toolLog: [{ tool: 'web_search', ok: true }], taught: false, model: 'llama' }));
+ok('同类技能复用累加（count++，不新增条目）', sks.总数 === n2 && Object.values(sks.技能).some(s => s.count >= 2));
+ok('技能库随交互增长', sks.总数 >= 2);
+// retrieve + 注入：会了就调出来
+const got = S.skillRetrieve(sks, '帮我查下日元汇率', 2);
+ok('按输入召回相关技能', got.length >= 1 && /检索|联网/.test(got[0].名 + got[0].方法));
+const skSum = S.summarizeSkills(sks, '查一下比特币价格');
+ok('习得技能能喂回上下文（自演化注入）', /自演化/.test(skSum) && /直接照做/.test(skSum));
+ok('无相关技能不产噪', S.summarizeSkills({ 技能: {}, 总数: 0 }, '你好') === '');
+// 只增不删：超上限才淘汰「最少用+最旧」
+let capSks = { 技能: {}, 总数: 0 };
+for (let i = 0; i < 5; i++) capSks = S.skillUpsert(capSks, { 名: 'T' + i, 方法: 'm', 触发: ['x'], ts: i + 1, count: 1 }, 3);
+ok('超上限淘汰最少用最旧（只增不删边界）', capSks.总数 === 3 && !capSks.技能['T0'] && !!capSks.技能['T4']);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

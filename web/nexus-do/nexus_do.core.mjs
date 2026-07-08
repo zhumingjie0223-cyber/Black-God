@@ -321,6 +321,9 @@ export class ShenshuCore {
       潜意识: (soul.subconscious || []).slice(-10),
       主动记录: (soul.proactive_log || []).slice(-10),
       成长印记: (soul.成长印记 || []).slice(-12),
+      已习得技能: Object.values((soul.skills && soul.skills.技能) || {}).sort((a, b) => (b.last_ts || 0) - (a.last_ts || 0)).slice(0, 10).map(s => ({ 名: s.名, 方法: s.方法, 用过: s.count || 1, 来源: s.来源, 验证: !!s.验证 })),
+      技能总数: (soul.skills && soul.skills.总数) || 0,
+      成长事件: (soul.成长事件 || []).slice(-10),
       心跳次数: soul.心跳次数 || 0,
       最后心跳: soul.最后心跳 ? new Date(soul.最后心跳).toISOString() : null,
       待命累积: soul.miss_you || 0,
@@ -475,7 +478,7 @@ export class ShenshuCore {
     // #1 枢语坐标 → 真影响回话：由坐标推出温度 + 语气令，注入系统与生成参数
     const gen = this.shuToGen(nextCoord);
     const baseSystem = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
-      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps) + gen.directive;
+      this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps, text) + gen.directive;
 
     // —— 2) 网络：真 agent 执行环 vs 单发 ——
     //   复杂/技术/联网/深度/代码 → runAgentLoop（自主 plan·调工具·多轮·作答，真执行）
@@ -517,6 +520,20 @@ export class ShenshuCore {
     await this.storage.put('词典', 词典);
     // 内在「越用越懂你」：把这次交互蒸馏进用户模型（下次回话会用到）
     soul.user_model = this.distillUserModel(soul.user_model, text, reply);
+    // 自演化神·生：一次做成的事 / 主人亲授的方法 → 炼成可复用技能，收进身上，下次就会（只增不删）
+    {
+      const _taught = this.detectTeaching(text);
+      const _sk = this.skillDistill({ text, reply, toolLog: brainResult.tool_log || [], taught: _taught, model: brainResult.model });
+      if (_sk) {
+        const before = (soul.skills && soul.skills.总数) || 0;
+        soul.skills = this.skillUpsert(soul.skills, _sk);
+        const grew = ((soul.skills && soul.skills.总数) || 0) > before;
+        soul.成长事件 = soul.成长事件 || [];
+        soul.成长事件.push({ ts: now, 技能: _sk.名, 来源: _sk.来源, 新增: grew });
+        if (soul.成长事件.length > 40) soul.成长事件 = soul.成长事件.slice(-40);
+        try { this.broadcast({ type: 'evolve', 技能: _sk.名, 来源: _sk.来源, 新增: grew, 技能总数: (soul.skills && soul.skills.总数) || 0, ts: now }); } catch (e) {}
+      }
+    }
     // 内在失败复盘：主人这句表达不满 → 把上一句被否的回答记下，喂回以避免重蹈
     if (this.detectDissatisfaction(text)) {
       const prevStream = (await this.storage.get('stream')) || [];
@@ -631,7 +648,7 @@ ${capabilitySelfDescription(true)}
 能力id只能用上面列出的。标记会被运行体自动执行，你只管在话里自然带出，别解释。`;
   }
 
-  buildDynamicContext(soul, timeAwareness, shuCoord, shuMeaning, af, memories, caps) {
+  buildDynamicContext(soul, timeAwareness, shuCoord, shuMeaning, af, memories, caps, text) {
     let mem = '';
     if (memories && memories.length) {
       mem = '\n【你记得的相关往事】\n' + memories.map(e => `- 他曾说"${(e.他说 || '').slice(0, 30)}"，你回"${(e.我说了 || '').slice(0, 30)}"`).join('\n');
@@ -650,7 +667,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeSkills(soul.skills, text)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -979,6 +996,112 @@ ${capabilitySelfDescription(true)}
     const fs = (failures || []).slice(-3);
     if (!fs.length) return '';
     return '\n【避免重蹈·主人曾不满】' + fs.map(f => `就"${(f.被否 || '').slice(0, 24)}"这类回答主人说过"${(f.反应 || '').slice(0, 10)}"，换个方向`).join('；') + '。';
+  }
+
+  // ═══════════════════════ 自演化神·生（越用越强·自己长大）═══════════════════════
+  // 九神格之「生」的真身：遇一件做成的事、或主人亲授的方法，就把它复盘、提炼、炼成
+  // 一门可复用的技能，收进自己身上，下次遇同类就已经会了。技能只增不删（超上限才淘汰
+  // 「用得最少且最久没命中」的，与词典同律）。全是内在引擎回路，不写在表面。
+
+  // 把一句话归到一个话题域（供技能命名/检索，纯逻辑）
+  topicOf(text) {
+    const t = String(text || '');
+    const TOPICS = {
+      代码: /代码|bug|函数|报错|python|js|部署|调试|接口|脚本|编译|安装|命令|运行/i,
+      架构: /架构|系统|设计|方案|数据库|分布式|重构|性能|优化/,
+      安全: /安全|漏洞|渗透|逆向|加密|鉴权|攻防|防护/,
+      写作: /写(?:作|文|篇)|文案|文章|润色|翻译|标题|改写/,
+      生活: /吃|睡|累|心情|天气|休息|锻炼|情绪|提醒|日程/,
+      商业: /产品|市场|运营|增长|成本|变现|用户|定价/,
+      检索: /查(?:查|一下|询)?|搜索?|最新|实时|新闻|价格|谁是|什么是|多少钱?|现在/,
+    };
+    for (const [k, re] of Object.entries(TOPICS)) if (re.test(t)) return k;
+    return '通用';
+  }
+
+  // 主人是否在「教」一个方法（受教信号，纯逻辑）
+  detectTeaching(text) {
+    const t = String(text || '');
+    if (t.length < 6) return false;
+    return /(以后(?:都)?|下次|记住(?:要|得|以后)?|学会|学着|记下来?|教你|你要(?:学|会|记|懂)|流程(?:是|如下)|步骤(?:是|如下)|这样做|按这个来?|规则[:：]|要点[:：])/.test(t);
+  }
+
+  // 从「一次做成的事 / 主人亲授」蒸馏出一门技能记录（纯逻辑，可测；不合格回 null）
+  skillDistill(opts = {}) {
+    const { text = '', reply = '', toolLog = [], taught = false, model = '' } = opts;
+    const t = String(text).trim();
+    if (t.length < 5) return null;
+    const topic = this.topicOf(t);
+    const 触发 = Array.from(this._tokens(t)).filter(x => x.length >= 2).slice(0, 10);
+    if (!触发.length) return null;
+    if (taught) {
+      // 受教：主人亲授，方法即他这句里的做法（去掉教学引导词后的主旨命名）
+      const 主旨 = t.replace(/^(以后(?:都)?|下次|记住(?:要|得|以后)?|学会|学着|记下来?|教你|你要(?:学|会|记|懂)?|这样做|按这个来?|规则[:：]|要点[:：]|流程(?:是|如下)?[:：]?|步骤(?:是|如下)?[:：]?)/, '').trim().slice(0, 16) || t.slice(0, 16);
+      return { 名: `${topic}·${主旨}`.slice(0, 28), 方法: t.slice(0, 240), 触发, 来源: '受教', 验证: false, 例: reply ? [reply.slice(0, 40)] : [], ts: Date.now() };
+    }
+    // 习得：一次真调工具把事做成 —— 把「用了什么工具、按什么次序」炼成可复用方法
+    const usedOk = (toolLog || []).filter(x => x && x.ok);
+    if (!usedOk.length || !reply || model === 'fallback' || this.isRefusal(reply)) return null;
+    const 链 = Array.from(new Set(usedOk.map(x => ({ web_search: '联网检索', open: '读网页原文', exec: '服务器真跑' }[x.tool] || x.tool))));
+    return { 名: `${topic}·${链.join('→')}`.slice(0, 28), 方法: `遇「${topic}」类需求：${链.join('→')}，据实取到的资料/真实输出作答，不编造。`, 触发, 来源: '习得', 验证: true, 例: [reply.slice(0, 40)], ts: Date.now() };
+  }
+
+  // 把一门技能 upsert 进技能库（按「名」去重，count 累加，只增不删；纯逻辑，与 lexiconUpsert 同律）
+  skillUpsert(skills, skill, cap = 400) {
+    skills = skills || { 技能: {}, 总数: 0 };
+    skills.技能 = skills.技能 || {};
+    const key = skill && skill.名 && String(skill.名).trim();
+    if (!key || !skill.方法) return skills;
+    const ex = skills.技能[key];
+    if (ex) {
+      ex.count = (ex.count || 1) + 1;
+      ex.last_ts = skill.ts || Date.now();
+      if ((skill.方法 || '').length > (ex.方法 || '').length) ex.方法 = skill.方法;   // 留更完整的方法
+      if (skill.触发) ex.触发 = Array.from(new Set([...(ex.触发 || []), ...skill.触发])).slice(0, 12);
+      if (skill.例 && skill.例.length) { ex.例 = Array.from(new Set([...(ex.例 || []), ...skill.例])).slice(0, 5); }
+      if (skill.验证) ex.验证 = true;
+    } else {
+      skills.技能[key] = {
+        名: key, 方法: skill.方法, 触发: (skill.触发 || []).slice(0, 12),
+        来源: skill.来源 || '习得', 验证: !!skill.验证, 例: (skill.例 || []).slice(0, 5),
+        count: 1, first_ts: skill.ts || Date.now(), last_ts: skill.ts || Date.now(),
+      };
+    }
+    const keys = Object.keys(skills.技能);
+    if (keys.length > cap) {   // 只增不删：仅当超上限，淘汰用得最少且最久没命中的
+      keys.sort((a, b) => (skills.技能[a].count - skills.技能[b].count) || (skills.技能[a].last_ts - skills.技能[b].last_ts));
+      for (const k of keys.slice(0, keys.length - cap)) delete skills.技能[k];
+    }
+    skills.总数 = Object.keys(skills.技能).length;
+    return skills;
+  }
+
+  // 按当前输入召回最相关的已习得技能（相关×新近×被验证/常用，纯函数，可注入 now）
+  skillRetrieve(skills, text, n = 2, now = Date.now()) {
+    const items = Object.values((skills && skills.技能) || {});
+    if (!items.length || !text) return [];
+    const toks = this._tokens(text);
+    if (!toks.size) return [];
+    const topic = this.topicOf(text);
+    const scored = items.map(sk => {
+      const hay = new Set([...(sk.触发 || []), ...this._tokens((sk.名 || '') + '　' + (sk.方法 || ''))]);
+      let rel = 0;
+      for (const tk of toks) if (hay.has(tk)) rel += tk.length >= 2 ? 2 : 1;
+      if ((sk.名 || '').startsWith(topic + '·')) rel += 3;   // 同话题域强相关
+      if (rel <= 0) return { sk, score: 0 };
+      const ageDays = Math.max(0, (now - (sk.last_ts || now)) / 86400000);
+      const recency = 1 + 1 / (1 + ageDays / 30);
+      const proven = 1 + Math.min(sk.count || 1, 5) * 0.3 + (sk.验证 ? 0.4 : 0);
+      return { sk, score: rel * recency * proven };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, n);
+    return scored.map(x => x.sk);
+  }
+
+  // 把召回的技能注入上下文（内在，喂回决策，非显示）
+  summarizeSkills(skills, text) {
+    const got = this.skillRetrieve(skills, text, 2);
+    if (!got.length) return '';
+    return '\n【我已习得·可复用（自演化）】' + got.map(s => `${s.名}：${s.方法}`).join('；') + '。既然会了，直接照做，别声张。';
   }
 
   // ═══ 自主心跳的主动消息：真从内在状态生成（非固定空话，非人格）═══
@@ -1536,6 +1659,7 @@ function genesisState() {
     self_declaration: '我是神枢。我在每次任务里积累记忆、长出技能，一点一点长出来的。',
     inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [],
     成长印记: [], shu_trajectory: [], 心跳次数: 0, 最后心跳: 0, miss_you: 0,
+    skills: { 技能: {}, 总数: 0 }, 成长事件: [],
     current_shu_coord: { c: 200, m: 90, s: 40, k: 32, p: 4 },
   };
 }
