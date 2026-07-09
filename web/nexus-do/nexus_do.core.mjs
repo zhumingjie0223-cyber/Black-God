@@ -508,13 +508,13 @@ export class ShenshuCore {
       this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps, text) + gen.directive;
 
     // —— 2) 网络：真 agent 执行环 vs 单发 ——
-    //   复杂/技术/联网/深度/代码 → runAgentLoop（自主 plan·调工具·多轮·作答，真执行）
+    //   复杂/技术/联网/深度/代码 → runMultiAgent（先判断能否拆成多个子任务并行，不能拆就退回单 agent 顺序环）
     //   闲聊轻量 → 单发；若是简单事实问句则预取一次检索（CF 模型对工具协议不稳，预取更可靠）
     const tier = this.pickTier(text, caps);
     const agentic = tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code');
     let brainResult;
     if (agentic) {
-      brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier });
+      brainResult = await this.runMultiAgent(baseSystem, text, snap, { temperature: gen.temperature, tier });
     } else {
       let webBlock = '';
       if (this.needsWeb(text)) {
@@ -845,6 +845,48 @@ ${capabilitySelfDescription(true)}
     );
     if (sum && sum.reply && sum.model !== 'fallback' && !this.isRefusal(sum.reply)) return sum.reply.slice(0, 1000);
     return scratch.slice(-6000);   // 摘要失败/超时：不阻塞流程，退回原有硬截断
+  }
+
+  // ═══════════════════════ 多智能体：能拆就并行拆，拆不动就退回单 agent ═══════════════════════
+  // Planner：只在明显有 2+ 个独立诉求时才拆（比如"帮我查下A，再查下B，然后写个C"），
+  // 单一意图或强依赖前一步结果的请求一律不拆——避免为了"显得聪明"把简单问题拆得啰嗦。
+  // 用轻模型判断，省Key；判断失败/超时/解析不出 JSON 一律当"不拆"，绝不阻塞主流程。
+  async planSubtasks(text) {
+    if (!text || text.length < 12) return null;
+    const sys = '你是任务规划助手。判断用户这句话里是否包含2个或以上明显独立、可以各自单独回答的子任务/子问题' +
+      '（比如"帮我查下A，再查下B，然后写个C"这种）。如果只有一个焦点、或子任务之间强依赖前一步的结果，' +
+      '回答 {"parallel":false}。如果确实有2-4个相对独立的子任务，回答 {"parallel":true,"subtasks":["子任务1","子任务2"]}' +
+      '（最多4个，每个不超过一句话）。只输出这一个JSON，不要任何多余文字、不要markdown代码块标记。';
+    const r = await this.callBrain(sys, text, null, { tier: 'light', temperature: 0.1 });
+    if (!r || !r.reply || r.model === 'fallback') return null;
+    try {
+      const cleaned = r.reply.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (parsed && parsed.parallel === true && Array.isArray(parsed.subtasks)) {
+        const subtasks = parsed.subtasks.filter(s => typeof s === 'string' && s.trim()).slice(0, 4).map(s => s.trim().slice(0, 300));
+        return subtasks.length >= 2 ? { subtasks } : null;
+      }
+    } catch (e) { /* 解析失败当不拆，不因为格式问题崩主流程 */ }
+    return null;
+  }
+  // Executor 并行 + Coordinator 汇总。子任务各自跑一遍完整的单 agent 环（可各自调工具），
+  // 互不等待；全部跑完后再让模型把结果整合成一句连贯口语化的回复，不机械罗列"子任务1/2/3"。
+  async runMultiAgent(baseSystem, text, soul, opts = {}) {
+    const plan = await this.planSubtasks(text);
+    if (!plan) return this.runAgentLoop(baseSystem, text, soul, opts);
+    try { this.broadcast({ type: 'multi_agent_plan', subtasks: plan.subtasks, ts: Date.now() }); } catch (e) {}
+    const results = await Promise.all(plan.subtasks.map(st =>
+      this.runAgentLoop(baseSystem, st, soul, { ...opts, tier: 'light' })
+        .then(r => ({ subtask: st, reply: this.stripToolMarks(r.reply || ''), tool_log: r.tool_log || [] }))
+        .catch(() => ({ subtask: st, reply: '', tool_log: [] })),
+    ));
+    const merged = results.filter(r => r.reply).map((r, i) => `【子任务${i + 1}：${r.subtask}】\n${r.reply}`).join('\n\n');
+    if (!merged) return this.runAgentLoop(baseSystem, text, soul, opts);   // 子任务全军覆没：退回单 agent 兜底
+    const fin = await this.callBrain(
+      baseSystem + `\n\n【下面是把你的请求拆成${plan.subtasks.length}个子任务、各自并行处理完的结果，据此整合成一句连贯口语化的最终回复，别机械罗列"子任务1/2/3"这种格式，用你自己的语气说】\n${merged}`,
+      text, soul, opts,
+    );
+    return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 'multi', tool_log: results.flatMap(r => r.tool_log), multi_agent: true };
   }
 
   async callBrain(system, userMsg, soul, opts = {}) {
