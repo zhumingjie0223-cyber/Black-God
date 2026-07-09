@@ -811,11 +811,24 @@ ${capabilitySelfDescription(true)}
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }
       scratch += (scratch ? '\n\n' : '') + obs.join('\n\n');
-      if (scratch.length > 6000) scratch = scratch.slice(-6000);
+      if (scratch.length > 6000) scratch = await this.compressScratch(scratch, text);
     }
     // 用尽轮数：拿现有资料强制作答（撤下工具指令，避免再要工具）。
     const fin = await this.callBrain(baseSystem + `\n\n【已查到的资料，据此作答、勿再调工具、勿编造】\n${scratch}`, text, soul, opts);
     return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 3, tool_log: toolLog };
+  }
+
+  // 长上下文压缩：资料堆多了，别再无脑砍头（会把最早查到的关键结论切没），
+  // 改用轻模型（免费 CF 层）先摘成要点，摘要失败才退回硬截断兜底。
+  async compressScratch(scratch, text) {
+    const sum = await this.callBrain(
+      '你是资料压缩助手。把下面这堆检索/执行结果压缩成不超过800字的要点摘要，只保留和当前问题直接相关的事实/数据/结论，不要评论、不要客套、不要重复原文措辞。',
+      `【当前问题】${text}\n\n【原始资料】\n${scratch.slice(0, 8000)}`,
+      null,
+      { tier: 'light', temperature: 0.3 },
+    );
+    if (sum && sum.reply && sum.model !== 'fallback' && !this.isRefusal(sum.reply)) return sum.reply.slice(0, 1000);
+    return scratch.slice(-6000);   // 摘要失败/超时：不阻塞流程，退回原有硬截断
   }
 
   async callBrain(system, userMsg, soul, opts = {}) {
