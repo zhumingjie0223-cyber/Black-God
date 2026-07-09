@@ -116,7 +116,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/unsubscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/unsubscribe', '/onboard', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -130,6 +130,7 @@ export class ShenshuCore {
         }
         if (path === '/heartbeat') return json(await this.autonomousTick());
         if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
+        if (path === '/onboard' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.onboardSeed(b)); }
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
         if (path === '/voice' && request.method === 'POST') { const b = await request.json(); return json(await this.genVoice(b.text || '', b)); }
         if (path === '/video' && request.method === 'POST') { const b = await request.json(); return json(await this.genVideo(b.prompt || '', b)); }
@@ -998,6 +999,24 @@ ${capabilitySelfDescription(true)}
     const ent = t.match(/[A-Za-z0-9_\-]{3,20}(?=\s*(?:项目|服务器|仓库|repo|库|系统))/g);
     if (ent) ent.forEach(e => { const key = e.trim(); if (key) model.entities[key] = (model.entities[key] || 0) + 1; });
     return model;
+  }
+  // 首次引导：把开屏问的「最近忙什么/怎么说话」直接种进用户模型，不用等真聊几轮才「越用越懂」。
+  // 只认白名单话题，避免前端传入乱七八糟的 key 污染画像。
+  async onboardSeed(body) {
+    const TOPIC_WHITELIST = new Set(['代码', '架构', '安全', '写作', '生活', '商业']);
+    const topics = Array.isArray(body && body.topics) ? body.topics.filter(t => TOPIC_WHITELIST.has(t)).slice(0, 6) : [];
+    const style = (body && (body.style === '简短' || body.style === '详细')) ? body.style : null;
+    if (!topics.length && !style) return { ok: true, seeded: false };
+    const soul = await this.getSoul();
+    const model = soul.user_model || { topics: {}, style: {}, entities: {}, count: 0 };
+    model.topics = model.topics || {}; model.style = model.style || {}; model.entities = model.entities || {};
+    for (const t of topics) model.topics[t] = (model.topics[t] || 0) + 3;   // 加权：比一次自然提及更肯定
+    if (style) model.style[style] = (model.style[style] || 0) + 3;
+    model.count = (model.count || 0) + 1;
+    soul.user_model = model;
+    soul.onboarded_at = soul.onboarded_at || Date.now();
+    await this.saveSoul(soul);
+    return { ok: true, seeded: true };
   }
   summarizeUserModel(model) {
     if (!model || !model.count) return '';

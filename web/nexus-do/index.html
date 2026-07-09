@@ -583,6 +583,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .ob-btn:active{transform:scale(.97)}
 .ob-btn:disabled{opacity:.55}
 .ob-sub{font-size:12.5px;color:var(--text-3);margin-top:16px;line-height:1.5;max-width:300px}
+.ob-chiprow{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;max-width:320px}
+.ob-chip{padding:9px 16px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface-2);
+  color:var(--text-2);font-size:13.5px;cursor:pointer;transition:.15s var(--spring)}
+.ob-chip.on{background:var(--cy-grad);color:#17191A;border-color:transparent;font-weight:700}
+.ob-chip:active{transform:scale(.94)}
 
 /* ═══════════ 石墨暗流 · Mac 动态流 + 伸缩式交互层（统一手感，覆盖在最后）═══════════ */
 :root{
@@ -689,6 +694,26 @@ body::before{
     <div class="ob-note">🔒 本地储存 · 不上云端</div>
     <button class="ob-btn" id="obReadBtn" onclick="obReadDevice()">读取设备 · 开始使用</button>
     <div class="ob-sub">仅存本机，用于为你定制</div>
+  </div>
+  <div class="ob-screen" id="obS1b">
+    <div class="ob-tag">先说说，最近主要在忙什么？</div>
+    <div class="ob-sub" style="margin:6px 0 18px">可多选，不选也能跳过</div>
+    <div class="ob-chiprow" id="obTopicRow">
+      <button class="ob-chip" data-topic="代码" onclick="obToggleTopic(this)">代码</button>
+      <button class="ob-chip" data-topic="架构" onclick="obToggleTopic(this)">架构</button>
+      <button class="ob-chip" data-topic="安全" onclick="obToggleTopic(this)">安全</button>
+      <button class="ob-chip" data-topic="写作" onclick="obToggleTopic(this)">写作</button>
+      <button class="ob-chip" data-topic="生活" onclick="obToggleTopic(this)">生活</button>
+      <button class="ob-chip" data-topic="商业" onclick="obToggleTopic(this)">商业</button>
+    </div>
+    <div class="ob-tag" style="margin-top:28px">更喜欢她怎么说话？</div>
+    <div class="ob-chiprow" id="obStyleRow">
+      <button class="ob-chip" data-style="简短" onclick="obPickStyle(this)">简短直接</button>
+      <button class="ob-chip" data-style="详细" onclick="obPickStyle(this)">详细耐心</button>
+    </div>
+    <div class="ob-note" style="margin-top:28px;white-space:normal;max-width:320px">她的建议仅供参考，重要决定你自己拿主意；这些偏好只存在这台服务器，随时可清空。</div>
+    <button class="ob-btn" onclick="obPrefsNext()">下一步</button>
+    <div class="ob-sub" id="obSkipBtn" onclick="obPrefsSkip()" style="cursor:pointer;text-decoration:underline">跳过</div>
   </div>
   <div class="ob-screen" id="obS2">
     <div class="ob-orb big"><span>神</span></div>
@@ -999,6 +1024,7 @@ const Nexus = {
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async unsubscribe(endpoint) { try { const r=await this._fetch('/unsubscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({endpoint})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async onboardSeed(prefs) { try { const r=await this._fetch('/onboard',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(prefs)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async connectWS() {
     if (this.mode === 'public') return;   // 公共用户不连实时旁听通道
     try {
@@ -1673,10 +1699,19 @@ async function obReadDevice(){
     }
   }catch(e){}
   finally{
-    $('#obS1').classList.remove('on'); $('#obS2').classList.add('on');   // 一定进入下一屏
+    $('#obS1').classList.remove('on'); $('#obS1b').classList.add('on');   // 一定进入下一屏
     btn.disabled=false; btn.textContent='读取设备 · 开始使用';           // 一定恢复按钮
   }
 }
+const obTopics=new Set(); let obStyle=null;
+function obToggleTopic(el){ const t=el.dataset.topic; el.classList.toggle('on'); el.classList.contains('on')?obTopics.add(t):obTopics.delete(t); }
+function obPickStyle(el){ obStyle=el.dataset.style; $$('#obStyleRow .ob-chip').forEach(c=>c.classList.toggle('on', c===el)); }
+async function obPrefsNext(){
+  // 铁律同上：这些是锦上添花的初始画像种子，绝不能把人卡在这一屏——失败也照样进下一屏。
+  try{ await Nexus.onboardSeed({ topics:[...obTopics], style: obStyle }); }catch(e){}
+  $('#obS1b').classList.remove('on'); $('#obS2').classList.add('on');
+}
+function obPrefsSkip(){ $('#obS1b').classList.remove('on'); $('#obS2').classList.add('on'); }
 function obFinish(){ store.set('onboarded','1'); $('#onboard').classList.remove('show'); }
 
 /* ============ 纵深视差（陀螺仪 / 指针，4D 感）============ */
