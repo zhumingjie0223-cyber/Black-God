@@ -543,6 +543,8 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:var(--cy-grad);color:#17191A;box-shadow:0 10px 26px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.22);transition:.15s var(--spring)}
 .lock-btn:active{transform:scale(.97)} .lock-btn:disabled{opacity:.6}
 .lock-switch{margin-top:16px;font-size:12.5px;color:var(--text-2);opacity:.62;cursor:pointer;letter-spacing:.02em}
+.reg-privacy-row{margin-top:10px;font-size:11px;color:var(--text-3);opacity:.55;letter-spacing:.02em}
+.reg-privacy-row a{color:inherit;text-decoration:underline}
 .reg-adv-toggle{margin-top:18px;font-size:12.5px;color:var(--text-3);cursor:pointer;letter-spacing:.02em;user-select:none;transition:.2s var(--ease)}
 .reg-adv-toggle:hover{color:var(--text-2)}
 .reg-adv{margin-top:14px;display:flex;flex-direction:column;gap:12px;animation:advIn .32s var(--ease)}
@@ -664,6 +666,7 @@ body::before{
         <div class="reg-adv-hint">不填即用内置大脑，随时可在设置里换</div>
       </div>
       <div class="lock-switch" onclick="setGateMode('owner')">我是主人 · 私密登录</div>
+      <div class="reg-privacy-row"><a href="/privacy" target="_blank" rel="noopener">隐私政策</a> · <a href="javascript:void(0)" onclick="doUnregister()">删除我的数据</a></div>
     </div>
 
     <!-- 主人私密模式：OWNER_TOKEN 解锁 -->
@@ -967,6 +970,7 @@ const Nexus = {
   ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
   hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; return h; },
   async register(nick, api) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, nick, api_url:(api&&api.url)||'', api_key:(api&&api.key)||'', api_model:(api&&api.model)||'' }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async unregister() { try { const r = await fetch(this.base + '/unregister', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
   async stats() { try { const r = await this._fetch('/stats', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async _fetch(path, opts) {
     const r = await fetch(this.base + path, opts);
@@ -1564,6 +1568,17 @@ async function doRegister(){
   if(r&&r.ok){ store.set('reg_nick',nick); store.set('reg_api_url',url); store.set('reg_api_key',key); store.set('reg_api_model',model);
     Nexus.mode='public'; hideLock(); hap([10,30,10]); initPublicMode(); }
   else { err.textContent='网络不太顺，再试一次'; }
+}
+async function doUnregister(){
+  const uid=store.get('reg_uid');
+  if(!uid){ alert('还没有注册过，没有数据可删。'); return; }
+  if(!confirm('确定删除你在本服务里的昵称、地区、消息统计等全部记录吗？此操作不可撤销。')) return;
+  Nexus.uid=uid;
+  const r=await Nexus.unregister();
+  try{ ['reg_uid','reg_nick','reg_api_url','reg_api_key','reg_api_model'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  Nexus.mode='none'; Nexus.uid='';
+  alert(r&&r.ok?'已删除，欢迎随时再来。':'删除请求已发送，若刚才网络不顺可重试一次。');
+  location.reload();
 }
 function initPublicMode(){
   Nexus.mode='public'; document.body.classList.add('public-mode');

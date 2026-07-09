@@ -1,0 +1,12 @@
+# blackgod88 这个 Worker（根目录 wrangler.jsonc → assets.directory = web）
+# 只用来发布下面这套旧版静态首页（index.html/theme.css/manifest.json/...）。
+#
+# nexus-do/ 和 nexus-studio/ 是两个各自独立部署的 Cloudflare Worker
+# （分别有自己的 wrangler.jsonc，走 .github/workflows/deploy-nexus.yml 和
+# deploy-studio.yml 部署到各自的域名/子域）。它们不该被 blackgod88 当成
+# 静态文件再发布一遍 —— 否则源码（含 account_id、鉴权逻辑注释等内部实现细节）
+# 会在 blackgod88 的域名下以裸文件形式被任何人下载到。
+#
+# 格式同 .gitignore（Cloudflare Workers 静态资源支持 .assetsignore）。
+nexus-do/
+nexus-studio/

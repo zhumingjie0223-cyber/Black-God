@@ -68,3 +68,17 @@ server/data/
 .wrangler
 .dev.vars*
 !.dev.vars.example
+
+# Android TWA 打包产物（bubblewrap init/build 生成，签名密钥绝不能上传）
+android/*.keystore
+android/*.apk
+android/*.aab
+android/.gradle/
+android/local.properties
+android/app/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/build.gradle
+android/settings.gradle
+android/node_modules/

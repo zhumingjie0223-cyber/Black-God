@@ -70,9 +70,14 @@
   加每分钟 / 每日调用上限。
 - [ ] **前端别再静默假装在线**：`index.html` 所有请求 `catch → Demo.*` 会在后端挂掉时
   显示本地假数据。区分「离线 / 出错」与「正常」，给真实故障提示。
-- [ ] **隐私合规**（面向公众 / 上架必须）：`readRequestDevice` / `recordDevice` 采集
-  IP、精确经纬度、运营商、设备型号、时区、电量并落库。需要隐私政策、采集同意、
-  数据删除入口。模拟亲密伴侣人格上架敏感，先评估过审风险。
+- [x] **隐私合规（基础版已加）**：新增 `/privacy` 公开只读页面（`PRIVACY_HTML`，说明
+  访客/主人两类身份各采集什么、分享给谁、保留多久、怎么删除），落地页新增「隐私政策 /
+  删除我的数据」链接；新增 `POST /unregister` 自助删除端点，访客凭自己的 `uid` 可随时
+  清空注册记录。**上架前仍需你手动做**：
+  - [ ] 把 `PRIVACY_HTML` 里的联系邮箱占位符换成真实可用邮箱（`web/nexus-do/nexus_do.core.mjs` 搜 `在此处填写你的联系邮箱`）
+  - [ ] 视商店要求补充英文版隐私政策（Google Play 若面向多语言用户会要求）
+  - [ ] 模拟亲密伴侣人格上架敏感，部分商店可能按「情感陪伴类」App 加审——先看目标商店的分类政策，必要时在商店后台的内容分级里如实申报
+  - [ ] 若正式面向未成年人可及的公开商店，需评估是否要加年龄确认
 - [ ] **端到端 / 鉴权回归测试**：目前只有 10 条纯逻辑自测；补路由、401、迁移、推送
   的集成测试。
 
@@ -80,16 +85,28 @@
 
 ## 🟡 P2 — 打磨 / 收尾
 
-- [x] **部署去重（已办一半）**：删掉了 root `wrangler.jsonc` —— 它把旧静态 `web/`
-  站当资源部署成另一个 worker `blackgod88`，和真正的产品 `nexus-do` 并行跑。
-  **仍需在 Cloudflare 面板手动关掉 `blackgod88` 的 Git 集成**（Workers → blackgod88 →
-  Settings → Builds → 断开 Git），否则每次 push 那条 Workers Build 会因找不到配置而变红。
-- [ ] **挑定唯一前门 / 归档旧壳**：`web/`（旧静态站，已弃用，改由 `web/nexus-do/` 内嵌
-  UI 提供）、`server/`（Python 内核，孤儿未接线）、`ios-app/`（半成品原生 App）。
-  确认 `nexus-do` 为唯一前门后，把 `web/` 旧静态文件与其余半成品归档。
-- [ ] **iOS 原生 App 取舍**：`build.yml` 产 unsigned IPA，无 Apple 开发者账号 + 签名
-  无法分发。当前实际路线是 PWA —— native 那套要么补齐要么砍掉（顺带停掉每次
-  push 都跑的 macOS 构建，省 Actions 额度）。
+- [x] **部署去重（现状更新）**：root `wrangler.jsonc` 后来（PR #20）又被有意加回来了 ——
+  `blackgod88` 这个 Worker 现在**故意**保留，专门发布旧静态首页 `web/index.html` 等文件；
+  真正的产品 `nexus-do`（DO 大脑）与 `nexus-studio`（自主智能体工作台）各自有独立
+  `wrangler.jsonc`，各走各的 GitHub Actions 部署，互不影响。
+  之前的风险是 `blackgod88` 把整个 `web/` 目录当静态资源发布，会连
+  `web/nexus-do/`、`web/nexus-studio/` 下的源码（`nexus_do.core.mjs`、`wrangler.jsonc`
+  含 account_id 等）一起当裸文件公开发布——**已修复**：新增 `web/.assetsignore`
+  排除这两个子目录，`blackgod88` 现在只发布真正的旧首页素材。
+  另外发现 `web/nexus-do/studio.html` 与线上实际服务的 `web/nexus-studio/public/index.html`
+  逐字节相同（前者是构建时未清理的重复文件，未被任何路由/构建脚本引用）——已删除。
+- [ ] **`web/` 旧静态首页去留未定**：`web/index.html` 等文件是否还要保留对外可访问
+  （`blackgod88` 域名），还是彻底下线改为只用 `aquan.lufei.uk`（`nexus-do`）当唯一入口，
+  需要你确认后再决定是否删除文件 + 关闭 `blackgod88` 的 Cloudflare Git 集成
+  （Workers → blackgod88 → Settings → Builds → 断开 Git）。
+- [ ] **`server/`（Python 内核）去留未定**：有自己的 `Dockerfile`/`docker-compose.yml`
+  可独立自托管跑，但其独有能力（省 Key 自适应推理/自进化/首次认识你/多智能体）尚未接入
+  `nexus-do` 线上产品，见 `CLOSURE_PLAN.md`。是继续维护 Docker 自托管路线，还是把能力
+  移植进 `nexus-do` 后归档，需要你决定。
+- [x] **iOS 原生 App 取舍（先止损）**：无 Apple 开发者账号，`build.yml` 产的 unsigned
+  IPA 签不了名、发不出去。已把 `build.yml` 触发方式从「每次 push 到 main 自动跑」改成
+  仅 `workflow_dispatch`（手动触发），省 Actions 分钟数；`ios-app/` 代码本身还留着，
+  等有开发者账号或决定彻底放弃原生 App 时再决定删不删。
 - [ ] **回复截断**：`callBrain` 的 `max_tokens: 320` 会截断长代码类回复，按需调大。
 - [ ] **错误信息收敛**：catch 把 `e.message` 直接回前端，轻微信息泄露。
 - [ ] **单一静态令牌**：无轮换 / 无过期 / 无多设备区分，按需升级。
