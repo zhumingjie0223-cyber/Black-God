@@ -998,6 +998,7 @@ const Nexus = {
   async testExec() { try { const r=await this._fetch('/exec-test',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:'{}'}); return r&&r.ok?await r.json():{ok:false,detail:'服务器无响应'}; } catch(e){ return {ok:false,detail:String(e).slice(0,80)}; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async unsubscribe(endpoint) { try { const r=await this._fetch('/unsubscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({endpoint})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async connectWS() {
     if (this.mode === 'public') return;   // 公共用户不连实时旁听通道
     try {
@@ -1642,7 +1643,18 @@ async function enablePush(){
   }catch(e){ toast('推送开启失败'); return false; }
 }
 function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到消息':'关 · 关着 app 也能收到消息'; }
-function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on){ store.set('push_on',''); setPushUI(false); toast('已关（订阅仍在，可再开）'); } else enablePush(); }
+async function disablePush(){
+  store.set('push_on',''); setPushUI(false);
+  try{
+    if('serviceWorker' in navigator){
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      if(sub){ await Nexus.unsubscribe(sub.endpoint); await sub.unsubscribe(); }
+    }
+    toast('已关闭推送');
+  }catch(e){ toast('已关（本地已关，服务端退订可能没成功，再开一次就好）'); }
+}
+function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on) disablePush(); else enablePush(); }
 
 /* ============ 开屏引导 ============ */
 function showOnboarding(){ $('#onboard').classList.add('show'); }

@@ -116,7 +116,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/unsubscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -141,6 +141,7 @@ export class ShenshuCore {
         // /migrate：仅 POST + 显式 ?force=1 才强制；默认幂等，防误触回滚记忆
         if (path === '/migrate' && request.method === 'POST') return json(await this.migrateFromKV(url.searchParams.get('force') === '1'));
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
+        if (path === '/unsubscribe' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.removePushSub(b.endpoint || '')); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '神枢在此，一直在。', '/'); return json(r); }
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
         if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
@@ -1495,6 +1496,15 @@ ${capabilitySelfDescription(true)}
     return { ok: true, 订阅数: subs.length };
   }
 
+  // 主动取消推送订阅：关掉通知权限/换设备时，前端应该能明确退订，而不是只能等推送 404 被动清理
+  async removePushSub(endpoint) {
+    if (!endpoint) return { error: 'missing endpoint' };
+    const subs = (await this.storage.get('push_subs')) || [];
+    const kept = subs.filter(s => s.endpoint !== endpoint);
+    if (kept.length !== subs.length) await this.storage.put('push_subs', kept);
+    return { ok: true, 订阅数: kept.length };
+  }
+
   // 给所有订阅端推送；失效订阅（404/410）自动清理
   // 只删确实失效的端点、发送后重读 fresh 再过滤，避免覆盖网络窗口内并发新增的订阅
   async pushToAll(title, body, url = '/') {
@@ -1763,9 +1773,15 @@ ${capabilitySelfDescription(true)}
     if (!u.api_url || !u.api_key) return { reply: '要用得先填你自己的 API（地址 + 密钥）—— 点上面「我的 API」设置一下就能聊。', model: 'no_api' };
     // 计数（轻量）
     u.last_seen = Date.now(); u.msgs = (u.msgs || 0) + 1; await this.storage.put('users', users);
-    // 公共版她：无私人记忆、无主人上下文、无状态 —— 主人隐私完全不暴露
+    // 公共版她：无私人记忆、无主人上下文、无状态——本来就是同问同答，缓存不会像 /talk 那样撞坏
+    // "越用越懂你"的人设（/talk 带心绪/记忆/技能库，故意不接缓存）。按模型分桶，避免不同用户
+    // 配的不同模型互相顶替回复。
+    const cacheKind = 'pub:' + (u.api_model || 'auto');
+    const cached = await this.cacheGet(cacheKind, text);
+    if (cached) return { reply: cached.reply, model: cached.model, _cached: true };
     const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(), text);
     if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + '），改一下「我的 API」再试。', model: 'api_error' };
+    await this.cachePut(cacheKind, text, { reply: r.reply, model: r.model });
     return { reply: r.reply, model: r.model };
   }
 
