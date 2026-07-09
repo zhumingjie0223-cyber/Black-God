@@ -671,6 +671,7 @@ body::before{
         <div class="reg-adv-hint">不填即用内置大脑，随时可在设置里换</div>
       </div>
       <div class="lock-switch" onclick="setGateMode('owner')">我是主人 · 私密登录</div>
+      <div class="lock-switch" onclick="setGateMode('trust')">我有亲友令牌</div>
       <div class="reg-privacy-row"><a href="/privacy" target="_blank" rel="noopener">隐私政策</a> · <a href="javascript:void(0)" onclick="doUnregister()">删除我的数据</a></div>
     </div>
 
@@ -680,6 +681,15 @@ body::before{
       <input id="lockInput" class="lock-input" type="password" placeholder="OWNER_TOKEN" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')tryUnlock()"/>
       <div id="lockErr" class="lock-err"></div>
       <button id="lockBtn" class="lock-btn" onclick="tryUnlock()">解锁</button>
+      <div class="lock-switch" onclick="setGateMode('public')">← 返回</div>
+    </div>
+
+    <!-- 亲友令牌模式：主人给的共享令牌，只能聊天，看不到主人任何隐私 -->
+    <div id="trustMode" style="display:none">
+      <div class="lock-sub">亲友令牌 · 输入对方给你的那串</div>
+      <input id="trustInput" class="lock-input" type="password" placeholder="亲友令牌" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')tryTrustEnter()"/>
+      <div id="trustErr" class="lock-err"></div>
+      <button id="trustEnterBtn" class="lock-btn" onclick="tryTrustEnter()">进 入</button>
       <div class="lock-switch" onclick="setGateMode('public')">← 返回</div>
     </div>
   </div>
@@ -989,8 +999,9 @@ const Demo = {
 const Nexus = {
   base: store.get('nexus_base') || '',        // 同源默认
   token: store.get('owner_token') || '',       // 私密令牌（配了 OWNER_TOKEN 才需要）
-  // 模式：owner=主人（私密全功能）｜public=注册用户（公共聊天，不碰主人数据）｜none=未进
-  mode: store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none'),
+  trustToken: store.get('trust_token') || '',  // 亲友令牌（有限信任层，只能聊天）
+  // 模式：owner=主人（私密全功能）｜trusted=亲友令牌（只能聊天）｜public=注册用户（公共聊天，不碰主人数据）｜none=未进
+  mode: store.get('owner_token') ? 'owner' : (store.get('trust_token') ? 'trusted' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none')),
   uid: store.get('reg_uid') || '',
   ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
   hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; return h; },
@@ -1010,9 +1021,18 @@ const Nexus = {
       try { const r = await fetch(this.base + '/pubtalk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, text }) });
         return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
     }
+    // 亲友令牌走 /trusttalk（真人格/真心绪，但绝不碰主人隐私）
+    if (this.mode === 'trusted') {
+      try { const r = await fetch(this.base + '/trusttalk', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+this.trustToken}, body: JSON.stringify({ text }) });
+        return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
+    }
     try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
       return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
   },
+  async trustVerify(token) { try { const r = await fetch(this.base + '/trust-verify', { method:'POST', headers:{'Authorization':'Bearer '+token} }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async trustList() { try { const r = await this._fetch('/trust', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async trustCreate(name) { try { const r = await this._fetch('/trust', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({name}) }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async trustRevoke(id) { try { const r = await this._fetch('/trust-revoke', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({id}) }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async device(info) { try { await this._fetch('/device',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(info)}); } catch(e){} },
   async whoami() { try { const r=await this._fetch('/whoami',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async image(prompt) { try { const r=await this._fetch('/image',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
@@ -1580,7 +1600,24 @@ function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记
 function onUnauthorized(){ if(Nexus.mode==='public') return; setGateMode('owner'); showLock(); }
 function toggleRegAdv(){ const a=$('#regAdv'), t=$('#regAdvToggle'); if(!a) return; const open=a.style.display!=='none';
   a.style.display=open?'none':'flex'; if(t) t.textContent = open ? '自带大脑 · 可选 ▾' : '自带大脑 · 可选 ▴'; }
-function setGateMode(m){ const rg=$('#regMode'), om=$('#ownerMode'); if(rg&&om){ rg.style.display=(m==='owner')?'none':''; om.style.display=(m==='owner')?'':'none'; } }
+function setGateMode(m){
+  const rg=$('#regMode'), om=$('#ownerMode'), tm=$('#trustMode'); if(!rg||!om||!tm) return;
+  rg.style.display = (m==='owner'||m==='trust') ? 'none' : '';
+  om.style.display = (m==='owner') ? '' : 'none';
+  tm.style.display = (m==='trust') ? '' : 'none';
+}
+async function tryTrustEnter(){
+  const v=$('#trustInput').value.trim(); const err=$('#trustErr'), btn=$('#trustEnterBtn');
+  if(!v){ err.textContent='输入令牌'; return; }
+  btn.disabled=true; btn.textContent='验证中…'; err.textContent='';
+  const r=await Nexus.trustVerify(v);
+  btn.disabled=false; btn.textContent='进 入';
+  if(r&&r.ok){
+    store.set('trust_token',v); store.set('trust_name',r.name||'');
+    Nexus.trustToken=v; Nexus.mode='trusted'; document.body.classList.add('public-mode');
+    hideLock(); hap([10,30,10]); initTrustedMode();
+  } else { err.textContent='令牌不对，跟主人确认一下'; hap(30); }
+}
 function ensureUid(){ let u=store.get('reg_uid'); if(!u){ u=(self.crypto&&crypto.randomUUID)?crypto.randomUUID().replace(/-/g,''):(Date.now().toString(36)+Math.random().toString(36).slice(2)); store.set('reg_uid',u); } Nexus.uid=u; return u; }
 function prefillReg(){ const g=(id,k)=>{ const el=$('#'+id); if(el&&store.get(k)!=null) el.value=store.get(k); };
   g('regNick','reg_nick'); g('regApiUrl','reg_api_url'); g('regApiKey','reg_api_key'); g('regApiModel','reg_api_model'); }
@@ -1613,6 +1650,12 @@ function initPublicMode(){
   ensurePubApiBtn();
   try{ toast('欢迎，'+(store.get('reg_nick')||'')); }catch(e){}
 }
+// 亲友令牌模式：和公共模式一样只露聊天面板，不拉 soul/hub 这些主人私密数据
+function initTrustedMode(){
+  Nexus.mode='trusted'; Nexus.trustToken=store.get('trust_token')||''; document.body.classList.add('public-mode');
+  try{ setLive(true); }catch(e){}
+  try{ toast('欢迎，'+(store.get('trust_name')||'')); }catch(e){}
+}
 // 公共模式：左上角「⚙︎ 我的 API」随时改自己的网关
 function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
@@ -1635,6 +1678,36 @@ function showStatsSheet(){
   const s=window._stats; if(!s) return;
   const rows=(s.名单||[]).slice(0,60).map(u=>`· ${u.昵称||'—'}　${u.地区||'—'}　${u.消息数||0}条　${fmtTs(u.最近)}`).join('\n')||'（还没有人注册）';
   alert('注册总数：'+(s.注册总数||0)+'\n今日活跃：'+(s.今日活跃||0)+'\n名单在册：'+(s.名单在册||0)+'\n\n'+rows);
+}
+// 主人模式：右上角「🔗 亲友令牌」管理入口——新建/撤销给家人熟人的共享令牌
+function ensureTrustBtn(){
+  if(Nexus.mode!=='owner') return;
+  let b=$('#trustMgmtBtn');
+  if(!b){ b=document.createElement('div'); b.id='trustMgmtBtn';
+    b.style.cssText='position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#6FA985;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    b.textContent='🔗 亲友令牌'; b.onclick=openTrustPanel; document.body.appendChild(b); }
+}
+async function openTrustPanel(){
+  const list=await Nexus.trustList();
+  if(!list||!list.ok){ toast('拉取失败'); return; }
+  const tokens=list.tokens||[];
+  const rows=tokens.map((t,i)=>`${i+1}. ${t.name}　消息${t.msgs||0}条　${t.last_used?fmtTs(t.last_used):'还没用过'}`).join('\n')||'（还没有共享令牌）';
+  const action=prompt('共享令牌管理\n\n'+rows+'\n\n输入"新建 名字"来创建，输入序号来撤销，取消则关闭：','');
+  if(!action) return;
+  const a=action.trim();
+  if(/^新建\s*(.*)$/.test(a)){
+    const name=a.replace(/^新建\s*/,'').trim()||'朋友';
+    const r=await Nexus.trustCreate(name);
+    if(r&&r.ok) alert('已创建，这串令牌只显示这一次，请立刻复制发给「'+r.name+'」：\n\n'+r.token);
+    else toast('创建失败');
+  } else if(/^\d+$/.test(a)){
+    const idx=parseInt(a,10)-1; const t=tokens[idx];
+    if(!t){ toast('序号不对'); return; }
+    if(confirm('确定撤销「'+t.name+'」的令牌吗？撤销后对方立刻不能再聊。')){
+      const r=await Nexus.trustRevoke(t.id);
+      toast(r&&r.ok?'已撤销':'撤销失败');
+    }
+  }
 }
 function showLock(){ const g=$('#lockgate'); if(!g) return; g.classList.add('show'); setTimeout(()=>{ const i=$('#lockInput'); if(i) i.focus(); }, 220); }
 function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
@@ -1753,9 +1826,10 @@ function typeInto(bubble, text, done){
   try{ setPushUI(!!store.get('push_on')); }catch(e){}
   try{ $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } }); }catch(e){}
   try{ ensureUid(); }catch(e){}
-  // —— 进哪个门：主人 / 已注册公共用户 / 未进（默认公共注册门）——
-  Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none');
+  // —— 进哪个门：主人 / 亲友令牌 / 已注册公共用户 / 未进（默认公共注册门）——
+  Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('trust_token') ? 'trusted' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none'));
   if(Nexus.mode==='owner') bootOwner();
+  else if(Nexus.mode==='trusted') initTrustedMode();
   else if(Nexus.mode==='public') initPublicMode();
   else { setGateMode('public'); prefillReg(); showLock(); }
   // 回到前台 / 网络恢复 → 瞬间重连（仅主人；公共用户无 WS，不触发私密接口）
@@ -1785,6 +1859,7 @@ function bootOwner(){
   try{ refreshSoul(); }catch(e){}
   try{ loadHub(); }catch(e){}
   try{ loadOwnerStats(); }catch(e){}
+  try{ ensureTrustBtn(); }catch(e){}
   try{ collectDevice().then(info=>Nexus.device(info)).catch(()=>{}); }catch(e){}
   if(!store.get('onboarded')) showOnboarding();
 }

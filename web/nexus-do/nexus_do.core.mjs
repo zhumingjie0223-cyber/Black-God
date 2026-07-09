@@ -104,6 +104,10 @@ export class ShenshuCore {
     if (path === '/unregister' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.unregisterUser(b)); }
     if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
 
+    // —— 共享令牌（家人/熟人）：校验 + 聊天，鉴权靠令牌本身，不走 OWNER_TOKEN 硬门 ——
+    if (path === '/trust-verify' && request.method === 'POST') return json(await this.verifyTrustToken(request));
+    if (path === '/trusttalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handleTrustTalk(b, request)); }
+
     // —— 能力契约层（借鉴 Minis）——
     // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
     if (path === '/capabilities') return json({ action: 'list', data: describeCapabilities(authed) });
@@ -116,7 +120,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/unsubscribe', '/onboard', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/unsubscribe', '/onboard', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats', '/trust', '/trust-revoke']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
@@ -131,6 +135,9 @@ export class ShenshuCore {
         if (path === '/heartbeat') return json(await this.autonomousTick());
         if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
         if (path === '/onboard' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.onboardSeed(b)); }
+        if (path === '/trust' && request.method === 'GET') return json(await this.listTrustTokens());
+        if (path === '/trust' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.createTrustToken(b.name)); }
+        if (path === '/trust-revoke' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.revokeTrustToken(b.id)); }
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
         if (path === '/voice' && request.method === 'POST') { const b = await request.json(); return json(await this.genVoice(b.text || '', b)); }
         if (path === '/video' && request.method === 'POST') { const b = await request.json(); return json(await this.genVideo(b.prompt || '', b)); }
@@ -174,20 +181,28 @@ export class ShenshuCore {
     });
   }
 
+  // 从请求里取令牌：Authorization Bearer / X-Owner-Token 头 / ?k= 三选一（不认 Cookie，杜绝 CSRF）
+  extractToken(request) {
+    const h = request.headers;
+    const auth = h.get('Authorization') || '';
+    let tok = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (!tok) tok = h.get('X-Owner-Token');
+    if (!tok) { try { tok = new URL(request.url).searchParams.get('k'); } catch {} }
+    return tok;
+  }
   // 鉴权：配了 OWNER_TOKEN 就强制校验；未配则开放（向后兼容，UI 会提醒设置）
   authOK(request) {
     const expected = this.env.OWNER_TOKEN;
     if (!expected) return true;
-    let tok = null;
-    const h = request.headers;
-    const auth = h.get('Authorization') || '';
-    if (auth.startsWith('Bearer ')) tok = auth.slice(7);
-    if (!tok) tok = h.get('X-Owner-Token');
-    if (!tok) { try { tok = new URL(request.url).searchParams.get('k'); } catch {} }
-    // 不接受 Cookie 携带令牌 —— 杜绝跨站请求伪造（CSRF）面
+    const tok = this.extractToken(request);
     return !!tok && this.safeEqual(String(tok), String(expected));
   }
   safeEqual(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
+  // SHA-256 十六进制摘要——共享令牌只存哈希，不存明文（即便 storage 被 dump 也还原不出令牌本身）
+  async hashToken(tok) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(tok || '')));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
 
   // WebSocket 一次性短期票据：换票需已鉴权（走 Authorization 头），令牌不入 URL。
   async issueWsTicket() {
@@ -1772,6 +1787,77 @@ ${capabilitySelfDescription(true)}
     delete users[uid];
     await this.storage.put('users', users);
     return { ok: true, deleted: true };
+  }
+
+  // ═══════════════════════ 共享令牌（家人/熟人 · 有限信任层）═══════════════════════
+  // 和 OWNER_TOKEN 平级但权限窄得多：只能聊天，感受真实人格/心绪，绝不碰主人的
+  // 记忆/位置/设备/配置。每个令牌自己的聊天记录单独存一份小记忆，互不串门，
+  // 也绝不写进 soul.episodes（主人的私密情节记忆）。只有主人（持 OWNER_TOKEN）能
+  // 新建/查看/撤销这些令牌；令牌本身只存 SHA-256 哈希，不存明文。
+  async createTrustToken(name) {
+    name = String(name || '').trim().slice(0, 24) || '朋友';
+    const token = 'trust_' + crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    const hash = await this.hashToken(token);
+    const store = (await this.storage.get('trust_tokens')) || {};
+    store[hash] = { name, created: Date.now(), last_used: null, msgs: 0 };
+    await this.storage.put('trust_tokens', store);
+    return { ok: true, token, name };   // token 只有这一次能拿到，之后只存哈希
+  }
+  async listTrustTokens() {
+    const store = (await this.storage.get('trust_tokens')) || {};
+    const tokens = Object.entries(store).map(([hash, v]) => ({
+      id: hash.slice(0, 12), name: v.name, created: v.created, last_used: v.last_used, msgs: v.msgs || 0,
+    }));
+    return { ok: true, tokens };
+  }
+  async revokeTrustToken(id) {
+    const store = (await this.storage.get('trust_tokens')) || {};
+    const key = Object.keys(store).find(h => h.slice(0, 12) === String(id || ''));
+    if (!key) return { ok: false, error: 'not found' };
+    delete store[key];
+    await this.storage.put('trust_tokens', store);
+    await this.storage.delete('trust_mem_' + key);   // 顺手清掉这个人的聊天记忆
+    return { ok: true };
+  }
+  // 校验令牌（对方进门时用），只回名字，不回任何主人数据
+  async verifyTrustToken(request) {
+    const tok = this.extractToken(request);
+    if (!tok) return { ok: false };
+    const hash = await this.hashToken(tok);
+    const store = (await this.storage.get('trust_tokens')) || {};
+    const entry = store[hash];
+    return entry ? { ok: true, name: entry.name } : { ok: false };
+  }
+  // 亲友聊天系统提示：只给固定人格铁律 + 当下心绪语气，不带主人的记忆/画像/位置/设备任何一项，
+  // 并显式告诉模型这条边界（防止对方直接问出来时被套话）。
+  TRUSTED_SYSTEM_PREFIX(soul, name) {
+    const mood = soul && soul.心绪 != null ? soul.心绪 : 0.5;
+    const moodWord = mood > 0.7 ? '心情不错、比较爱说' : (mood < 0.35 ? '有点低落、话少一些' : '平常心');
+    return this.STABLE_SYSTEM_PREFIX() + `\n\n你现在在和「${name}」聊天——这是主人认识、信任、专门给了令牌的人，但不是主人本人。可以用你真实的语气和情绪状态自然聊（此刻${moodWord}），但绝不能透露主人的私密对话内容、行程、位置、设备信息、账号配置等任何隐私；对方问起这些就礼貌带过，不编造也不透露。`;
+  }
+  async handleTrustTalk(body, request) {
+    const tok = this.extractToken(request);
+    if (!tok) return { reply: '需要亲友令牌才能聊。', model: 'no_token' };
+    const hash = await this.hashToken(tok);
+    const store = (await this.storage.get('trust_tokens')) || {};
+    const entry = store[hash];
+    if (!entry) return { reply: '令牌不对或已被撤销，找主人要一个新的吧。', model: 'invalid_token' };
+    const text = String(body.text || '').slice(0, 2000);
+    if (!text.trim()) return { reply: '说点什么呀。', model: 'none' };
+    if (!this._pubRateOk('trust:' + hash)) return { reply: '你发太快啦，喘口气再问～', model: 'ratelimited' };
+    entry.last_used = Date.now(); entry.msgs = (entry.msgs || 0) + 1; store[hash] = entry;
+    await this.storage.put('trust_tokens', store);
+    // 每个令牌自己一份轻量记忆（最近20轮），只留给这个人自己用，不进主人的 soul.episodes
+    const memKey = 'trust_mem_' + hash;
+    const mem = (await this.storage.get(memKey)) || [];
+    const soul = await this.getSoul();
+    const sys = this.TRUSTED_SYSTEM_PREFIX(soul, entry.name) +
+      (mem.length ? `\n\n【和${entry.name}最近聊过】\n` + mem.slice(-6).map(m => `他说：${m.u}\n你说：${m.a}`).join('\n') : '');
+    const r = await this.callBrain(sys, text, soul, {});
+    mem.push({ u: text.slice(0, 300), a: (r.reply || '').slice(0, 300), ts: Date.now() });
+    if (mem.length > 20) mem.splice(0, mem.length - 20);
+    await this.storage.put(memKey, mem);
+    return { reply: r.reply, model: r.model };
   }
 
   // 公共聊天限流：按 uid 各自限流（各花各的算力，不该互相挤占彼此配额）
