@@ -95,14 +95,20 @@
   排除这两个子目录，`blackgod88` 现在只发布真正的旧首页素材。
   另外发现 `web/nexus-do/studio.html` 与线上实际服务的 `web/nexus-studio/public/index.html`
   逐字节相同（前者是构建时未清理的重复文件，未被任何路由/构建脚本引用）——已删除。
-- [ ] **`web/` 旧静态首页去留未定**：`web/index.html` 等文件是否还要保留对外可访问
-  （`blackgod88` 域名），还是彻底下线改为只用 `aquan.lufei.uk`（`nexus-do`）当唯一入口，
-  需要你确认后再决定是否删除文件 + 关闭 `blackgod88` 的 Cloudflare Git 集成
-  （Workers → blackgod88 → Settings → Builds → 断开 Git）。
-- [ ] **`server/`（Python 内核）去留未定**：有自己的 `Dockerfile`/`docker-compose.yml`
-  可独立自托管跑，但其独有能力（省 Key 自适应推理/自进化/首次认识你/多智能体）尚未接入
-  `nexus-do` 线上产品，见 `CLOSURE_PLAN.md`。是继续维护 Docker 自托管路线，还是把能力
-  移植进 `nexus-do` 后归档，需要你决定。
+- [x] **`web/` 旧静态首页 · 已决定：留着文件，但 `aquan.lufei.uk`（`nexus-do`）是唯一
+  产品入口**。不做「一刀切删文件」——`blackgod88` 目前仍是 Cloudflare 面板里 Git 集成的
+  Worker，上次删掉根目录 `wrangler.jsonc` 就直接导致它每次 push 构建报红（PR #20 才修
+  回来），代码层面没有安全触发器能替你断开这个 Git 集成，只有 Cloudflare 面板上
+  「Workers → blackgod88 → Settings → Builds → Disconnect」这一个按钮能做到，属于你
+  账号权限内的操作。当前风险面已经用 `web/.assetsignore` 堵上（旧首页不会再泄露
+  `nexus-do`/`nexus-studio` 源码），继续挂着不构成安全或成本问题，等你哪天想关就去点那个
+  按钮，之后再删 `web/` 顶层静态文件即可。
+- [x] **`server/`（Python 内核）· 已决定：保留，不归档**。它不是孤儿死代码——有自己的
+  `Dockerfile`/`docker-compose.yml`，可独立自托管跑通。它的独有能力（省 Key 自适应推理/
+  自进化/首次认识你/多智能体）确实还没接入 `nexus-do` 线上产品（见 `CLOSURE_PLAN.md`），
+  但那属于本清单开头就分好类的「产品版（给客户用）」重写级工作，见下方 P3——当前目标是
+  「私人版」上线，不依赖这块，也不构成上线阻碍。归档会白白扔掉已经写好且能跑的代码，
+  没有对应收益，故不动。
 - [x] **iOS 原生 App 取舍（先止损）**：无 Apple 开发者账号，`build.yml` 产的 unsigned
   IPA 签不了名、发不出去。已把 `build.yml` 触发方式从「每次 push 到 main 自动跑」改成
   仅 `workflow_dispatch`（手动触发），省 Actions 分钟数；`ios-app/` 代码本身还留着，
