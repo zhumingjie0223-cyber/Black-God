@@ -1523,7 +1523,8 @@ async function collectDevice(){
     网络: (n.connection && n.connection.effectiveType)||'—',
     在线: n.onLine?'是':'否', 触摸点: n.maxTouchPoints||0,
   };
-  try { if(n.getBattery){ const b=await n.getBattery(); info.电量 = Math.round(b.level*100)+'%'+(b.charging?' ⚡充电':''); } } catch(e){}
+  // getBattery 在部分安卓浏览器(荣耀/华为)会「永不 resolve」——必须加超时兜底，否则整条开屏卡死
+  try { if(n.getBattery){ const b=await Promise.race([ n.getBattery().catch(()=>null), new Promise(r=>setTimeout(()=>r(null),1200)) ]); if(b) info.电量 = Math.round(b.level*100)+'%'+(b.charging?' ⚡充电':''); } } catch(e){}
   if(window._geo) info.定位 = window._geo;
   return info;
 }
@@ -1632,14 +1633,22 @@ function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on){ s
 function showOnboarding(){ $('#onboard').classList.add('show'); }
 async function obReadDevice(){
   const btn=$('#obReadBtn'); btn.disabled=true; btn.textContent='读取中…';
-  const info=await collectDevice();
-  Nexus.device(info);
-  let srv=null; try{ srv=await Nexus.whoami(); }catch(e){}
-  const city = srv&&srv.地理&&srv.地理.城市;
-  const parts=[info.系统, city, info.网络&&info.网络!=='—'?('网络 '+info.网络):null].filter(Boolean);
-  $('#obDevSummary').textContent='已识别 · '+(parts.join(' · ')||'你的设备');
-  $('#obS1').classList.remove('on'); $('#obS2').classList.add('on');
-  btn.disabled=false; btn.textContent='读取设备 · 开始使用';
+  // 铁律：读设备只是锦上添花，绝不能把人卡在开屏。每一步都带超时，无论成败都进下一屏。
+  const withTimeout=(p,ms)=>Promise.race([Promise.resolve(p).catch(()=>null), new Promise(r=>setTimeout(()=>r(null),ms))]);
+  try{
+    const info=await withTimeout(collectDevice(),3000);
+    if(info){
+      try{ Nexus.device(info); }catch(e){}
+      const srv=await withTimeout(Nexus.whoami(),3000);
+      const city=srv&&srv.地理&&srv.地理.城市;
+      const parts=[info.系统, city, info.网络&&info.网络!=='—'?('网络 '+info.网络):null].filter(Boolean);
+      const el=$('#obDevSummary'); if(el) el.textContent='已识别 · '+(parts.join(' · ')||'你的设备');
+    }
+  }catch(e){}
+  finally{
+    $('#obS1').classList.remove('on'); $('#obS2').classList.add('on');   // 一定进入下一屏
+    btn.disabled=false; btn.textContent='读取设备 · 开始使用';           // 一定恢复按钮
+  }
 }
 function obFinish(){ store.set('onboarded','1'); $('#onboard').classList.remove('show'); }
 
