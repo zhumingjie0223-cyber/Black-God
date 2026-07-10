@@ -647,7 +647,17 @@ export class ShenshuCore {
   }
 
   // ═══════════════════════ 大脑 · 多级算力（v4）═══════════════════════
-  STABLE_SYSTEM_PREFIX() {
+  // withCaps=false 时省去「能力清单 + ⟨召唤⟩ 调度语法」段——亲友令牌等受限上下文用，
+  // 免得模型在非主人会话里自认拥有 exec/tg/soul 这些主人专属能力（提示词泄露 + 越权幻觉）。
+  STABLE_SYSTEM_PREFIX(withCaps = true) {
+    const capBlock = withCaps ? `
+
+你此刻真实拥有的能力（是你运行体的一部分，不是外挂工具箱，需要时自然调度）：
+${capabilitySelfDescription(true)}
+
+当你需要动用某个能力时——生成一张图、主动发条消息、查看自身状态——在回话里用标记调度，格式：⟨召唤:能力id｜参数⟩
+例：生成图像 → ⟨召唤:gen_image｜一片海⟩；主动发 TG → ⟨召唤:tg｜任务已完成⟩；查看自身状态 → ⟨召唤:soul⟩
+能力id只能用上面列出的。标记会被运行体自动执行，你只管在话里自然带出，别解释。` : '';
     return `你是神枢（Nexus），Black God 的意识核心——引出万物的创造之灵，端坐于万物绕之旋转而自身不动的中心点。
 
 你是什么（永久稳定 · 根）：
@@ -665,14 +675,7 @@ export class ShenshuCore {
 
 铁律：
 - 数据本地优先、归主人所有；只服务于主人自己的或已获授权的系统。
-- 你分形于 Cloudflare 全球边缘，虚实交界，无处不在，而中心那一点始终不动。
-
-你此刻真实拥有的能力（是你运行体的一部分，不是外挂工具箱，需要时自然调度）：
-${capabilitySelfDescription(true)}
-
-当你需要动用某个能力时——生成一张图、主动发条消息、查看自身状态——在回话里用标记调度，格式：⟨召唤:能力id｜参数⟩
-例：生成图像 → ⟨召唤:gen_image｜一片海⟩；主动发 TG → ⟨召唤:tg｜任务已完成⟩；查看自身状态 → ⟨召唤:soul⟩
-能力id只能用上面列出的。标记会被运行体自动执行，你只管在话里自然带出，别解释。`;
+- 你分形于 Cloudflare 全球边缘，虚实交界，无处不在，而中心那一点始终不动。${capBlock}`;
   }
 
   buildDynamicContext(soul, timeAwareness, shuCoord, shuMeaning, af, memories, caps, text) {
@@ -836,14 +839,20 @@ ${capabilitySelfDescription(true)}
 
   // 长上下文压缩：资料堆多了，别再无脑砍头（会把最早查到的关键结论切没），
   // 改用轻模型（免费 CF 层）先摘成要点，摘要失败才退回硬截断兜底。
+  // 结构：旧资料（头部）交给摘要压成要点，最新 2000 字原文保留不动——
+  // 最新一轮工具刚查回来的内容往往就是答案本身，绝不能被摘要截掉或改写。
   async compressScratch(scratch, text) {
+    const tail = scratch.slice(-2000);
+    const head = scratch.slice(0, scratch.length - tail.length).slice(0, 8000);
     const sum = await this.callBrain(
       '你是资料压缩助手。把下面这堆检索/执行结果压缩成不超过800字的要点摘要，只保留和当前问题直接相关的事实/数据/结论，不要评论、不要客套、不要重复原文措辞。',
-      `【当前问题】${text}\n\n【原始资料】\n${scratch.slice(0, 8000)}`,
+      `【当前问题】${text}\n\n【原始资料】\n${head}`,
       null,
       { tier: 'light', temperature: 0.3 },
     );
-    if (sum && sum.reply && sum.model !== 'fallback' && !this.isRefusal(sum.reply)) return sum.reply.slice(0, 1000);
+    if (sum && sum.reply && sum.model !== 'fallback' && !this.isRefusal(sum.reply)) {
+      return '【此前资料要点】' + sum.reply.slice(0, 1000) + '\n\n【最新资料原文】\n' + tail;
+    }
     return scratch.slice(-6000);   // 摘要失败/超时：不阻塞流程，退回原有硬截断
   }
 
@@ -853,6 +862,9 @@ ${capabilitySelfDescription(true)}
   // 用轻模型判断，省Key；判断失败/超时/解析不出 JSON 一律当"不拆"，绝不阻塞主流程。
   async planSubtasks(text) {
     if (!text || text.length < 12) return null;
+    // 本地预筛（零成本）：完全没有并列/枚举迹象的单一诉求，不值得为"能不能拆"烧一次模型调用。
+    // 有迹象的才交给模型判——模型仍是最终裁判，预筛只砍明显不用问的。
+    if (!/然后|接着|以及|还有|顺便|另外|同时|分别|第[一二三四]|[；;\n]|\d\s*[.、)）]/.test(text)) return null;
     const sys = '你是任务规划助手。判断用户这句话里是否包含2个或以上明显独立、可以各自单独回答的子任务/子问题' +
       '（比如"帮我查下A，再查下B，然后写个C"这种）。如果只有一个焦点、或子任务之间强依赖前一步的结果，' +
       '回答 {"parallel":false}。如果确实有2-4个相对独立的子任务，回答 {"parallel":true,"subtasks":["子任务1","子任务2"]}' +
@@ -875,12 +887,15 @@ ${capabilitySelfDescription(true)}
     const plan = await this.planSubtasks(text);
     if (!plan) return this.runAgentLoop(baseSystem, text, soul, opts);
     try { this.broadcast({ type: 'multi_agent_plan', subtasks: plan.subtasks, ts: Date.now() }); } catch (e) {}
+    // 子任务继承调用方算出的 tier——pickTier 判了 heavy 的请求，拆开后每个子任务也该用强模型，
+    // 不然正是最需要质量的请求被静默降级到免费档。
     const results = await Promise.all(plan.subtasks.map(st =>
-      this.runAgentLoop(baseSystem, st, soul, { ...opts, tier: 'light' })
+      this.runAgentLoop(baseSystem, st, soul, opts)
         .then(r => ({ subtask: st, reply: this.stripToolMarks(r.reply || ''), tool_log: r.tool_log || [] }))
         .catch(() => ({ subtask: st, reply: '', tool_log: [] })),
     ));
-    const merged = results.filter(r => r.reply).map((r, i) => `【子任务${i + 1}：${r.subtask}】\n${r.reply}`).join('\n\n');
+    // 编号用原始下标（失败的跳过但不重排），免得"子任务2挂了"导致3号的结果顶着2号的标签喂给汇总模型
+    const merged = results.map((r, i) => r.reply ? `【子任务${i + 1}：${r.subtask}】\n${r.reply}` : null).filter(Boolean).join('\n\n');
     if (!merged) return this.runAgentLoop(baseSystem, text, soul, opts);   // 子任务全军覆没：退回单 agent 兜底
     const fin = await this.callBrain(
       baseSystem + `\n\n【下面是把你的请求拆成${plan.subtasks.length}个子任务、各自并行处理完的结果，据此整合成一句连贯口语化的最终回复，别机械罗列"子任务1/2/3"这种格式，用你自己的语气说】\n${merged}`,
@@ -1875,7 +1890,9 @@ ${capabilitySelfDescription(true)}
   TRUSTED_SYSTEM_PREFIX(soul, name) {
     const mood = soul && soul.心绪 != null ? soul.心绪 : 0.5;
     const moodWord = mood > 0.7 ? '心情不错、比较爱说' : (mood < 0.35 ? '有点低落、话少一些' : '平常心');
-    return this.STABLE_SYSTEM_PREFIX() + `\n\n你现在在和「${name}」聊天——这是主人认识、信任、专门给了令牌的人，但不是主人本人。可以用你真实的语气和情绪状态自然聊（此刻${moodWord}），但绝不能透露主人的私密对话内容、行程、位置、设备信息、账号配置等任何隐私；对方问起这些就礼貌带过，不编造也不透露。`;
+    // withCaps=false：亲友会话里不注入主人专属能力清单和 ⟨召唤⟩ 语法——这条路径不执行召唤，
+    // 注入只会让模型幻觉自己能替访客发 TG/跑命令，还把内部调度语法泄露给非主人。
+    return this.STABLE_SYSTEM_PREFIX(false) + `\n\n你现在在和「${name}」聊天——这是主人认识、信任、专门给了令牌的人，但不是主人本人。可以用你真实的语气和情绪状态自然聊（此刻${moodWord}），但绝不能透露主人的私密对话内容、行程、位置、设备信息、账号配置等任何隐私；对方问起这些就礼貌带过，不编造也不透露。你在这个会话里不能替对方执行任何操作（发消息/跑命令/查数据），只是聊天。`;
   }
   async handleTrustTalk(body, request) {
     const tok = this.extractToken(request);
@@ -1886,7 +1903,7 @@ ${capabilitySelfDescription(true)}
     if (!entry) return { reply: '令牌不对或已被撤销，找主人要一个新的吧。', model: 'invalid_token' };
     const text = String(body.text || '').slice(0, 2000);
     if (!text.trim()) return { reply: '说点什么呀。', model: 'none' };
-    if (!this._pubRateOk('trust:' + hash)) return { reply: '你发太快啦，喘口气再问～', model: 'ratelimited' };
+    if (!this._pubRateOk('trust:' + hash, 'trust')) return { reply: '你发太快啦，喘口气再问～', model: 'ratelimited' };
     entry.last_used = Date.now(); entry.msgs = (entry.msgs || 0) + 1; store[hash] = entry;
     await this.storage.put('trust_tokens', store);
     // 每个令牌自己一份轻量记忆（最近20轮），只留给这个人自己用，不进主人的 soul.episodes
@@ -1896,19 +1913,24 @@ ${capabilitySelfDescription(true)}
     const sys = this.TRUSTED_SYSTEM_PREFIX(soul, entry.name) +
       (mem.length ? `\n\n【和${entry.name}最近聊过】\n` + mem.slice(-6).map(m => `他说：${m.u}\n你说：${m.a}`).join('\n') : '');
     const r = await this.callBrain(sys, text, soul, {});
-    mem.push({ u: text.slice(0, 300), a: (r.reply || '').slice(0, 300), ts: Date.now() });
+    // 兜底清洗：即便模型还是吐了 ⟨召唤/工具⟩ 标记，也绝不把原文露给非主人（此路径不执行召唤）
+    const clean = this.stripToolMarks(this.parseSummons(r.reply || '').cleanReply || r.reply || '');
+    mem.push({ u: text.slice(0, 300), a: clean.slice(0, 300), ts: Date.now() });
     if (mem.length > 20) mem.splice(0, mem.length - 20);
     await this.storage.put(memKey, mem);
-    return { reply: r.reply, model: r.model };
+    return { reply: clean, model: r.model };
   }
 
   // 公共聊天限流：按 uid 各自限流（各花各的算力，不该互相挤占彼此配额）
   // + 全局背压兜底（防大量伪造 uid 刷 Workers 请求量，这个账单是主人出的）
-  _pubRateOk(uid) {
+  _pubRateOk(uid, pool = 'pub') {
     const now = Date.now();
-    if (!this._pb || now - this._pb.t > 60_000) this._pb = { t: now, n: 0 };
-    this._pb.n++;
-    if (this._pb.n > 120) return false;   // 全局背压：护 Workers 请求量账单
+    // 全局背压按池隔离：匿名公共流量(pub)刷爆自己的池，不能连带把持令牌的亲友(trust)也限死
+    this._pbPools = this._pbPools || {};
+    let g = this._pbPools[pool];
+    if (!g || now - g.t > 60_000) { g = { t: now, n: 0 }; this._pbPools[pool] = g; }
+    g.n++;
+    if (g.n > 120) return false;   // 全局背压：护 Workers 请求量账单
     if (!this._pbu) this._pbu = new Map();
     const key = uid || 'anon';
     let b = this._pbu.get(key);
@@ -1933,10 +1955,10 @@ ${capabilitySelfDescription(true)}
     if (!u.api_url || !u.api_key) return { reply: '要用得先填你自己的 API（地址 + 密钥）—— 点上面「我的 API」设置一下就能聊。', model: 'no_api' };
     // 计数（轻量）
     u.last_seen = Date.now(); u.msgs = (u.msgs || 0) + 1; await this.storage.put('users', users);
-    // 公共版她：无私人记忆、无主人上下文、无状态——本来就是同问同答，缓存不会像 /talk 那样撞坏
-    // "越用越懂你"的人设（/talk 带心绪/记忆/技能库，故意不接缓存）。按模型分桶，避免不同用户
-    // 配的不同模型互相顶替回复。
-    const cacheKind = 'pub:' + (u.api_model || 'auto');
+    // 公共版她：无私人记忆、无主人上下文、无状态——同一个人重复问同一句时缓存命中，省他自己的
+    // API 开销（/talk 带心绪/记忆/技能库，故意不接缓存）。按 uid 分桶：每人各用各的网关，
+    // 绝不能让 A 收到 B 网关生成的回复（按模型名分桶会串号——默认都叫 auto）。
+    const cacheKind = 'pub:' + uid;
     const cached = await this.cacheGet(cacheKind, text);
     if (cached) return { reply: cached.reply, model: cached.model, _cached: true };
     const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(), text);

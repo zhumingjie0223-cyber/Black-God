@@ -1597,7 +1597,13 @@ async function openDevice(){ const info=await collectDevice(); window._dev=info;
 function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记住了这台设备'); closeSheet(); } }
 
 /* ============ 门 · 公共注册 / 主人私密 ============ */
-function onUnauthorized(){ if(Nexus.mode==='public') return; setGateMode('owner'); showLock(); }
+function onUnauthorized(){
+  if(Nexus.mode==='public') return;
+  // 亲友令牌用户误触主人专属接口(如设置页推送开关)拿到 401 时，绝不能把 OWNER_TOKEN
+  // 密码框弹给他——回亲友令牌门让他重验自己的令牌即可
+  if(Nexus.mode==='trusted'){ setGateMode('trust'); showLock(); return; }
+  setGateMode('owner'); showLock();
+}
 function toggleRegAdv(){ const a=$('#regAdv'), t=$('#regAdvToggle'); if(!a) return; const open=a.style.display!=='none';
   a.style.display=open?'none':'flex'; if(t) t.textContent = open ? '自带大脑 · 可选 ▾' : '自带大脑 · 可选 ▴'; }
 function setGateMode(m){
@@ -1746,7 +1752,8 @@ async function disablePush(){
   store.set('push_on',''); setPushUI(false);
   try{
     if('serviceWorker' in navigator){
-      const reg=await navigator.serviceWorker.ready;
+      // SW 注册卡死时 .ready 永不 resolve——加超时，别让"关闭"静默挂起（UI 已显示关，用户无从知晓退订没发生）
+      const reg=await Promise.race([navigator.serviceWorker.ready, new Promise((_,rej)=>setTimeout(()=>rej(new Error('sw-timeout')),4000))]);
       const sub=await reg.pushManager.getSubscription();
       if(sub){ await Nexus.unsubscribe(sub.endpoint); await sub.unsubscribe(); }
     }
