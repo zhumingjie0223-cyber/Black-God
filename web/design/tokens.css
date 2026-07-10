@@ -1,40 +1,42 @@
 /* ═══════════════════════════════════════════════════════════
-   Black God 设计系统 V3 —「玉印 · 朱砂」
+   Black God 设计系统 V3 —「深海 · 潮光」
    单一事实源。规范见 docs/design/DESIGN_SYSTEM_V3.md
    铁律：一切样式走 token；动效只用 transform/opacity；WCAG AA。
    ═══════════════════════════════════════════════════════════ */
 
-/* ── 1. 色彩：深色主题（默认 · 黑曜石）── */
+/* ── 1. 色彩：深色主题（默认 · 深海）── */
 :root {
-  --bg-deep: #0A0F0D;
-  --bg-1: #0D1411;
-  --bg-2: #131C18;
-  --bg-3: #1A2620;
+  --bg-deep: #05080A;
+  --bg-1: #0A1014;
+  --bg-2: #101820;
+  --bg-3: #16222C;
   --glass-1: rgba(255, 255, 255, .035);
   --glass-2: rgba(255, 255, 255, .06);
   --glass-3: rgba(255, 255, 255, .09);
-  --line: rgba(150, 190, 170, .16);
-  --line-strong: rgba(150, 190, 170, .30);
-  --text-1: #EAF2ED;
-  --text-2: #9FB3A8;
-  --text-3: #5F7268;
-  --chrome-grad: linear-gradient(157deg, #EAF2ED, #B8CCC0 30%, #7E948A 55%, #DCE8E1 78%, #3E4A44);
-  --accent: #34C97B;
-  --accent-hi: #5FE39C;
-  --accent-deep: #1E8A55;
-  --stamp: #E0472F;
+  --line: rgba(150, 180, 195, .16);
+  --line-strong: rgba(150, 180, 195, .30);
+  --text-1: #E8F0F2;
+  --text-2: #9FB0B8;
+  --text-3: #5E6E76;
+  --chrome-grad: linear-gradient(157deg, #E8F0F2, #A8BAC2 30%, #6C7880 55%, #DCE6EA 78%, #39434A);
+  --accent: #4FC4D9;
+  --accent-hi: #7DDDEE;
+  --accent-deep: #2E8CA4;
+  --surge: #3D7FB8;
+  --spume: #DFF4F8;
+  --stamp: var(--surge);
   --gold: var(--accent);
   --gold-hi: var(--accent-hi);
-  --accent-grad: linear-gradient(157deg, #5FE39C, #34C97B 45%, #1E8A55);
-  --stamp-grad: linear-gradient(157deg, #F06A50, #E0472F 55%, #B23520);
+  --accent-grad: linear-gradient(157deg, #7DDDEE, #4FC4D9 45%, #3D7FB8);
+  --stamp-grad: linear-gradient(157deg, #5E9FD4, #3D7FB8 55%, #2A5E8C);
   --gold-grad: var(--accent-grad);
-  --accent-glow: rgba(52, 201, 123, .24);
+  --accent-glow: rgba(79, 196, 217, .24);
   --gold-glow: var(--accent-glow);
-  --accent-ink: #0A1F14;              /* 玉底上的墨色字 */
+  --accent-ink: #061418;              /* 潮光底上的深海墨字 */
   --gold-ink: var(--accent-ink);
   --live: var(--accent-hi);
   --warn: #E8B34B;
-  --danger: #E45B45;   /* 朱砂族 */
+  --danger: #E4604F;
   --info: #5AC8FA;
   --mood-warm: #E8A87C;
   --mood-cold: #7CA6C8;
@@ -74,66 +76,70 @@
   color-scheme: dark;
 }
 
-/* ── 1.2 浅色主题（暖纸）── */
+/* ── 1.2 浅色主题（天光）── */
 [data-theme="light"] {
-  --bg-deep: #EDEAE0;
-  --bg-1: #F6F3EA;
+  --bg-deep: #E4EDF1;
+  --bg-1: #F2F6F8;
   --bg-2: #FFFFFF;
-  --bg-3: #FBF9F2;
-  --glass-1: rgba(23, 33, 27, .03);
-  --glass-2: rgba(23, 33, 27, .05);
-  --glass-3: rgba(23, 33, 27, .08);
-  --line: rgba(48, 66, 56, .16);
-  --line-strong: rgba(48, 66, 56, .30);
-  --text-1: #17211B;
-  --text-2: #52625A;
-  --text-3: #85958C;
-  --chrome-grad: linear-gradient(157deg, #3E4A44, #6B7F74 40%, #263029 75%, #7E948A);
-  --accent: #147A4D;
-  --accent-hi: #2FBF71;
-  --accent-deep: #0E5C39;
-  --stamp: #C43D2B;
+  --bg-3: #F8FBFC;
+  --glass-1: rgba(18, 28, 33, .03);
+  --glass-2: rgba(18, 28, 33, .05);
+  --glass-3: rgba(18, 28, 33, .08);
+  --line: rgba(40, 60, 72, .16);
+  --line-strong: rgba(40, 60, 72, .30);
+  --text-1: #121C21;
+  --text-2: #4A5C64;
+  --text-3: #7E8E96;
+  --chrome-grad: linear-gradient(157deg, #39434A, #64747E 40%, #232B31 75%, #6C7880);
+  --accent: #17768F;
+  --accent-hi: #2FA5C0;
+  --accent-deep: #0F5A6E;
+  --surge: #2A5E8C;
+  --spume: #B8E2EC;
+  --stamp: var(--surge);
   --gold: var(--accent);
   --gold-hi: var(--accent-hi);
-  --accent-grad: linear-gradient(157deg, #2FBF71, #147A4D 55%, #0E5C39);
-  --stamp-grad: linear-gradient(157deg, #D9553E, #C43D2B 55%, #9C2F20);
+  --accent-grad: linear-gradient(157deg, #2FA5C0, #17768F 55%, #0F5A6E);
+  --stamp-grad: linear-gradient(157deg, #4A7FAE, #2A5E8C 55%, #1E4568);
   --gold-grad: var(--accent-grad);
-  --accent-glow: rgba(20, 122, 77, .20);
+  --accent-glow: rgba(23, 118, 143, .20);
   --gold-glow: var(--accent-glow);
-  --accent-ink: #F6FFF9;
+  --accent-ink: #F4FBFD;
   --gold-ink: var(--accent-ink);
   --live: var(--accent-hi);
   --warn: #9C7420;
-  --danger: #B5382A;   /* 朱砂族 */
+  --danger: #B23E2F;
   --info: #2779A7;
-  --shadow-1: 0 2px 10px rgba(24, 34, 28, .10);
-  --shadow-2: 0 8px 40px rgba(24, 34, 28, .18);
-  --scrim: rgba(16, 26, 20, .4);
+  --shadow-1: 0 2px 10px rgba(20, 32, 40, .10);
+  --shadow-2: 0 8px 40px rgba(20, 32, 40, .18);
+  --scrim: rgba(12, 24, 30, .4);
   color-scheme: light;
 }
 
 /* 跟随系统：无 data-theme 时由系统决定浅色 */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg-deep: #EDEAE0; --bg-1: #F6F3EA; --bg-2: #FFFFFF; --bg-3: #FBF9F2;
-    --glass-1: rgba(23, 33, 27, .03); --glass-2: rgba(23, 33, 27, .05); --glass-3: rgba(23, 33, 27, .08);
-    --line: rgba(48, 66, 56, .16); --line-strong: rgba(48, 66, 56, .30);
-    --text-1: #17211B; --text-2: #52625A; --text-3: #85958C;
-    --chrome-grad: linear-gradient(157deg, #3E4A44, #6B7F74 40%, #263029 75%, #7E948A);
-    --accent: #147A4D;
-  --accent-hi: #2FBF71;
-  --accent-deep: #0E5C39;
-  --stamp: #C43D2B;
+    --bg-deep: #E4EDF1; --bg-1: #F2F6F8; --bg-2: #FFFFFF; --bg-3: #F8FBFC;
+    --glass-1: rgba(18, 28, 33, .03); --glass-2: rgba(18, 28, 33, .05); --glass-3: rgba(18, 28, 33, .08);
+    --line: rgba(40, 60, 72, .16); --line-strong: rgba(40, 60, 72, .30);
+    --text-1: #121C21; --text-2: #4A5C64; --text-3: #7E8E96;
+    --chrome-grad: linear-gradient(157deg, #39434A, #64747E 40%, #232B31 75%, #6C7880);
+    --accent: #17768F;
+  --accent-hi: #2FA5C0;
+  --accent-deep: #0F5A6E;
+  --surge: #2A5E8C;
+  --spume: #B8E2EC;
+  --stamp: var(--surge);
   --gold: var(--accent); --gold-hi: var(--accent-hi);
-    --accent-grad: linear-gradient(157deg, #2FBF71, #147A4D 55%, #0E5C39);
-  --stamp-grad: linear-gradient(157deg, #D9553E, #C43D2B 55%, #9C2F20);
+    --accent-grad: linear-gradient(157deg, #2FA5C0, #17768F 55%, #0F5A6E);
+  --stamp-grad: linear-gradient(157deg, #4A7FAE, #2A5E8C 55%, #1E4568);
   --gold-grad: var(--accent-grad);
-    --accent-glow: rgba(20, 122, 77, .20);
-  --gold-glow: var(--accent-glow); --accent-ink: #F6FFF9;
+    --accent-glow: rgba(23, 118, 143, .20);
+  --gold-glow: var(--accent-glow); --accent-ink: #F4FBFD;
   --gold-ink: var(--accent-ink);
-    --live: var(--accent-hi); --warn: #9C7420; --danger: #B5382A;   /* 朱砂族 */ --info: #2779A7;
-    --shadow-1: 0 2px 10px rgba(24, 34, 28, .10); --shadow-2: 0 8px 40px rgba(24, 34, 28, .18);
-    --scrim: rgba(16, 26, 20, .4);
+    --live: var(--accent-hi); --warn: #9C7420; --danger: #B23E2F; --info: #2779A7;
+    --shadow-1: 0 2px 10px rgba(20, 32, 40, .10); --shadow-2: 0 8px 40px rgba(20, 32, 40, .18);
+    --scrim: rgba(12, 24, 30, .4);
     color-scheme: light;
   }
 }

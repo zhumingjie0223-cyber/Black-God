@@ -9,7 +9,7 @@
      tokens.css 加载成功后，其 :root 声明在级联顺序上晚于本块，会整体覆盖。 */
   :root{
     --line: rgba(150,190,170,.16);
-    --accent: #34C97B;
+    --accent: #4FC4D9;
     --info: #5AC8FA;
   }
 </style>
@@ -28,7 +28,7 @@
     --mut: var(--text-2, #8f8f98);
     --mut2: var(--text-3, #6a6a72);
     --ok: var(--live, #5fd39a);
-    --run: var(--accent, #e8c37a);
+    --run: var(--accent, #4FC4D9);
     --err: var(--danger, #e06b6b);
     --r: var(--r-md, 14px);
     --shadow: var(--shadow-2, 0 8px 40px rgba(0,0,0,.45));
@@ -50,7 +50,7 @@
     display:flex; flex-direction:column; min-height:0}
   .brand{padding:20px 20px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--line)}
   .logo{width:38px;height:38px;border-radius:var(--r-sm, 11px); display:grid; place-items:center; font-weight:800; font-size:20px;
-    background:var(--accent-grad, linear-gradient(145deg,#e8c37a,#c99b4e)); color:var(--accent-ink, #1a1206);
+    background:var(--accent-grad, linear-gradient(145deg,#4FC4D9,#c99b4e)); color:var(--accent-ink, #1a1206);
     box-shadow:0 4px 18px var(--accent-glow, rgba(201,155,78,.35))}
   .brand h1{font-size:15px; letter-spacing:.5px; font-weight:700}
   .brand p{font-size:11px; color:var(--mut); margin-top:2px; letter-spacing:.3px}
@@ -72,7 +72,7 @@
   /* 流式生成中 */
   .streaming{margin-top:6px; background:var(--panel); border:1px solid var(--gold2); border-radius:var(--r-sm, 11px);
     padding:12px 14px; font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; color:var(--txt)}
-  .streaming .cursor{display:inline-block; width:7px; height:15px; background:var(--accent, #e8c37a); margin-left:2px;
+  .streaming .cursor{display:inline-block; width:7px; height:15px; background:var(--accent, #4FC4D9); margin-left:2px;
     vertical-align:text-bottom; animation:blink .9s steps(2) infinite}
   @keyframes blink{50%{opacity:0}}
   /* 产物下载 */
@@ -123,7 +123,7 @@
   /* 计划卡 */
   .plan{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line2);
     border-radius:var(--r); padding:16px 18px; margin-bottom:18px; box-shadow:var(--shadow)}
-  .plan h2{font-size:13px; color:var(--accent, #e8c37a); letter-spacing:.5px; margin-bottom:12px; display:flex; align-items:center; gap:8px}
+  .plan h2{font-size:13px; color:var(--accent, #4FC4D9); letter-spacing:.5px; margin-bottom:12px; display:flex; align-items:center; gap:8px}
   .deliv-note{margin-top:12px; padding-top:11px; border-top:1px solid var(--line); font-size:12px; color:var(--mut2)}
   .deliv-note b{color:var(--goldsoft)}
 
@@ -146,7 +146,7 @@
   .bg-step__label{ line-height:1.5 }
   .bg-step.is-running{ color:var(--txt) }
   .bg-step.is-running .bg-step__dot{
-    background:var(--accent, #e8c37a); box-shadow:0 0 8px var(--accent-glow, rgba(201,155,78,.4));
+    background:var(--accent, #4FC4D9); box-shadow:0 0 8px var(--accent-glow, rgba(201,155,78,.4));
     animation:bg-breath 5s cubic-bezier(.2,.7,.3,1) infinite;
   }
   .bg-step.is-done{ color:var(--txt) }
@@ -182,7 +182,7 @@
   .ev .tag{font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; padding:2px 7px; border-radius:6px}
   .tag.tool{color:var(--info); background:color-mix(in srgb, var(--info, #7ab6e8) 14%, transparent)}
   .tag.result{color:var(--ok); background:color-mix(in srgb, var(--ok, #5fd39a) 14%, transparent)}
-  .tag.thought{color:var(--accent, #e8c37a); background:var(--accent-glow, rgba(201,155,78,.12))}
+  .tag.thought{color:var(--accent, #4FC4D9); background:var(--accent-glow, rgba(201,155,78,.12))}
   .tag.error{color:var(--err); background:color-mix(in srgb, var(--err, #e06b6b) 14%, transparent)}
   .ev .body{margin-top:7px; background:var(--panel); border:1px solid var(--line); border-radius:var(--r-sm, 11px);
     padding:11px 13px; font-size:13px; line-height:1.55; color:var(--txt); white-space:pre-wrap; word-break:break-word}
@@ -192,7 +192,7 @@
   /* 交付物：独立成卡 */
   .deliverable{margin-top:20px; background:linear-gradient(180deg,color-mix(in srgb, var(--accent, #c99b4e) 8%, transparent),var(--panel));
     border:1px solid var(--gold2); border-radius:var(--r); padding:18px 20px; box-shadow:var(--shadow)}
-  .deliverable h2{font-size:14px; color:var(--accent, #e8c37a); margin-bottom:6px; display:flex; align-items:center; gap:9px}
+  .deliverable h2{font-size:14px; color:var(--accent, #4FC4D9); margin-bottom:6px; display:flex; align-items:center; gap:9px}
   .deliverable .meta{font-size:11px; color:var(--mut2); margin-bottom:12px; font-family:var(--mono)}
   .deliverable .content{font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; color:var(--txt)}
   .deliverable .acts{margin-top:14px; display:flex; gap:9px}
@@ -214,7 +214,7 @@
     .deliverable{padding:15px 16px}
   }
   .menu{display:none; width:34px;height:34px; place-items:center; border-radius:var(--r-sm, 9px); border:1px solid var(--line2);
-    background:var(--panel); cursor:pointer; color:var(--accent, #e8c37a)}
+    background:var(--panel); cursor:pointer; color:var(--accent, #4FC4D9)}
 
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{ animation:none !important; transition:none !important }

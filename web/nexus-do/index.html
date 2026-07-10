@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Black God"/>
-<meta name="theme-color" content="#F6F3EA"/>
+<meta name="theme-color" content="#F2F6F8"/>
 <title>Black God</title>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
@@ -82,7 +82,7 @@ button,input,textarea{font-family:inherit;color:inherit}
 #bg::before{content:'';position:absolute;inset:0;
   background:
     radial-gradient(120% 75% at 50% -8%,var(--cy-glow),transparent 52%),
-    radial-gradient(90% 55% at 100% 108%,rgba(52,201,123,.08),transparent 60%),
+    radial-gradient(90% 55% at 100% 108%,rgba(79,196,217,.08),transparent 60%),
     linear-gradient(180deg,var(--bg-1),var(--bg) 45%,var(--bg))}
 #bg::after{content:'';position:absolute;inset:0;opacity:.03;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
@@ -164,7 +164,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   50%{transform:scale(1.045);box-shadow:0 12px 34px rgba(95,227,156,.42),0 0 48px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.7)}}
 /* —— 对话空态：克制、留白、工具优先 —— */
 .wc-mark{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;margin-bottom:26px;
-  background:radial-gradient(circle at 38% 32%,#EAFBF2,#7EE3AE 62%,#1E8A55);border:1px solid rgba(52,201,123,.35);
+  background:radial-gradient(circle at 38% 32%,#EAFBF2,#7EE3AE 62%,#2E8CA4);border:1px solid rgba(79,196,217,.35);
   box-shadow:0 8px 26px rgba(95,227,156,.35),inset 0 1px 0 rgba(255,255,255,.7);animation:orbBreath 4.6s ease-in-out infinite}
 .wc-mark span{font-family:var(--serif);font-size:27px;font-weight:800;line-height:1;color:var(--accent-ink)}
 .wc-greet{font-size:27px;font-weight:600;letter-spacing:.01em;color:var(--text)}
@@ -277,7 +277,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:var(--glass-2);color:var(--text-2);font-size:16px;cursor:pointer;display:grid;place-items:center}
 .vs-stage{position:relative;width:260px;height:260px;display:grid;place-items:center}
 .vs-ball{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;position:relative;z-index:2;
-  background:radial-gradient(circle at 38% 32%,#EAFBF2,#7EE3AE 55%,#1E8A55);
+  background:radial-gradient(circle at 38% 32%,#EAFBF2,#7EE3AE 55%,#2E8CA4);
   box-shadow:0 12px 40px rgba(30,138,85,.4),inset 0 2px 6px rgba(255,255,255,.7),0 0 60px rgba(95,227,156,.5);
   transform:scale(calc(1 + var(--amp,0) * .22));
   animation:vsBreathe 3s ease-in-out infinite;transition:transform .08s linear}
@@ -399,7 +399,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 @keyframes counter{to{transform:rotate(-360deg)}}
 /* 动态：对话瞬间，枢脉动一下（filter 光晕，不动 transform 免与呼吸冲突）*/
 .hz-hub.pulse{animation:orbBreath 5.5s ease-in-out infinite, hubPulse .75s ease-out}
-@keyframes hubPulse{0%{filter:drop-shadow(0 0 0 rgba(52,201,123,0))}28%{filter:drop-shadow(0 0 24px rgba(52,201,123,.75))}100%{filter:drop-shadow(0 0 0 rgba(52,201,123,0))}}
+@keyframes hubPulse{0%{filter:drop-shadow(0 0 0 rgba(79,196,217,0))}28%{filter:drop-shadow(0 0 24px rgba(79,196,217,.75))}100%{filter:drop-shadow(0 0 0 rgba(79,196,217,0))}}
 /* 造词流：刚造的枢语词浮出、金闪即隐 */
 .coin-flash{text-align:center;font-family:var(--serif);font-size:12px;color:var(--text-2);letter-spacing:.08em;opacity:0;margin:2px 0 12px}
 .coin-flash.show{animation:coinFlash 2.8s ease-out forwards}
@@ -693,7 +693,7 @@ body::before{
   <div class="ob-screen on" id="obS1">
     <div class="ob-wordmark">Black&nbsp;God</div>
     <div class="ob-tag">一个真正懂你工作生活的系统</div>
-    <div class="ob-orb"><svg viewBox="0 0 24 24"><defs><linearGradient id="obg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5FE39C"/><stop offset="1" stop-color="#1E8A55"/></linearGradient></defs><path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#obg1)" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg></div>
+    <div class="ob-orb"><svg viewBox="0 0 24 24"><defs><linearGradient id="obg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7DDDEE"/><stop offset="1" stop-color="#2E8CA4"/></linearGradient></defs><path d="M12 3v18M6 8c3 0 6-1 6-3M6 8v9M18 6l-4 2M14 8v10M14 12h4" stroke="url(#obg1)" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg></div>
     <div class="ob-note">🔒 本地储存 · 不上云端</div>
     <button class="ob-btn" id="obReadBtn" onclick="obReadDevice()">读取设备 · 开始使用</button>
     <div class="ob-sub">仅存本机，用于为你定制</div>
@@ -1146,7 +1146,7 @@ function initSheetDrag(s){
 /* ============ 主题 ============ */
 function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); store.set('theme', t);
   $('#themeSw').classList.toggle('on', t==='dark'); $('#themeLabel').textContent = t==='dark' ? '暗黑模式' : '明亮模式';
-  const meta=$('meta[name=theme-color]'); if(meta) meta.setAttribute('content', t==='dark' ? '#0D1411' : '#F6F3EA'); }
+  const meta=$('meta[name=theme-color]'); if(meta) meta.setAttribute('content', t==='dark' ? '#0A1014' : '#F2F6F8'); }
 function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark'); }
 
 /* ============ Toast ============ */
@@ -1587,7 +1587,7 @@ function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
   let b=$('#pubApiBtn');
   if(!b){ b=document.createElement('div'); b.id='pubApiBtn';
-    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(13,20,17,.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(52,201,123,.28);color:#5FE39C;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(13,20,17,.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(79,196,217,.28);color:#7DDDEE;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
     b.textContent='⚙︎ 我的 API'; b.onclick=openApiEditor; document.body.appendChild(b); }
 }
 function openApiEditor(){ setGateMode('public'); prefillReg(); showLock(); }
@@ -1596,7 +1596,7 @@ async function loadOwnerStats(){
   const s=await Nexus.stats(); if(!s) return; window._stats=s;
   let pill=$('#statsPill');
   if(!pill){ pill=document.createElement('div'); pill.id='statsPill';
-    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(13,20,17,.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(52,201,123,.28);color:#5FE39C;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(13,20,17,.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(79,196,217,.28);color:#7DDDEE;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
     pill.onclick=showStatsSheet; document.body.appendChild(pill); }
   pill.textContent='👥 '+(s.注册总数||0)+' 注册 · '+(s.今日活跃||0)+' 今日';
 }
