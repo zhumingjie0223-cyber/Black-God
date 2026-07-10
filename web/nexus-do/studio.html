@@ -13,7 +13,7 @@
     --info: #5AC8FA;
   }
 </style>
-<link rel="stylesheet" href="design/tokens.css">
+<link rel="stylesheet" href="/design/tokens.css">
 <style>
   :root{
     /* 页面私有别名 → 设计系统 V3 语义 token：var(--token, 旧值)，外链缺失时旧值兜底 */
@@ -103,7 +103,7 @@
   /* ── 主区 ── */
   .main{display:flex; flex-direction:column; min-width:0; min-height:0}
   .topbar{height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:14px;
-    padding:0 22px; background:rgba(20,20,24,.55); backdrop-filter:blur(10px)}
+    padding:0 22px; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px)}
   .dot{width:8px;height:8px;border-radius:50%; background:var(--mut2); transition:.3s}
   .dot.on{background:var(--ok); box-shadow:0 0 10px var(--ok)}
   .dot.busy{background:var(--run); box-shadow:0 0 10px var(--run); animation:pulse 1s infinite}

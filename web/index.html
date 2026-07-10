@@ -54,7 +54,7 @@
      —— --bg-1/--bg-2/--bg-3/--line/--text-2/--text-3/--warn/--chrome-grad 与 token 同名，
         不在此重复声明，直接吃 tokens.css 的级联值（深浅主题自动生效；--chrome-grad 现为
         「玉调银」冷渐变，品牌大字/wordmark 对齐到该权威值，不再本地覆盖成金色）。
-     —— 其余变量用 var() 显式对齐到最接近的权威 token（优先 --accent*/--stamp* 命名），
+     —— 其余变量用 var() 显式对齐到最接近的权威 token（优先 --accent* / --stamp* 命名），
         变量名保持不变以免动到下方几百处既有引用。—— */
 
   /* —— 底色 / 层次（→ 对齐 --bg-deep/--bg-1/2/3）—— */
@@ -141,7 +141,7 @@ button{font-family:inherit}
 
 /* —— 顶栏 —— */
 .topbar{display:flex;align-items:center;gap:10px;padding:0 14px;height:54px;flex-shrink:0;
-  background:rgba(8,9,11,.82);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  background:color-mix(in srgb, var(--bg-1) 82%, transparent);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
   border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
 .brand-logo{width:30px;height:30px;border-radius:var(--r-sm);overflow:hidden;flex-shrink:0;

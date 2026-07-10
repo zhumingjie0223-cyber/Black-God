@@ -536,7 +536,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 /* —— 锁屏门 —— */
 .lockgate{position:fixed;inset:0;z-index:600;display:none;place-items:center;padding:32px;
-  background:radial-gradient(120% 80% at 50% -8%,rgba(230,232,234,.06),transparent 55%),linear-gradient(180deg,#212425,#1A1C1D 45%,#161718)}
+  background:radial-gradient(120% 80% at 50% -8%,var(--cy-glow),transparent 55%),linear-gradient(180deg,var(--bg-1),var(--bg) 45%,var(--bg))}
 .lockgate.show{display:grid;animation:obIn .5s var(--ease)}
 .lock-inner{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .lock-orb{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;position:relative;margin-bottom:22px;
@@ -563,7 +563,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 
 /* —— 开屏引导 —— */
 .onboard{position:fixed;inset:0;z-index:500;display:none;
-  background:radial-gradient(120% 80% at 50% -8%,rgba(230,232,234,.06),transparent 55%),linear-gradient(180deg,#212425,#1A1C1D 45%,#161718)}
+  background:radial-gradient(120% 80% at 50% -8%,var(--cy-glow),transparent 55%),linear-gradient(180deg,var(--bg-1),var(--bg) 45%,var(--bg))}
 .onboard.show{display:block}
 .ob-screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;
   padding:calc(var(--safe-top) + 44px) 30px calc(var(--safe-bot) + 40px)}
