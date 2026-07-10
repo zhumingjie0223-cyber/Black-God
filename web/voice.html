@@ -4,81 +4,97 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>语音合成 - Black God</title>
+<link rel="stylesheet" href="/design/tokens.css">
 <style>
 :root {
-  --bg: #0a0a0f; --card: #15151f; --accent: #6c5ce7; --accent2: #a29bfe;
-  --text: #e8e8f0; --text2: #8888a0; --border: #2a2a3a; --danger: #e74c3c;
+  /* V3 迁移：本地变量别名到 design/tokens.css 的语义 token，深浅主题自动生效 */
+  --bg: var(--bg-1); --card: var(--bg-2); --accent: var(--gold); --accent2: var(--gold-hi);
+  --text: var(--text-1); --text2: var(--text-2); --border: var(--line);
   --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { background: var(--bg); color: var(--text); font-family: -apple-system, 'PingFang SC', sans-serif; padding-top: var(--safe-top); padding-bottom: calc(60px + var(--safe-bottom)); }
 .header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
 .header h1 { font-size: 18px; font-weight: 600; }
-.back-btn { font-size: 24px; color: var(--accent2); cursor: pointer; }
+.back-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: -10px; font-size: 24px; color: var(--accent); cursor: pointer; border-radius: var(--r-pill, 999px); }
 .section { padding: 16px 20px; }
 .section-title { font-size: 13px; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-textarea { width: 100%; min-height: 80px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: var(--text); font-size: 15px; resize: vertical; font-family: inherit; }
-textarea:focus { outline: none; border-color: var(--accent); }
+textarea { width: 100%; min-height: 80px; background: var(--glass-1, var(--card)); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: var(--text); font-size: 15px; resize: vertical; font-family: inherit; }
+textarea:focus-visible { outline: none; border-color: var(--line-strong, var(--accent)); box-shadow: 0 0 0 3px var(--gold-glow); }
 .emotion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.emotion-btn { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 6px; color: var(--text2); font-size: 12px; text-align: center; cursor: pointer; transition: all 0.2s; }
-.emotion-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.emotion-btn { min-height: 44px; display: flex; align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 6px; color: var(--text2); font-size: 12px; text-align: center; cursor: pointer; transition: transform 0.2s, opacity 0.2s; }
+.emotion-btn.active { background: var(--gold-grad, var(--accent)); border-color: transparent; color: var(--gold-ink, #14100A); }
 .emotion-btn:active { transform: scale(0.95); }
+.emotion-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow), 0 0 0 1px var(--accent); }
 .voice-select { display: flex; gap: 8px; margin-bottom: 12px; }
-.voice-option { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; font-size: 13px; color: var(--text2); }
-.voice-option.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.synth-btn { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; padding: 14px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: opacity 0.2s; }
+.voice-option { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; font-size: 13px; color: var(--text2); }
+.voice-option.active { background: var(--gold-grad, var(--accent)); border-color: transparent; color: var(--gold-ink, #14100A); }
+.voice-option:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow), 0 0 0 1px var(--accent); }
+.synth-btn { width: 100%; min-height: 44px; background: var(--gold-grad, linear-gradient(135deg, var(--accent), var(--accent2))); border: none; border-radius: 12px; padding: 14px; color: var(--gold-ink, #14100A); font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: opacity 0.2s, transform 0.2s; }
 .synth-btn:active { opacity: 0.7; }
 .synth-btn:disabled { opacity: 0.4; }
+.synth-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow), 0 0 0 1px var(--accent); }
 .audio-player { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 16px; display: none; }
 .audio-player.show { display: block; }
 .audio-player audio { width: 100%; margin-top: 8px; }
 .status-bar { padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-top: 8px; display: none; }
 .status-bar.show { display: block; }
-.status-bar.ok { background: rgba(46,204,113,0.15); color: #2ecc71; }
-.status-bar.err { background: rgba(231,76,60,0.15); color: var(--danger); }
-.status-bar.info { background: rgba(108,92,231,0.15); color: var(--accent2); }
+.status-bar.ok { background: color-mix(in srgb, var(--live, #3DDC84) 15%, transparent); color: var(--live, #3DDC84); }
+.status-bar.err { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+.status-bar.info { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); display: flex; align-items: center; gap: 8px; }
+.status-bar.info.show::before {
+  content: "";
+  flex: none;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--gold-grad, var(--accent));
+  box-shadow: var(--shadow-glow, none);
+  animation: bg-breath var(--breath, 5s) var(--ease, ease) infinite;
+}
 .tab-bar { display: flex; border-bottom: 1px solid var(--border); }
-.tab { flex: 1; padding: 12px; text-align: center; color: var(--text2); font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; }
-.tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+.tab { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 12px; text-align: center; color: var(--text2); font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold-glow); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-.ext-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-size: 14px; margin-bottom: 8px; }
-.ext-input:focus { outline: none; border-color: var(--accent); }
+.ext-input { width: 100%; min-height: 44px; background: var(--glass-1, var(--card)); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-size: 14px; margin-bottom: 8px; }
+.ext-input:focus-visible { outline: none; border-color: var(--line-strong, var(--accent)); box-shadow: 0 0 0 3px var(--gold-glow); }
 .ext-input::placeholder { color: var(--text2); }
 .info-text { font-size: 12px; color: var(--text2); line-height: 1.6; margin-top: 8px; }
 .train-list { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
 .train-list-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .train-list-desc { font-size: 12px; color: var(--text2); }
+.back-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow), 0 0 0 1px var(--accent); }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <span class="back-btn" onclick="history.back()">‹</span>
+  <span class="back-btn" onclick="history.back()" role="button" tabindex="0" aria-label="返回">‹</span>
   <h1>🎙️ 语音合成</h1>
   <span style="width:24px"></span>
 </div>
 
-<div class="tab-bar">
-  <div class="tab active" onclick="switchTab('synth')">合成</div>
-  <div class="tab" onclick="switchTab('external')">外接API</div>
-  <div class="tab" onclick="switchTab('train')">训练</div>
+<div class="tab-bar" role="tablist">
+  <div class="tab active" onclick="switchTab('synth')" role="tab" tabindex="0" aria-selected="true">合成</div>
+  <div class="tab" onclick="switchTab('external')" role="tab" tabindex="0" aria-selected="false">外接API</div>
+  <div class="tab" onclick="switchTab('train')" role="tab" tabindex="0" aria-selected="false">训练</div>
 </div>
 
 <!-- 合成 Tab -->
 <div class="tab-content active" id="tab-synth">
   <div class="section">
     <div class="section-title">输入文本</div>
-    <textarea id="text-input" placeholder="输入要合成的文字..." maxlength="500"></textarea>
+    <textarea class="bg-input" id="text-input" placeholder="输入要合成的文字..." maxlength="500"></textarea>
   </div>
   <div class="section">
     <div class="section-title">情绪选择</div>
     <div class="emotion-grid" id="emotion-grid"></div>
   </div>
   <div class="section">
-    <button class="synth-btn" id="synth-btn" onclick="synthesize()">🔊 生成语音</button>
-    <div class="status-bar" id="status"></div>
-    <div class="audio-player" id="player">
+    <button class="synth-btn bg-btn bg-btn--primary" id="synth-btn" onclick="synthesize()">🔊 生成语音</button>
+    <div class="status-bar" id="status" role="status" aria-live="polite"></div>
+    <div class="audio-player bg-card" id="player">
       <div class="section-title">合成结果</div>
       <audio id="audio" controls></audio>
     </div>
@@ -89,12 +105,12 @@ textarea:focus { outline: none; border-color: var(--accent); }
 <div class="tab-content" id="tab-external">
   <div class="section">
     <div class="section-title">外接 TTS API 配置</div>
-    <input class="ext-input" id="ext-url" placeholder="API URL (如 https://api.openai.com/v1/audio/speech)">
-    <input class="ext-input" id="ext-key" type="password" placeholder="API Key">
-    <input class="ext-input" id="ext-model" placeholder="模型 (如 tts-1, cosyvoice)">
-    <input class="ext-input" id="ext-voice" placeholder="音色 (如 alloy, nova)">
-    <button class="synth-btn" onclick="saveExternal()">保存配置</button>
-    <div class="status-bar" id="ext-status"></div>
+    <input class="ext-input bg-input" id="ext-url" placeholder="API URL (如 https://api.openai.com/v1/audio/speech)">
+    <input class="ext-input bg-input" id="ext-key" type="password" placeholder="API Key">
+    <input class="ext-input bg-input" id="ext-model" placeholder="模型 (如 tts-1, cosyvoice)">
+    <input class="ext-input bg-input" id="ext-voice" placeholder="音色 (如 alloy, nova)">
+    <button class="synth-btn bg-btn bg-btn--primary" onclick="saveExternal()">保存配置</button>
+    <div class="status-bar" id="ext-status" role="status" aria-live="polite"></div>
     <div class="info-text">
       支持 OpenAI TTS 兼容格式。填好后合成将走外接 API，不填则用内置 edge-tts。<br>
       常见支持：OpenAI TTS / 火山引擎 / Azure / 自建 GPT-SoVITS API
@@ -110,23 +126,23 @@ textarea:focus { outline: none; border-color: var(--accent); }
       以下训练后端接口已预留，当前为占位状态。<br>
       需在 GPU 环境部署后激活。
     </div>
-    <div class="train-list">
+    <div class="train-list bg-card">
       <div class="train-list-title">GPT-SoVITS</div>
       <div class="train-list-desc">少样本克隆，≥10条样本，需GPU</div>
     </div>
-    <div class="train-list">
+    <div class="train-list bg-card">
       <div class="train-list-title">RVC</div>
       <div class="train-list-desc">声音转换，≥5条样本，需GPU</div>
     </div>
-    <div class="train-list">
+    <div class="train-list bg-card">
       <div class="train-list-title">CosyVoice (阿里)</div>
       <div class="train-list-desc">多情绪克隆，≥3条样本，需GPU</div>
     </div>
-    <div class="train-list">
+    <div class="train-list bg-card">
       <div class="train-list-title">F5-TTS</div>
       <div class="train-list-desc">零样本克隆，≥1条样本，需GPU</div>
     </div>
-    <div class="train-list">
+    <div class="train-list bg-card">
       <div class="train-list-title">ChatTTS</div>
       <div class="train-list-desc">对话TTS，自带情绪，无需训练</div>
     </div>
@@ -151,6 +167,8 @@ function initEmotions() {
     const btn = document.createElement('div');
     btn.className = 'emotion-btn' + (k === selectedEmotion ? ' active' : '');
     btn.textContent = v;
+    btn.setAttribute('role', 'button');
+    btn.tabIndex = 0;
     btn.onclick = () => {
       selectedEmotion = k;
       document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
@@ -162,7 +180,9 @@ function initEmotions() {
 
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', ['synth','external','train'][i] === name);
+    const isActive = ['synth','external','train'][i] === name;
+    t.classList.toggle('active', isActive);
+    t.setAttribute('aria-selected', String(isActive));
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
