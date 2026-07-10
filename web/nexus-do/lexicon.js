@@ -90,10 +90,18 @@ const SCALS = expand(SCAL_BASE, LAT_S, HAN_S);   // 64
 const PHASES = PHASE_BASE;                        // 8
 
 const NC=CORES.length, NM=MANIS.length, NS=STATS.length, NK=SCALS.length, NP=PHASES.length;
-export const CAPACITY = NC*NM*NS*NK*NP;          // 2,949,120,000
+export const CAPACITY = NC*NM*NS*NK*NP;          // 7,667,712,000 (核1040×映180×态80×标64×相8)
+
+// 反向索引：拉丁词形 → 轴内下标（O(1) encode，与 shuyu-lang/lexicon.js 同步）
+const CORE_IDX = new Map(CORES.map((x,i)=>[x[0],i]));
+const MANI_IDX = new Map(MANIS.map((x,i)=>[x[0],i]));
+const STAT_IDX = new Map(STATS.map((x,i)=>[x[0],i]));
+const SCAL_IDX = new Map(SCALS.map((x,i)=>[x[0],i]));
+const PHASE_IDX = new Map(PHASES.map((x,i)=>[x[0],i]));
 
 // ══════ 编号 → 词（O(1) 寻址）══════
 export function decode(n){
+  if(!Number.isInteger(n)) throw new TypeError("编号必须是整数");
   if(n<0||n>=CAPACITY) throw new RangeError(`编号越界 0..${CAPACITY-1}`);
   let nn=n;
   const p=nn%NP; nn=Math.floor(nn/NP);
@@ -114,17 +122,22 @@ export function decode(n){
   return { id:n, 词:word, 汉:han, 层:C[3], 义:sem };
 }
 
-// ══════ 词 → 编号（反向寻址）══════
+// ══════ 词 → 编号（O(1) 反向寻址，非法词返回 -1）══════
 export function encode(word){
   try{
-    const [head, ph] = word.split("·");
+    const sep = word.lastIndexOf("·");
+    if(sep < 0) return -1;
+    const head = word.slice(0, sep), ph = word.slice(sep+1);
     const parts = head.split("-");
-    const ci=CORES.findIndex(x=>x[0]===parts[0]);
-    const mi=MANIS.findIndex(x=>x[0]===parts[1]);
-    const si=STATS.findIndex(x=>x[0]===parts[2]);
-    const ki=parts.length>3?SCALS.findIndex(x=>x[0]===parts[3]):0;
-    const pi=PHASES.findIndex(x=>x[0]===ph);
+    if(parts.length < 3 || parts.length > 4) return -1;
+    const ci = CORE_IDX.get(parts[0]) ?? -1;
+    const mi = MANI_IDX.get(parts[1]) ?? -1;
+    const si = STAT_IDX.get(parts[2]) ?? -1;
+    const ki = parts.length > 3 ? (SCAL_IDX.get(parts[3]) ?? -1) : 0;
+    const pi = PHASE_IDX.get(ph) ?? -1;
     if([ci,mi,si,ki,pi].some(i=>i<0)) return -1;
+    // 3段词形对应空标量；显式写出空标量不合法（与 shuyu_engine.py 同规则）
+    if(parts.length > 3 && ki === 0) return -1;
     return ((((ci*NM)+mi)*NS+si)*NK+ki)*NP+pi;
   }catch{ return -1; }
 }
