@@ -1,32 +1,40 @@
 /* ═══════════════════════════════════════════════════════════
-   Black God 设计系统 V3 —「黑曜石 · 活体」
+   Black God 设计系统 V3 —「玉印 · 朱砂」
    单一事实源。规范见 docs/design/DESIGN_SYSTEM_V3.md
    铁律：一切样式走 token；动效只用 transform/opacity；WCAG AA。
    ═══════════════════════════════════════════════════════════ */
 
 /* ── 1. 色彩：深色主题（默认 · 黑曜石）── */
 :root {
-  --bg-deep: #050506;
-  --bg-1: #0A0B0D;
-  --bg-2: #12141A;
-  --bg-3: #1B1E26;
+  --bg-deep: #0A0F0D;
+  --bg-1: #0D1411;
+  --bg-2: #131C18;
+  --bg-3: #1A2620;
   --glass-1: rgba(255, 255, 255, .035);
   --glass-2: rgba(255, 255, 255, .06);
   --glass-3: rgba(255, 255, 255, .09);
-  --line: rgba(196, 205, 216, .14);
-  --line-strong: rgba(196, 205, 216, .26);
-  --text-1: #F0F3F7;
-  --text-2: #A7AEB9;
-  --text-3: #646B75;
-  --chrome-grad: linear-gradient(157deg, #F0F3F7, #C4CDD8 30%, #8A929E 55%, #DFE5EC 78%, #454B54);
-  --gold: #C9A86A;
-  --gold-hi: #E8D4A0;
-  --gold-grad: linear-gradient(157deg, #E8D4A0, #C9A86A 45%, #8A6F3C);
-  --gold-glow: rgba(201, 168, 106, .22);
-  --gold-ink: #14100A;               /* 金底上的深色字 */
-  --live: #3DDC84;
+  --line: rgba(150, 190, 170, .16);
+  --line-strong: rgba(150, 190, 170, .30);
+  --text-1: #EAF2ED;
+  --text-2: #9FB3A8;
+  --text-3: #5F7268;
+  --chrome-grad: linear-gradient(157deg, #EAF2ED, #B8CCC0 30%, #7E948A 55%, #DCE8E1 78%, #3E4A44);
+  --accent: #34C97B;
+  --accent-hi: #5FE39C;
+  --accent-deep: #1E8A55;
+  --stamp: #E0472F;
+  --gold: var(--accent);
+  --gold-hi: var(--accent-hi);
+  --accent-grad: linear-gradient(157deg, #5FE39C, #34C97B 45%, #1E8A55);
+  --stamp-grad: linear-gradient(157deg, #F06A50, #E0472F 55%, #B23520);
+  --gold-grad: var(--accent-grad);
+  --accent-glow: rgba(52, 201, 123, .24);
+  --gold-glow: var(--accent-glow);
+  --accent-ink: #0A1F14;              /* 玉底上的墨色字 */
+  --gold-ink: var(--accent-ink);
+  --live: var(--accent-hi);
   --warn: #E8B34B;
-  --danger: #E5645C;
+  --danger: #E45B45;   /* 朱砂族 */
   --info: #5AC8FA;
   --mood-warm: #E8A87C;
   --mood-cold: #7CA6C8;
@@ -35,7 +43,7 @@
   --miss: #B79BE0;
   --shadow-1: 0 2px 10px rgba(0, 0, 0, .25);
   --shadow-2: 0 8px 40px rgba(0, 0, 0, .45);
-  --shadow-glow: 0 0 24px var(--gold-glow);
+  --shadow-glow: 0 0 24px var(--accent-glow);
   --scrim: rgba(0, 0, 0, .5);
 
   /* ── 2. 字体 ── */
@@ -68,48 +76,64 @@
 
 /* ── 1.2 浅色主题（暖纸）── */
 [data-theme="light"] {
-  --bg-deep: #EFEAE0;
-  --bg-1: #F7F4EC;
+  --bg-deep: #EDEAE0;
+  --bg-1: #F6F3EA;
   --bg-2: #FFFFFF;
-  --bg-3: #FFFDF8;
-  --glass-1: rgba(20, 18, 12, .03);
-  --glass-2: rgba(20, 18, 12, .05);
-  --glass-3: rgba(20, 18, 12, .08);
-  --line: rgba(60, 54, 40, .14);
-  --line-strong: rgba(60, 54, 40, .28);
-  --text-1: #1A1916;
-  --text-2: #5C574C;
-  --text-3: #8B8578;
-  --chrome-grad: linear-gradient(157deg, #454B54, #6B7280 40%, #2E333B 75%, #8A929E);
-  --gold: #8A6F3C;
-  --gold-hi: #C9A86A;
-  --gold-grad: linear-gradient(157deg, #C9A86A, #8A6F3C 55%, #6B5426);
-  --gold-glow: rgba(138, 111, 60, .18);
-  --gold-ink: #FFFDF8;
-  --live: #1F9D57;
+  --bg-3: #FBF9F2;
+  --glass-1: rgba(23, 33, 27, .03);
+  --glass-2: rgba(23, 33, 27, .05);
+  --glass-3: rgba(23, 33, 27, .08);
+  --line: rgba(48, 66, 56, .16);
+  --line-strong: rgba(48, 66, 56, .30);
+  --text-1: #17211B;
+  --text-2: #52625A;
+  --text-3: #85958C;
+  --chrome-grad: linear-gradient(157deg, #3E4A44, #6B7F74 40%, #263029 75%, #7E948A);
+  --accent: #147A4D;
+  --accent-hi: #2FBF71;
+  --accent-deep: #0E5C39;
+  --stamp: #C43D2B;
+  --gold: var(--accent);
+  --gold-hi: var(--accent-hi);
+  --accent-grad: linear-gradient(157deg, #2FBF71, #147A4D 55%, #0E5C39);
+  --stamp-grad: linear-gradient(157deg, #D9553E, #C43D2B 55%, #9C2F20);
+  --gold-grad: var(--accent-grad);
+  --accent-glow: rgba(20, 122, 77, .20);
+  --gold-glow: var(--accent-glow);
+  --accent-ink: #F6FFF9;
+  --gold-ink: var(--accent-ink);
+  --live: var(--accent-hi);
   --warn: #9C7420;
-  --danger: #B23830;
+  --danger: #B5382A;   /* 朱砂族 */
   --info: #2779A7;
-  --shadow-1: 0 2px 10px rgba(40, 34, 20, .10);
-  --shadow-2: 0 8px 40px rgba(40, 34, 20, .18);
-  --scrim: rgba(30, 26, 16, .4);
+  --shadow-1: 0 2px 10px rgba(24, 34, 28, .10);
+  --shadow-2: 0 8px 40px rgba(24, 34, 28, .18);
+  --scrim: rgba(16, 26, 20, .4);
   color-scheme: light;
 }
 
 /* 跟随系统：无 data-theme 时由系统决定浅色 */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg-deep: #EFEAE0; --bg-1: #F7F4EC; --bg-2: #FFFFFF; --bg-3: #FFFDF8;
-    --glass-1: rgba(20, 18, 12, .03); --glass-2: rgba(20, 18, 12, .05); --glass-3: rgba(20, 18, 12, .08);
-    --line: rgba(60, 54, 40, .14); --line-strong: rgba(60, 54, 40, .28);
-    --text-1: #1A1916; --text-2: #5C574C; --text-3: #8B8578;
-    --chrome-grad: linear-gradient(157deg, #454B54, #6B7280 40%, #2E333B 75%, #8A929E);
-    --gold: #8A6F3C; --gold-hi: #C9A86A;
-    --gold-grad: linear-gradient(157deg, #C9A86A, #8A6F3C 55%, #6B5426);
-    --gold-glow: rgba(138, 111, 60, .18); --gold-ink: #FFFDF8;
-    --live: #1F9D57; --warn: #9C7420; --danger: #B23830; --info: #2779A7;
-    --shadow-1: 0 2px 10px rgba(40, 34, 20, .10); --shadow-2: 0 8px 40px rgba(40, 34, 20, .18);
-    --scrim: rgba(30, 26, 16, .4);
+    --bg-deep: #EDEAE0; --bg-1: #F6F3EA; --bg-2: #FFFFFF; --bg-3: #FBF9F2;
+    --glass-1: rgba(23, 33, 27, .03); --glass-2: rgba(23, 33, 27, .05); --glass-3: rgba(23, 33, 27, .08);
+    --line: rgba(48, 66, 56, .16); --line-strong: rgba(48, 66, 56, .30);
+    --text-1: #17211B; --text-2: #52625A; --text-3: #85958C;
+    --chrome-grad: linear-gradient(157deg, #3E4A44, #6B7F74 40%, #263029 75%, #7E948A);
+    --accent: #147A4D;
+  --accent-hi: #2FBF71;
+  --accent-deep: #0E5C39;
+  --stamp: #C43D2B;
+  --gold: var(--accent); --gold-hi: var(--accent-hi);
+    --accent-grad: linear-gradient(157deg, #2FBF71, #147A4D 55%, #0E5C39);
+  --stamp-grad: linear-gradient(157deg, #D9553E, #C43D2B 55%, #9C2F20);
+  --gold-grad: var(--accent-grad);
+    --accent-glow: rgba(20, 122, 77, .20);
+  --gold-glow: var(--accent-glow); --accent-ink: #F6FFF9;
+  --gold-ink: var(--accent-ink);
+    --live: var(--accent-hi); --warn: #9C7420; --danger: #B5382A;   /* 朱砂族 */ --info: #2779A7;
+    --shadow-1: 0 2px 10px rgba(24, 34, 28, .10); --shadow-2: 0 8px 40px rgba(24, 34, 28, .18);
+    --scrim: rgba(16, 26, 20, .4);
     color-scheme: light;
   }
 }
@@ -157,7 +181,7 @@
 .bg-btn:hover { transform: translateY(-1px); }
 .bg-btn:active { transform: translateY(0); opacity: .85; }
 .bg-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-.bg-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow), 0 0 0 1px var(--gold); }
+.bg-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow), 0 0 0 1px var(--gold); }
 .bg-btn--primary {
   background: var(--gold-grad);
   border-color: transparent;
@@ -195,7 +219,7 @@
 .bg-input:focus-visible {
   outline: none;
   border-color: var(--line-strong);
-  box-shadow: 0 0 0 3px var(--gold-glow);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 /* ── 卡片 ── */
@@ -290,7 +314,7 @@
 }
 .bg-switch:checked { background: var(--gold-grad); border-color: transparent; }
 .bg-switch:checked::after { transform: translateX(18px); background: var(--gold-ink); }
-.bg-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-glow); }
+.bg-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
 
 /* ── 分段控件（主题三态等）── */
 .bg-seg {
@@ -313,7 +337,7 @@
   cursor: pointer;
 }
 .bg-seg > button.is-active { background: var(--glass-3); color: var(--text-1); }
-.bg-seg > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--gold-glow); }
+.bg-seg > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-glow); }
 
 /* ── 弹层 ── */
 .bg-scrim {
