@@ -485,7 +485,8 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   backdrop-filter:blur(34px) saturate(1.5);-webkit-backdrop-filter:blur(34px) saturate(1.5);
   border-top:1px solid var(--line)}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;
-  color:var(--text-3);transition:.2s;position:relative}
+  color:var(--text-2);opacity:.85;transition:.2s;position:relative}
+.tab.on{opacity:1}
 .tab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;transition:.2s var(--spring)}
 .tab span{font-size:10px;font-weight:600;letter-spacing:.02em}
 .tab.on{color:var(--cy-1)}

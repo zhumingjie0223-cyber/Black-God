@@ -112,13 +112,31 @@
   .topbar .stat{margin-left:auto; display:flex; gap:18px; font-size:12px; color:var(--mut)}
   .topbar .stat b{color:var(--goldsoft); font-family:var(--mono); font-weight:600}
 
-  .stage{flex:1; min-height:0; overflow:auto; padding:22px 26px 40px}
+  .stage{flex:1; min-height:0; overflow:auto; padding:22px 26px 40px;
+    background:
+      radial-gradient(90% 55% at 72% -6%, color-mix(in srgb, var(--accent, #4FC4D9) 7%, transparent), transparent 62%),
+      radial-gradient(70% 45% at 12% 108%, color-mix(in srgb, var(--surge, #3D7FB8) 6%, transparent), transparent 58%)}
   .stage::-webkit-scrollbar,.hist::-webkit-scrollbar{width:9px}
   .stage::-webkit-scrollbar-thumb,.hist::-webkit-scrollbar-thumb{background:var(--line2); border-radius:8px}
 
   .empty{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:var(--mut2)}
   .empty .big{font-size:52px; opacity:.5}
-  .empty p{font-size:14px}
+  .empty p{font-size:14px; max-width:340px; text-align:center; line-height:1.8}
+  /* 空态·神枢印记：深海底 + 潮光描边 + 潮涌呼吸（transform/opacity，尊重 reduced-motion） */
+  .e-mark{width:92px; height:92px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:"Noto Serif SC","Songti SC",serif; font-size:44px; font-weight:700;
+    color:var(--accent, #4FC4D9);
+    background:radial-gradient(120% 120% at 30% 20%, var(--bg-3, #16222C), var(--bg-1, #0A1014) 70%);
+    border:1px solid color-mix(in srgb, var(--accent, #4FC4D9) 45%, transparent);
+    position:relative}
+  .e-mark::after{content:''; position:absolute; inset:-14px; border-radius:50%;
+    background:radial-gradient(closest-side, color-mix(in srgb, var(--accent, #4FC4D9) 26%, transparent), transparent 72%);
+    animation:eBreath var(--breath, 5s) var(--ease, ease) infinite; z-index:-1}
+  @keyframes eBreath{0%,100%{opacity:.4; transform:scale(.92)} 50%{opacity:1; transform:scale(1.08)}}
+  .e-title{font-family:"Noto Serif SC","Songti SC",serif; font-size:19px; letter-spacing:.04em;
+    color:var(--text-1, #E8F0F2); margin-top:4px}
+  [data-theme="light"] .e-mark{background:radial-gradient(120% 120% at 30% 20%, #FFFFFF, var(--bg-deep, #E4EDF1) 75%)}
+  @media (prefers-reduced-motion: reduce){ .e-mark::after{animation:none} }
 
   /* 计划卡 */
   .plan{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line2);
@@ -256,7 +274,8 @@
     </div>
     <div class="stage" id="stage" aria-live="polite">
       <div class="empty" id="empty">
-        <div class="big">◆</div>
+        <div class="e-mark">神</div>
+        <div class="e-title">深海之下，给她一个目标</div>
         <p>输入一个目标，神枢会自己规划、调用工具、逐步执行并交付成果。</p>
       </div>
     </div>
