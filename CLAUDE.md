@@ -10,25 +10,61 @@
 5. 中途权哥打断或换方向,先更新 `TODO.md` 再执行新指令,保证任何时候看 `TODO.md`
    都知道干到哪了。
 
-# Black God — 项目指南
+# Black God / 神枢 — 项目指南
 
-神枢(Nexus)· 主动型智能体产品:Cloudflare Workers 三项目部署
-(blackgod88 静态站 / nexus-do 大脑 / nexus-studio 工作台)+ iOS 应用。
+Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 Cloudflare Workers Durable Object，
+仓库内 `web/nexus-do/`）= 赵思涵（人格外化）。三层命名分清楚，不要混用。
+
+## 语言规则（强制，不可违反）
+
+**所有面向权哥的输出一律用中文**——包括对话回复、commit message、PR 标题与描述、
+文档、代码注释、任务汇报。禁止中英夹杂、禁止甩英文专业术语不解释、禁止大段英文原文粘贴。
+权哥不看英文。竞品调研/技术资料若来源是英文，必须先消化理解后用中文转述结论，
+不要把英文原文整段甩出来当汇报。变量名/函数名等代码标识符不受此规则约束（保持英文规范）。
+
+## 用量守护（强制，任务开工前必查）
+
+在开始任何重活（架构设计、多 agent 并行调研、大范围重构、UI 全站重写）之前，先确认当前 5 小时用量：
+- **用量 ≥ 85%**：不再开新的重活/新 agent，把当前进度和后续计划写成 `PROGRESS.md`
+  存档到仓库根目录后停下，明确告诉权哥"用量见底，已存档，等额度重置（看面板显示的重置时间）
+  或换轻量模型后继续"。不要在濒临限流时硬跑导致响应卡死、任务烂尾。
+- **用量 60%~85%**：可以继续，但新任务优先派给轻量 agent，减少高算力模型（Fable/Opus）的调用频次。
+- 每完成一个阶段性成果，主动同步剩余用量情况，不要闷头跑到弹尽粮绝才说话。
+
+## 铁律
+
+- 不要碰服务器（SSH/部署）除非权哥明确要求——神枢架构是纯 Cloudflare Workers，不用 VPS。
+- 做事必须先备份/归档再删除，禁止对未核实的目录做粗暴的 `rm -rf`/`git add -A` 一把梭。
+- "读一遍/看一遍"类要求必须完整输出原文，不许摘要、不许截断冒充读完。
+- 品牌/UI 相关决策（配色、Logo、核心视觉）改动前，先看 `web/logo.png` 或 `brand/brand_logo.png`
+  现有品牌资产，新方案要能让现有 Logo 直接放上去浑然一体，不要另起炉灶。
 
 ## 常用命令
 
 ```bash
-cd web/nexus-do && node build.mjs && node selftest.mjs   # 构建 + 83 项自测(改 UI 必跑)
-node tools/sync-ui.mjs --check                           # UI 双副本同步校验
+cd web/nexus-do && node build.mjs && node selftest.mjs   # 构建 + 自测
+node tools/check-sync.mjs                                  # 与 shuyu-lang 源头引擎同步校验
 ```
 
-## 铁律
+## Sub-agent 模型路由（成本分级，自动遵守）
 
-- **UI 一切样式走设计令牌**:单一事实源 `web/design/tokens.css`,规范见
+任务派发时**按下表选 agent，不要事事用主会话高算力模型跑**：
+
+| 任务类型 | Agent | 模型 |
+|---|---|---|
+| 架构设计、UI 设计系统裁决、品牌视觉决策、跨仓库一致性核对 | `heavy-architect` | Fable 5 |
+| 竞品调研、大范围核对、发版联动审计 | `sync-auditor` | Opus |
+| 读文件、跑测试、格式化、简单 bug 修复、单页面重构、文档更新 | `dev-worker` | Sonnet |
+| 遍历多页面/批量 grep/机械式清单核对/词库体检 | `batch-sweeper` | Haiku |
+
+路由原则：默认从最便宜的能胜任的一级开始（batch-sweeper → dev-worker → sync-auditor/heavy-architect），
+只在任务确实需要判断力时升级；多个独立子任务并行派发。
+
+## 设计系统铁律(UI 重设计 V3 起生效)
+
+- UI 一切样式走设计令牌:单一事实源 `web/design/tokens.css`,规范见
   `docs/design/DESIGN_SYSTEM_V3.md`(深海·潮光色系/字体五族/卡片 10-8-2 圆角),
   禁止页面私设色值;动效只用 transform/opacity。
-- 改 `web/nexus-do/index.html` 后必须重新构建(页面是构建时整体注入 Worker 的)。
-- `web/nexus-do/lexicon.js` 是枢语引擎消费方副本,**权威源头在 shuyu-lang 仓库**,
-  改词根表/编码规则必须两仓同步并跑 shuyu-lang 的 `tools/check-sync.mjs`。
+- 改 `web/nexus-do/index.html` 后必须重新构建(页面是构建时整体注入 Worker 的),
+  并跑 `node tools/sync-ui.mjs --check` 校验双副本同步。
 - `/api/confirm` 危险操作二次确认是安全红线,任何重构不得移除。
-- **所有面向权哥的输出一律中文**(对话/提交说明/PR/文档),禁止中英夹杂。
