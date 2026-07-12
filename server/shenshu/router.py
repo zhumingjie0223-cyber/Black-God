@@ -3,9 +3,8 @@
 神枢 AI 网关 - 模型分档路由器
 Shenshu Gateway - Complexity-based Model Router
 
-核心逻辑: 根据任务复杂度评分，路由到对应的Provider+模型档位。
-今晚(2026-07-12)实测验证: 跨Provider双模型绑定才能真正防容灾，
-同Provider内切模型不算数(共享同一条OAuth线路会同时失效)。
+核心逻辑: 神枢决断——枢不是Agent，不需要兜底。
+一个复杂度，一个模型，一个决断。
 """
 
 import re

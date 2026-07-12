@@ -200,14 +200,69 @@ class ModelGateway:
         slot[1] += 1
 
 
+# ═══════════════════════════════════════════════════════════════
+#  神枢 · 枢 — 分档路由（枢决断，不兜底）
+#  2026-07-12 实测：神枢不是Agent，是轴心。它只决定用谁。
+# ═══════════════════════════════════════════════════════════════
+
+# 神枢路由表 — 一个复杂度对应一个模型，没有备胎
+_SHENSHU_ROUTE = {
+    "trivial":  ("Anthropic 2jie", "claude-haiku-4-5-20251001"),
+    "low":      ("max号",           "claude-sonnet-4-6"),
+    "medium":   ("max号",           "claude-sonnet-5"),
+    "high":     ("max号",           "claude-opus-4-8"),
+    "max":      ("max号",           "claude-opus-4-8"),
+}
+
+# 复杂度关键词评分表（从 router.py 同步）
+_COMPLEXITY_KW = {
+    "max":    ["架构设计","重新设计","从零搭建","从零设计","系统性重构","完整的架构"],
+    "high":   ["重构","优化性能","复杂逻辑","多模块","并发","分布式","refactor"],
+    "low":    ["改一下","小改动","修个","调整一下","加个","错字","格式化","翻译"],
+    "trivial":["错字","格式化","翻译","一句话","简单","typo","format","translate"],
+}
+
+
+def score_complexity(text: str, steps: int = 1, files: int = 1) -> str:
+    """基于关键词 + 步骤数 + 文件数的复杂度评分 (trivial/low/medium/high/max)"""
+    tl = text.lower()
+    for level in ["max", "high", "low", "trivial"]:
+        if any(kw in tl for kw in _COMPLEXITY_KW.get(level, [])):
+            return level
+    if steps >= 8 or files >= 5:   return "max"
+    if steps >= 5 or files >= 3:   return "high"
+    if steps >= 2 or files >= 2:   return "medium"
+    if steps == 1 and files == 1:  return "low"
+    return "medium"
+
+
+def 枢决断(task_text: str, steps: int = 1, files: int = 1) -> dict:
+    """神枢决断：输入任务描述 → 输出唯一模型路由。不兜底，不备选。"""
+    level = score_complexity(task_text, steps, files)
+    provider, model = _SHENSHU_ROUTE.get(level, _SHENSHU_ROUTE["medium"])
+    return {"complexity": level, "provider": provider, "model": model}
+
+
 # --------------------------------------------------------------------------- #
-#  默认后端集（含本地小模型兜底）
+#  默认后端集（含本地小模型兜底 + 神枢路由桥接）
 # --------------------------------------------------------------------------- #
 def default_gateway() -> ModelGateway:
     gw = ModelGateway()
     gw.register(ModelBackend(
-        "claude", Tier.STRONG,
-        {"coding": 0.95, "reasoning": 0.93, "long_ctx": 0.9, "general": 0.9},
+        "max号/claude-opus-4-8", Tier.STRONG,
+        {"coding": 0.98, "reasoning": 0.97, "long_ctx": 0.96, "general": 0.95},
+        cost_per_1k=15.0, latency_ms=1200, refuse_prob=0.03))
+    gw.register(ModelBackend(
+        "Anthropic2jie/claude-opus-4-7", Tier.STRONG,
+        {"coding": 0.96, "reasoning": 0.95, "long_ctx": 0.94, "general": 0.93},
+        cost_per_1k=15.0, latency_ms=1200, refuse_prob=0.03))
+    gw.register(ModelBackend(
+        "max号/claude-sonnet-5", Tier.STRONG,
+        {"coding": 0.93, "reasoning": 0.90, "long_ctx": 0.88, "general": 0.90},
+        cost_per_1k=9.0, latency_ms=900, refuse_prob=0.05))
+    gw.register(ModelBackend(
+        "Anthropic2jie/claude-sonnet-5", Tier.STRONG,
+        {"coding": 0.93, "reasoning": 0.90, "long_ctx": 0.88, "general": 0.90},
         cost_per_1k=9.0, latency_ms=900, refuse_prob=0.05))
     gw.register(ModelBackend(
         "gpt", Tier.STRONG,
