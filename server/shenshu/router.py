@@ -13,6 +13,16 @@ import json
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Optional
+
+# v2 能力接入:会诊面板 / 高危命令安全门 / 摘要防污染
+from router_v2 import (
+    AdvisorSlot,
+    aggregate_advisory,
+    evaluate_destructive_action,
+    run_advisory_panel,
+    wrap_compacted_summary,
+)
 
 
 class Complexity(Enum):
@@ -209,20 +219,76 @@ def apply_route_to_session(route: ModelRoute) -> dict:
     return results
 
 
-def route_task(task_text: str, estimated_steps: int = 1, file_count: int = 1) -> dict:
+def build_advisors_for(complexity: Complexity) -> list[AdvisorSlot]:
     """
-    对外主入口: 输入任务描述，输出完整路由决策。
+    按目标复杂度组一个顾问团:取比执行档更低的两档 Primary 当顾问
+    (顾问只出意见,便宜档位足够;聚合决策留给执行档的高档模型)。
     """
-    complexity = score_complexity(task_text, estimated_steps, file_count)
-    route = get_route(complexity)
+    ladder = [Complexity.TRIVIAL, Complexity.LOW, Complexity.MEDIUM,
+              Complexity.HIGH, Complexity.MAX]
+    idx = ladder.index(complexity)
+    advisor_tiers = ladder[max(0, idx - 2):idx] or ladder[:1]
+    return [
+        AdvisorSlot(provider=ROUTING_TABLE[t].primary_provider,
+                    model=ROUTING_TABLE[t].primary_model)
+        for t in advisor_tiers
+    ]
 
-    return {
+
+def route_task(task_text: str, estimated_steps: int = 1, file_count: int = 1,
+               command: Optional[str] = None,
+               target_path: Optional[str] = None,
+               history_summary: Optional[str] = None,
+               advisory: Optional[bool] = None) -> dict[str, Any]:
+    """
+    对外主入口: 输入任务描述,输出完整路由决策。
+
+    v2 接入(向后兼容,老调用方式行为不变):
+    - command 给定时先过高危安全门:requires_confirmation 的命令直接返回
+      blocked 决策,不写会话路由(人没批之前一个配置写入都不花);
+    - history_summary 给定时用 CompactionGuard 包裹后随决策返回,
+      调用方必须用包裹后的 context,防止摘要被下一轮当成任务复活;
+    - advisory=None 时 HIGH/MAX 复杂度自动开会诊,True/False 强制开/关;
+      顾问全缺席不阻塞主流程(聚合器短路,照常按档位路由)。
+    """
+    decision: dict[str, Any] = {
         "task_preview": task_text[:80],
         "estimated_steps": estimated_steps,
         "file_count": file_count,
-        "complexity": complexity.value,
-        "route": apply_route_to_session(route),
     }
+
+    # ── 安全门:高危命令未获确认前,路由流程直接刹停 ──
+    if command:
+        gate = evaluate_destructive_action(command, target_path)
+        decision["safety_gate"] = gate
+        if gate["requires_confirmation"]:
+            decision["blocked"] = True
+            decision["blocked_reason"] = (
+                f"高危命令需二次确认({gate['risk_level']}): {gate['reason']}"
+            )
+            return decision
+
+    complexity = score_complexity(task_text, estimated_steps, file_count)
+    route = get_route(complexity)
+    decision["complexity"] = complexity.value
+
+    # ── 防污染:历史摘要必须包裹标记后再进入下一轮上下文 ──
+    if history_summary:
+        decision["context"] = wrap_compacted_summary(history_summary)
+
+    # ── 会诊:高复杂度任务先并行问一圈便宜档,再由执行档聚合 ──
+    if advisory is None:
+        advisory = complexity in (Complexity.HIGH, Complexity.MAX)
+    if advisory:
+        panel = run_advisory_panel(task_text, build_advisors_for(complexity))
+        decision["advisory"] = aggregate_advisory(
+            task_text, panel,
+            aggregator_provider=route.primary_provider,
+            aggregator_model=route.primary_model,
+        )
+
+    decision["route"] = apply_route_to_session(route)
+    return decision
 
 
 if __name__ == "__main__":
@@ -254,4 +320,23 @@ if __name__ == "__main__":
         print(f"  说明: {route.label}")
         print()
 
-    print("真实写入用法: python3 router.py --apply <任务描述>")
+    print("=== v2 安全门自测(纯逻辑,不写入不调模型) ===\n")
+    gate_cases = [
+        "rm -rf /",
+        "git push origin main --force",
+        "git push --force-with-lease",
+        "rm -rf /tmp/build_cache",
+        "ls -la",
+    ]
+    for cmd in gate_cases:
+        gate = evaluate_destructive_action(cmd)
+        flag = "🛑需确认" if gate["requires_confirmation"] else "✓可执行"
+        print(f"  [{gate['risk_level']:^8}] {flag}  {cmd}")
+
+    print("\n=== v2 摘要防污染自测 ===\n")
+    wrapped = wrap_compacted_summary("上一轮任务:部署了 v3 网关,待办:清理旧日志")
+    print(f"  包裹后首行: {wrapped.splitlines()[0]}")
+    print(f"  幂等校验: {'通过' if wrap_compacted_summary(wrapped) == wrapped else '失败'}")
+
+    print("\n真实写入用法: python3 router.py --apply <任务描述>")
+    print("(--apply 下 HIGH/MAX 复杂度默认自动开多模型会诊,advisory=False 可关)")

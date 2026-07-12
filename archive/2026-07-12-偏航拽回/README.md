@@ -44,6 +44,11 @@ PROJECT_ANALYSIS_REPORT。
 - `docs/`(含移入 docs/product/ 的核心哲学、设计纲领 v2、上线清单)
 - 品牌资产 `brand/`、`assets/`、iOS/安卓壳、根 README/CLAUDE/项目介绍
 
+## 已按权哥指令请回主线的部分
+
+- `server/shenshu/`(分档路由器)——2026-07-12 权哥明确点名开发 router_v2,
+  该子目录已移回仓库根 `server/shenshu/`,不再属于本归档。其余内容维持冻结。
+
 ## 如果哪天要重启服务器线
 
 先跟权哥确认解除「纯 Workers」铁律,再把 `server/` 拷回根目录即可,
