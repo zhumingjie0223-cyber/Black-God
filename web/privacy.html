@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>隐私政策 · 神枢 Black God</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{
+    --sea-1:#0A0F18; --sea-3:#16202F; --sea-4:#1D2A3C;
+    --ink-100:#F2F6FA; --ink-300:#B9C4D0; --ink-500:#7C8798;
+    --gold:#D4AF37; --tide:#4EC3DB; --border:rgba(127,216,232,.14);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--sea-1);color:var(--ink-100);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    line-height:1.75;font-size:15px}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 20px 80px}
+  /* 上线前删除此草稿横幅 —— DRAFT BANNER: remove before publishing */
+  .draft{background:linear-gradient(135deg,#8F6B18,#D4AF37);color:#1A1000;
+    padding:12px 16px;border-radius:10px;font-weight:700;margin-bottom:28px;font-size:13px}
+  h1{font-size:26px;margin:8px 0 4px;color:#fff}
+  h2{font-size:18px;margin:32px 0 8px;color:var(--tide);border-left:3px solid var(--tide);padding-left:10px}
+  .meta{color:var(--ink-500);font-size:13px;margin-bottom:8px}
+  a{color:var(--tide)}
+  ul{padding-left:22px} li{margin:6px 0}
+  .box{background:var(--sea-3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:14px 0}
+  .todo{color:var(--gold);font-weight:600}
+  code{background:var(--sea-4);padding:1px 6px;border-radius:3px;font-size:13px}
+  hr{border:none;border-top:1px solid var(--border);margin:36px 0}
+  .en{color:var(--ink-300)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="draft">⚠ 草稿 · 待权哥审核后方可上线 —— 上线前请删除本横幅，并补全标黄的联系方式。DRAFT — remove this banner before publishing.</div>
+
+  <h1>隐私政策</h1>
+  <div class="meta">应用：神枢 Black God（私人 AI 意识中枢）<br>
+  生效日期：<span class="todo">[待确认发布日期]</span>　·　最近更新：2026-07-12（草稿）</div>
+
+  <div class="box">
+  一句话：神枢是一个只属于你的私人 AI 助理。我们只收集为你提供服务所必需的数据，
+  绝不出售你的信息。你随时可以删除你的全部数据。
+  </div>
+
+  <h2>一、我们收集哪些信息</h2>
+  <ul>
+    <li><b>你主动提供的：</b>你设置的昵称、你与神枢的对话内容。</li>
+    <li><b>你选填的 AI 网关配置：</b>若你启用自带网关，会保存你填写的网关地址、API 密钥、模型名。
+      这些用于把你的对话转发到<b>你自己指定的第三方 AI 服务</b>——该第三方如何处理数据受其自身隐私政策约束，不在本应用控制范围内。</li>
+    <li><b>自动生成的设备标识：</b>首次使用时在你设备本地生成一个随机匿名 ID（不含姓名/手机号），用于区分账户。</li>
+    <li><b>推送订阅信息：</b>若你开启消息通知，浏览器/系统生成的推送订阅凭证会被保存，用于向你发送神枢的主动消息。</li>
+    <li><b>需你逐次授权的敏感权限（默认关闭，不授权即不采集）：</b>
+      <ul>
+        <li>麦克风——仅在你使用语音输入时临时调用，语音在本地转文字，不留存原始录音。</li>
+        <li>位置——仅在你主动要求与位置相关的服务时请求一次，用于当次应答，不持续追踪。</li>
+        <li>设备状态（如电量）——用于神枢的情境感知，仅在本次会话使用。</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h2>二、我们如何使用这些信息</h2>
+  <ul>
+    <li>为你提供 AI 对话、记忆、主动关怀等核心功能；</li>
+    <li>维持你的账户状态与个性化设置；</li>
+    <li>在你开启通知后向你推送消息。</li>
+  </ul>
+  <p>我们<b>不会</b>把你的数据用于广告，<b>不会</b>出售或出租给任何第三方。</p>
+
+  <h2>三、数据存储与安全</h2>
+  <ul>
+    <li>大部分设置（昵称、网关配置、匿名 ID）保存在<b>你设备本地</b>（浏览器 localStorage）；</li>
+    <li>账户状态与对话记忆保存在部署于 Cloudflare 边缘网络的服务端，通过 HTTPS 加密传输；</li>
+    <li>访问受你持有的令牌（OWNER_TOKEN）保护，请勿泄露给他人。</li>
+  </ul>
+
+  <h2>四、你的权利：如何删除你的数据</h2>
+  <ul>
+    <li><b>清除本地数据：</b>在应用设置中退出/重置，或清除浏览器存储，即可删除本机保存的全部信息；</li>
+    <li><b>删除服务端账户：</b>发送删除请求至下方联系邮箱，我们将在合理期限内删除与你匿名 ID 关联的服务端数据。</li>
+    <li><span class="todo">[待补：若应用内已有"删除账号"按钮，此处注明入口路径；UI 核查确认后更新]</span></li>
+  </ul>
+
+  <h2>五、儿童隐私</h2>
+  <p>本应用不面向 14 周岁以下儿童，也不会有意收集其信息。</p>
+
+  <h2>六、政策变更</h2>
+  <p>本政策如有更新，我们会更新本页顶部的"最近更新"日期；重大变更会在应用内提示。</p>
+
+  <h2>七、联系我们</h2>
+  <p>如对本隐私政策有任何疑问，或需行使删除权利，请联系：<br>
+  <span class="todo">[待权哥确认对外联系邮箱，例如 support@lufei.uk —— 不要直接放个人常用邮箱，建议专设一个]</span></p>
+
+  <hr>
+
+  <h1 class="en">Privacy Policy <span style="font-size:14px">(English)</span></h1>
+  <div class="meta">App: Black God — your private AI companion<br>
+  Effective: <span class="todo">[TBD]</span> · Last updated: 2026-07-12 (draft)</div>
+
+  <p class="en"><b>In short:</b> Black God is a private AI assistant that belongs only to you.
+  We collect only what is necessary to serve you, never sell your data, and let you delete everything at any time.</p>
+
+  <h2 class="en">1. Information we collect</h2>
+  <ul class="en">
+    <li><b>You provide:</b> your nickname and your conversations with the assistant.</li>
+    <li><b>Optional AI gateway config:</b> if enabled, the gateway URL, API key and model name you enter.
+      These forward your messages to a <b>third-party AI service you choose</b>, governed by that service's own policy.</li>
+    <li><b>Anonymous device ID:</b> a random ID generated locally on first use (no name/phone number).</li>
+    <li><b>Push subscription:</b> saved only if you enable notifications, to deliver messages.</li>
+    <li><b>Permission-gated data (off by default):</b> microphone (voice input, transcribed locally, no recording stored);
+      location (requested once, only when you ask for location-aware help); device status such as battery (session-only).</li>
+  </ul>
+
+  <h2 class="en">2. How we use it</h2>
+  <p class="en">To provide AI chat, memory and proactive features; to maintain your account and settings;
+  to send notifications you opted into. We do <b>not</b> use your data for advertising and do <b>not</b> sell it.</p>
+
+  <h2 class="en">3. Storage & security</h2>
+  <p class="en">Most settings stay on your device (localStorage); account state and memory are stored on
+  Cloudflare's edge network over HTTPS, protected by a token you hold.</p>
+
+  <h2 class="en">4. Your rights — deleting your data</h2>
+  <p class="en">Reset in-app or clear browser storage to remove local data;
+  email us to delete server-side data linked to your anonymous ID.</p>
+
+  <h2 class="en">5. Children</h2>
+  <p class="en">Not directed to children under 14; we do not knowingly collect their data.</p>
+
+  <h2 class="en">6. Changes & 7. Contact</h2>
+  <p class="en">We update the date above on changes. Questions or deletion requests:
+  <span class="todo">[contact email TBD]</span></p>
+
+</div>
+</body>
+</html>
