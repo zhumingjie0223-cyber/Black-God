@@ -981,7 +981,7 @@ const Nexus = {
       try { const r = await fetch(this.base + '/pubtalk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, text }) });
         return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
     }
-    try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
+    try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps, model: (store.get('model')||'auto') }) });
       return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
   },
   async device(info) { try { await this._fetch('/device',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(info)}); } catch(e){} },

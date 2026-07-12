@@ -118,7 +118,7 @@ export class ShenshuCore {
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       try {
-        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [])); }
+        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [], b.model)); }
         if (path === '/soul') return json(await this.getSoulPublic());
         if (path === '/inner') return json(await this.getInner());
         // #2 个人枢语词典：造词沉淀，可检索、越用越厚
@@ -216,7 +216,7 @@ export class ShenshuCore {
         ws.send(JSON.stringify({ type: 'soul', soul: await this.getSoulPublic() }));
       }
       if (msg.type === 'talk') {
-        const result = await this.handleTalk(msg.text || '', null, msg.caps || []);
+        const result = await this.handleTalk(msg.text || '', null, msg.caps || [], msg.model);
         ws.send(JSON.stringify({ type: 'reply', data: result }));
       }
     } catch (e) {
@@ -470,9 +470,12 @@ export class ShenshuCore {
   // ═══════════════════════ 对话主流程 ═══════════════════════
   // 并发安全：网络调用（callBrain）只读快照、不写 soul；所有 soul 读-改-写集中在
   // callBrain 之后一段「仅 storage 操作」的连续临界段里（DO 输入门保证原子，无丢失更新）。
-  async handleTalk(text, request, capsIn) {
+  async handleTalk(text, request, capsIn, model) {
     const now = Date.now();
     const caps = Array.isArray(capsIn) ? capsIn : [];
+    // 用户在「大脑·模型」里的选择（auto/strong/cf-llama），透传给 callBrain 决定后端顺序；
+    // 缺省(undefined/老客户端) → auto，行为与改动前完全一致（向后兼容）。
+    const brainModel = model || 'auto';
 
     // —— 1) 读快照，构建上下文（只读，不落盘）——
     const snap = await this.getSoul();
@@ -495,14 +498,14 @@ export class ShenshuCore {
     const agentic = tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code');
     let brainResult;
     if (agentic) {
-      brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier });
+      brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier, model: brainModel });
     } else {
       let webBlock = '';
       if (this.needsWeb(text)) {
         const found = await this.webSearch(text).catch(() => '');
         if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
       }
-      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier });
+      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, model: brainModel });
     }
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
@@ -691,6 +694,17 @@ ${capabilitySelfDescription(true)}
     return 'light';
   }
 
+  // 后端尝试顺序：用户在「大脑·模型」里的显式选择优先生效，未选(auto)则按 tier 智能路由。
+  // 纯函数、确定性、可测。返回 ['cf'|'gateway', ...]，callBrain 按此顺序逐个尝试。
+  // 诚实降级铁律：strong 网关挂了仍兜底 CF，不假装成功；cf-llama = 用户明确只要免费内置，只用 CF。
+  pickBrainOrder(tier, model) {
+    const m = model || 'auto';
+    if (m === 'cf-llama') return ['cf'];
+    if (m === 'strong') return ['gateway', 'cf'];
+    // auto：light 先免费 CF（省 Key），heavy 网关优先质量，均双向兜底
+    return tier === 'light' ? ['cf', 'gateway'] : ['gateway', 'cf'];
+  }
+
   // ═══════════════════════ 联网 · 真实检索（DuckDuckGo，无需外部服务器）═══════════════════════
   // 判定这句是否需要联网取外部/新鲜信息。纯函数，确定性，可测。保守触发，不滥用抓取。
   needsWeb(text) {
@@ -854,8 +868,9 @@ ${capabilitySelfDescription(true)}
       return null;
     };
 
-    // light：先免费 CF（省 Key），挂了才上网关；heavy：网关优先，挂了降级 CF
-    const order = tier === 'light' ? [tryCF, tryGateway] : [tryGateway, tryCF];
+    // 顺序由 pickBrainOrder 决定（用户「大脑·模型」选择优先，否则按 tier 智能路由）
+    const fnMap = { cf: tryCF, gateway: tryGateway };
+    const order = this.pickBrainOrder(tier, opts.model).map(k => fnMap[k]);
     for (const fn of order) { const r = await fn(); if (r) return r; }
 
     // 兜底：永不失语
@@ -1577,7 +1592,7 @@ ${capabilitySelfDescription(true)}
       // 按能力 argShape 映射入参（只覆盖当前登记的能力）
       let out;
       switch (cap.id) {
-        case 'talk':      out = await this.handleTalk(params.text || '', request, params.caps || []); break;
+        case 'talk':      out = await this.handleTalk(params.text || '', request, params.caps || [], params.model); break;
         case 'agent':     out = await this.handleAgent(params.text || '', params.context || {}); break;
         case 'device':    out = await this.recordDevice(params.info || {}, request); break;
         case 'gen_image': out = await this.genImage(params.prompt || '', params); break;
