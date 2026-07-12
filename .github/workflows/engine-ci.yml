@@ -1,0 +1,35 @@
+# 神枢引擎 CI — 构建 + 自测 + 引擎指纹自检 + UI 双副本校验
+# 任何推送/PR 必须过这四道门禁,防止引擎副本被改坏、UI 改了忘重建
+name: 神枢引擎测试
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 构建自测 + 同步门禁
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 构建 + 语法检查 + 自测(83 项行为测试)
+        working-directory: web/nexus-do
+        run: |
+          node build.mjs
+          node --check nexus_do.mjs
+          node selftest.mjs
+
+      - name: 引擎指纹自检(词根表防篡改 + 双向寻址往返)
+        run: node tools/check-sync.mjs
+
+      - name: UI 双副本同步校验(index.html ↔ nexus_do.mjs)
+        run: node tools/sync-ui.mjs --check

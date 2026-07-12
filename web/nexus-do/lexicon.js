@@ -4,7 +4,7 @@
 /**
  * 枢语造词引擎 — JS版 (lexicon.js)
  * © Black God
- * 5维乘法语义空间：核×映×态×标×相 = 29.5亿
+ * 5维乘法语义空间：核×映×态×标×相 = 76.7亿 (7,667,712,000)
  * 与 shuyu_engine.py 同构，供 nexuslang.js 解释器调用
  */
 
@@ -83,14 +83,18 @@ function expand(base, latT, hanT){
   return out;
 }
 
-const CORES = expand(CORE_BASE, LAT_T, HAN_T);   // 400
+const CORES = expand(CORE_BASE, LAT_T, HAN_T);   // 52*20=1040
 const MANIS = expand(MANI_BASE, LAT_A, HAN_A);   // 180
 const STATS = expand(STAT_BASE, LAT_F, HAN_F);   // 80
 const SCALS = expand(SCAL_BASE, LAT_S, HAN_S);   // 64
 const PHASES = PHASE_BASE;                        // 8
 
 const NC=CORES.length, NM=MANIS.length, NS=STATS.length, NK=SCALS.length, NP=PHASES.length;
-export const CAPACITY = NC*NM*NS*NK*NP;          // 2,949,120,000
+export const CAPACITY = NC*NM*NS*NK*NP;          // 7,667,712,000
+
+// ══════ 词根表结构化导出（测试防篡改护栏 + 跨仓同步校验用，只读勿改）══════
+export const ROOTS = { CORE_BASE, MANI_BASE, STAT_BASE, SCAL_BASE, PHASE_BASE,
+                       AXES: { NC, NM, NS, NK, NP } };
 
 // ══════ 编号 → 词（O(1) 寻址）══════
 export function decode(n){
@@ -260,4 +264,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, decode, encode, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, ROOTS, decode, encode, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
