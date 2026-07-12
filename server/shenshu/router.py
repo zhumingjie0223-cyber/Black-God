@@ -15,13 +15,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
 
-# v2 能力接入:会诊面板 / 高危命令安全门 / 摘要防污染
+# v2 能力接入:会诊面板 / 高危命令安全门 / 摘要防污染 / 模型条目解析(复用加固版)
 from router_v2 import (
     AdvisorSlot,
     aggregate_advisory,
     evaluate_destructive_action,
     run_advisory_panel,
     wrap_compacted_summary,
+    _resolve_entry_id,
 )
 
 
@@ -124,7 +125,11 @@ def score_complexity(task_text: str, estimated_steps: int = 1,
     这是启发式规则，不是精确科学，宁可路由到更高档位也不要
     路由到更低档位(省小钱不如别翻车)。
     """
-    text_lower = task_text.lower()
+    if not task_text or not task_text.strip():
+        # 空描述:纯按步骤/文件数走启发式,不做关键词匹配(原实现 .lower() 会崩)
+        text_lower = ""
+    else:
+        text_lower = task_text.lower()
 
     # 关键词命中检测(从高到低检测，命中即返回)
     for complexity in [Complexity.MAX, Complexity.HIGH, Complexity.LOW, Complexity.TRIVIAL]:
@@ -150,72 +155,83 @@ def get_route(complexity: Complexity) -> ModelRoute:
     return ROUTING_TABLE.get(complexity, ROUTING_TABLE[Complexity.MEDIUM])
 
 
-def apply_route_to_session(route: ModelRoute) -> dict:
+def _write_session_model(config_key: str, entry_id: str,
+                         timeout: int = 35) -> tuple[bool, Optional[str]]:
+    """
+    把一个 entry_id 写进 minis-config 的某个会话键。
+    返回 (写入成功?, 错误信息或None)。
+    原来 primary/sub 两段是复制粘贴,现在收敛为这一处,顺带补 returncode 校验
+    (原实现 returncode 非零但 stdout 恰好可解析时会误判成成功)。
+    """
+    try:
+        val = json.dumps(f"entry:{entry_id}")
+        proc = subprocess.run(
+            ["minis-config", "set", config_key, val],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        if proc.returncode != 0:
+            return False, (proc.stderr or proc.stdout or "").strip()[:300]
+        if not proc.stdout:
+            return False, proc.stderr.strip()[:300] or "无输出"
+        try:
+            parsed = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            return False, f"写入输出非JSON: {proc.stdout[:200]}"
+        return bool(parsed.get("ok")), None if parsed.get("ok") else str(parsed)[:300]
+    except subprocess.TimeoutExpired:
+        return False, f"写入超时(>{timeout}s)"
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
+def apply_route_to_session(route: ModelRoute, _allow_fallback: bool = True) -> dict[str, Any]:
     """
     把路由配置真正写入当前会话 (通过 minis-config 实际执行)。
-    这里不再是纸面方案 —— 直接调 minis-config set 命令落地。
+
+    整改点(把散落的函数调用打通):
+    - entry_id 解析复用 router_v2._resolve_entry_id(带缓存/线程锁/returncode
+      校验),删掉这里重复的内嵌 find_entry_id + 裸 subprocess;
+    - primary/sub 写入收敛到 _write_session_model,消除两段复制粘贴;
+    - 接线 EMERGENCY_FALLBACK:原来它定义了却从没被任何函数调用过——现在
+      primary/sub 任一模型解析不到时,自动降级到跨厂商兜底路由再试一次
+      (_allow_fallback 防无限递归),结果标注 fell_back_to_emergency。
     """
-    results = {
+    results: dict[str, Any] = {
         "route_label": route.label,
         "primary": f"{route.primary_provider} / {route.primary_model}",
         "sub": f"{route.sub_provider} / {route.sub_model}",
     }
 
-    # Step 1: 拉取真实模型清单，解析出 entry_id (provider_uuid/model_id)
-    try:
-        list_out = subprocess.run(
-            ["minis-config", "get", "models"],
-            capture_output=True, text=True, timeout=15
-        )
-        models_data = json.loads(list_out.stdout)
-        models = json.loads(models_data["value"])
-    except Exception as e:
-        results["error"] = f"读取模型列表失败: {e}"
+    primary_entry = _resolve_entry_id(route.primary_provider, route.primary_model)
+    sub_entry = _resolve_entry_id(route.sub_provider, route.sub_model)
+
+    # 解析失败 → 尝试紧急兜底路由(仅一层,兜底自身再失败就如实报错)
+    if not primary_entry or not sub_entry:
+        missing = []
+        if not primary_entry:
+            missing.append(f"Primary {route.primary_provider}/{route.primary_model}")
+        if not sub_entry:
+            missing.append(f"Sub {route.sub_provider}/{route.sub_model}")
+        if _allow_fallback and route is not EMERGENCY_FALLBACK:
+            fb = apply_route_to_session(EMERGENCY_FALLBACK, _allow_fallback=False)
+            fb["fell_back_to_emergency"] = True
+            fb["fallback_reason"] = f"原路由模型解析失败: {', '.join(missing)}"
+            return fb
+        results["error"] = f"找不到模型: {', '.join(missing)}"
+        results["applied"] = False
         return results
 
-    def find_entry_id(provider_label: str, model_id: str) -> str | None:
-        for m in models:
-            if m.get("provider_label") == provider_label and m.get("model_id") == model_id:
-                return m.get("entry_id")
-        return None
+    primary_ok, primary_err = _write_session_model("session.primaryModel", primary_entry)
+    results["primary_write"] = primary_ok
+    if primary_err:
+        results["primary_write_error"] = primary_err
 
-    primary_entry = find_entry_id(route.primary_provider, route.primary_model)
-    sub_entry = find_entry_id(route.sub_provider, route.sub_model)
+    sub_ok, sub_err = _write_session_model("session.subModel", sub_entry)
+    results["sub_write"] = sub_ok
+    if sub_err:
+        results["sub_write_error"] = sub_err
 
-    if not primary_entry:
-        results["error"] = f"找不到 Primary 模型: {route.primary_provider}/{route.primary_model}"
-        return results
-    if not sub_entry:
-        results["error"] = f"找不到 Sub 模型: {route.sub_provider}/{route.sub_model}"
-        return results
-
-    # Step 2: 实际写入 session.primaryModel
-    try:
-        primary_val = json.dumps(f"entry:{primary_entry}")
-        r1 = subprocess.run(
-            ["minis-config", "set", "session.primaryModel", primary_val],
-            capture_output=True, text=True, timeout=35
-        )
-        primary_result = json.loads(r1.stdout) if r1.stdout else {"ok": False, "raw_error": r1.stderr}
-        results["primary_write"] = primary_result.get("ok", False)
-    except Exception as e:
-        results["primary_write"] = False
-        results["primary_write_error"] = str(e)
-
-    # Step 3: 实际写入 session.subModel
-    try:
-        sub_val = json.dumps(f"entry:{sub_entry}")
-        r2 = subprocess.run(
-            ["minis-config", "set", "session.subModel", sub_val],
-            capture_output=True, text=True, timeout=35
-        )
-        sub_result = json.loads(r2.stdout) if r2.stdout else {"ok": False, "raw_error": r2.stderr}
-        results["sub_write"] = sub_result.get("ok", False)
-    except Exception as e:
-        results["sub_write"] = False
-        results["sub_write_error"] = str(e)
-
-    results["applied"] = results.get("primary_write", False) and results.get("sub_write", False)
+    results["applied"] = primary_ok and sub_ok
     return results
 
 
