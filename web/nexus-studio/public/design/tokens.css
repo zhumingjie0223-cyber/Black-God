@@ -8,7 +8,7 @@
 :root {
   --bg-deep: #05080A;
   --bg-1: #0A1014;
-  --bg-2: #101820;
+  --bg-2: #141822;
   --bg-3: #16222C;
   --glass-1: rgba(255, 255, 255, .035);
   --glass-2: rgba(255, 255, 255, .06);
@@ -46,13 +46,18 @@
   --shadow-1: 0 2px 10px rgba(0, 0, 0, .25);
   --shadow-2: 0 8px 40px rgba(0, 0, 0, .45);
   --shadow-glow: 0 0 24px var(--accent-glow);
+  --card-line: rgba(255, 255, 255, .10);                                  /* 卡片描边:白10% */
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .07);  /* 外阴影+顶部内高光 */
   --scrim: rgba(0, 0, 0, .5);
 
   /* ── 2. 字体 ── */
-  --font-display: "Noto Serif SC", "Songti SC", serif;
-  --font-body: "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-brand-en: "Cormorant Garamond", Georgia, serif;
-  --font-mono: "Space Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 中西反差=高级感:宋体镇场 × 几何无衬线科技感 × Inter 正文 × Geist 等宽 × Cormorant 诗意点缀 */
+  --font-display: "Noto Serif SC", "Songti SC", "STSong", serif;          /* 中文标题「神枢」700 */
+  --font-brand-en: "Space Grotesk", "Inter", -apple-system, sans-serif;   /* 英文字标 Black God */
+  --font-body: "Inter", "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Geist Mono", "Space Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-poetic: "Cormorant Garamond", Georgia, serif;                    /* 意识流诗句斜体点缀 */
+  --ls-tight: -0.02em;                                                    /* 全局字距收紧 */
   --fs-1: 12px; --fs-2: 13px; --fs-3: 15px; --fs-4: 17px;
   --fs-5: 20px; --fs-6: 24px; --fs-7: 32px; --fs-8: 44px;
   --lh-body: 1.7;
@@ -61,7 +66,7 @@
   /* ── 3. 空间 / 圆角 / 层级 ── */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 44px;
-  --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-pill: 999px;
+  --r-sm: 8px; --r-md: 10px; --r-lg: 20px; --r-tag: 2px; --r-pill: 999px;  /* 卡片基准10/嵌套8/小标签2 */
   --z-nav: 100; --z-sheet: 200; --z-modal: 300; --z-toast: 400;
   --tap: 44px;
 
@@ -112,6 +117,8 @@
   --info: #2779A7;
   --shadow-1: 0 2px 10px rgba(20, 32, 40, .10);
   --shadow-2: 0 8px 40px rgba(20, 32, 40, .18);
+  --card-line: rgba(18, 28, 33, .10);
+  --shadow-card: 0 4px 20px rgba(20, 32, 40, .10), inset 0 1px 0 rgba(255, 255, 255, .85);
   --scrim: rgba(12, 24, 30, .4);
   color-scheme: light;
 }
@@ -139,6 +146,8 @@
   --gold-ink: var(--accent-ink);
     --live: var(--accent-hi); --warn: #9C7420; --danger: #B23E2F; --info: #2779A7;
     --shadow-1: 0 2px 10px rgba(20, 32, 40, .10); --shadow-2: 0 8px 40px rgba(20, 32, 40, .18);
+    --card-line: rgba(18, 28, 33, .10);
+    --shadow-card: 0 4px 20px rgba(20, 32, 40, .10), inset 0 1px 0 rgba(255, 255, 255, .85);
     --scrim: rgba(12, 24, 30, .4);
     color-scheme: light;
   }
@@ -151,10 +160,13 @@
   font-family: var(--font-body);
   font-size: var(--fs-3);
   line-height: var(--lh-body);
+  letter-spacing: var(--ls-tight);
   -webkit-font-smoothing: antialiased;
 }
-.bg-display { font-family: var(--font-display); line-height: var(--lh-title); }
-.bg-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.bg-display { font-family: var(--font-display); font-weight: 700; line-height: var(--lh-title); }
+.bg-brand-en { font-family: var(--font-brand-en); font-weight: 700; letter-spacing: -0.01em; }
+.bg-poetic { font-family: var(--font-poetic); font-style: italic; }
+.bg-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .bg-chrome-text {
   background: var(--chrome-grad);
   -webkit-background-clip: text;
@@ -231,9 +243,11 @@
 /* ── 卡片 ── */
 .bg-card {
   background: linear-gradient(var(--glass-1), var(--glass-1)) , var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-md);       /* 卡片基准 10px,嵌套元素用 --r-sm:8px,小标签 --r-tag:2px */
+  box-shadow: var(--shadow-card);
   padding: var(--sp-5);
 }
 

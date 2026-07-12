@@ -13,7 +13,7 @@
 <meta name="theme-color" content="#F2F6F8" media="(prefers-color-scheme: light)"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&family=Space+Mono:wght@400;700&family=Great+Vibes&family=Mr+Dafoe&family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=Space+Mono:wght@400;700&family=Great+Vibes&family=Mr+Dafoe&family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet"/>
 <!-- Black God 设计系统 V3 · 单一事实源 token（见 docs/design/DESIGN_SYSTEM_V3.md） -->
 <link rel="stylesheet" href="/design/tokens.css"/>
 <script>
@@ -120,7 +120,7 @@
 }
 html,body{
   height:100%;background:var(--bg);color:var(--text);
-  font-family:"Space Grotesk","Noto Sans SC",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-family:var(--font-body, "Inter","Noto Sans SC",-apple-system,sans-serif);letter-spacing:var(--ls-tight, -0.02em);
   overflow:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility
 }
 button{font-family:inherit}
@@ -244,9 +244,9 @@ button{font-family:inherit}
 .msg.err .bubble{background:var(--err-dim);border:1px solid var(--err-line);color:#FF9A9A;border-radius:var(--r-sm)}
 .bubble strong{color:#fff;font-weight:600}
 .bubble pre{background:#06070A;border:1px solid var(--line);border-radius:var(--r-sm);padding:11px;
-  overflow-x:auto;margin:8px 0;font-family:"Space Mono",ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5}
+  overflow-x:auto;margin:8px 0;font-family:var(--font-mono);font-size:13px;line-height:1.5}
 .bubble code{background:var(--surface-3);padding:2px 5px;border-radius:5px;
-  font-family:"Space Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
+  font-family:var(--font-mono);font-size:12.5px}
 .bubble pre code{background:none;padding:0}
 
 .ts{font-size:11px;color:var(--text-3);margin-top:4px;padding:0 4px}
@@ -281,12 +281,12 @@ button{font-family:inherit}
 .step.failed .step-ic{background:var(--err-dim);border-color:var(--err-line);color:var(--err)}
 .step-body{flex:1;min-width:0}
 .step-top{display:flex;align-items:center;gap:7px}
-.step-tool{font-family:"Space Mono",ui-monospace,monospace;font-size:11px;color:var(--chrome-2);
+.step-tool{font-family:var(--font-mono);font-size:11px;color:var(--chrome-2);
   background:var(--surface);padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
 .step-title{font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .step.running .step-title{color:var(--run)}
 .step-detail{font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5;
-  font-family:"Space Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;
+  font-family:var(--font-mono);white-space:pre-wrap;word-break:break-word;
   max-height:0;overflow:hidden;transition:max-height var(--t-base) ease}
 .step.open .step-detail{max-height:240px;overflow-y:auto}
 .step-toggle{font-size:11px;color:var(--text-3);cursor:pointer;flex-shrink:0;
@@ -356,10 +356,11 @@ button{font-family:inherit}
 .page{flex:1;overflow-y:auto;overflow-x:hidden;display:none}
 .page::-webkit-scrollbar{display:none}
 .page-h{padding:18px 16px 6px;font-size:13px;font-weight:700;letter-spacing:.18em;color:var(--chrome-2)}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+.card{background:var(--surface);border:1px solid var(--card-line, var(--line));border-radius:var(--r-md, 10px);box-shadow:var(--shadow-card, 0 4px 20px rgba(0,0,0,.35));
   padding:15px;margin:8px 16px 0;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .card-t{font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:12px;letter-spacing:.02em}
 .stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+.stat3 b,.stat3 .v{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:0}
 .stat-n{font-size:26px;font-weight:800;background:var(--chrome-grad);-webkit-background-clip:text;
   background-clip:text;-webkit-text-fill-color:transparent}
 .stat-l{font-size:11px;color:var(--text-2);margin-top:2px}
@@ -504,7 +505,7 @@ button{font-family:inherit}
   justify-content:center;font-size:16px;background:var(--warn-dim);border:1px solid var(--warn-line);color:var(--warn)}
 .cb-title{font-size:15px;font-weight:700;flex:1}
 .cb-detail{font-size:12.5px;color:var(--text-2);line-height:1.5;margin-bottom:13px;
-  font-family:"Space Mono",ui-monospace,monospace;background:var(--bg);padding:9px 11px;border-radius:var(--r-sm);
+  font-family:var(--font-mono);background:var(--bg);padding:9px 11px;border-radius:var(--r-sm);
   border:1px solid var(--line);max-height:130px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
 .cb-btns{display:flex;gap:9px}
 .cb-btn{flex:1;height:44px;border:none;border-radius:var(--r-sm);cursor:pointer;font-size:14.5px;font-weight:600;transition:var(--t-fast)}
@@ -543,7 +544,7 @@ button{font-family:inherit}
 .dialog-ic.danger{background:var(--err-dim);border-color:var(--err-line)}
 .dialog-t{font-size:17px;font-weight:700;text-align:center;margin-bottom:8px}
 .dialog-d{font-size:13px;color:var(--text-2);text-align:center;line-height:1.6;margin-bottom:20px;
-  font-family:"Space Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;
+  font-family:var(--font-mono);white-space:pre-wrap;word-break:break-word;
   max-height:160px;overflow-y:auto}
 .dialog-btns{display:flex;gap:10px}
 .dialog-btns button{flex:1;height:46px;border-radius:var(--r-md);cursor:pointer;font-size:14.5px;font-weight:600;transition:var(--t-fast)}
@@ -579,11 +580,11 @@ button{font-family:inherit}
 .cascade-title{font-size:12.5px;color:var(--text-2);font-weight:600;margin-bottom:12px}
 .cascade-bars{display:flex;flex-direction:column;gap:7px}
 .cb-row{display:flex;align-items:center;gap:10px}
-.cb-label{font-size:12px;color:var(--text-3);font-family:"Space Mono",ui-monospace,monospace;
+.cb-label{font-size:12px;color:var(--text-3);font-family:var(--font-mono);
   flex:0 0 100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cb-track{flex:1;height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden}
 .cb-fill{height:100%;border-radius:3px;transition:width .6s var(--ease)}
-.cb-pct{font-size:11.5px;font-family:"Space Mono",ui-monospace,monospace;flex:0 0 34px;text-align:right}
+.cb-pct{font-size:11.5px;font-family:var(--font-mono);flex:0 0 34px;text-align:right}
 
 /* —— Tab icon update: unicode chrome chars —— */
 .tab-ic{font-size:19px;line-height:1;transition:transform var(--t-base);
@@ -597,7 +598,7 @@ button{font-family:inherit}
   transition:border-color var(--t-base),box-shadow var(--t-base)}
 .prov-row.on{border-color:var(--line-chrome);box-shadow:var(--shadow-1),0 0 10px var(--chrome-glow)}
 .prov-name{font-size:15px;color:var(--text);font-weight:600}
-.prov-model{font-size:12.5px;color:var(--text-3);font-family:"Space Mono",ui-monospace,monospace;margin-top:2px}
+.prov-model{font-size:12.5px;color:var(--text-3);font-family:var(--font-mono);margin-top:2px}
 .prov-badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-lg);
   font-size:11px;font-weight:600;background:var(--ok-dim);border:1px solid var(--ok-line);color:var(--ok);margin-left:7px}
 
@@ -647,7 +648,7 @@ button{font-family:inherit}
           <div class="cb-row"><span class="cb-label">亲密度</span><div class="cb-track"><div class="cb-fill" id="cbIntim" style="width:0%;background:linear-gradient(90deg,#e0436b,#ff8fab)"></div></div><span class="cb-pct" id="cbIntimPct">—</span></div>
           <div class="cb-row"><span class="cb-label">活力</span><div class="cb-track"><div class="cb-fill" id="cbEnergy" style="width:0%;background:linear-gradient(90deg,#3a8fd9,#6fc8ff)"></div></div><span class="cb-pct" id="cbEnergyPct">—</span></div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:11.5px;color:var(--text-3);font-family:'Space Mono',ui-monospace,monospace">
+        <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:11.5px;color:var(--text-3);font-family:var(--font-mono)">
           <span id="nexusEncounters">第—次见你</span>
           <span id="nexusSkills">技能 —</span>
         </div>

@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>神枢 · 自主智能体工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet"/>
 <style>
   /* 兜底：外链 design/tokens.css 404 时的降级默认值（对齐权威深色主题基线）。
      tokens.css 加载成功后，其 :root 声明在级联顺序上晚于本块，会整体覆盖。 */
@@ -38,7 +41,7 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{
-    font-family:var(--sans); background:var(--bg); color:var(--txt);
+    font-family:var(--sans); background:var(--bg); color:var(--txt); letter-spacing:var(--ls-tight, -0.02em);
     -webkit-font-smoothing:antialiased; overflow:hidden;
     background-image:radial-gradient(1200px 600px at 80% -10%, color-mix(in srgb, var(--accent, #c99b4e) 14%, transparent), transparent 60%),
                      radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--accent, #c99b4e) 8%, transparent), transparent 55%);
@@ -49,10 +52,10 @@
   .side{border-right:1px solid var(--line); background:linear-gradient(180deg,var(--bg2),var(--bg));
     display:flex; flex-direction:column; min-height:0}
   .brand{padding:20px 20px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--line)}
-  .logo{width:38px;height:38px;border-radius:var(--r-sm, 11px); display:grid; place-items:center; font-weight:800; font-size:20px;
+  .logo{width:38px;height:38px;border-radius:var(--r-sm, 8px); display:grid; place-items:center; font-family:var(--font-display, serif); font-weight:800; font-size:20px;
     background:var(--accent-grad, linear-gradient(145deg,#4FC4D9,#c99b4e)); color:var(--accent-ink, #1a1206);
     box-shadow:0 4px 18px var(--accent-glow, rgba(201,155,78,.35))}
-  .brand h1{font-size:15px; letter-spacing:.5px; font-weight:700}
+  .brand h1{font-family:var(--font-display, "Noto Serif SC",serif); font-size:16px; letter-spacing:.4px; font-weight:700}
   .brand p{font-size:11px; color:var(--mut); margin-top:2px; letter-spacing:.3px}
 
   .compose{padding:16px 18px 8px}
@@ -139,7 +142,7 @@
   @media (prefers-reduced-motion: reduce){ .e-mark::after{animation:none} }
 
   /* 计划卡 */
-  .plan{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line2);
+  .plan{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--card-line, var(--line2));
     border-radius:var(--r); padding:16px 18px; margin-bottom:18px; box-shadow:var(--shadow)}
   .plan h2{font-size:13px; color:var(--accent, #4FC4D9); letter-spacing:.5px; margin-bottom:12px; display:flex; align-items:center; gap:8px}
   .deliv-note{margin-top:12px; padding-top:11px; border-top:1px solid var(--line); font-size:12px; color:var(--mut2)}

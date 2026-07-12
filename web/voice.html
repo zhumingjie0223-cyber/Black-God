@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>语音合成 - Black God</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/design/tokens.css">
 <style>
 :root {
@@ -13,7 +16,7 @@
   --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body { background: var(--bg); color: var(--text); font-family: -apple-system, 'PingFang SC', sans-serif; padding-top: var(--safe-top); padding-bottom: calc(60px + var(--safe-bottom)); }
+body { background: var(--bg); color: var(--text); font-family: var(--font-body, 'Inter','Noto Sans SC',-apple-system,sans-serif); letter-spacing: var(--ls-tight, -0.02em); padding-top: var(--safe-top); padding-bottom: calc(60px + var(--safe-bottom)); }
 .header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
 .header h1 { font-size: 18px; font-weight: 600; }
 .back-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: -10px; font-size: 24px; color: var(--accent); cursor: pointer; border-radius: var(--r-pill, 999px); }
