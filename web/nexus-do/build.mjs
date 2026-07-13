@@ -7,6 +7,8 @@ const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 let core = readFileSync(new URL('./nexus_do.core.mjs', import.meta.url), 'utf8');
 const marker = '"__CHAT_HTML__"';
 if (!core.includes(marker)) throw new Error('marker "__CHAT_HTML__" not found in core');
-core = core.replace(marker, JSON.stringify(html));
+// 必须用函数式替换:直接传字符串时 replace 会把 $$/$& 等序列当特殊替换符吞掉,
+// 页面里的 `const $$ = ...` 会被毁成重复声明 `const $`,整页脚本语法错误。
+core = core.replace(marker, () => JSON.stringify(html));
 writeFileSync(new URL('./nexus_do.mjs', import.meta.url), core);
 console.log('✓ built nexus_do.mjs', statSync(new URL('./nexus_do.mjs', import.meta.url)).size, 'bytes · html', html.length, 'bytes');
