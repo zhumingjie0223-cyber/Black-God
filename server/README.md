@@ -1,5 +1,11 @@
 # Black God Server
 
+> ⚠️ **定位变更(方案① · 2026-07-13)**:本 Python 服务器已从"独立大脑"**降级为按需调用的重算力后端**。
+> 常驻大脑(日常对话/情绪/记忆/设备识别/保活)已统一归 CF 主轨 `web/nexus-do`。
+> 本目录只保留重活:docker 隔离沙箱、深度多 agent、本地大模型、code_engine,由 CF 经
+> `execRemote` 远程调用。边界划分与调用协议详见 [`docs/architecture/双轨边界-方案①.md`](../docs/architecture/双轨边界-方案①.md)。
+> `core/` 下标了 `DEPRECATED(方案①)` 的模块属"大脑常驻"能力,勿再当主大脑扩展。
+
 Black God 后端服务器（Python）
 
 ## 🚀 快速启动
