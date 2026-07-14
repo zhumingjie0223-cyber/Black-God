@@ -100,6 +100,8 @@ export class ShenshuCore {
 
     // —— 公开：注册 + 公共聊天（普通用户填昵称即用，不碰主人私密数据）——
     if (path === '/register' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.registerUser(b, request)); }
+    if (path === '/privacy') return new Response(PRIVACY_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+    if (path === '/unregister' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.unregisterUser(b)); }
     if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
 
     // —— 能力契约层（借鉴 Minis）——
@@ -1753,6 +1755,17 @@ ${capabilitySelfDescription(true)}
     return { ok: true, uid, nick, welcome: `欢迎，${nick}。` };
   }
 
+  // 用户自助注销：凭自己的 uid（本地存储里那个）删掉名单里的自己，对应隐私政策里的「随时可删」承诺。
+  async unregisterUser(body) {
+    const uid = String((body && body.uid) || '').slice(0, 64);
+    if (!uid) return { ok: false, error: 'missing uid' };
+    const users = (await this.storage.get('users')) || {};
+    if (!(uid in users)) return { ok: true, deleted: false };
+    delete users[uid];
+    await this.storage.put('users', users);
+    return { ok: true, deleted: true };
+  }
+
   // 公共聊天限流：按 uid 各自限流（各花各的算力，不该互相挤占彼此配额）
   // + 全局背压兜底（防大量伪造 uid 刷 Workers 请求量，这个账单是主人出的）
   _pubRateOk(uid) {
@@ -1861,6 +1874,99 @@ function genesisState() {
 }
 
 // UI（构建时由 index.html 注入，绝不截断）
+// 隐私政策 —— 公开只读页面，供商店审核 / App 内链接 / 用户查阅（对应 /privacy 路由）
+const PRIVACY_HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>隐私政策 · Black God 神枢</title>
+<style>
+  body{max-width:720px;margin:0 auto;padding:32px 20px 80px;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;color:#1c1c1e;background:#fbfbf9}
+  h1{font-size:1.5rem;margin-bottom:.2em}
+  h2{font-size:1.15rem;margin-top:2em;border-left:4px solid #2FB96B;padding-left:.6em}
+  .meta{color:#777;font-size:.9rem;margin-bottom:2em}
+  table{width:100%;border-collapse:collapse;margin:1em 0;font-size:.92rem}
+  th,td{border:1px solid #e2e2e0;padding:.5em .7em;text-align:left;vertical-align:top}
+  th{background:#f0f4f1}
+  code{background:#eef2ef;padding:.1em .4em;border-radius:4px;font-size:.9em}
+  a{color:#1B8A54}
+  .tag{display:inline-block;background:#eef7f1;color:#1B8A54;border-radius:4px;padding:.1em .5em;font-size:.8em;margin-right:.3em}
+  @media (prefers-color-scheme: dark){
+    body{background:#151714;color:#e8e8e6}
+    h2{border-left-color:#3FCB80}
+    th{background:#1e211d}
+    th,td{border-color:#2c2f2a}
+    code{background:#20241f}
+    a{color:#5BE39A}
+    .tag{background:#1b2620;color:#5BE39A}
+  }
+</style>
+</head>
+<body>
+<h1>隐私政策 · Black God（神枢）</h1>
+<p class="meta">生效日期：2026-07-14　·　适用范围：本服务的网页 / PWA / 安卓 TWA 客户端（<code>aquan.lufei.uk</code>）</p>
+
+<p>Black God（产品内名称「神枢」）是一个私人 AI 助理服务。本页说明我们收集哪些数据、为什么收集、存在哪里、以及你能怎么处理自己的数据。使用本服务即表示你已阅读并同意本政策。</p>
+
+<h2>1. 我们收集什么</h2>
+<p>服务分两种身份，收集的数据不同，<b>互相隔离，公共访客访问不到主人的任何数据</b>：</p>
+<table>
+<tr><th>身份</th><th>收集的数据</th><th>用途</th></tr>
+<tr>
+  <td><span class="tag">访客 / 注册用户</span>填昵称即用的普通聊天用户</td>
+  <td>
+    昵称、大致地理位置（仅城市/地区/国家，由 Cloudflare 边缘节点按 IP 解析得出，<b>不是 GPS 精确定位</b>）、
+    浏览器 User-Agent（截断保存）、消息条数与最近活跃时间；
+    若你自愿填写「自带大脑」的第三方 API 地址/模型名，会连同你的 API 密钥一起保存，<b>仅用于把你的聊天转发到你自己配置的网关</b>，密钥不会在界面上明文回显。
+  </td>
+  <td>维持你与神枢的对话上下文、按用户各自限流（防止一人刷爆额度影响所有人）、给主人展示「多少人在用」的汇总统计（不含密钥）。</td>
+</tr>
+<tr>
+  <td><span class="tag">主人</span>持有 <code>OWNER_TOKEN</code> 的私密用户</td>
+  <td>
+    在访客数据基础上，额外包含：IP 地址、设备平台/型号线索（通过标准浏览器请求头读取）、
+    更完整的边缘地理信息（含经纬度估算、时区、邮编、网络运营商/ASN）、完整聊天记录、
+    情节记忆与情绪状态、以及你主动开启的 Telegram 推送目标。
+  </td>
+  <td>提供个性化、有记忆、能主动联系你的私人助理体验；这些数据只有带正确 <code>OWNER_TOKEN</code> 的请求能读取。</td>
+</tr>
+</table>
+
+<h2>2. 数据分享给谁</h2>
+<ul>
+<li>你的聊天文本会发送给<b>你自己选择/配置的</b> AI 网关（内置默认网关，或你在「自带大脑」里填写的第三方网关），用于生成回复。我们不会把这些文本另作他用。</li>
+<li>不接入任何广告 SDK、不做跨站追踪、不向数据经纬商出售或出租数据。</li>
+<li>基础设施本身运行在 Cloudflare Workers / Durable Objects 之上，Cloudflare 作为基础设施提供方按其自身政策处理传输层数据（如 IP 用于边缘路由）。</li>
+</ul>
+
+<h2>3. 数据存放与保留</h2>
+<ul>
+<li>数据存放在 Cloudflare Durable Object 自带存储中（相当于一个轻量数据库），不使用额外的第三方数据库或分析平台。</li>
+<li>访客名单为防止无限增长设了上限（保留最近活跃的一批），超出上限时最旧的记录会被自动清理；除此之外没有固定的自动过期时间。</li>
+<li>主人的记忆/情绪等私密数据由主人自行通过内部工具管理，长期保留以维持连续的人格记忆。</li>
+</ul>
+
+<h2>4. 你的权利</h2>
+<ul>
+<li><b>删除</b>：访客/注册用户可随时调用 <code>POST /unregister</code>（带上你注册时得到的 <code>uid</code>）自助删除你在名单里的全部记录；也可以直接清空浏览器本地存储以停止关联。</li>
+<li><b>查询/更正</b>：可联系下方邮箱说明你的 <code>uid</code> 或昵称，我们会核实后协助处理。</li>
+<li>本服务不提供针对未成年人的定向功能；如你是监护人并发现未成年人数据，请联系我们删除。</li>
+</ul>
+
+<h2>5. 儿童隐私</h2>
+<p>本服务不面向 13 岁以下儿童设计，不会有意收集其个人信息。</p>
+
+<h2>6. 政策变更</h2>
+<p>本政策如有实质性变更，会更新本页顶部的生效日期；建议定期查看。</p>
+
+<h2>7. 联系我们</h2>
+<p>关于本政策或你的数据，请联系：<a href="mailto:aquan@lufei.uk"><code>aquan@lufei.uk</code></a>。</p>
+
+</body>
+</html>`;
+
+
 const CHAT_HTML = "__CHAT_HTML__";
 
 // PWA manifest —— 让神枢能加到桌面
