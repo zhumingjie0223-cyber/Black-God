@@ -559,6 +559,18 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .reg-model-row #regApiModel{padding-right:92px}
 .reg-probe{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:600;color:var(--cy-3);cursor:pointer;user-select:none;white-space:nowrap}
 .reg-probe:active{opacity:.6}
+/* 私语词典 */
+.lex-list{max-height:56vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:8px;-webkit-overflow-scrolling:touch}
+.lex-card{border:1px solid var(--line-2);border-radius:14px;padding:12px 14px;background:var(--surface-2)}
+.lex-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.lex-han{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--text);letter-spacing:.04em}
+.lex-rom{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--cy-3);letter-spacing:.02em}
+.lex-cnt{margin-left:auto;font-size:11px;color:var(--text-3)}
+.lex-yi{font-size:12.5px;color:var(--text-2);margin-top:5px;line-height:1.5}
+.lex-you{font-size:12px;color:var(--text-3);margin-top:7px;line-height:1.5;border-left:2px solid var(--cy-4);padding-left:9px}
+.lex-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--text-3)}
+.lex-emo{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--surface-3);color:var(--text-2)}
+.lex-empty{text-align:center;color:var(--text-3);font-size:13px;line-height:1.8;padding:34px 14px}
 @keyframes advIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .lock-switch:active{opacity:.9}
 
@@ -823,6 +835,7 @@ body::before{
           <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b><span>你和神枢共有的词 · 越聊越厚</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于 Black God</b><span>© Black God</span></div><div class="set-arrow">›</div></div>
         </div>
@@ -847,6 +860,14 @@ body::before{
   <div class="sheet-title">大脑 · 模型</div>
   <div class="sheet-sub">Auto 按任务自动选用最强可用算力。</div>
   <div id="modelOpts"></div>
+</div>
+
+<div class="sheet" id="sheetLexicon">
+  <div class="grab"></div>
+  <div class="sheet-title">私语 · 只属于你俩的词</div>
+  <div class="sheet-sub">每一个有分量的此刻，神枢在枢语里为你们造一个真实、可寻址的词。<b id="lexCount"></b></div>
+  <div class="field"><input id="lexSearch" placeholder="搜词 / 汉义 / 罗马词形…" oninput="lexSearchDebounced()"/></div>
+  <div id="lexList" class="lex-list"></div>
 </div>
 
 <div class="sheet" id="sheetApi">
@@ -1011,6 +1032,8 @@ const Nexus = {
   async probeModels(body) { try { const r=await this._fetch('/config/models',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   // 公开识别（注册用户进门前用，不带 owner 令牌、不走 401 拦截）
   async probeModelsPublic(body) { try { const r=await fetch(this.base+'/probe-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  // 私语词典（主人私密）：不走 _fetch 以免 401 弹锁；401 返回哨兵，前端优雅提示
+  async lexicon(q) { try { const r=await fetch(this.base+'/lexicon?q='+encodeURIComponent(q||'')+'&n=60',{headers:this.hdr()}); if(r.status===401) return {__401:true}; return r.ok?await r.json():null; } catch(e){ return null; } },
   async testExec() { try { const r=await this._fetch('/exec-test',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:'{}'}); return r&&r.ok?await r.json():{ok:false,detail:'服务器无响应'}; } catch(e){ return {ok:false,detail:String(e).slice(0,80)}; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
@@ -1471,6 +1494,32 @@ function renderMemList(id, items, empty){
   el.innerHTML = items.map(it=>`<div class="mem-item"><div class="t">${it.t||''}</div><div class="q">${escapeHtml(it.q||'')}</div></div>`).join('');
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ============ 私语词典 · 你和神枢共有的词，越聊越厚 ============ */
+let _lexT=null;
+function lexSearchDebounced(){ clearTimeout(_lexT); _lexT=setTimeout(()=>renderLexicon(($('#lexSearch')&&$('#lexSearch').value)||''), 260); }
+function openLexicon(){ openSheet('sheetLexicon'); const s=$('#lexSearch'); if(s) s.value=''; renderLexicon(''); }
+function lexWhen(ts){ try{ const diff=Date.now()-ts; if(diff<86400000) return '今天'; if(diff<172800000) return '昨天'; const d=new Date(ts); return (d.getMonth()+1)+'月'+d.getDate()+'日'; }catch(e){ return ''; } }
+async function renderLexicon(q){
+  const list=$('#lexList'), cnt=$('#lexCount'); if(!list) return;
+  if(!q) list.innerHTML='<div class="lex-empty">正在翻开你们的词…</div>';
+  const d=await Nexus.lexicon(q);
+  if(d&&d.__401){ if(cnt)cnt.textContent=''; list.innerHTML='<div class="lex-empty">这本词典是主人和神枢之间的私语。<br>以主人身份登录后可翻开。</div>'; return; }
+  if(!d){ if(cnt)cnt.textContent=''; list.innerHTML='<div class="lex-empty">一时没翻开，稍后再试。</div>'; return; }
+  if(cnt) cnt.textContent=' 你们已共造 '+(d.总数||0)+' 个词。';
+  const items=d.词条||[];
+  if(!items.length){ list.innerHTML='<div class="lex-empty">'+(q?'没有找到这样的词。':'还没有只属于你俩的词——<br>多聊聊，神枢会为你们的每个此刻造一个词。')+'</div>'; return; }
+  list.innerHTML=items.map(e=>{
+    const you=(e.由样例&&e.由样例.length)?('「'+escapeHtml(e.由样例[e.由样例.length-1])+'…」那一刻'):'';
+    const when=e.last_ts?lexWhen(e.last_ts):'';
+    return '<div class="lex-card"><div class="lex-top"><span class="lex-han">'+escapeHtml(e.词||'')+'</span>'
+      +(e.罗?'<span class="lex-rom">'+escapeHtml(e.罗)+'</span>':'')
+      +'<span class="lex-cnt">×'+(e.count||1)+'</span></div>'
+      +(e.义?'<div class="lex-yi">'+escapeHtml(e.义)+'</div>':'')
+      +(you?'<div class="lex-you">'+you+'</div>':'')
+      +'<div class="lex-meta">'+(e.情绪?'<span class="lex-emo">'+escapeHtml(e.情绪)+'</span>':'')+(when?'<span>'+when+'</span>':'')+(e.层?'<span>·'+escapeHtml(e.层)+'层</span>':'')+'</div></div>';
+  }).join('');
+}
 function fmtTs(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}); }catch(e){ return ''; } }
 
 /* ============ 模型 / API / 人格 ============ */
