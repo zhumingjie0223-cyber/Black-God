@@ -1002,9 +1002,11 @@ const Nexus = {
   mode: store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none'),
   uid: store.get('reg_uid') || '',
   ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
-  hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; return h; },
-  async register(nick, api) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, nick, api_url:(api&&api.url)||'', api_key:(api&&api.key)||'', api_model:(api&&api.model)||'' }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
-  async unregister() { try { const r = await fetch(this.base + '/unregister', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
+  mt: false,   // 多租户开关(从 /health 读):开→注册用户有自己的实例
+  async loadHealth(){ try{ const r=await fetch(this.base+'/health'); if(r&&r.ok){ const d=await r.json(); this.mt=!!d.multitenant; } }catch(e){} },
+  hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; if (this.uid) h['X-Nexus-Uid'] = this.uid; return h; },
+  async register(nick, api) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json', ...(this.uid?{'X-Nexus-Uid':this.uid}:{})}, body: JSON.stringify({ uid:this.uid, nick, api_url:(api&&api.url)||'', api_key:(api&&api.key)||'', api_model:(api&&api.model)||'' }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async unregister() { try { const r = await fetch(this.base + '/unregister', { method:'POST', headers:{'Content-Type':'application/json', ...(this.uid?{'X-Nexus-Uid':this.uid}:{})}, body: JSON.stringify({ uid:this.uid }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
   async stats() { try { const r = await this._fetch('/stats', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async _fetch(path, opts) {
     const r = await fetch(this.base + path, opts);
@@ -1014,11 +1016,18 @@ const Nexus = {
   async getSoul() { try { const r = await this._fetch('/soul', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.getSoul(); } catch(e){ return Demo.getSoul(); } },
   async getInner() { try { const r = await this._fetch('/inner', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.inner(); } catch(e){ return Demo.inner(); } },
   async talk(text, caps) {
-    // 公共用户走 /pubtalk（无鉴权、无状态、不碰主人数据）
-    if (this.mode === 'public') {
-      try { const r = await fetch(this.base + '/pubtalk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ uid:this.uid, text }) });
+    // 多租户开:注册用户走「自己的实例」/talk（带 X-Nexus-Uid 头即被路由+授予实例主人权），
+    // 拿完整体验（自己的灵魂/记忆/私语,用自己的 key,费用各付各的）。
+    if (this.mode === 'public' && this.mt) {
+      try { const r = await fetch(this.base + '/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
         return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
     }
+    // 单租户（默认）:公共用户走无状态 /pubtalk（不碰主人数据）
+    if (this.mode === 'public') {
+      try { const r = await fetch(this.base + '/pubtalk', { method:'POST', headers:{'Content-Type':'application/json', ...(this.uid?{'X-Nexus-Uid':this.uid}:{})}, body: JSON.stringify({ uid:this.uid, text }) });
+        return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
+    }
+    // 主人:私密 /talk
     try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
       return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
   },
@@ -1806,6 +1815,7 @@ function typeInto(bubble, text, done){
   try{ setPushUI(!!store.get('push_on')); }catch(e){}
   try{ $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } }); }catch(e){}
   try{ ensureUid(); }catch(e){}
+  try{ Nexus.loadHealth(); }catch(e){}   // 读多租户开关(异步,不阻塞进门)
   // —— 进哪个门：主人 / 已注册公共用户 / 未进（默认公共注册门）——
   Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none');
   if(Nexus.mode==='owner') bootOwner();

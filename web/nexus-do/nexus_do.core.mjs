@@ -79,6 +79,7 @@ export class ShenshuCore {
       const secure = !!this.env.OWNER_TOKEN;
       return json({
         ok: true, ts: Date.now(), secure, auth: secure ? 'required' : 'open',
+        multitenant: !!this.env.MULTITENANT,   // 前端据此决定:开→注册用户走自己实例(/talk);关→老流程(/pubtalk)
         ...(secure ? {} : { warning: '⚠️ OWNER_TOKEN 未设置：所有私密接口（/soul /device /talk 等，含 IP/定位）对公众开放。请执行 npx wrangler secret put OWNER_TOKEN 后重新部署。' }),
       });
     }
@@ -1790,6 +1791,16 @@ ${capabilitySelfDescription(true)}
       await this.storage.put('users', users);
     }
     if (isNew) await this.storage.put('users_total', ((await this.storage.get('users_total')) || 0) + 1);
+    // 多租户:在「自己的实例」里注册时,把自带 API 镜像进本实例 config,好让 /talk 的 callBrain 用它。
+    // 仅 instance 角色才做——单租户(共享实例)下绝不写 config,否则会覆盖系统主人的网关配置。
+    if (this.env.MULTITENANT && request && request.headers && request.headers.get('X-Nexus-Role') === 'instance' && u.api_url && u.api_key) {
+      const cfg = (await this.storage.get('config')) || {};
+      if (cfg.gateway_url !== u.api_url || cfg.gateway_key !== u.api_key || (u.api_model || '') !== (cfg.gateway_model || '')) {
+        cfg.gateway_url = u.api_url; cfg.gateway_key = u.api_key; cfg.gateway_model = u.api_model || '';
+        delete cfg._auto_model;   // 换网关/模型:清自动识别缓存,下次重识别
+        await this.storage.put('config', cfg);
+      }
+    }
     return { ok: true, uid, nick, welcome: `欢迎，${nick}。` };
   }
 
