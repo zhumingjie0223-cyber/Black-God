@@ -73,6 +73,9 @@ const DB = (await import(pathToFileURL(peer.data))).default;
 for (const [name, D, ENG] of [['本仓', DA, A], ['对方', DB, B]]) {
   const badIds = Object.entries(D.word_ids).filter(([, id]) => !Number.isInteger(id) || id < 0 || id >= ENG.CAPACITY);
   if (badIds.length) fail(`${name}词库有 ${badIds.length} 个编号越界,如: ${badIds.slice(0, 3).map(([w, i]) => `${w}=${i}`).join(', ')}`);
+  // 空串/纯空白键是脱敏/迁移残留的垃圾词条(如把人格词清成空串却没删条目),硬失败
+  const emptyKeys = Object.keys(D.word_ids).filter(w => w.trim() === '');
+  if (emptyKeys.length) fail(`${name}词库有 ${emptyKeys.length} 个空/纯空白词条(编号=${emptyKeys.map(w => D.word_ids[w]).join(', ')}),应整条删除而非留空键`);
 }
 
 const famA = Object.keys(DA.vocab), famB = Object.keys(DB.vocab);
