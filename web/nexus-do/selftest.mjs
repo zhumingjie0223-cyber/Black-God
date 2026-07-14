@@ -3,7 +3,7 @@
 import { ShenshuCore } from './nexus_do.mjs';
 import { decode, encode, CAPACITY, coinWord } from './lexicon.js';
 import { resolveCapability, describeCapabilities, capabilitySelfDescription, CAPABILITIES } from './capabilities.mjs';
-import { resolveIdentity, sanitizeUid } from './tenancy.mjs';
+import { resolveIdentity, sanitizeUid, isSystemOnlyPath } from './tenancy.mjs';
 import LEX from './lexicon_data.js';
 
 let pass = 0, fail = 0;
@@ -233,6 +233,13 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
   ok('能力·系统主人全权', resolveCapability('exec', { role: 'system' }).ok === true && resolveCapability('gen_image', { role: 'system' }).ok === true);
   ok('能力·旧布尔签名仍兼容', resolveCapability('exec', true).ok === true && resolveCapability('exec', false).reason === 'owner_only');
   ok('能力·每个能力都已分级(instance|system)', CAPABILITIES.every(c => c.tier === 'instance' || c.tier === 'system'));
+}
+// ── 系统专属路由:实例主人碰不到(烧钱/危险/跨用户/规模)──
+{
+  ok('路由·执行脑系统专属', isSystemOnlyPath('/exec-test') === true);
+  ok('路由·造像造声造影系统专属', isSystemOnlyPath('/image') && isSystemOnlyPath('/voice') && isSystemOnlyPath('/video'));
+  ok('路由·跨用户统计/迁移/推送系统专属', isSystemOnlyPath('/stats') && isSystemOnlyPath('/migrate') && isSystemOnlyPath('/push-test'));
+  ok('路由·自己的对话/灵魂/私语不是系统专属', !isSystemOnlyPath('/talk') && !isSystemOnlyPath('/soul') && !isSystemOnlyPath('/lexicon') && !isSystemOnlyPath('/config'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -33,3 +33,16 @@ export function resolveIdentity({ authHeader = '', uidHeader = '', ownerToken = 
   // 匿名:无实例
   return { role: 'anon', doName: null, uid: null };
 }
+
+// 系统专属路由:实例主人(普通用户)绝不可达——含烧权哥算力(造像/造声/造影)、
+// 危险/规模(执行脑/迁移/推送/自主守望/心跳)、跨用户(统计)、以及暂缓的 WS。
+export const SYSTEM_ONLY_PATHS = new Set([
+  '/exec-test', '/migrate', '/push-test', '/stats',
+  '/image', '/voice', '/video',
+  '/heartbeat', '/loop', '/wsticket',
+]);
+
+// 该路由是否为系统专属(仅系统主人可达)
+export function isSystemOnlyPath(path) {
+  return SYSTEM_ONLY_PATHS.has(path);
+}
