@@ -831,8 +831,8 @@ body::before{
         <div class="page-inner">
           <div class="set-row" onclick="toggleTheme()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
           <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关 · 关着 app 也能收到消息</span></div><div class="switch" id="pushSw"><i></i></div></div>
-          <div class="set-row" onclick="openSheet('sheetModel')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openSheet('sheetApi')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openModelSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b><span>你和神枢共有的词 · 越聊越厚</span></div><div class="set-arrow">›</div></div>
@@ -1693,8 +1693,21 @@ function initPublicMode(){
   Nexus.mode='public'; document.body.classList.add('public-mode');
   try{ setLive(true); }catch(e){}
   ensurePubApiBtn();
+  try{ syncMyApiLabels(); }catch(e){}
   try{ toast('欢迎，'+(store.get('reg_nick')||'')); }catch(e){}
 }
+// 公共模式:设置里的「模型/算力接口」标签反映你注册时填的 API(而不是主人的 /config)。
+function syncMyApiLabels(){
+  if(Nexus.mode!=='public') return;
+  try{
+    const model=store.get('reg_api_model'), url=store.get('reg_api_url');
+    const ml=$('#modelLabel'); if(ml) ml.textContent = model || '你的模型 · 自动识别';
+    const al=$('#apiLabel'); if(al) al.textContent = url ? ('你的网关 · '+(model||'自动')) : '未接入 · 点这里填';
+  }catch(e){}
+}
+// 设置里点「大脑·模型 / 算力接口」:公共用户走自己的 API 编辑器(不是主人的 /config 面板)。
+function openBrainSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetApi'); }
+function openModelSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetModel'); }
 // 公共模式：左上角「⚙︎ 我的 API」随时改自己的网关
 function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
