@@ -843,7 +843,8 @@ body::before{
   <div class="sheet-sub">填你自己的网关（标准 Chat Completions），填一次即生效。<b>留空 = 用内置大脑</b>。</div>
   <div class="field"><label>网关地址（Base URL 或完整端点）</label><input id="apiBase" placeholder="如 https://aquan.love:8443/v1"/></div>
   <div class="field"><label>密钥 API Key</label><input id="apiKey" type="password" placeholder="sk-…"/></div>
-  <div class="field"><label>模型名</label><input id="apiModel" placeholder="如 sihan-max"/></div>
+  <div class="field"><label>模型名 <span id="probeBtn" onclick="probeModels()" style="float:right;font-weight:600;color:var(--brand,#4ea1ff);cursor:pointer">🔍 识别模型</span></label><input id="apiModel" list="modelList" placeholder="留空 = 自动识别，或点右上「识别模型」选"/><datalist id="modelList"></datalist></div>
+  <div id="modelHint" style="font-size:12px;color:var(--text-3);margin:-6px 0 8px"></div>
   <div id="apiStatus" style="font-size:12px;color:var(--text-3);margin:-4px 0 12px"></div>
   <button class="btn" onclick="saveApi()">保存</button>
   <div class="field" style="margin-top:16px"><label>神枢核心地址（一般不用改）</label><input id="nexusBase" placeholder="留空 = 当前地址"/></div>
@@ -995,6 +996,7 @@ const Nexus = {
   async video(prompt) { try { const r=await this._fetch('/video',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async getConfig() { try { const r=await this._fetch('/config',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async probeModels(body) { try { const r=await this._fetch('/config/models',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async testExec() { try { const r=await this._fetch('/exec-test',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:'{}'}); return r&&r.ok?await r.json():{ok:false,detail:'服务器无响应'}; } catch(e){ return {ok:false,detail:String(e).slice(0,80)}; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
@@ -1476,6 +1478,23 @@ async function fillApi(){
   if(c){ $('#apiBase').value=c.gateway_url||''; $('#apiModel').value=c.gateway_model||''; $('#apiKey').value=c.gateway_key||'';
     $('#apiStatus').textContent='当前大脑：'+(c.来源||'内置'); $('#apiLabel').textContent = c.gateway_url?('外接 · '+(c.gateway_model||'网关')):'内置 Llama';
   } else { $('#apiStatus').textContent='（离线，无法读取服务器配置）'; }
+}
+async function probeModels(){
+  const base=$('#apiBase').value.trim();
+  const hint=$('#modelHint'); const btn=$('#probeBtn');
+  if(!base){ hint.style.color='var(--text-3)'; hint.textContent='先填网关地址再识别'; return; }
+  const key=$('#apiKey').value;
+  const body={ gateway_url:base }; if(key && !/^[•*]/.test(key)) body.gateway_key=key.trim();
+  if(btn) btn.textContent='识别中…'; hint.style.color='var(--text-3)'; hint.textContent='正在联网识别…';
+  const d=await Nexus.probeModels(body);
+  if(btn) btn.textContent='🔍 识别模型';
+  if(d&&d.ok&&d.models&&d.models.length){
+    $('#modelList').innerHTML=d.models.map(m=>'<option value="'+m.replace(/"/g,'&quot;')+'">').join('');
+    if(!$('#apiModel').value.trim()) $('#apiModel').value=d.models[0];
+    hint.style.color='var(--text-3)'; hint.textContent='识别到 '+d.count+' 个模型 · 点输入框可下拉选（已默认第一个：'+d.models[0]+'）';
+  } else {
+    hint.style.color='var(--danger,#e5484d)'; hint.textContent=(d&&d.error)||'识别失败，可直接手填模型名';
+  }
 }
 async function saveApi(){
   const nb=$('#nexusBase').value.trim(); store.set('nexus_base',nb); Nexus.base=nb;

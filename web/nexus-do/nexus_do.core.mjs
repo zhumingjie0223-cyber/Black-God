@@ -145,6 +145,7 @@ export class ShenshuCore {
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
         if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
+        if (path === '/config/models' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.probeModels(b)); }
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
         // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
@@ -826,8 +827,17 @@ ${capabilitySelfDescription(true)}
       const cfg = (await this.storage.get('config')) || {};
       const gwBase = cfg.gateway_url || this.env.NEXUS_GATEWAY_URL;
       const gwKey = cfg.gateway_key || this.env.NEXUS_GATEWAY_KEY;
-      const gwModel = cfg.gateway_model || this.env.NEXUS_GATEWAY_MODEL || 'auto';
+      let gwModel = cfg.gateway_model || this.env.NEXUS_GATEWAY_MODEL || '';
       if (!gwBase) return null;
+      // 未指定模型（留空或 auto）：联网识别一次，取第一个真实模型并缓存，避免硬传 "auto" 被网关拒
+      if (!gwModel || gwModel === 'auto') {
+        if (cfg._auto_model) gwModel = cfg._auto_model;
+        else {
+          const probe = await this.probeModels({ gateway_url: gwBase, gateway_key: gwKey });
+          if (probe.ok && probe.models.length) { gwModel = probe.models[0]; cfg._auto_model = gwModel; await this.storage.put('config', cfg); }
+        }
+      }
+      if (!gwModel) gwModel = 'auto';   // 实在识别不到，保持原行为交给网关自行决定
       const gw = /\/(chat\/completions|completions|messages)$/.test(gwBase) ? gwBase : gwBase.replace(/\/+$/, '') + '/chat/completions';
       try {
         const r = await fetch(gw, {
@@ -1660,8 +1670,33 @@ ${capabilitySelfDescription(true)}
       exec_on: !!(c.exec_url || this.env.NEXUS_EXEC_URL),
     };
   }
+  // 从网关 base 推导标准 /models 端点（剥掉 chat/completions 等尾巴，补 /models）
+  modelsEndpoint(base) {
+    return String(base || '').replace(/\/+$/, '').replace(/\/(chat\/completions|completions|messages)$/, '') + '/models';
+  }
+  // 联网识别网关支持的模型列表：GET {base}/models，兼容 OpenAI {data:[{id}]} / {models:[...]} / 纯数组
+  async probeModels(b) {
+    const c = (await this.storage.get('config')) || {};
+    const base = String((b && b.gateway_url) || c.gateway_url || this.env.NEXUS_GATEWAY_URL || '').trim();
+    // 请求体带的真实 key 优先（前端填了没保存也能识别）；掩码则回退已存 key
+    const key = (b && b.gateway_key && !/^[•*]/.test(b.gateway_key)) ? String(b.gateway_key).trim()
+      : (c.gateway_key || this.env.NEXUS_GATEWAY_KEY || '');
+    if (!base) return { error: '先填网关地址' };
+    const endpoint = this.modelsEndpoint(base);
+    try {
+      const r = await fetch(endpoint, { headers: { ...(key ? { Authorization: 'Bearer ' + key } : {}) } });
+      if (!r.ok) return { error: `网关返回 ${r.status}（该网关可能不支持 /models 列举，可直接手填模型名）`, endpoint };
+      const d = await r.json().catch(() => null);
+      const list = Array.isArray(d?.data) ? d.data : Array.isArray(d?.models) ? d.models : Array.isArray(d) ? d : [];
+      const ids = [...new Set(list.map(m => (typeof m === 'string' ? m : (m && (m.id || m.name || m.model)))).filter(Boolean))];
+      if (!ids.length) return { error: '网关没返回可识别的模型列表', endpoint };
+      return { ok: true, models: ids, count: ids.length, endpoint };
+    } catch (e) { return { error: '连不上网关：' + ((e && e.message) || 'network'), endpoint }; }
+  }
   async setConfig(b) {
     const c = (await this.storage.get('config')) || {};
+    // 换网关/换模型：清掉自动识别缓存，下次重新识别
+    if ((b.gateway_url !== undefined && b.gateway_url !== c.gateway_url) || b.gateway_model !== undefined) delete c._auto_model;
     if (b.gateway_url !== undefined) c.gateway_url = String(b.gateway_url || '').trim();
     if (b.gateway_model !== undefined) c.gateway_model = String(b.gateway_model || '').trim();
     // 密钥：空串=清空；掩码开头(•)=不动；其它=更新
