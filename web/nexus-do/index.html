@@ -554,6 +554,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .reg-adv-hint{font-size:11.5px;color:var(--text-3);line-height:1.5;margin-top:-2px}
 .reg-privacy-row{margin-top:10px;font-size:11px;color:var(--text-3);opacity:.55;letter-spacing:.02em}
 .reg-privacy-row a{color:inherit;text-decoration:underline}
+.reg-hint{font-size:11.5px;color:var(--text-3);line-height:1.5;margin-top:8px;text-align:center}
+.reg-model-row{position:relative}
+.reg-model-row #regApiModel{padding-right:92px}
+.reg-probe{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:600;color:var(--cy-3);cursor:pointer;user-select:none;white-space:nowrap}
+.reg-probe:active{opacity:.6}
 @keyframes advIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .lock-switch:active{opacity:.9}
 
@@ -657,19 +662,21 @@ body::before{
     <div class="lock-orb"></div>
     <div class="lock-title">Black God</div>
 
-    <!-- 公共注册：起名即进，大脑内置；自带大脑为可选高级项 -->
+    <!-- 公共注册：起名 + 接入你自己的大模型 API（密钥你自己的，费用各付各的） -->
     <div id="regMode">
-      <div class="lock-sub">起个名字，进来聊</div>
-      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的名字" autocomplete="off" onkeydown="if(event.key==='Enter')doRegister()"/>
+      <div class="lock-sub">起个名字，接入你的大模型，就能聊</div>
+      <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的名字" autocomplete="off"/>
+      <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
+      <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
+      <div class="reg-model-row">
+        <input id="regApiModel" class="lock-input" type="text" list="regModelList" placeholder="模型（留空 = 自动识别）" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')doRegister()"/>
+        <datalist id="regModelList"></datalist>
+        <span id="regProbeBtn" class="reg-probe" onclick="probeRegModels()">🔍 识别模型</span>
+      </div>
+      <div id="regModelHint" class="reg-hint"></div>
       <div id="regErr" class="lock-err"></div>
       <button id="regBtn" class="lock-btn" onclick="doRegister()">进 入</button>
-      <div class="reg-adv-toggle" id="regAdvToggle" onclick="toggleRegAdv()">自带大脑 · 可选 ▾</div>
-      <div id="regAdv" class="reg-adv" style="display:none">
-        <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
-        <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
-        <input id="regApiModel" class="lock-input" type="text" placeholder="模型（留空 = 自动）" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')doRegister()"/>
-        <div class="reg-adv-hint">不填即用内置大脑，随时可在设置里换</div>
-      </div>
+      <div class="reg-hint">用你自己的 API / 密钥驱动大模型，费用走你自己的账号，隐私互不打扰</div>
       <div class="lock-switch" onclick="setGateMode('owner')">我是主人 · 私密登录</div>
       <div class="reg-privacy-row"><a href="/privacy" target="_blank" rel="noopener">隐私政策</a> · <a href="javascript:void(0)" onclick="doUnregister()">删除我的数据</a></div>
     </div>
@@ -1002,6 +1009,8 @@ const Nexus = {
   async getConfig() { try { const r=await this._fetch('/config',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async probeModels(body) { try { const r=await this._fetch('/config/models',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  // 公开识别（注册用户进门前用，不带 owner 令牌、不走 401 拦截）
+  async probeModelsPublic(body) { try { const r=await fetch(this.base+'/probe-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async testExec() { try { const r=await this._fetch('/exec-test',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:'{}'}); return r&&r.ok?await r.json():{ok:false,detail:'服务器无响应'}; } catch(e){ return {ok:false,detail:String(e).slice(0,80)}; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
@@ -1592,12 +1601,30 @@ async function doUnregister(){
 }
 function prefillReg(){ const g=(id,k)=>{ const el=$('#'+id); if(el&&store.get(k)!=null) el.value=store.get(k); };
   g('regNick','reg_nick'); g('regApiUrl','reg_api_url'); g('regApiKey','reg_api_key'); g('regApiModel','reg_api_model'); }
+async function probeRegModels(){
+  const base=($('#regApiUrl').value||'').trim();
+  const hint=$('#regModelHint'), btn=$('#regProbeBtn');
+  if(!base){ if(hint){ hint.style.color='var(--err)'; hint.textContent='先填 API 地址再识别'; } return; }
+  const key=($('#regApiKey').value||'').trim();
+  if(btn) btn.textContent='识别中…'; if(hint){ hint.style.color='var(--text-3)'; hint.textContent='正在联网识别…'; }
+  const d=await Nexus.probeModelsPublic({ gateway_url:base, gateway_key:key });
+  if(btn) btn.textContent='🔍 识别模型';
+  if(d&&d.ok&&d.models&&d.models.length){
+    const dl=$('#regModelList'); if(dl) dl.innerHTML=d.models.map(m=>'<option value="'+String(m).replace(/"/g,'&quot;')+'">').join('');
+    if(!($('#regApiModel').value||'').trim()) $('#regApiModel').value=d.models[0];
+    if(hint){ hint.style.color='var(--ok)'; hint.textContent='✓ 网关已连通，识别到 '+d.count+' 个模型（默认：'+d.models[0]+'）'; }
+  } else {
+    if(hint){ hint.style.color='var(--err)'; hint.textContent=(d&&d.error)||'识别失败，可直接手填模型名'; }
+  }
+}
 async function doRegister(){
   const nick=($('#regNick').value||'').trim();
   const url=($('#regApiUrl').value||'').trim(), key=($('#regApiKey').value||'').trim(), model=($('#regApiModel').value||'').trim();
   const err=$('#regErr'), btn=$('#regBtn');
   if(!nick){ err.textContent='起个名字吧'; return; }
-  if(!url||!key){ err.textContent='要填你自己的 API（地址 + 密钥）才能用'; return; }
+  if(!url && !key){ err.textContent='接入你的大模型：填 API 地址 + 密钥'; return; }
+  if(!url){ err.textContent='还差 API 地址（如 https://host/v1）'; return; }
+  if(!key){ err.textContent='还差 API 密钥'; return; }
   ensureUid(); btn.disabled=true; btn.textContent='进入中…'; err.textContent='';
   const r=await Nexus.register(nick,{url,key,model}); btn.disabled=false; btn.textContent='进入';
   if(r&&r.ok){ store.set('reg_nick',nick); store.set('reg_api_url',url); store.set('reg_api_key',key); store.set('reg_api_model',model);

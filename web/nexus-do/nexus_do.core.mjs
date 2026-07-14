@@ -102,6 +102,7 @@ export class ShenshuCore {
     if (path === '/register' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.registerUser(b, request)); }
     if (path === '/privacy') return new Response(PRIVACY_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path === '/unregister' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.unregisterUser(b)); }
+    if (path === '/probe-models' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.probeModelsPublic(b)); }
     if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
 
     // —— 能力契约层（借鉴 Minis）——
@@ -1686,6 +1687,23 @@ ${capabilitySelfDescription(true)}
     try {
       const r = await fetch(endpoint, { headers: { ...(key ? { Authorization: 'Bearer ' + key } : {}) } });
       if (!r.ok) return { error: `网关返回 ${r.status}（该网关可能不支持 /models 列举，可直接手填模型名）`, endpoint };
+      const d = await r.json().catch(() => null);
+      const list = Array.isArray(d?.data) ? d.data : Array.isArray(d?.models) ? d.models : Array.isArray(d) ? d : [];
+      const ids = [...new Set(list.map(m => (typeof m === 'string' ? m : (m && (m.id || m.name || m.model)))).filter(Boolean))];
+      if (!ids.length) return { error: '网关没返回可识别的模型列表', endpoint };
+      return { ok: true, models: ids, count: ids.length, endpoint };
+    } catch (e) { return { error: '连不上网关：' + ((e && e.message) || 'network'), endpoint }; }
+  }
+  // 公开版：供注册用户在进门前识别自己网关的模型。只用调用方自己传的 url/key,
+  // 绝不回退主人的 config/env（否则会把主人网关暴露、甚至把主人 key 发到别人填的 URL）。
+  async probeModelsPublic(b) {
+    const base = String((b && b.gateway_url) || '').trim();
+    const key = String((b && b.gateway_key) || '').trim();
+    if (!base) return { error: '先填 API 地址' };
+    const endpoint = this.modelsEndpoint(base);
+    try {
+      const r = await fetch(endpoint, { headers: { ...(key ? { Authorization: 'Bearer ' + key } : {}) } });
+      if (!r.ok) return { error: `网关返回 ${r.status}（可能不支持 /models 列举，可直接手填模型名）`, endpoint };
       const d = await r.json().catch(() => null);
       const list = Array.isArray(d?.data) ? d.data : Array.isArray(d?.models) ? d.models : Array.isArray(d) ? d : [];
       const ids = [...new Set(list.map(m => (typeof m === 'string' ? m : (m && (m.id || m.name || m.model)))).filter(Boolean))];
