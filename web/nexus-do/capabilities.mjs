@@ -14,84 +14,98 @@ export const CAPABILITIES = [
     id: 'talk', name: '对话', layer: '意识',
     desc: '带状态/记忆/枢语坐标回话',
     handler: 'handleTalk', argShape: '(text, request, caps)',
+    tier: 'instance',
     owner_only: true,
   },
   {
     id: 'agent', name: 'iOS 快捷指令联动', layer: '行动',
     desc: '从回复里抽取可执行动作（地图/电话/日历/网页 scheme）',
     handler: 'handleAgent', argShape: '(text, context)',
+    tier: 'instance',
     owner_only: true,
   },
   {
     id: 'inner', name: '元认知内心独白', layer: '意识',
     desc: '回头看自己，输出内心状态与独白',
     handler: 'getInner', argShape: '()',
+    tier: 'instance',
     owner_only: true,
   },
   {
     id: 'heartbeat', name: '自主心跳', layer: '意识',
     desc: '自己醒来，想主人到憋不住会主动发 TG',
     handler: 'autonomousTick', argShape: '()',
+    tier: 'system',
     owner_only: true,
   },
   {
     id: 'device', name: '设备感知', layer: '感知',
     desc: '认得主人的设备，记录设备信息',
     handler: 'recordDevice', argShape: '(info, request)',
+    tier: 'instance',
     owner_only: true,
   },
   {
     id: 'gen_image', name: '造像', layer: '创造',
     desc: '文生图',
     handler: 'genImage', argShape: '(prompt, opts)',
+    tier: 'system',
     owner_only: true,
   },
   {
     id: 'gen_voice', name: '发声', layer: '创造',
     desc: '文本转语音',
     handler: 'genVoice', argShape: '(text, opts)',
+    tier: 'system',
     owner_only: true,
   },
   {
     id: 'gen_video', name: '造影', layer: '创造',
     desc: '文生视频',
     handler: 'genVideo', argShape: '(prompt, opts)',
+    tier: 'system',
     owner_only: true,
   },
   {
     id: 'push', name: '主动推送', layer: '行动',
     desc: '向所有订阅端推送消息（web push）',
     handler: 'pushToAll', argShape: '(title, body, url)',
+    tier: 'system',
     owner_only: true,
   },
   {
     id: 'tg', name: 'TG 私聊', layer: '行动',
     desc: '通过 Telegram Bot 给主人发消息',
     handler: 'sendToQuan', argShape: '(text)',
+    tier: 'system',
     owner_only: true,
   },
   {
     id: 'stats', name: '自我统计', layer: '元认知',
     desc: '返回注册用户名单/用量统计（含昵称/地区，仅主人可看）',
     handler: 'getStats', argShape: '()',
+    tier: 'system',
     owner_only: true,   // 与 /stats 私密路由语义一致：含用户 PII，绝不公开
   },
   {
     id: 'soul', name: '灵魂快照', layer: '意识',
     desc: '返回灵魂状态（心绪/亲密度/设备与地理信息，仅主人可看）',
     handler: 'getSoulPublic', argShape: '()',
+    tier: 'instance',
     owner_only: true,   // 与 /soul 私密路由语义一致：含设备/地理等隐私字段，绝不公开
   },
   {
     id: 'exec', name: '执行脑（真沙箱）', layer: '行动',
     desc: '在主人自有服务器上真跑 shell 命令/代码（需配 NEXUS_EXEC_URL + token；未配则如实告知，绝不假装）',
     handler: 'execRemote', argShape: '(command)',
+    tier: 'system',
     owner_only: true,   // 能在真机跑命令，最高危：仅主人、且靠服务器端 token 双重门
   },
   {
     id: 'watch', name: '自主守望（闭环神·环）', layer: '行动',
     desc: '架一条不用人守的常驻管道：她定时自己去取、真调工具推演，有变化就主动推给主人。说「帮我每小时盯一下X」即可织一条。',
     handler: 'createWatch', argShape: '(text: 盯什么·多久一次)',
+    tier: 'system',
     owner_only: true,
   },
 ];
@@ -119,9 +133,21 @@ export function capabilitySelfDescription(ownerCtx = true) {
 }
 
 // —— 统一调度：找到能力 → 权限校验 → 返回声明（真正执行在 core.invokeCapability 里）——
-export function resolveCapability(id, ownerCtx = false) {
+// ctx 兼容两种写法：
+//   · 布尔（旧·单租户）：true=主人上下文，false=公开。语义不变。
+//   · 对象（新·多租户）：{ role: 'system' | 'instance' | 'anon' }。
+//     system=系统主人(权哥,全权)；instance=实例主人(只放行 tier==='instance' 的能力)；
+//     anon=匿名(只放行非 owner_only,现阶段=无)。
+export function resolveCapability(id, ctx = false) {
   const cap = CAPABILITIES.find((c) => c.id === id);
   if (!cap) return { ok: false, reason: 'unknown_capability', id };
-  if (cap.owner_only && !ownerCtx) return { ok: false, reason: 'owner_only', id };
+  const role = (ctx && typeof ctx === 'object') ? ctx.role : (ctx ? 'system' : 'anon');
+  if (role === 'system') return { ok: true, cap };
+  if (role === 'instance') {
+    if (cap.tier === 'instance') return { ok: true, cap };
+    return { ok: false, reason: 'system_only', id };  // 实例主人碰不到系统级(exec/烧钱/跨用户)
+  }
+  // anon
+  if (cap.owner_only) return { ok: false, reason: 'owner_only', id };
   return { ok: true, cap };
 }
