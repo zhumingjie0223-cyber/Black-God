@@ -1926,7 +1926,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 <p>本政策如有实质性变更，会更新本页顶部的生效日期；建议定期查看。</p>
 
 <h2>7. 联系我们</h2>
-<p>关于本政策或你的数据，请联系：<code>&lt;在此处填写你的联系邮箱&gt;</code>（部署前请替换为真实可用邮箱）。</p>
+<p>关于本政策或你的数据，请联系：<a href="mailto:aquan@lufei.uk"><code>aquan@lufei.uk</code></a>。</p>
 
 </body>
 </html>`;
