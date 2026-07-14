@@ -16,6 +16,7 @@
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
+import { resolveIdentity, SYSTEM_DO, isSystemOnlyPath } from './tenancy.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
@@ -56,7 +57,10 @@ export class ShenshuCore {
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
       status, headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8' },
     });
-    const authed = this.authOK(request);
+    // 角色:单租户下 = authOK ? system : anon(行为不变);多租户下读 worker 设的可信角色头。
+    const _mt = !!this.env.MULTITENANT;
+    const _role = _mt ? (request.headers.get('X-Nexus-Role') || 'anon') : (this.authOK(request) ? 'system' : 'anon');
+    const authed = (_role === 'system' || _role === 'instance');
 
     // WebSocket 升级（Hibernation）—— 需鉴权，杜绝匿名实时旁听。
     // 浏览器 WebSocket 无法带 Authorization 头，故走一次性短期票据（?t=），
@@ -120,6 +124,10 @@ export class ShenshuCore {
     const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
+      // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
+      if (_mt && _role === 'instance' && isSystemOnlyPath(path)) {
+        return json({ error: 'system_only', 提示: '这是系统主人的能力,你的神枢用不了。' }, 403);
+      }
       try {
         if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [])); }
         if (path === '/soul') return json(await this.getSoulPublic());
@@ -495,18 +503,21 @@ export class ShenshuCore {
     // —— 2) 网络：真 agent 执行环 vs 单发 ——
     //   复杂/技术/联网/深度/代码 → runAgentLoop（自主 plan·调工具·多轮·作答，真执行）
     //   闲聊轻量 → 单发；若是简单事实问句则预取一次检索（CF 模型对工具协议不稳，预取更可靠）
+    // 多租户:实例主人(普通用户)只走「用自己 key 的单发对话」—— 不开 agent/联网/CF,
+    // 那些会烧系统(权哥)的算力。他的神枢用他自己的网关回话。
+    const instanceMode = !!this.env.MULTITENANT && (request && request.headers && request.headers.get('X-Nexus-Role')) === 'instance';
     const tier = this.pickTier(text, caps);
-    const agentic = tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code');
+    const agentic = !instanceMode && (tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code'));
     let brainResult;
     if (agentic) {
       brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier });
     } else {
       let webBlock = '';
-      if (this.needsWeb(text)) {
+      if (!instanceMode && this.needsWeb(text)) {
         const found = await this.webSearch(text).catch(() => '');
         if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
       }
-      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier });
+      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, instanceMode });
     }
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
@@ -822,13 +833,21 @@ ${capabilitySelfDescription(true)}
   async callBrain(system, userMsg, soul, opts = {}) {
     const temperature = (typeof opts.temperature === 'number') ? opts.temperature : 0.85;
     const tier = opts.tier === 'light' ? 'light' : 'heavy';   // 默认 heavy，保守不牺牲质量
+    // 多租户实例主人:只准用他自己实例里配的网关,绝不回退到系统(权哥)的 env 网关/CF AI。
+    const instanceMode = !!opts.instanceMode;
+    if (instanceMode) {
+      const cfg = (await this.storage.get('config')) || {};
+      if (!cfg.gateway_url) {
+        return { reply: '先在设置里填你自己的 API(地址 + 密钥),我才能用你的大脑陪你聊。', model: 'no_api', tier };
+      }
+    }
 
     // 强算力网关（Claude 等，标准 Chat Completions；URL 可填 base，自动补端点）
     const tryGateway = async () => {
       const cfg = (await this.storage.get('config')) || {};
-      const gwBase = cfg.gateway_url || this.env.NEXUS_GATEWAY_URL;
-      const gwKey = cfg.gateway_key || this.env.NEXUS_GATEWAY_KEY;
-      let gwModel = cfg.gateway_model || this.env.NEXUS_GATEWAY_MODEL || '';
+      const gwBase = cfg.gateway_url || (instanceMode ? null : this.env.NEXUS_GATEWAY_URL);
+      const gwKey = cfg.gateway_key || (instanceMode ? '' : this.env.NEXUS_GATEWAY_KEY);
+      let gwModel = cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || '';
       if (!gwBase) return null;
       // 未指定模型（留空或 auto）：联网识别一次，取第一个真实模型并缓存，避免硬传 "auto" 被网关拒
       if (!gwModel || gwModel === 'auto') {
@@ -856,6 +875,7 @@ ${capabilitySelfDescription(true)}
     };
     // CF Workers AI Llama-3.3-70b（免费、CF 内部、稳定）
     const tryCF = async () => {
+      if (instanceMode) return null;   // 实例主人不烧系统(权哥)的 CF AI 额度
       if (!this.env.AI) return null;
       try {
         const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
@@ -2092,8 +2112,29 @@ self.addEventListener('fetch', e => {
 // ═══════════════════════ Worker 入口 ═══════════════════════
 export default {
   async fetch(request, env) {
-    const id = env.SHENSHU.idFromName('quan-shenshu-nexus');
-    return env.SHENSHU.get(id).fetch(request);
+    // 单租户(默认):所有请求 → 唯一实例。行为与历史完全一致。
+    if (!env.MULTITENANT) {
+      const id = env.SHENSHU.idFromName(SYSTEM_DO);
+      return env.SHENSHU.get(id).fetch(request);
+    }
+    // 多租户(开关开):按身份路由到各自的 DO。
+    const ident = resolveIdentity({
+      authHeader: request.headers.get('Authorization') || '',
+      uidHeader: request.headers.get('X-Nexus-Uid') || '',
+      ownerToken: env.OWNER_TOKEN || '',
+    });
+    if (ident.role === 'anon') {
+      return new Response(JSON.stringify({ error: 'need_register', 提示: '先注册(填个昵称 + 你自己的 API),就有一个只属于你的神枢。' }),
+        { status: 401, headers: { 'content-type': 'application/json; charset=utf-8' } });
+    }
+    // 安全:剥掉客户端可能伪造的可信头,只用 worker 服务器端判定的角色/uid 转发给 DO。
+    // DO 只经 worker 可达,故信这两个头;绝不信客户端原样传入的版本。
+    const h = new Headers(request.headers);
+    h.delete('X-Nexus-Role'); h.delete('X-Nexus-Trust-Uid');
+    h.set('X-Nexus-Role', ident.role);
+    if (ident.uid) h.set('X-Nexus-Trust-Uid', ident.uid);
+    const id = env.SHENSHU.idFromName(ident.doName);
+    return env.SHENSHU.get(id).fetch(new Request(request, { headers: h }));
   },
   async scheduled(event, env, ctx) {
     const id = env.SHENSHU.idFromName('quan-shenshu-nexus');
