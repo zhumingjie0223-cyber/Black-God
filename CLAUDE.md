@@ -15,6 +15,10 @@
 Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 Cloudflare Workers Durable Object，
 仓库内 `web/nexus-do/`）= 赵思涵（人格外化）。三层命名分清楚，不要混用。
 
+**两仓已合一**：枢语源头引擎并入本仓 `shuyu/` 目录（权威源，Python + JS 双实现 + 词根表 + 测试），
+`web/nexus-do/` 里是它的消费副本。改引擎在 `shuyu/` 改，再同步到消费副本，见下方同步校验命令。
+（原独立的 shuyu-lang 仓库已封存归档，不再更新。）
+
 ## 语言规则（强制，不可违反）
 
 **所有面向权哥的输出一律用中文**——包括对话回复、commit message、PR 标题与描述、
@@ -43,7 +47,8 @@ Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 C
 
 ```bash
 cd web/nexus-do && node build.mjs && node selftest.mjs   # 构建 + 自测
-node tools/check-sync.mjs                                  # 与 shuyu-lang 源头引擎同步校验
+node tools/check-sync.mjs                                  # 校验 shuyu/ 源头 ↔ web/nexus-do 消费副本
+node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释器测试(合仓后在本仓跑)
 ```
 
 ## Sub-agent 模型路由（成本分级，自动遵守）

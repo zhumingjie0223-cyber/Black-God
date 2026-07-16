@@ -1,0 +1,12 @@
+[project]
+name = "shuyu-engine"
+version = "4.0.0"
+description = "枢语 (Shuyu) — 5维乘法语义空间语言引擎（Python 版，与 lexicon.js 同构）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "阿权/路飞" }]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"

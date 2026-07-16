@@ -1,5 +1,5 @@
-// 同步校验 — 枢语源头引擎(shuyu/) ↔ Black God 消费副本(web/nexus-do)
-// 两仓已合一:源头就在本仓 shuyu/ 目录,不带参数即自动找到;仍兼容显式传路径。
+// 同步校验 — 枢语源头引擎(本目录 shuyu/) ↔ Black God 消费副本(web/nexus-do)
+// 两仓已合一:本目录即 Black-God/shuyu/,消费副本在上一级 web/nexus-do/,不带参数自动找到。
 // 用法: node tools/check-sync.mjs [对方路径] [--strict]
 //   引擎层(词根表/容量/编解码行为)不一致 → 硬失败(退出码 1)
 //   数据层(词库/情绪表/编号表)分叉      → 警告报告(--strict 时也算失败)
@@ -20,13 +20,12 @@ function locate(repoRoot) {
   return null;
 }
 
-// 对方路径:显式参数优先;否则先找合仓后的内部位置(本仓 shuyu/ 或宿主仓根),再猜同级目录(兼容旧布局)
+// 对方路径:显式参数优先;否则先找合仓后的宿主根(本目录 shuyu/ 的上一级),再猜同级目录(兼容旧布局)
 let peerRoot = args[0];
 if (!peerRoot) {
-  const parent = path.dirname(HERE);
+  const parent = path.dirname(HERE);   // 合仓后:HERE=Black-God/shuyu,parent=Black-God 根(内含 web/nexus-do)
   const cands = [
-    path.join(HERE, 'shuyu'),   // 从 Black-God 根跑:枢语源头在本仓 shuyu/
-    parent,                     // 从 shuyu/ 子目录跑:宿主仓根(web/nexus-do 是消费副本)
+    parent,
     ...['shuyu-lang', 'black-god', 'Black-God', 'BLACK-GOD'].map(s => path.join(parent, s)),
   ];
   peerRoot = cands.find(p => p !== HERE && existsSync(p) && locate(p));

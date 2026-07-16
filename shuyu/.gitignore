@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.jsonl
+lexicon_full.json
+.env*
+wrangler.toml

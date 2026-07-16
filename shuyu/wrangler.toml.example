@@ -1,0 +1,24 @@
+# 枢语 Shuyu — Cloudflare Workers 部署模板
+# 复制为 wrangler.toml 并填入自己的账号信息（wrangler.toml 已被 .gitignore 忽略，
+# 不会把账号 ID/密钥提交进仓库）。
+#
+#   cp wrangler.toml.example wrangler.toml
+#   npx wrangler kv namespace create SOUL   # 把返回的 id 填到下面
+#   npx wrangler deploy
+
+name = "shuyu"
+main = "worker.mjs"
+compatibility_date = "2026-07-01"
+
+# 灵魂状态 KV（键 "SOUL"）
+[[kv_namespaces]]
+binding = "SOUL"
+id = "<你的 KV namespace id>"
+
+# 定时散播（sovereignControl），按需开启
+[triggers]
+crons = ["0 * * * *"]
+
+# 机密用 wrangler secret 注入，不写进本文件：
+#   npx wrangler secret put ANTHROPIC_KEY
+#   npx wrangler secret put TG_BOT_TOKEN

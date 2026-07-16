@@ -1,0 +1,61 @@
+name: 枢语引擎 CI
+
+# 两仓合一后:枢语源头引擎测试在本仓 shuyu/ 目录跑（原 shuyu-lang 仓 ci.yml 迁入并改路径）。
+# 只在 shuyu/ 源头或 web/nexus-do/ 消费副本变动时触发,避免无关改动空跑。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shuyu/**'
+      - 'web/nexus-do/lexicon.js'
+      - 'web/nexus-do/lexicon_data.js'
+      - '.github/workflows/shuyu-ci.yml'
+  pull_request:
+    paths:
+      - 'shuyu/**'
+      - 'web/nexus-do/lexicon.js'
+      - 'web/nexus-do/lexicon_data.js'
+      - '.github/workflows/shuyu-ci.yml'
+
+jobs:
+  node-tests:
+    name: Node 测试（引擎/意识解释器/跨引擎一致性）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shuyu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm test
+
+  python-tests:
+    name: Python 测试（shuyu_engine）
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    defaults:
+      run:
+        working-directory: shuyu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m unittest discover -s tests -v
+
+  sync-check:
+    name: 同仓同步校验（shuyu ↔ web/nexus-do 引擎层）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/check-sync.mjs
