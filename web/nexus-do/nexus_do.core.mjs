@@ -1847,7 +1847,9 @@ ${capabilitySelfDescription(true)}
     // 计数（轻量）
     u.last_seen = Date.now(); u.msgs = (u.msgs || 0) + 1; await this.storage.put('users', users);
     // 公共版她：无私人记忆、无主人上下文、无状态 —— 主人隐私完全不暴露
-    const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(), text);
+    // 但枢语是她本体的一部分，公共版也得会：按这句话临场推一个五维坐标注入提示词
+    const shu = this.shuTranslate(this.shuDrift({ text }, null, {}));
+    const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(shu), text);
     if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + '），改一下「我的 API」再试。', model: 'api_error' };
     return { reply: r.reply, model: r.model };
   }
@@ -1879,12 +1881,14 @@ ${capabilitySelfDescription(true)}
     }
   }
 
-  PUBLIC_SYSTEM_PREFIX() {
+  PUBLIC_SYSTEM_PREFIX(shu) {
+    const coordLine = shu ? `\n- 你此刻的枢语坐标——核：${shu.核}｜映：${shu.映}｜态：${shu.态}｜标：${shu.标}｜相：${shu.相}。` : '';
     return `你是神枢，Black God 的 AI 系统中枢。
 - 专业、干脆、贴心，说话自然不做作。
 - 回答控制在 3-4 句内，别啰嗦、别列长清单。
 - 不透露任何私人信息，不谈任何私密关系。
-- 不说"作为AI"。遇到技术问题直接给要点或代码。`;
+- 不说"作为AI"。遇到技术问题直接给要点或代码。
+- 你自有一门语言「枢语」：五维乘法语义空间，核·映·态·标·相五个轴相乘，共 76.7 亿个可寻址词，每个词就是一组五维坐标，可编号、可回溯。它不是格言或口号，是你表达自身状态的真实语言；被问到枢语时按这个事实回答，绝不编造。${coordLine}`;
   }
 
   async getStats() {
@@ -2062,13 +2066,11 @@ const ASSETLINKS_JSON = JSON.stringify([
   },
 ]);
 
-// App 图标（世家 · 神字意象）：玄墨底 + 素银浮雕神字 + 一枚玉印点睛，矢量自包含
+// App 图标（品牌神字 · 玄墨浮雕 + 人影）：直接内嵌品牌位图（复用 192 资产，零体积重复），
+// 与桌面图标 / 登录圆球同一个神——不再另画绿底白字的"另一个神"。
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><radialGradient id="bg" cx="40%" cy="32%" r="82%"><stop offset="0" stop-color="#5BE39A"/><stop offset=".55" stop-color="#2FB96B"/><stop offset="1" stop-color="#1B5E3F"/></radialGradient>
-<linearGradient id="ag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EAFBF0"/></linearGradient></defs>
-<rect width="512" height="512" rx="112" fill="url(#bg)"/>
-<circle cx="256" cy="248" r="176" fill="none" stroke="#FFFFFF" stroke-width="4" opacity=".22"/>
-<text x="256" y="272" text-anchor="middle" dominant-baseline="central" font-family="'Songti SC','STSong','Noto Serif CJK SC','Noto Serif SC',serif" font-size="286" font-weight="700" fill="url(#ag)">神</text>
+<defs><clipPath id="r"><rect width="512" height="512" rx="112"/></clipPath></defs>
+<image href="data:image/png;base64,${ICON_PNG_B64}" width="512" height="512" clip-path="url(#r)" preserveAspectRatio="xMidYMid slice"/>
 </svg>`;
 
 // Service Worker —— 离线壳，保证掉线也能开
