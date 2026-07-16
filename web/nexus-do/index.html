@@ -1037,7 +1037,7 @@ const Nexus = {
   async voice(text) { try { const r=await this._fetch('/voice',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({text})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async video(prompt) { try { const r=await this._fetch('/video',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({prompt})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async getConfig() { try { const r=await this._fetch('/config',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
-  async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); if(r&&(r.status===401||r.status===403)) return {__401:true}; return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async probeModels(body) { try { const r=await this._fetch('/config/models',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   // 公开识别（注册用户进门前用，不带 owner 令牌、不走 401 拦截）
   async probeModelsPublic(body) { try { const r=await fetch(this.base+'/probe-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
@@ -1575,6 +1575,7 @@ async function saveApi(){
   if(!/^[•*]/.test(key)) body.gateway_key=key.trim();   // 掩码不回传
   const r=await Nexus.setConfig(body);
   if(r&&r.ok){ $('#apiLabel').textContent = r.gateway_url?('外接 · '+(r.gateway_model||'网关')):'内置 Llama'; toast('已保存 · 大脑已切换'); closeSheet(); }
+  else if(r&&r.__401) toast('这是主人的私密配置——先点「我是主人 · 私密登录」解锁');
   else toast('保存失败（检查是否在线/已解锁）');
 }
 /* 执行脑连接器：App 内一键连，不碰命令行 */
@@ -1595,6 +1596,7 @@ async function saveExec(){
   const r=await Nexus.setConfig(body);
   if(r&&r.ok){ _execLabel(r.exec_on); _execStat(r.exec_on?'已保存 · 正在测试连通…':'已断开（地址留空）'); toast(r.exec_on?'连接器已保存':'已断开执行脑');
     if(r.exec_on){ await testExec(); } }
+  else if(r&&r.__401) _execStat('执行脑是主人的私密能力——先点「我是主人 · 私密登录」解锁再配置','var(--err)');
   else _execStat('保存失败（检查是否在线/已解锁）','var(--err)');
 }
 async function testExec(){
