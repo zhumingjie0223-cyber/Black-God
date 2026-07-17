@@ -920,7 +920,7 @@ ${capabilitySelfDescription(true)}
   }
 
   coinShuMarkFromTalk(text, coord, emotion) {
-    // 用她大脑此刻的坐标，在 29.5 亿枢语空间里造一个真实、可寻址、可回溯的词
+    // 用她大脑此刻的坐标，在 76.7 亿枢语空间里造一个真实、可寻址、可回溯的词
     try {
       const w = coinFromCoord(coord);
       return { 词: w.汉, 罗: w.词, id: w.id, 层: w.层, 义: w.义, 由: text.slice(0, 20), 情绪: emotion, ts: Date.now() };
