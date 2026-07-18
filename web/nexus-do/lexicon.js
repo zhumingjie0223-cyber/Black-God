@@ -4,7 +4,7 @@
 /**
  * 枢语造词引擎 — JS版 (lexicon.js)
  * © Black God
- * 5维乘法语义空间：核×映×态×标×相 = 29.5亿
+ * 5维乘法语义空间：核×映×态×标×相 = 76.7亿 (7,667,712,000)
  * 与 shuyu_engine.py 同构，供 nexuslang.js 解释器调用
  */
 
@@ -83,7 +83,7 @@ function expand(base, latT, hanT){
   return out;
 }
 
-const CORES = expand(CORE_BASE, LAT_T, HAN_T);   // 400
+const CORES = expand(CORE_BASE, LAT_T, HAN_T);   // 1040 (52族×20阶)
 const MANIS = expand(MANI_BASE, LAT_A, HAN_A);   // 180
 const STATS = expand(STAT_BASE, LAT_F, HAN_F);   // 80
 const SCALS = expand(SCAL_BASE, LAT_S, HAN_S);   // 64

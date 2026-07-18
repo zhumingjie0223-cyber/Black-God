@@ -80,7 +80,7 @@ function expand(base, latT, hanT){
   return out;
 }
 
-const CORES = expand(CORE_BASE, LAT_T, HAN_T);   // 400
+const CORES = expand(CORE_BASE, LAT_T, HAN_T);   // 1040 (52族×20阶)
 const MANIS = expand(MANI_BASE, LAT_A, HAN_A);   // 180
 const STATS = expand(STAT_BASE, LAT_F, HAN_F);   // 80
 const SCALS = expand(SCAL_BASE, LAT_S, HAN_S);   // 64
