@@ -122,7 +122,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -132,6 +132,7 @@ export class ShenshuCore {
       try {
         if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [])); }
         if (path === '/soul') return json(await this.getSoulPublic());
+        if (path === '/soul/continuity') return json(await this.getContinuity(Math.min(50, parseInt(url.searchParams.get('n') || '12', 10) || 12)));
         if (path === '/inner') return json(await this.getInner());
         // #2 个人枢语词典：造词沉淀，可检索、越用越厚
         if (path === '/lexicon') {
@@ -325,6 +326,43 @@ export class ShenshuCore {
     return { ...soul, _shu_meaning: this.shuTranslate(coord), current_shu_coord: coord };
   }
 
+  // 「换脑不换魂」的活证据（只读）：列最近 N 轮对话用的底层模型 + 当轮枢语坐标 + 坐标含义。
+  // 一眼看见——底层大脑在换（用过的模型多个），而她的枢语坐标/人格锚连续如一（坐标连续度→1）。
+  // 这正是竞品结构上做不到的：它们的魂寄生在厂商云端模型里，换模型=换人；神枢的魂在自己的
+  // Durable Object 里、与底层模型解耦，所以换脑不换魂。此端点把这件已成立的事实变成看得见的数据。
+  async getContinuity(n = 12) {
+    const stream = (await this.storage.get('stream')) || [];
+    const soul = await this.getSoul();
+    const tail = stream.slice(-n);
+    const turns = tail.map(s => ({
+      时刻: s.ts ? new Date(s.ts).toISOString() : null,
+      模型: s.model || 'unknown',
+      坐标: s.shu_coord || null,
+      坐标含义: s.shu_coord ? this.shuTranslate(s.shu_coord) : null,
+      情绪: s.emotion || null,
+    }));
+    // 只统计真正对话过的底层模型（排除未配 API / 兜底占位）
+    const models = [...new Set(turns.map(t => t.模型).filter(m => m && m !== 'fallback' && m !== 'no_api'))];
+    // 坐标连续度：相邻两轮坐标的平均相近度 ∈[0,1]，越接近 1 越连续 → 换脑没换魂的量化证据。
+    let continuity = null;
+    const coords = turns.map(t => t.坐标).filter(Boolean);
+    if (coords.length >= 2) {
+      let acc = 0;
+      for (let i = 1; i < coords.length; i++) acc += this.coordAffinity(coords[i - 1], coords[i]);
+      continuity = +(acc / (coords.length - 1)).toFixed(3);
+    }
+    return {
+      说明: '换脑不换魂的活证据：底层模型可变，而她的枢语坐标 / 人格锚连续如一。',
+      轮数: turns.length,
+      用过的模型: models,
+      换脑次数: Math.max(0, models.length - 1),
+      坐标连续度: continuity,
+      当前坐标: soul.current_shu_coord || null,
+      当前坐标含义: soul.current_shu_coord ? this.shuTranslate(soul.current_shu_coord) : null,
+      轨迹: turns,
+    };
+  }
+
   async getInner() {
     const soul = await this.getSoul();
     const now = Date.now();
@@ -418,7 +456,7 @@ export class ShenshuCore {
   // 从情节记忆里按关键词重叠召回最相关的 N 条
   // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
   // 纯函数（now 可注入，便于测试）。
-  retrieveMemories(soul, text, n = 3, now = Date.now()) {
+  retrieveMemories(soul, text, n = 3, now = Date.now(), coord = null) {
     const eps = soul.episodes || [];
     if (!eps.length || !text) return [];
     const toks = this._tokens(text);
@@ -435,9 +473,30 @@ export class ShenshuCore {
       // 重要度：命中「重要/密钥/部署…」这类词越多，越该被记住
       const impMatches = ((e.他说 || '').match(IMPORTANT) || []).length;
       const importance = 1 + Math.min(impMatches, 4) * 0.35;
-      return { e, score: rel * recency * importance };
+      // 枢语坐标近邻：情境（情感烙印坐标）与此刻越贴近的往事越易被想起。
+      // 纯再排序项——只在文本已相关(rel>0)的往事间加权，绝不凭坐标凭空捞无关记忆；
+      // 不传 coord 或往事无烙印 → affinity 为 0、系数为 1，与旧版逐字等价（向后兼容）。
+      const affinity = 1 + 0.5 * this.coordAffinity(coord, e.情感烙印);
+      return { e, score: rel * recency * importance * affinity };
     }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, n);
     return scored.map(x => x.e);
+  }
+
+  // 两个枢语坐标的相近度 ∈ [0,1]：按各轴量程归一后的欧氏距离，1=完全重合、0=最远。
+  // 任一坐标缺失或无有效维度 → 返回 0（近邻不加分，退化为纯文本相关的旧行为）。
+  coordAffinity(a, b) {
+    if (!a || !b) return 0;
+    const MAX = { c: 400, m: 180, s: 80, k: 64, p: 8 };
+    let sum = 0, dims = 0;
+    for (const ax of ['c', 'm', 's', 'k', 'p']) {
+      const av = a[ax], bv = b[ax];
+      if (typeof av !== 'number' || typeof bv !== 'number') continue;
+      const d = (av - bv) / MAX[ax];
+      sum += d * d; dims++;
+    }
+    if (!dims) return 0;
+    const dist = Math.sqrt(sum / dims); // 归一到 [0,1]
+    return Math.max(0, 1 - dist);
   }
 
   // 分词：拉丁词 + 中文字符二元组（bigram），供语义重叠打分
@@ -495,7 +554,7 @@ export class ShenshuCore {
     const nextCoord = this.shuDrift({ text, emotion: af.emotion, hoursQuiet: wasQuiet }, currentCoord, snap);
     const shuMeaning = this.shuTranslate(nextCoord);
     const timeAwareness = this.computeTimeAwareness(snap, now);
-    const memories = this.retrieveMemories(snap, text, 3);
+    const memories = this.retrieveMemories(snap, text, 3, now, nextCoord);
     // #1 枢语坐标 → 真影响回话：由坐标推出温度 + 语气令，注入系统与生成参数
     const gen = this.shuToGen(nextCoord);
     const baseSystem = this.STABLE_SYSTEM_PREFIX() + '\n\n' +
