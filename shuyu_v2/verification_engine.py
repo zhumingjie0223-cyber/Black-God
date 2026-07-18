@@ -273,7 +273,7 @@ class VerificationEngine:
 
 if __name__ == "__main__":
     # 复用 task_contract.py demo 里"抓取商品页价格"任务的构造逻辑
-    from shuyu.v2.task_contract import (
+    from task_contract import (
         Verification, HardCheckKind, JudgeModelConfig,
         TriggerMode, OnFailPolicy, CostBudget, InspectionMode,
     )
