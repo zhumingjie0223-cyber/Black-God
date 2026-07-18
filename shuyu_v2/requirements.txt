@@ -1,0 +1,5 @@
+# shuyu_v2 P0 运行/测试依赖(工业级:锁定依赖,任何人可一键复现)
+# tokenizer.py / parser.py 仅用标准库,无需下列依赖即可跑;
+# task_contract.py / verification_engine.py 用 pydantic 做数据校验,测试用 pytest。
+pydantic>=2,<3
+pytest>=8

@@ -1,0 +1,29 @@
+name: 枢语 v2 CI
+
+# shuyu_v2 P0(任务合同 + 验证引擎 + DSL 解析器)回归测试。
+# 只在 shuyu_v2/ 变动时触发,避免无关改动空跑。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shuyu_v2/**'
+      - '.github/workflows/shuyu-v2-ci.yml'
+  pull_request:
+    paths:
+      - 'shuyu_v2/**'
+      - '.github/workflows/shuyu-v2-ci.yml'
+
+jobs:
+  python-tests:
+    name: Python 测试（任务合同/验证引擎/DSL 解析器）
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -r shuyu_v2/requirements.txt
+      - run: python -m pytest shuyu_v2/tests_v2.py -q

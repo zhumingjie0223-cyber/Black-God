@@ -16,12 +16,20 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional
 
-from task_contract import (
-    TaskContract,
-    HardCheck,
-    SoftCheck,
-    FailureCause,
-)
+try:  # 作为包被导入(shuyu_v2.verification_engine)时走相对导入
+    from .task_contract import (
+        TaskContract,
+        HardCheck,
+        SoftCheck,
+        FailureCause,
+    )
+except ImportError:  # 在 shuyu_v2 目录内直接运行脚本时回退到同级导入
+    from task_contract import (
+        TaskContract,
+        HardCheck,
+        SoftCheck,
+        FailureCause,
+    )
 
 
 # ---------------------------------------------------------------------------
