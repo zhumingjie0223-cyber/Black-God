@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Set
 
-from tokenizer import Token, TokenType, Tokenizer
+try:  # 作为包被导入(shuyu_v2.parser)时走相对导入
+    from .tokenizer import Token, TokenType, Tokenizer
+except ImportError:  # 在 shuyu_v2 目录内直接运行脚本时回退到同级导入
+    from tokenizer import Token, TokenType, Tokenizer
 
 
 # ---------------------------------------------------------------------------
