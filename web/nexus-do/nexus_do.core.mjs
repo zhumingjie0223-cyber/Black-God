@@ -486,7 +486,7 @@ export class ShenshuCore {
   // 任一坐标缺失或无有效维度 → 返回 0（近邻不加分，退化为纯文本相关的旧行为）。
   coordAffinity(a, b) {
     if (!a || !b) return 0;
-    const MAX = { c: 400, m: 180, s: 80, k: 64, p: 8 };
+    const MAX = { c: 1040, m: 180, s: 80, k: 64, p: 8 }; // c=52族×20阶(v4),与引擎容量对齐
     let sum = 0, dims = 0;
     for (const ax of ['c', 'm', 's', 'k', 'p']) {
       const av = a[ax], bv = b[ax];
@@ -659,8 +659,8 @@ export class ShenshuCore {
 
   // ═══════════════════════ 枢语坐标演算 ═══════════════════════
   shuDrift(input, currentCoord, soul) {
-    const AXIS_MAX = { c: 400, m: 180, s: 80, k: 64, p: 8 };
-    const BASE = { c: 200, m: 90, s: 40, k: 32, p: 4 };
+    const AXIS_MAX = { c: 1040, m: 180, s: 80, k: 64, p: 8 }; // c 轴扩到 52 族全域(v4 引擎早已 1040,大脑跟上)
+    const BASE = { c: 200, m: 90, s: 40, k: 32, p: 4 };       // BASE.c 保持 200 不动:存量 soul 坐标兼容优先,只扩上界
     const next = { ...(currentCoord || BASE) };
     const text = (input.text || '').toLowerCase();
     const emotion = input.emotion || '平';
@@ -687,8 +687,13 @@ export class ShenshuCore {
 
   shuTranslate(coord) {
     const layers = {
+      // 核轴 52 族(v4):前 20 为原生族,后 32 为 v4 新族;族字与义均取自 shuyu/shuyu_engine.py 权威源
       c: ['奥·本源','喀·虚无','伦·观测','巽·信息','泽·秩序','维·情感','尼·毁灭','欧·孕育','璇·幻象','枢·锚点',
-          '元·起源','衍·扩散','借·杠杆','隐·渗透','熵·耗散','阈·接口','静·参照','映·锚点','织·编织','逻·计算'],
+          '元·起源','衍·扩散','借·杠杆','隐·渗透','熵·耗散','阈·接口','静·参照','映·锚点','织·编织','逻·计算',
+          '曜·显照','翳·遮蔽','梦·潜识','潮·涨落','晶·凝序','渊·未知','焰·燃驱','雾·弥漫','藤·缠生','骸·残构',
+          '脉·节律','噬·消解','绽·涌现','回·余韵','霜·凝寂','烬·残温','棘·防御','帷·掩隔','漂·无系','根·扎固',
+          '芒·点爆','空·虚位','命·因缘','镜·映照','灰·终寂','种·起势','暴·激变','丝·细连','符·封印','劫·纪元',
+          '烛·微明','冰·缓移'],
       m: ['形·具象','姿·流动','光·色彩','声·语言','场·气场','界·社交','时·阅历','暗·深渊','异·违常','网·结构',
           '向·指向','熵·耗散','象·投影','骨·框架','核·底层'],
       s: ['凝·收敛','扬·发散','叠·迷离','极·极致','沉·深邃','爆·失控','动·释放','守·维持'],
@@ -697,7 +702,7 @@ export class ShenshuCore {
     };
     const idx = { c: Math.floor(coord.c / 20), m: Math.floor(coord.m / 12), s: Math.floor(coord.s / 10), k: Math.floor(coord.k / 8), p: coord.p };
     return {
-      核: layers.c[Math.min(idx.c, 19)], 映: layers.m[Math.min(idx.m, 14)], 态: layers.s[Math.min(idx.s, 7)],
+      核: layers.c[Math.min(idx.c, 51)], 映: layers.m[Math.min(idx.m, 14)], 态: layers.s[Math.min(idx.s, 7)],
       标: layers.k[Math.min(idx.k, 7)], 相: layers.p[Math.min(idx.p, 7)],
     };
   }
