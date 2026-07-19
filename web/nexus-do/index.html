@@ -1604,7 +1604,10 @@ function renderBrains(){
   const el=$('#brainList'); if(!el) return;
   el.innerHTML=_brains.map((b,i)=>`<div class="brain-card" style="border:1px solid var(--line-2);border-radius:14px;padding:11px;margin-bottom:10px">
     <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+      <span style="font-size:11px;color:var(--text-3);white-space:nowrap">#${i+1}</span>
       <input class="lock-input" style="flex:1;text-align:left;padding:8px;letter-spacing:0" placeholder="标签(如 Kimi、GPT快版)" value="${_esc(b.label)}" oninput="_bset(${i},'label',this.value)"/>
+      <span onclick="brainMove(${i},-1)" style="cursor:pointer;font-size:15px;opacity:${i===0?'.25':'.7'};padding:0 2px" title="上移(优先级更高)">▲</span>
+      <span onclick="brainMove(${i},1)" style="cursor:pointer;font-size:15px;opacity:${i===_brains.length-1?'.25':'.7'};padding:0 2px" title="下移">▼</span>
       <label style="font-size:12px;white-space:nowrap"><input type="checkbox" ${b.on!==false?'checked':''} onchange="_bset(${i},'on',this.checked)"/> 启用</label>
     </div>
     <textarea rows="1" class="lock-input" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;font-size:12px;letter-spacing:0" placeholder="一键粘贴：地址+key 整段粘这里自动拆" oninput="_bpaste(${i},this.value)"></textarea>
@@ -1628,6 +1631,7 @@ function _bpaste(i,raw){
 }
 function _bstat(m,c){ const el=$('#brainStatus'); if(el){ el.textContent=m; el.style.color=c||'var(--text-3)'; } }
 function brainAdd(){ if(_brains.length>=9){ _bstat('最多 9 条','var(--danger,#e5484d)'); return; } _brains.push({url:'',key:'',model:'',label:'',on:true}); renderBrains(); }
+function brainMove(i,d){ const j=i+d; if(j<0||j>=_brains.length) return; const t=_brains[i]; _brains[i]=_brains[j]; _brains[j]=t; renderBrains(); _bstat('顺序=神枢优先调度次序,保存后生效'); }
 function brainDel(i){ _brains.splice(i,1); renderBrains(); }
 async function fillBrains(){
   _bstat('读取当前配置…');
