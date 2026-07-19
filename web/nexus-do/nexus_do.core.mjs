@@ -1610,7 +1610,7 @@ ${capabilitySelfDescription(true)}
     let v = await this.storage.get('_vapid');
     if (!v || !v.publicKey || !v.privateJwk) {
       v = await generateVapidKeys();
-      v.subject = this.env.VAPID_SUBJECT || 'mailto:owner@blackgod.app';
+      v.subject = this.env.VAPID_SUBJECT || 'mailto:blackgod@lufei.uk';
       await this.storage.put('_vapid', v);
     }
     return v;
@@ -2144,7 +2144,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 <p>本政策如有实质性变更，会更新本页顶部的生效日期；建议定期查看。</p>
 
 <h2>7. 联系我们</h2>
-<p>关于本政策或你的数据，请联系：<a href="mailto:aquan@lufei.uk"><code>aquan@lufei.uk</code></a>。</p>
+<p>关于本政策或你的数据，请联系：<a href="mailto:blackgod@lufei.uk"><code>blackgod@lufei.uk</code></a>。</p>
 
 </body>
 </html>`;

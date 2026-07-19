@@ -559,6 +559,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .reg-model-row #regApiModel{padding-right:92px}
 .reg-probe{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:600;color:var(--cy-3);cursor:pointer;user-select:none;white-space:nowrap}
 .reg-probe:active{opacity:.6}
+.reg-select{margin-top:10px;text-align-last:center;cursor:pointer;color:var(--text)}
 /* 私语词典 */
 .lex-list{max-height:56vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:8px;-webkit-overflow-scrolling:touch}
 .lex-card{border:1px solid var(--line-2);border-radius:14px;padding:12px 14px;background:var(--surface-2)}
@@ -685,6 +686,7 @@ body::before{
         <datalist id="regModelList"></datalist>
         <span id="regProbeBtn" class="reg-probe" onclick="probeRegModels()">🔍 识别模型</span>
       </div>
+      <select id="regModelSelect" class="lock-input reg-select" style="display:none" onchange="onRegModelPick(this.value)" aria-label="选择模型"></select>
       <div id="regModelHint" class="reg-hint"></div>
       <div id="regErr" class="lock-err"></div>
       <button id="regBtn" class="lock-btn" onclick="doRegister()">进 入</button>
@@ -1685,12 +1687,29 @@ async function probeRegModels(){
   const d=await Nexus.probeModelsPublic({ gateway_url:base, gateway_key:key });
   if(btn) btn.textContent='🔍 识别模型';
   if(d&&d.ok&&d.models&&d.models.length){
-    const dl=$('#regModelList'); if(dl) dl.innerHTML=d.models.map(m=>'<option value="'+String(m).replace(/"/g,'&quot;')+'">').join('');
-    if(!($('#regApiModel').value||'').trim()) $('#regApiModel').value=d.models[0];
-    if(hint){ hint.style.color='var(--ok)'; hint.textContent='✓ 网关已连通，识别到 '+d.count+' 个模型（默认：'+d.models[0]+'）'; }
+    const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    const dl=$('#regModelList'); if(dl) dl.innerHTML=d.models.map(m=>'<option value="'+esc(m)+'">').join('');
+    // 可见下拉：一个 API 下多个模型，明明白白列出来自己挑（末尾留「手动输入」应对列表外的）
+    const sel=$('#regModelSelect');
+    const cur=($('#regApiModel').value||'').trim();
+    const pick=(cur && d.models.includes(cur)) ? cur : d.models[0];
+    if(sel){
+      sel.innerHTML=d.models.map(m=>'<option value="'+esc(m)+'"'+(m===pick?' selected':'')+'>'+esc(m)+'</option>').join('')
+        +'<option value="__manual__">✍️ 手动输入其它…</option>';
+      sel.style.display='';
+    }
+    $('#regApiModel').value=pick;
+    $('#regApiModel').style.display='none';   // 识别到就用下拉挑；要填列表外的走「手动输入」
+    if(hint){ hint.style.color='var(--ok)'; hint.textContent='✓ 已识别 '+d.count+' 个模型，下面自己选（或选「手动输入」填其它）'; }
   } else {
     if(hint){ hint.style.color='var(--err)'; hint.textContent=(d&&d.error)||'识别失败，可直接手填模型名'; }
   }
+}
+// 从下拉挑模型：选具体型号→写入；选「手动输入」→露出输入框自己填
+function onRegModelPick(v){
+  const inp=$('#regApiModel');
+  if(v==='__manual__'){ inp.value=''; inp.style.display=''; inp.focus(); const h=$('#regModelHint'); if(h){ h.style.color='var(--text-3)'; h.textContent='手动输入模型名（列表外的型号）'; } }
+  else if(inp){ inp.value=v; }
 }
 async function doRegister(){
   const nick=($('#regNick').value||'').trim();
