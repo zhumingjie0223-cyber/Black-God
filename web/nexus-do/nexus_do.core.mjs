@@ -914,9 +914,12 @@ ${capabilitySelfDescription(true)}
     const hasT = typeof opts.temperature === 'number';
     if (provider === 'anthropic') {
       const url = /\/v1\/messages$/.test(base) ? base : String(base).replace(/\/+$/, '') + '/v1/messages';
+      // Claude 有两种认证:标准 API key(sk-ant-api…)走 x-api-key;OAuth token(sk-ant-oat…,如 Claude Code 令牌)走 Bearer + oauth beta 头。
+      const isOAuth = /^sk-ant-oat/i.test(String(key || ''));
+      const auth = key ? (isOAuth ? { Authorization: 'Bearer ' + key, 'anthropic-beta': 'oauth-2025-04-20' } : { 'x-api-key': key }) : {};
       return {
         url,
-        headers: { 'Content-Type': 'application/json', ...(key ? { 'x-api-key': key } : {}), 'anthropic-version': '2023-06-01' },
+        headers: { 'Content-Type': 'application/json', ...auth, 'anthropic-version': '2023-06-01' },
         body: { model, max_tokens: mt, ...(system ? { system } : {}), messages: [{ role: 'user', content: userMsg }], ...(hasT ? { temperature: opts.temperature } : {}) },
       };
     }
