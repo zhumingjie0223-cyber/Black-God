@@ -2175,31 +2175,45 @@ ${capabilitySelfDescription(true)}
     // 公共版她：无私人记忆、无主人上下文、无状态 —— 主人隐私完全不暴露
     // 但枢语是她本体的一部分，公共版也得会：按这句话临场推一个五维坐标注入提示词
     const shu = this.shuTranslate(this.shuDrift({ text }, null, {}));
-    const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(shu), text);
+    const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(shu), text, u._provider);
     if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + (r.detail ? ' · ' + r.detail : '') + '），改一下「我的 API」再试。', model: 'api_error' };
+    if (r.provider && u._provider !== r.provider) { u._provider = r.provider; try { await this.storage.put('users', users); } catch (e) {} }   // 记住这位游客 API 的方言,之后直连
     return { reply: r.reply, model: r.model };
   }
 
   // 通用 OpenAI 风格网关调用（供公共用户各自的 API 用）。URL 可填 base 或完整端点。
   // 带超时（20s）：用户填的第三方网关卡住不回时，别把请求一起拖死，给清晰的超时提示。
-  async callGateway(base, key, model, system, userMsg) {
+  async callGateway(base, key, model, system, userMsg, providerHint) {
     if (!base) return { ok: false, err: '没填网关地址' };
-    const provider = this.brainProvider(base, model);
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 20_000);
+    // 游客路径同样自适应格式:锁定过就直连;否则试会的方言,通了返回并回传检测到的方言供缓存。
+    const locked = providerHint || '';
+    const guess = locked || this.brainProvider(base, model);
+    const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
     try {
-      const send = (withT) => {
-        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500 });   // 给推理模型(kimi-k2.6/o1 等)留出 reasoning 预算，否则 content 被截空
-        return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: ac.signal });
-      };
-      let r = await send(true);
-      // 推理模型(如 kimi-k2.6 / OpenAI o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
-      if (!r.ok && r.status === 400) r = await send(false);
-      if (!r.ok) { const body = await r.text().catch(() => ''); return { ok: false, err: 'HTTP ' + r.status, detail: body.replace(/\s+/g, ' ').slice(0, 140) }; }
-      const d = await r.json();
-      const text = this.parseBrainText(provider, d);
-      if (text && text.trim()) return { ok: true, reply: this.normalizeIdentity(text.trim(), 'public'), model: model || 'gateway' };
-      return { ok: false, err: '空回复' };
+      let lastErr = '连不上', lastDetail = '';
+      for (const provider of dialects) {
+        const send = (withT) => {
+          const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500 });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
+          return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: ac.signal });
+        };
+        let r = await send(true);
+        if (!r.ok && r.status === 400) r = await send(false);   // 推理模型只接受 temperature=1 → 去掉重试
+        if (r.ok) {
+          const d = await r.json().catch(() => null);
+          const text = this.parseBrainText(provider, d);
+          if (text && text.trim()) return { ok: true, reply: this.normalizeIdentity(text.trim(), 'public'), model: model || 'gateway', provider };
+          lastErr = '空回复';
+          if (!locked && provider !== dialects[dialects.length - 1]) continue;
+          return { ok: false, err: '空回复' };
+        }
+        const body = await r.text().catch(() => '');
+        // 格式可能不对(404/400)且未锁定 → 换方言;真错(401/429/5xx)直接如实报
+        if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = 'HTTP ' + r.status; lastDetail = body.replace(/\s+/g, ' ').slice(0, 140); continue; }
+        return { ok: false, err: 'HTTP ' + r.status, detail: body.replace(/\s+/g, ' ').slice(0, 140) };
+      }
+      return { ok: false, err: lastErr, detail: lastDetail };
     } catch (e) {
       if (e && e.name === 'AbortError') return { ok: false, err: '网关响应超时(20s)' };
       return { ok: false, err: String(e && e.message || e).slice(0, 80) };
