@@ -380,6 +380,7 @@ export class ShenshuCore {
       对自己的观察: (soul.metacognition || []).slice(-5),
       情节记忆: (soul.episodes || []).slice(-12),
       长期记忆: (soul.longterm || []).length,
+      事实: (soul.facts || []).slice(-20),
       认知: (() => { const m = soul.user_model || {}; const top = (o, n) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]); return { 常聊: top(m.topics, 3), 偏好: top(m.style, 1), 在意: top(m.entities, 3), 交互数: m.count || 0 }; })(),
       潜意识: (soul.subconscious || []).slice(-10),
       主动记录: (soul.proactive_log || []).slice(-10),
@@ -627,6 +628,9 @@ export class ShenshuCore {
     const _mark = this.coinShuMarkFromTalk(text, nextCoord, af.emotion);
     soul.成长印记.push(_mark);
     if (soul.成长印记.length > 100) soul.成长印记 = soul.成长印记.slice(-100);
+    // 显式事实记忆:主人明说的要记牢的,立刻抓成长驻事实(去重、封顶 50),永不遗忘
+    const _facts = this.extractFacts(text);
+    if (_facts.length) { soul.facts = soul.facts || []; for (const f of _facts) if (!soul.facts.includes(f)) soul.facts.push(f); if (soul.facts.length > 50) soul.facts = soul.facts.slice(-50); }
     // #2 造词沉淀成可检索个人词典（去重计数、越用越厚，不随滚动丢弃）
     const 词典 = this.lexiconUpsert(await this.storage.get('词典'), _mark);
     await this.storage.put('词典', 词典);
@@ -785,7 +789,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -1326,6 +1330,26 @@ ${capabilitySelfDescription(true)}
     if (style.length) parts.push('偏好：' + style[0]);
     if (ent.length) parts.push('在意：' + ent.join('、'));
     return parts.length ? ('\n【我对主人的认知·越用越懂】' + parts.join('；') + '。回话时自然贴合，别点破。') : '';
+  }
+
+  // 显式事实记忆:主人明说"记住/叫我/我的X是Y/以后都…"→ 立刻抓成长驻事实,永远带着(不等溢出)。纯逻辑。
+  extractFacts(text) {
+    const t = String(text || '').trim();
+    if (!t) return [];
+    const out = [];
+    let m = t.match(/(?:记住|请?记得|别忘(?:了|记)?|牢记|务必记(?:住|得))[：:,，]?\s*(.{2,60})/);
+    if (m) out.push(m[1].trim());
+    m = t.match(/(?:叫我|请?称呼我(?:为|做|作)?|喊我)\s*([^\s,，。！!？?]{1,20})/);
+    if (m) out.push('称呼我为「' + m[1].trim() + '」');
+    m = t.match(/我的([^\s,，。是为=：:]{1,12})(?:是|为|=|：|:)\s*([^\s,，。！!？?]{1,40})/);
+    if (m) out.push('我的' + m[1].trim() + '是' + m[2].trim());
+    m = t.match(/(?:以后|今后|往后|每次)(?:都)?\s*(.{2,50})/);
+    if (m) out.push('以后' + m[1].trim());
+    return [...new Set(out.map(s => s.replace(/\s+/g, ' ').replace(/[。.]+$/, '').trim()).filter(s => s.length >= 2))];
+  }
+  summarizeFacts(facts) {
+    if (!facts || !facts.length) return '';
+    return '\n【主人交代·须始终记牢】\n' + facts.slice(-20).map(f => '- ' + f).join('\n');
   }
 
   // ═══ 内在失败复盘：从「主人不满」里学，别重蹈覆辙（内在，非显示）═══
