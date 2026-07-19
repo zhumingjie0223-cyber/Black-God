@@ -628,9 +628,8 @@ export class ShenshuCore {
     const _mark = this.coinShuMarkFromTalk(text, nextCoord, af.emotion);
     soul.成长印记.push(_mark);
     if (soul.成长印记.length > 100) soul.成长印记 = soul.成长印记.slice(-100);
-    // 显式事实记忆:主人明说的要记牢的,立刻抓成长驻事实(去重、封顶 50),永不遗忘
-    const _facts = this.extractFacts(text);
-    if (_facts.length) { soul.facts = soul.facts || []; for (const f of _facts) if (!soul.facts.includes(f)) soul.facts.push(f); if (soul.facts.length > 50) soul.facts = soul.facts.slice(-50); }
+    // 显式事实记忆:主人明说的立刻记牢;换称呼最新为准;说"别叫我/忘掉"就抹掉(能记能改能删)
+    this.applyFactMemory(soul, text);
     // #2 造词沉淀成可检索个人词典（去重计数、越用越厚，不随滚动丢弃）
     const 词典 = this.lexiconUpsert(await this.storage.get('词典'), _mark);
     await this.storage.put('词典', 词典);
@@ -1336,16 +1335,39 @@ ${capabilitySelfDescription(true)}
   extractFacts(text) {
     const t = String(text || '').trim();
     if (!t) return [];
+    const NEG_NAME = /(?:别|不要|不用|别再|甭|无需|不必)\s*(?:再\s*)?(?:叫我|喊我|称呼我)/; // 否定式改称呼,不当新事实
     const out = [];
     let m = t.match(/(?:记住|请?记得|别忘(?:了|记)?|牢记|务必记(?:住|得))[：:,，]?\s*(.{2,60})/);
     if (m) out.push(m[1].trim());
-    m = t.match(/(?:叫我|请?称呼我(?:为|做|作)?|喊我)\s*([^\s,，。！!？?]{1,20})/);
-    if (m) out.push('称呼我为「' + m[1].trim() + '」');
+    if (!NEG_NAME.test(t)) { m = t.match(/(?:叫我|请?称呼我(?:为|做|作)?|喊我)\s*([^\s,，。！!？?]{1,20})/); if (m) out.push('称呼我为「' + m[1].trim() + '」'); }
     m = t.match(/我的([^\s,，。是为=：:]{1,12})(?:是|为|=|：|:)\s*([^\s,，。！!？?]{1,40})/);
     if (m) out.push('我的' + m[1].trim() + '是' + m[2].trim());
     m = t.match(/(?:以后|今后|往后|每次)(?:都)?\s*(.{2,50})/);
-    if (m) out.push('以后' + m[1].trim());
+    if (m && !/别叫我|不叫我|不用叫我|不要叫我|别记|忘(?:掉|记)|删掉|删除/.test(m[1])) out.push('以后' + m[1].trim());
     return [...new Set(out.map(s => s.replace(/\s+/g, ' ').replace(/[。.]+$/, '').trim()).filter(s => s.length >= 2))];
+  }
+  // 显式遗忘:主人说"别叫我X了/忘掉X/删掉X"→ 该抹掉的抹掉(记忆能改能删,不只堆积)。纯逻辑。
+  extractForgets(text) {
+    const t = String(text || '').trim();
+    if (!t) return { 称呼: false, keywords: [] };
+    const 称呼 = /(?:别|不要|不用|别再|甭|无需|不必)\s*(?:再\s*)?(?:叫我|喊我|称呼我)/.test(t);
+    const keywords = [];
+    const m = t.match(/(?:忘(?:掉|记)|删掉|删除|去掉|别再记(?:着|住)?|不用记(?:着|住)?)(?:关于|那个|我说的|我的|一下)?\s*(.{2,20})/);
+    if (m) { const k = m[1].replace(/\s+/g, ' ').replace(/[。.了吧呢啊嘛，,！!]+$/, '').trim(); if (k.length >= 2) keywords.push(k); }
+    return { 称呼, keywords };
+  }
+  // 抓新事实 + 换称呼(最新为准) + 显式遗忘,合并进 soul.facts(去重、封顶 50)。纯逻辑。
+  applyFactMemory(soul, text) {
+    soul.facts = soul.facts || [];
+    const forgets = this.extractForgets(text);
+    if (forgets.称呼) soul.facts = soul.facts.filter(f => !f.startsWith('称呼我为'));
+    for (const kw of forgets.keywords) soul.facts = soul.facts.filter(f => !f.includes(kw));
+    for (const f of this.extractFacts(text)) {
+      if (f.startsWith('称呼我为')) soul.facts = soul.facts.filter(x => !x.startsWith('称呼我为')); // 换称呼:旧的让位
+      if (!soul.facts.includes(f)) soul.facts.push(f);
+    }
+    if (soul.facts.length > 50) soul.facts = soul.facts.slice(-50);
+    return soul.facts;
   }
   summarizeFacts(facts) {
     if (!facts || !facts.length) return '';
