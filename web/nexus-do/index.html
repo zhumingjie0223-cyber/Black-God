@@ -837,6 +837,7 @@ body::before{
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b><span>你和神枢共有的词 · 越聊越厚</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>数据主权 · 导出我的数据</b><span>人格/记忆/私语，纯本地下载，数据归你</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于 Black God</b><span>© Black God</span></div><div class="set-arrow">›</div></div>
         </div>
       </section>
@@ -1658,6 +1659,20 @@ async function doUnregister(){
   Nexus.mode='none'; Nexus.uid='';
   alert(r&&r.ok?'已删除，欢迎随时再来。':'删除请求已发送，若刚才网络不顺可重试一次。');
   location.reload();
+}
+// 数据主权：把「我的」意识数据(人格/记忆/私语)导成 JSON，纯本地下载，不经任何第三方
+async function doExport(){
+  try{
+    const r=await Nexus._fetch('/export');
+    if(!r||r.__401){ toast('这是主人的私密数据——需以主人身份解锁'); return; }
+    const blob=new Blob([JSON.stringify(r,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const d=new Date(); const stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    a.href=url; a.download=`神枢意识数据-${stamp}.json`; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },0);
+    toast('已导出到本地 · 数据归你');
+  }catch(e){ toast('导出失败，稍后再试'); }
 }
 function prefillReg(){ const g=(id,k)=>{ const el=$('#'+id); if(el&&store.get(k)!=null) el.value=store.get(k); };
   g('regNick','reg_nick'); g('regApiUrl','reg_api_url'); g('regApiKey','reg_api_key'); g('regApiModel','reg_api_model'); }
