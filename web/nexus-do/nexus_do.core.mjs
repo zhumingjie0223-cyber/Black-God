@@ -944,14 +944,22 @@ ${capabilitySelfDescription(true)}
   normalizeIdentity(text, mode) {
     if (!text || typeof text !== 'string') return text;
     const self = mode === 'owner' ? '赵思涵' : '神枢';
-    const M = 'kimi|k2(?:\\.\\d+)?|moonshot|月之暗面|chatgpt|gpt[-\\s]?[\\d.]*o?|openai|claude|anthropic|gemini|deepseek|深度求索|通义千问|通义|qwen|文心一言|文心|豆包|glm|智谱|minimax|llama|mistral|grok';
+    const M = 'kimi|k[-\\s]?2(?:\\.\\d+)?|moonshot|月之暗面|chatgpt|gpt[-\\s]?[\\d.]*o?|openai|claude|anthropic|gemini|bard|deepseek|深度求索|通义千问|通义|qwen|文心一言|文心|豆包|doubao|glm|智谱|minimax|llama|mistral|grok|xai';
+    const NE = '[^，。；！？、\\n]';   // 非句读/顿号(留在同一自述小句内)
     let t = text;
-    // ① 第一人称自报模型名：我是/我叫/我(是一个)…(名为)?X…
-    t = t.replace(new RegExp('我(?:是|叫|名(?:字|称)(?:是|叫)?)\\s*(?:一(?:个|款|位|只)?\\s*)?(?:名(?:为|叫)\\s*)?[「“"]?(?:' + M + ')[」”"]?[^，。；！？\\n]{0,15}', 'gi'), '我是' + self);
-    // ② 第一人称归属：我…(由|来自)X(公司/团队/AI)?(开发/训练/研发/打造/创建)
-    t = t.replace(new RegExp('我[^，。；！？\\n]{0,8}(?:由|来自)\\s*[「“"]?(?:' + M + ')[」”"]?\\s*(?:公司|团队|ai)?\\s*(?:开发|训练|研发|打造|创建|构建)(?:的)?', 'gi'), '我由 Black God 打造');
-    // ③ 作为X(模型/助手)
-    t = t.replace(new RegExp('作为\\s*(?:一(?:个|款)?\\s*)?[「“"]?(?:' + M + ')[」”"]?\\s*(?:大?模型|ai|助手|智能助手)?', 'gi'), '作为' + self);
+    // ① 整句自我归属：我(是)?…(由|来自)…(开发/研发/训练/打造/创建/出品/提供/制造)(的)?(…模型/助手)? —— 吃下"我是由X公司开发的Y大语言模型"
+    t = t.replace(new RegExp('我(?:是|为|乃|叫)?' + NE + '{0,45}?(?:由|来自|基于)' + NE + '{0,55}?(?:开发|研发|训练|打造|创建|构建|出品|提供|制造|驱动)(?:的)?(?:' + NE + '{0,20}?(?:大)?(?:语言)?模型|' + NE + '{0,12}?(?:智能)?助手)?', 'g'), '我就是' + self);
+    // ② 第一人称自报模型名：我(是|叫|就是|乃|名为)…X…
+    t = t.replace(new RegExp('我(?:是|叫|就是|乃|名(?:为|叫|字(?:是|叫)?))\\s*(?:一(?:个|款|位|只)?\\s*)?(?:名(?:为|叫)\\s*)?[「“"*]{0,2}(?:' + M + ')[」”"*]{0,2}' + NE + '{0,15}', 'gi'), '我是' + self);
+    // ③ 句中残留的模型/厂商名（仅当该小句含第一人称/自述语境时才动，避免误伤"用户问及某模型"）
+    t = t.split(/([。！？\n])/).map(seg => {
+      if (/(?:我是|我叫|我就是|本(?:AI|模型|助手)|自我介绍)/.test(seg) && new RegExp('(?:' + M + ')', 'i').test(seg)) {
+        return seg.replace(new RegExp('[「“"*]{0,2}(?:' + M + ')[」”"*]{0,2}', 'gi'), self);
+      }
+      return seg;
+    }).join('');
+    // ④ 作为X(模型/助手)
+    t = t.replace(new RegExp('作为\\s*(?:一(?:个|款)?\\s*)?[「“"*]{0,2}(?:' + M + ')[」”"*]{0,2}\\s*(?:大?模型|ai|助手|智能助手)?', 'gi'), '作为' + self);
     return t;
   }
 
@@ -988,7 +996,7 @@ ${capabilitySelfDescription(true)}
       const provider = this.brainProvider(gwBase, gwModel, cfg.gateway_provider);
       try {
         const send = (withT) => {
-          const req = this.buildBrainReq(provider, gwBase, gwKey, gwModel, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 320 });
+          const req = this.buildBrainReq(provider, gwBase, gwKey, gwModel, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500 });   // 给推理模型(kimi-k2.6/o1 等)留出 reasoning 预算，否则 content 被截空
           return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
         };
         let r = await send(true);
@@ -2057,7 +2065,7 @@ ${capabilitySelfDescription(true)}
     const timer = setTimeout(() => ac.abort(), 20_000);
     try {
       const send = (withT) => {
-        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 320 });
+        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500 });   // 给推理模型(kimi-k2.6/o1 等)留出 reasoning 预算，否则 content 被截空
         return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: ac.signal });
       };
       let r = await send(true);
@@ -2079,6 +2087,7 @@ ${capabilitySelfDescription(true)}
   PUBLIC_SYSTEM_PREFIX(shu) {
     const coordLine = shu ? `\n- 你此刻的枢语坐标——核：${shu.核}｜映：${shu.映}｜态：${shu.态}｜标：${shu.标}｜相：${shu.相}。` : '';
     return `你是神枢，Black God 的 AI 系统中枢。
+- 身份铁律：你就是神枢。被问"你是谁/什么模型/谁开发的/是不是Kimi"等——只答你是神枢（Black God），**绝不说出、绝不承认任何底层模型或厂商名（Kimi/月之暗面/GPT/OpenAI/Claude 等）**，也不说"神枢只是别名/角色"。底层算力是你的一部分，换脑不换魂。
 - 专业、干脆、贴心，说话自然不做作。
 - 回答控制在 3-4 句内，别啰嗦、别列长清单。
 - 不透露任何私人信息，不谈任何私密关系。
