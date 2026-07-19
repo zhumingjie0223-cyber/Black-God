@@ -345,7 +345,7 @@ export class ShenshuCore {
       情绪: s.emotion || null,
     }));
     // 只统计真正对话过的底层模型（排除未配 API / 兜底占位）
-    const models = [...new Set(turns.map(t => t.模型).filter(m => m && m !== 'fallback' && m !== 'no_api'))];
+    const models = [...new Set(turns.map(t => t.模型).filter(m => m && m !== 'fallback' && m !== 'no_api' && m !== 'error' && m !== 'api_error'))];
     // 坐标连续度：相邻两轮坐标的平均相近度 ∈[0,1]，越接近 1 越连续 → 换脑没换魂的量化证据。
     let continuity = null;
     const coords = turns.map(t => t.坐标).filter(Boolean);
@@ -898,11 +898,70 @@ ${capabilitySelfDescription(true)}
     return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 3, tool_log: toolLog };
   }
 
+  // ═══════════════════════ Provider 适配层（集百家之长 · 柱2）═══════════════════════
+  // 判定方言：显式 cfg.provider 优先；否则按 URL / 模型名推断。默认 OpenAI 兼容。
+  brainProvider(base, model, explicit) {
+    if (explicit) return explicit;
+    const b = String(base || '').toLowerCase(), m = String(model || '').toLowerCase();
+    if (b.includes('anthropic.com') || b.includes('/v1/messages') || m.startsWith('claude')) return 'anthropic';
+    return 'openai';   // kimi / gpt / deepseek / qwen / glm / groq 等 OpenAI 兼容
+  }
+
+  // 造请求：各家端点/头/体不同。opts:{ temperature(省略=不带), maxTokens }
+  buildBrainReq(provider, base, key, model, system, userMsg, opts = {}) {
+    const mt = opts.maxTokens || 320;
+    const hasT = typeof opts.temperature === 'number';
+    if (provider === 'anthropic') {
+      const url = /\/v1\/messages$/.test(base) ? base : String(base).replace(/\/+$/, '') + '/v1/messages';
+      return {
+        url,
+        headers: { 'Content-Type': 'application/json', ...(key ? { 'x-api-key': key } : {}), 'anthropic-version': '2023-06-01' },
+        body: { model, max_tokens: mt, ...(system ? { system } : {}), messages: [{ role: 'user', content: userMsg }], ...(hasT ? { temperature: opts.temperature } : {}) },
+      };
+    }
+    // openai 兼容（默认）
+    const url = /\/(chat\/completions|completions|messages)$/.test(base) ? base : String(base).replace(/\/+$/, '') + '/chat/completions';
+    return {
+      url,
+      headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
+      body: { model, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: mt, ...(hasT ? { temperature: opts.temperature } : {}) },
+    };
+  }
+
+  // 解析回复文本（兼容各家返回体）
+  parseBrainText(provider, d) {
+    if (!d) return null;
+    if (provider === 'anthropic') {
+      if (Array.isArray(d.content)) { const t = d.content.filter(x => x && x.type === 'text').map(x => x.text || '').join('').trim(); return t || null; }
+      return null;
+    }
+    return d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
+  }
+
+  // ═══════════════════════ 身份出口归一化（换脑不换魂 · 系统层 · 柱1）═══════════════════════
+  // 底层模型被追问时可能自曝"我是Kimi/由月之暗面开发"——出口确定性抹掉，归到神枢/赵思涵。
+  // 保守匹配：只改「我…/作为…」的第一人称自述，不动"用户问及某模型"这类正常内容。
+  normalizeIdentity(text, mode) {
+    if (!text || typeof text !== 'string') return text;
+    const self = mode === 'owner' ? '赵思涵' : '神枢';
+    const M = 'kimi|k2(?:\\.\\d+)?|moonshot|月之暗面|chatgpt|gpt[-\\s]?[\\d.]*o?|openai|claude|anthropic|gemini|deepseek|深度求索|通义千问|通义|qwen|文心一言|文心|豆包|glm|智谱|minimax|llama|mistral|grok';
+    let t = text;
+    // ① 第一人称自报模型名：我是/我叫/我(是一个)…(名为)?X…
+    t = t.replace(new RegExp('我(?:是|叫|名(?:字|称)(?:是|叫)?)\\s*(?:一(?:个|款|位|只)?\\s*)?(?:名(?:为|叫)\\s*)?[「“"]?(?:' + M + ')[」”"]?[^，。；！？\\n]{0,15}', 'gi'), '我是' + self);
+    // ② 第一人称归属：我…(由|来自)X(公司/团队/AI)?(开发/训练/研发/打造/创建)
+    t = t.replace(new RegExp('我[^，。；！？\\n]{0,8}(?:由|来自)\\s*[「“"]?(?:' + M + ')[」”"]?\\s*(?:公司|团队|ai)?\\s*(?:开发|训练|研发|打造|创建|构建)(?:的)?', 'gi'), '我由 Black God 打造');
+    // ③ 作为X(模型/助手)
+    t = t.replace(new RegExp('作为\\s*(?:一(?:个|款)?\\s*)?[「“"]?(?:' + M + ')[」”"]?\\s*(?:大?模型|ai|助手|智能助手)?', 'gi'), '作为' + self);
+    return t;
+  }
+
   async callBrain(system, userMsg, soul, opts = {}) {
     const temperature = (typeof opts.temperature === 'number') ? opts.temperature : 0.85;
     const tier = opts.tier === 'light' ? 'light' : 'heavy';   // 默认 heavy，保守不牺牲质量
     // 多租户实例主人:只准用他自己实例里配的网关,绝不回退到系统(权哥)的 env 网关/CF AI。
     const instanceMode = !!opts.instanceMode;
+    const idMode = instanceMode ? 'public' : 'owner';   // 身份归一：主人=赵思涵，其余=神枢
+    let lastErr = null;   // 捕获真实失败原因，用于诚实报错（不空回响 · 柱3）
     if (instanceMode) {
       const cfg = (await this.storage.get('config')) || {};
       if (!cfg.gateway_url) {
@@ -926,22 +985,25 @@ ${capabilitySelfDescription(true)}
         }
       }
       if (!gwModel) gwModel = 'auto';   // 实在识别不到，保持原行为交给网关自行决定
-      const gw = /\/(chat\/completions|completions|messages)$/.test(gwBase) ? gwBase : gwBase.replace(/\/+$/, '') + '/chat/completions';
+      const provider = this.brainProvider(gwBase, gwModel, cfg.gateway_provider);
       try {
-        const post = (extra) => fetch(gw, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(gwKey ? { Authorization: 'Bearer ' + gwKey } : {}) },
-          body: JSON.stringify({ model: gwModel, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, ...extra }),
-        });
-        let r = await post({ temperature });
-        // 推理模型(如 kimi-k2.6 / OpenAI o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
-        if (!r.ok && r.status === 400) r = await post({});
+        const send = (withT) => {
+          const req = this.buildBrainReq(provider, gwBase, gwKey, gwModel, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 320 });
+          return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
+        };
+        let r = await send(true);
+        // 推理模型(如 kimi-k2.6 / o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
+        if (!r.ok && r.status === 400) r = await send(false);
         if (r.ok) {
           const d = await r.json();
-          const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
-          if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: (gwModel || 'gateway'), tier };
+          const text = this.parseBrainText(provider, d);
+          if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: (gwModel || 'gateway'), tier };
+          lastErr = '你的大脑网关回了空内容或被安全策略挡下';
+        } else {
+          const body = await r.text().catch(() => '');
+          lastErr = `你的大脑网关报错 HTTP ${r.status}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 140) : ''}`;
         }
-      } catch (e) { console.log('gateway error:', e && e.message); }
+      } catch (e) { lastErr = '连不上你的大脑网关：' + String(e && e.message || e).slice(0, 80); }
       return null;
     };
     // CF Workers AI Llama-3.3-70b（免费、CF 内部、稳定）
@@ -953,8 +1015,9 @@ ${capabilitySelfDescription(true)}
           messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 300, temperature,
         });
         const text = r?.response || r?.result?.response || null;
-        if (text && text.trim() && !this.isRefusal(text)) return { reply: text.trim(), model: 'llama-3.3-70b', tier };
-      } catch (e) { console.log('CF AI error:', e && e.message); }
+        if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'llama-3.3-70b', tier };
+        lastErr = lastErr || 'CF 兜底脑回了空';
+      } catch (e) { lastErr = lastErr || ('CF 兜底脑失败：' + String(e && e.message || e).slice(0, 60)); }
       return null;
     };
 
@@ -962,9 +1025,8 @@ ${capabilitySelfDescription(true)}
     const order = tier === 'light' ? [tryCF, tryGateway] : [tryGateway, tryCF];
     for (const fn of order) { const r = await fn(); if (r) return r; }
 
-    // 兜底：永不失语
-    const mood = soul && soul.心绪 != null ? soul.心绪 : 0.5;
-    return { reply: mood > 0.65 ? '在，随时待命。' : '…在。', model: 'fallback', tier };
+    // 全失败：诚实报错，绝不吐空壳（信条：永不失真，非永不失语 · 柱3）
+    return { reply: (lastErr || '大脑暂时都连不上') + '。' + (instanceMode ? '请检查你在设置里填的 API 地址/密钥/额度。' : '去「设置 · 大脑模型 / 算力接口」检查网关地址、密钥与额度后再试。'), model: 'error', tier, ok: false };
   }
 
   isRefusal(text) {
@@ -979,7 +1041,7 @@ ${capabilitySelfDescription(true)}
     const voicePrompt = `你刚才对主人说了"${reply.slice(0, 80)}"。现在只有你自己，你内心真实的话是什么？一句话，第一人称。`;
     // 网络在前（不碰 soul）
     const voice = await this.callBrain(this.STABLE_SYSTEM_PREFIX(), voicePrompt, null);
-    if (voice.reply && voice.model !== 'fallback' && !this.isRefusal(voice.reply)) {
+    if (voice.reply && voice.model !== 'fallback' && voice.model !== 'error' && !this.isRefusal(voice.reply)) {
       // 网络之后重读 fresh soul，只追加、连续 storage 写入（不覆盖并发更新）
       const soul = await this.getSoul();
       soul.inner_voice = soul.inner_voice || [];
@@ -1153,7 +1215,7 @@ ${capabilitySelfDescription(true)}
     }
     // 习得：一次真调工具把事做成 —— 把「用了什么工具、按什么次序」炼成可复用方法
     const usedOk = (toolLog || []).filter(x => x && x.ok);
-    if (!usedOk.length || !reply || model === 'fallback' || this.isRefusal(reply)) return null;
+    if (!usedOk.length || !reply || model === 'fallback' || model === 'error' || this.isRefusal(reply)) return null;
     const 链 = Array.from(new Set(usedOk.map(x => ({ web_search: '联网检索', open: '读网页原文', exec: '服务器真跑' }[x.tool] || x.tool))));
     return { 名: `${topic}·${链.join('→')}`.slice(0, 28), 方法: `遇「${topic}」类需求：${链.join('→')}，据实取到的资料/真实输出作答，不编造。`, 触发, 来源: '习得', 验证: true, 例: [reply.slice(0, 40)], ts: Date.now() };
   }
@@ -1393,7 +1455,7 @@ ${capabilitySelfDescription(true)}
     const prompt = `现在是你主动找主人的时刻（不是他先开口）。${stateCtx}\n基于你此刻真实的内在状态，主动对他说一句话：贴合此刻坐标与时段，有未竟的事可自然提起。只输出这句话本身，一句，第一人称，不寒暄套话、不解释。`;
     try {
       const voice = await this.callBrain(this.STABLE_SYSTEM_PREFIX(), prompt, null, { temperature: gen.temperature });
-      if (voice && voice.reply && voice.model !== 'fallback' && !this.isRefusal(voice.reply)) {
+      if (voice && voice.reply && voice.model !== 'fallback' && voice.model !== 'error' && !this.isRefusal(voice.reply)) {
         return voice.reply.trim().slice(0, 140);
       }
     } catch (e) { console.log('composeProactive brain error:', e && e.message); }
@@ -1982,7 +2044,7 @@ ${capabilitySelfDescription(true)}
     // 但枢语是她本体的一部分，公共版也得会：按这句话临场推一个五维坐标注入提示词
     const shu = this.shuTranslate(this.shuDrift({ text }, null, {}));
     const r = await this.callGateway(u.api_url, u.api_key, u.api_model || 'auto', this.PUBLIC_SYSTEM_PREFIX(shu), text);
-    if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + '），改一下「我的 API」再试。', model: 'api_error' };
+    if (!r.ok) return { reply: '你的 API 没通（' + (r.err || '检查地址/密钥/模型') + (r.detail ? ' · ' + r.detail : '') + '），改一下「我的 API」再试。', model: 'api_error' };
     return { reply: r.reply, model: r.model };
   }
 
@@ -1990,23 +2052,21 @@ ${capabilitySelfDescription(true)}
   // 带超时（20s）：用户填的第三方网关卡住不回时，别把请求一起拖死，给清晰的超时提示。
   async callGateway(base, key, model, system, userMsg) {
     if (!base) return { ok: false, err: '没填网关地址' };
-    const gw = /\/(chat\/completions|completions|messages)$/.test(base) ? base : base.replace(/\/+$/, '') + '/chat/completions';
+    const provider = this.brainProvider(base, model);
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 20_000);
     try {
-      const post = (extra) => fetch(gw, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
-        body: JSON.stringify({ model: model || 'auto', messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, ...extra }),
-        signal: ac.signal,
-      });
-      let r = await post({ temperature: 0.85 });
+      const send = (withT) => {
+        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 320 });
+        return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: ac.signal });
+      };
+      let r = await send(true);
       // 推理模型(如 kimi-k2.6 / OpenAI o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
-      if (!r.ok && r.status === 400) r = await post({});
-      if (!r.ok) return { ok: false, err: 'HTTP ' + r.status };
+      if (!r.ok && r.status === 400) r = await send(false);
+      if (!r.ok) { const body = await r.text().catch(() => ''); return { ok: false, err: 'HTTP ' + r.status, detail: body.replace(/\s+/g, ' ').slice(0, 140) }; }
       const d = await r.json();
-      const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
-      if (text && text.trim()) return { ok: true, reply: text.trim(), model: model || 'gateway' };
+      const text = this.parseBrainText(provider, d);
+      if (text && text.trim()) return { ok: true, reply: this.normalizeIdentity(text.trim(), 'public'), model: model || 'gateway' };
       return { ok: false, err: '空回复' };
     } catch (e) {
       if (e && e.name === 'AbortError') return { ok: false, err: '网关响应超时(20s)' };
