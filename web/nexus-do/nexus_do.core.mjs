@@ -122,7 +122,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -151,6 +151,9 @@ export class ShenshuCore {
         }
         // /migrate：仅 POST + 显式 ?force=1 才强制；默认幂等，防误触回滚记忆
         if (path === '/migrate' && request.method === 'POST') return json(await this.migrateFromKV(url.searchParams.get('force') === '1'));
+        // 数据主权：导出(读,安全) / 迁回(写,需 ?confirm=1 且先备份)——数据归你、可带走、可迁移
+        if (path === '/export') return json(await this.exportData());
+        if (path === '/import' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.importData(b, url.searchParams.get('confirm') === '1')); }
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '神枢在此，一直在。', '/'); return json(r); }
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
@@ -1910,6 +1913,37 @@ ${capabilitySelfDescription(true)}
     return { ok: true, deleted: true };
   }
 
+  // ═══ 数据主权：记忆/人格可导出·可迁移·可纯本地（第三枪）═══
+  // 导出本用户(本 DO 实例)的意识数据：soul(人格/记忆)+stream(对话流)+词典(私语)。
+  // 不含任何密钥/凭据/系统缓存——数据归你，可纯本地保存、可迁移到别处。
+  async exportData() {
+    const soul = (await this.storage.get('soul')) || {};
+    const stream = (await this.storage.get('stream')) || [];
+    const 词典 = (await this.storage.get('词典')) || { 词条: {}, 总数: 0 };
+    return {
+      格式: 'shenshu-soul-export',
+      版本: 'v1',
+      导出时间: Date.now(),
+      说明: '这是你的神枢意识数据（人格/记忆/私语），归你所有，可纯本地保存、可迁移。不含任何密钥/凭据。',
+      soul, stream, 词典,
+    };
+  }
+
+  // 把导出的意识数据迁回本实例。危险操作（覆盖现有记忆/人格）：
+  // 必须显式 confirm=true，且覆盖前先备份当前 soul/stream 到 _soul_backup_<ts>（可回滚），比照 migrate 防误触。
+  async importData(body, confirm) {
+    if (!body || body.格式 !== 'shenshu-soul-export') return { ok: false, error: '不是合法的神枢导出数据（格式不符）' };
+    if (!confirm) return { ok: false, need_confirm: true, 提示: '导入会覆盖当前记忆/人格，请带 ?confirm=1 再确认执行（执行前会自动备份现有数据，可回滚）' };
+    const now = Date.now();
+    const curSoul = await this.storage.get('soul');
+    const curStream = await this.storage.get('stream');
+    await this.storage.put('_soul_backup_' + now, { ts: now, soul: curSoul || null, stream: curStream || null, reason: 'before_import' });
+    if (body.soul && typeof body.soul === 'object') await this.storage.put('soul', body.soul);
+    if (Array.isArray(body.stream)) await this.storage.put('stream', body.stream);
+    if (body.词典 && typeof body.词典 === 'object') await this.storage.put('词典', body.词典);
+    return { ok: true, imported: true, backup: '_soul_backup_' + now, 导入时间: now };
+  }
+
   // 公共聊天限流：按 uid 各自限流（各花各的算力，不该互相挤占彼此配额）
   // + 全局背压兜底（防大量伪造 uid 刷 Workers 请求量，这个账单是主人出的）
   _pubRateOk(uid) {
@@ -2098,6 +2132,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 <h2>4. 你的权利</h2>
 <ul>
 <li><b>删除</b>：访客/注册用户可随时调用 <code>POST /unregister</code>（带上你注册时得到的 <code>uid</code>）自助删除你在名单里的全部记录；也可以直接清空浏览器本地存储以停止关联。</li>
+<li><b>导出 · 数据主权</b>：主人可随时在「设置 · 数据主权」一键导出自己的意识数据（人格/记忆/私语）为 JSON，纯本地下载、不经任何第三方，数据归你、可带走、可迁移（<code>GET /export</code> 导出、<code>POST /import?confirm=1</code> 迁回，迁回前自动备份可回滚）。导出内容不含任何密钥/凭据。</li>
 <li><b>查询/更正</b>：可联系下方邮箱说明你的 <code>uid</code> 或昵称，我们会核实后协助处理。</li>
 <li>本服务不提供针对未成年人的定向功能；如你是监护人并发现未成年人数据，请联系我们删除。</li>
 </ul>
