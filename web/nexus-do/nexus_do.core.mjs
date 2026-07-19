@@ -982,11 +982,19 @@ ${capabilitySelfDescription(true)}
     return out.slice(0, 9);
   }
 
-  // 神枢主导的职责分派：对口职责的脑排前(秒派),其余作故障转移(总能兜底,永不卡死)。
+  // 神枢自己判定每条脑的擅长(用户不用选,这是神枢的事)：从模型名/标签推断职责。
+  inferBrainRole(model, label) {
+    const s = (String(model || '') + ' ' + String(label || '')).toLowerCase();
+    if (/code|coder|代码/.test(s)) return '代码';
+    if (/o[13]\b|o1-|o3-|\br1\b|reason|think|deepseek-r|k2|推理|深思/.test(s)) return '深思';
+    if (/mini|flash|turbo|lite|fast|small|nano|8b|air|快/.test(s)) return '快答';
+    return '主力';
+  }
+  // 神枢主导的职责分派：把神枢判定为对口职责的脑排前(秒派),其余作故障转移(总能兜底,永不卡死)。
   orderBrainsForTask(brains, role) {
     if (!role || !Array.isArray(brains) || brains.length < 2) return brains;
     const pri = [], rest = [];
-    for (const b of brains) (b.role === role ? pri : rest).push(b);
+    for (const b of brains) (this.inferBrainRole(b.model, b.label) === role ? pri : rest).push(b);
     return pri.concat(rest);
   }
   // 按任务算首选职责(不乱:确定性映射)。caps 含 code→代码;heavy/think→深思;light→快答;否则主力。

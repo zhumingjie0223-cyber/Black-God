@@ -889,7 +889,7 @@ body::before{
 <div class="sheet" id="sheetBrains">
   <div class="grab"></div>
   <div class="sheet-title">大脑舰队 · 神枢调度</div>
-  <div class="sheet-sub">挂 1~9 条 API，神枢<b>按职责秒派</b>、一条挂了自动换下一条。<b>神枢始终主导</b>，底层只是算力。</div>
+  <div class="sheet-sub">挂 1~9 条 API 就行，<b>神枢自己看模型判断谁擅长什么</b>、按任务秒派、一条挂了自动换。<b>神枢始终主导</b>，底层只是算力，分工不用你操心。</div>
   <div id="brainList"></div>
   <button class="btn ghost" id="brainAddBtn" onclick="brainAdd()" style="margin-top:4px">＋ 加一条脑（最多 9）</button>
   <div id="brainStatus" style="font-size:12px;color:var(--text-3);margin:10px 0;min-height:16px"></div>
@@ -1592,16 +1592,14 @@ async function saveApi(){
   else if(r&&r.__401) toast('这是主人的私密配置——需以主人身份解锁');
   else toast('保存失败（检查是否在线/已解锁）');
 }
-/* 大脑舰队：1~9 条 API，神枢按职责调度。神枢始终主导，底层只是算力。 */
-const BRAIN_ROLES=['主力','快答','代码','深思'];
+/* 大脑舰队：1~9 条 API，神枢自己判断分工、按任务调度。神枢始终主导，底层只是算力。 */
 let _brains=[];
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 function renderBrains(){
   const el=$('#brainList'); if(!el) return;
   el.innerHTML=_brains.map((b,i)=>`<div class="brain-card" style="border:1px solid var(--line-2);border-radius:14px;padding:11px;margin-bottom:10px">
     <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
-      <input class="lock-input" style="flex:1;text-align:left;padding:8px;letter-spacing:0" placeholder="标签(如 Kimi快版)" value="${_esc(b.label)}" oninput="_bset(${i},'label',this.value)"/>
-      <select class="lock-input" style="width:88px;padding:8px" onchange="_bset(${i},'role',this.value)">${BRAIN_ROLES.map(r=>`<option${r===(b.role||'主力')?' selected':''}>${r}</option>`).join('')}</select>
+      <input class="lock-input" style="flex:1;text-align:left;padding:8px;letter-spacing:0" placeholder="标签(如 Kimi、GPT快版)" value="${_esc(b.label)}" oninput="_bset(${i},'label',this.value)"/>
       <label style="font-size:12px;white-space:nowrap"><input type="checkbox" ${b.on!==false?'checked':''} onchange="_bset(${i},'on',this.checked)"/> 启用</label>
     </div>
     <textarea rows="1" class="lock-input" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;font-size:12px;letter-spacing:0" placeholder="一键粘贴：地址+key 整段粘这里自动拆" oninput="_bpaste(${i},this.value)"></textarea>
@@ -1624,7 +1622,7 @@ function _bpaste(i,raw){
   if(url||tok) _bstat('已自动拆分'+(url?' · 地址✓':'')+(tok?' · key✓':''),'var(--ok)');
 }
 function _bstat(m,c){ const el=$('#brainStatus'); if(el){ el.textContent=m; el.style.color=c||'var(--text-3)'; } }
-function brainAdd(){ if(_brains.length>=9){ _bstat('最多 9 条','var(--danger,#e5484d)'); return; } _brains.push({url:'',key:'',model:'',label:'',role:'主力',on:true}); renderBrains(); }
+function brainAdd(){ if(_brains.length>=9){ _bstat('最多 9 条','var(--danger,#e5484d)'); return; } _brains.push({url:'',key:'',model:'',label:'',on:true}); renderBrains(); }
 function brainDel(i){ _brains.splice(i,1); renderBrains(); }
 async function fillBrains(){
   _bstat('读取当前配置…');
@@ -1637,7 +1635,7 @@ async function fillBrains(){
 }
 async function saveBrains(){
   const brains=_brains.filter(b=>(b.url||'').trim()).slice(0,9).map(b=>({
-    url:(b.url||'').trim(), model:(b.model||'').trim(), label:(b.label||'').trim(), role:b.role||'主力', on:b.on!==false,
+    url:(b.url||'').trim(), model:(b.model||'').trim(), label:(b.label||'').trim(), on:b.on!==false,
     ...(/^[•*]/.test(b.key||'')?{key:b.key}:{key:(b.key||'').trim()})   // 掩码原样回传→后端沿用原 key
   }));
   _bstat('保存中…');
