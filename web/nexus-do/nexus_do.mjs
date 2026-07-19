@@ -992,8 +992,8 @@ ${capabilitySelfDescription(true)}
     const cfg = (await this.storage.get('config')) || {};
     cfg._provider = cfg._provider || {}; cfg._auto_models = cfg._auto_models || {};
     const brains = await this.resolveBrains(false);
-    const out = [];
-    for (const brain of brains) {
+    // 并发探测:9 条同时测,秒出结果(各条独立、只读缓存,无写冲突)
+    const out = await Promise.all(brains.map(async (brain) => {
       const t0 = Date.now();
       const res = { label: brain.label || brain.url, url: brain.url, model: brain.model || 'auto', ok: false, dialect: '', ms: 0, err: '' };
       let model = brain.model || cfg._auto_models[brain.url] || 'auto';
@@ -1021,8 +1021,8 @@ ${capabilitySelfDescription(true)}
         } catch (e) { res.err = String(e && e.message || e).slice(0, 50); break; }
       }
       res.ms = Date.now() - t0;
-      out.push(res);
-    }
+      return res;
+    }));
     return { brains: out, count: out.length, ok: out.filter(x => x.ok).length };
   }
 
