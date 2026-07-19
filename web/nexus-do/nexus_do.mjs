@@ -1042,30 +1042,41 @@ ${capabilitySelfDescription(true)}
           }
         }
         if (!model) model = 'auto';
-        const provider = this.brainProvider(brain.url, model, brain.provider);
+        cfg._provider = cfg._provider || {};
         const tag = brain.label || brain.url;
-        try {
-          const send = (withT) => {
-            const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500 });   // 给推理模型(kimi-k2.6/o1)留 reasoning 预算，否则 content 被截空
-            return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
-          };
-          let r = await send(true);
-          // 推理模型只接受 temperature=1，自定义值 400 → 去掉 temperature 重试一次
-          if (!r.ok && r.status === 400) r = await send(false);
-          if (r.ok) {
-            const d = await r.json();
-            const text = this.parseBrainText(provider, d);
-            if (text && text.trim() && !this.isRefusal(text)) {
-              if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
-              return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
+        // 神枢自己试出格式:锁定过(显式或缓存)就直连;否则依次试会的方言,哪种通就锁哪种(之后秒回直连)。
+        const locked = brain.provider || cfg._provider[brain.url] || '';
+        const guess = locked || this.brainProvider(brain.url, model);
+        const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
+        for (const provider of dialects) {
+          try {
+            const send = (withT) => {
+              const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500 });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
+              return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
+            };
+            let r = await send(true);
+            if (!r.ok && r.status === 400) r = await send(false);   // 推理模型只接受 temperature=1 → 去掉重试
+            if (r.ok) {
+              const d = await r.json().catch(() => null);
+              const text = this.parseBrainText(provider, d);
+              if (text && text.trim() && !this.isRefusal(text)) {
+                if (cfg._provider[brain.url] !== provider) { cfg._provider[brain.url] = provider; cacheDirty = true; }   // 锁定这家的方言
+                if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
+                return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
+              }
+              // 连通但解析空:可能方言选错(解析路径不对)→ 未锁定则试下一种方言
+              lastErr = `${tag}：回了空/被挡`;
+              if (!locked && provider !== dialects[dialects.length - 1]) continue;
+              break;
             }
-            lastErr = `${tag}：回了空/被挡`;
-          } else {
             const body = await r.text().catch(() => '');
+            // 404/400 视为"格式可能不对":未锁定则换方言再试;其它(401/403/429/5xx)是真错,不乱换方言
+            if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = `${tag}·${provider} HTTP ${r.status}`; continue; }
             lastErr = `${tag} 报错 HTTP ${r.status}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 100) : ''}`;
-          }
-        } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); }
-        // 这条挂了 → 自动换下一条(自由调度 · 故障转移)
+            break;
+          } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); break; }
+        }
+        // 这条(所有方言)都没成 → 自动换下一条脑(自由调度 · 故障转移)
       }
       if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
       return null;
