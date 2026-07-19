@@ -458,10 +458,32 @@ export class ShenshuCore {
 
   // ═══════════════════════ 记忆检索（v4 语义召回）═══════════════════════
   // 从情节记忆里按关键词重叠召回最相关的 N 条
+  // 记忆巩固:情节记忆溢出时别直接丢——把要紧的(重要词/情绪强)提炼进长期记忆,要事永不遗忘。
+  // 纯逻辑,便于测试。返回被修改的 soul(episodes 裁到 KEEP,重要老记忆沉入 longterm)。
+  consolidateMemory(soul) {
+    const eps = soul.episodes || [];
+    if (eps.length <= EPISODE_KEEP) return soul;
+    const IMPORTANT = /重要|记住|记得|永远|别忘|密钥|部署|上线|生产|项目|仓库|禁|别碰|规矩|原则|偏好|习惯|喜欢|讨厌|生日|名字|叫我|以后|每次|约定/;
+    const overflow = eps.slice(0, eps.length - EPISODE_KEEP);   // 即将被挤掉的老记忆
+    soul.longterm = soul.longterm || [];
+    for (const e of overflow) {
+      const txt = e.他说 || '';
+      // 情绪强度:坐标态(s)偏离中枢越大越强烈;或命中重要词 → 值得长期记住
+      const strong = e.情感烙印 && typeof e.情感烙印.s === 'number' && Math.abs(e.情感烙印.s - 40) > 28;
+      if (IMPORTANT.test(txt) || strong) {
+        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true });
+      }
+    }
+    if (soul.longterm.length > 200) soul.longterm = soul.longterm.slice(-200);   // 长期记忆封顶 200
+    soul.episodes = eps.slice(-EPISODE_KEEP);
+    return soul;
+  }
+
   // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
+  // 长期记忆(longterm)与近期情节(episodes)一起参与召回——要事沉底但相关时仍会被想起。
   // 纯函数（now 可注入，便于测试）。
   retrieveMemories(soul, text, n = 3, now = Date.now(), coord = null) {
-    const eps = soul.episodes || [];
+    const eps = [...(soul.longterm || []), ...(soul.episodes || [])];
     if (!eps.length || !text) return [];
     const toks = this._tokens(text);
     if (!toks.size) return [];
@@ -635,7 +657,7 @@ export class ShenshuCore {
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       soul.episodes.push({ ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion });
-      if (soul.episodes.length > EPISODE_KEEP) soul.episodes = soul.episodes.slice(-EPISODE_KEEP);
+      this.consolidateMemory(soul);   // 溢出前先把要事沉入长期记忆,再裁 —— 越聊越厚,要事不忘
     }
     await this.saveSoul(soul);
     let stream = (await this.storage.get('stream')) || [];
@@ -1923,7 +1945,7 @@ ${capabilitySelfDescription(true)}
           ts: now, 他说: `（我${cap.name}）`, 我说了: f.心事,
           情感烙印: cur.current_shu_coord || null, emotion: 'agency', cap: cap.id,
         });
-        if (cur.episodes.length > EPISODE_KEEP) cur.episodes = cur.episodes.slice(-EPISODE_KEEP);
+        this.consolidateMemory(cur);   // 同上:要事沉长期记忆再裁
         // 主动为主人做事，心绪回暖一点点（agency = 中枢感到自己有用、被需要）
         cur.心绪 = clamp01((cur.心绪 ?? 0.5) + f.dv);
         // 内心独白也留一笔，喂养 /inner 的自我觉知
