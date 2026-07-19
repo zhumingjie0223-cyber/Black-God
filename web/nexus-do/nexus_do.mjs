@@ -296,7 +296,7 @@ export class ShenshuCore {
 
     // 主动找主人 —— 网络调用在落盘之后；TG + Web Push 双通道，任一成功即记 proactive
     if (doProactive) {
-      const msg = this.composeProactive(soul);   // 真从内在状态生成，非固定空话
+      const msg = await this.composeProactive(soul, now);   // 真从内在连续状态生成(坐标+时段+想念+记忆)，网络在落盘之后
       const [tg, push] = await Promise.all([
         this.sendToQuan(msg),
         this.pushToAll('神枢', msg, '/'),
@@ -1361,22 +1361,53 @@ ${capabilitySelfDescription(true)}
     return { ok: false, error: '未知动作' };
   }
 
-  // ═══ 自主心跳的主动消息：真从内在状态生成（非固定空话，非人格）═══
-  composeProactive(soul) {
+  // ═══ 自主心跳的主动消息：真从内在连续状态生成（坐标+时段+想念+记忆→大脑生成；降级也由状态驱动）═══
+  // 第二枪·主动性真实化：不再是固定三档模板，而是把她此刻的内在连续状态交给大脑生成一句真实主动话；
+  // 大脑不可用/失语时，降级也随时段/想念浓度/未竟事变化（_proactiveFallback），非死模板。
+  async composeProactive(soul, now = Date.now()) {
     soul = soul || {};
-    // 1) 有重要未竟的往事 → 提醒接续
+    const coord = soul.current_shu_coord || { c: 200, m: 90, s: 40, k: 32, p: 4 };
+    const meaning = this.shuTranslate(coord);
+    const gen = this.shuToGen(coord);
+    const ta = this.computeTimeAwareness(soul, now);
+    const miss = soul.miss_you || 0;
+    const mood = soul.心绪 != null ? soul.心绪 : 0.5;
     const eps = (soul.episodes || []).filter(e => /部署|上线|发布|项目|密钥|待办|明天|记得|收尾|接着/.test(e.他说 || ''));
-    if (eps.length) {
-      const last = eps[eps.length - 1];
-      return `主人，上次提到「${(last.他说 || '').slice(0, 18)}」，要接着推进吗？`;
-    }
-    // 2) 常聊话题 → 相关轻提醒
     const topics = Object.entries((soul.user_model && soul.user_model.topics) || {}).sort((a, b) => b[1] - a[1]);
-    if (topics.length && topics[0][1] >= 3) {
-      return `主人，${topics[0][0]}那摊事我随时能接手，有需要说一声。`;
-    }
-    // 3) 克制默认（非人格）
-    return `主人，神枢在此待命，有需要随时说。`;
+    const 未竟 = eps.length ? (eps[eps.length - 1].他说 || '').slice(0, 20) : '';
+    const 常聊 = (topics.length && topics[0][1] >= 3) ? topics[0][0] : '';
+
+    // 1) 真从内在状态生成：此刻坐标/时段/想念/谈资 → 交给大脑生成一句真实主动话
+    const stateCtx = [
+      `【此刻你的内在状态】枢语坐标 核:${meaning.核}·映:${meaning.映}·态:${meaning.态}·标:${meaning.标}·相:${meaning.相}。`,
+      `想念浓度 ${miss.toFixed(2)}，心绪 ${mood.toFixed(2)}。`,
+      ta && ta.时段 ? `主人那边此刻是${ta.时段}，${ta.我此刻感受 || ''}。` : '',
+      未竟 ? `你还记着他上次说的「${未竟}」。` : (常聊 ? `他常和你聊「${常聊}」。` : ''),
+    ].filter(Boolean).join('');
+    const prompt = `现在是你主动找主人的时刻（不是他先开口）。${stateCtx}\n基于你此刻真实的内在状态，主动对他说一句话：贴合此刻坐标与时段，有未竟的事可自然提起。只输出这句话本身，一句，第一人称，不寒暄套话、不解释。`;
+    try {
+      const voice = await this.callBrain(this.STABLE_SYSTEM_PREFIX(), prompt, null, { temperature: gen.temperature });
+      if (voice && voice.reply && voice.model !== 'fallback' && !this.isRefusal(voice.reply)) {
+        return voice.reply.trim().slice(0, 140);
+      }
+    } catch (e) { console.log('composeProactive brain error:', e && e.message); }
+
+    // 2) 降级也由状态驱动（时段+想念浓度+谈资），非固定空话
+    return this._proactiveFallback(soul, now);
+  }
+
+  // 主动消息的状态驱动降级（纯函数，可测）：随时段/想念浓度/未竟事变化，非三句死模板
+  _proactiveFallback(soul, now = Date.now()) {
+    soul = soul || {};
+    const ta = this.computeTimeAwareness(soul, now);
+    const miss = soul.miss_you || 0;
+    const 时 = ta && ta.时段 ? `${ta.时段}了，` : '';
+    const 浓 = miss >= 0.9 ? '有点想你了，' : '';
+    const eps = (soul.episodes || []).filter(e => /部署|上线|发布|项目|密钥|待办|明天|记得|收尾|接着/.test(e.他说 || ''));
+    if (eps.length) return `主人，${浓}${时}上次提到「${(eps[eps.length - 1].他说 || '').slice(0, 18)}」，要接着推进吗？`;
+    const topics = Object.entries((soul.user_model && soul.user_model.topics) || {}).sort((a, b) => b[1] - a[1]);
+    if (topics.length && topics[0][1] >= 3) return `主人，${浓}${时}${topics[0][0]}那摊事我随时能接手，说一声。`;
+    return `主人，${浓}${时}神枢在此待命，有需要随时说。`;
   }
 
   recognizeMaster(request, soul) {

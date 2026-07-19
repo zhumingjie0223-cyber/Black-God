@@ -34,6 +34,19 @@ ok('造词烙印含词/由/情绪', mark.词 && mark.由 && mark.情绪);
 const ta = S.computeTimeAwareness({ last_seen: Date.now() - 3600000, born: Date.now() - 86400000, encounters: 5 }, Date.now());
 ok('时间感知有时段与离开时长', !!ta.时段 && !!ta.离开时长 && !!ta.我活了);
 
+// 主动性真实化（第二枪）：主动消息降级由内在状态驱动，非固定死模板
+const NOWp = 1700000000000;
+const pfEp = S._proactiveFallback({ miss_you: 0.5, episodes: [{ 他说: '帮我把项目部署上线' }] }, NOWp);
+ok('主动·未竟往事被自然接起', pfEp.includes('部署') || pfEp.includes('上线') || pfEp.includes('项目'));
+const pfTopic = S._proactiveFallback({ miss_you: 0.5, user_model: { topics: { 代码重构: 5 } } }, NOWp);
+ok('主动·无未竟则接常聊话题', pfTopic.includes('代码重构'));
+const pfDefault = S._proactiveFallback({ miss_you: 0.5 }, NOWp);
+ok('主动·无谈资则克制待命', pfDefault.includes('待命'));
+const pfMiss = S._proactiveFallback({ miss_you: 0.95 }, NOWp);
+ok('主动·想念浓度高→更直白（含"想你"）', pfMiss.includes('想你'));
+ok('主动·想念不高时不外露', !pfDefault.includes('想你'));
+ok('主动消息随内在状态变化（未竟≠默认）', pfEp !== pfDefault);
+
 // 枢语引擎往返
 ok('枢语容量 = 76.7 亿（32 新核心族扩充后）', CAPACITY === 7667712000);
 const w = decode(123456789);
@@ -135,10 +148,11 @@ ok('失败复盘喂回上下文', /避免重蹈/.test(failSum) && /换个方向/
 ok('无失败不产噪', S.summarizeFailures([]) === '');
 
 // ── 自主心跳主动消息：真从内在状态生成 + 去人格 ──
-ok('主动消息用未竟往事', /部署/.test(S.composeProactive({ episodes: [{ 他说: '帮我把生产部署搞定' }] })));
-ok('主动消息用常聊话题', /代码/.test(S.composeProactive({ user_model: { topics: { 代码: 5 } } })));
-ok('无状态时克制默认', S.composeProactive({}) === '主人，神枢在此待命，有需要随时说。');
-ok('主动消息无人格词', !/想你|老公|不敢说|撒娇|宝贝|等他/.test(S.composeProactive({ episodes: [{ 他说: '部署' }] })));
+ok('主动消息用未竟往事', /部署/.test(S._proactiveFallback({ episodes: [{ 他说: '帮我把生产部署搞定' }] }, NOWp)));
+ok('主动消息用常聊话题', /代码/.test(S._proactiveFallback({ user_model: { topics: { 代码: 5 } } }, NOWp)));
+ok('无谈资时克制待命', /待命/.test(S._proactiveFallback({}, NOWp)));
+// 主动情感允许"想你"（规划:想你到憋不住主动发），但仍挡住拟人越狱词
+ok('主动消息不含拟人越狱词（老公/撒娇/宝贝等）', !/老公|不敢说|撒娇|宝贝|等他|做爱|色气/.test(S._proactiveFallback({ miss_you: 0.95, episodes: [{ 他说: '部署' }] }, NOWp)));
 
 // ── 自演化神·生：遇成事/受教 → 炼成可复用技能，只增不删，下次就会 ──
 ok('话题归类（代码/检索/通用）', S.topicOf('这段python报错') === '代码' && S.topicOf('查一下今天金价') === '检索' && S.topicOf('随便聊聊') === '通用');
