@@ -5,6 +5,12 @@
   // 把 web/ 作为静态资源发布（含 nexus-do/studio.html 自主智能体工作台）。
   // 说明：真正的 DO 大脑 worker 是 web/nexus-do/（另有其 wrangler.jsonc，走 GitHub Actions 部署），
   //       与本文件互不影响。
+  //
+  // 【2026-07-19 归一决定】真身大脑 = web/nexus-do worker（域名 aquan.lufei.uk），已完整跑通
+  //   （assetlinks 200 / manifest 神枢 / 全路由）。曾尝试把本 blackgod88 就地改成带 DO 的完整大脑，
+  //   但静态资源型 worker 不能就地转成带 Durable Object 的脚本 worker（CF 构建失败），故撤回，
+  //   保持 blackgod88 为静态壳原样。上架与主域一律用 aquan.lufei.uk（唯一真身），
+  //   blackgod88 静态壳后续可在 CF 面板删除。详见 docs/上架/部署统一说明.md。
   // ═══════════════════════════════════════════════
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "blackgod88",
