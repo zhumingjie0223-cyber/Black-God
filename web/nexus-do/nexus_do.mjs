@@ -963,6 +963,24 @@ ${capabilitySelfDescription(true)}
     return t;
   }
 
+  // ═══════════════════════ 多脑注册表（1~9 条 · 自由调度 · 柱2 升级）═══════════════════════
+  // 返回有序可用大脑列表(去重、≤9)，向后兼容旧单网关(cfg.gateway_*)。神枢按序故障转移调度。
+  async resolveBrains(instanceMode) {
+    const cfg = (await this.storage.get('config')) || {};
+    const out = [];
+    if (Array.isArray(cfg.brains)) {
+      for (const x of cfg.brains.slice(0, 9)) {
+        if (x && x.url && x.on !== false) out.push({ url: String(x.url).trim(), key: String(x.key || '').trim(), model: String(x.model || '').trim() || 'auto', provider: x.provider || '', label: x.label || '' });
+      }
+    }
+    // 旧单网关 → 追加为一条(去重)；系统主人可回落 env 网关，实例主人只用自己配的
+    const legacyUrl = String(cfg.gateway_url || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_URL || ''))).trim();
+    if (legacyUrl && !out.some(b => b.url === legacyUrl)) {
+      out.push({ url: legacyUrl, key: cfg.gateway_key || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_KEY || '')), model: (cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || 'auto'), provider: cfg.gateway_provider || '', label: '主网关' });
+    }
+    return out.slice(0, 9);
+  }
+
   async callBrain(system, userMsg, soul, opts = {}) {
     const temperature = (typeof opts.temperature === 'number') ? opts.temperature : 0.85;
     const tier = opts.tier === 'light' ? 'light' : 'heavy';   // 默认 heavy，保守不牺牲质量
@@ -972,46 +990,55 @@ ${capabilitySelfDescription(true)}
     let lastErr = null;   // 捕获真实失败原因，用于诚实报错（不空回响 · 柱3）
     if (instanceMode) {
       const cfg = (await this.storage.get('config')) || {};
-      if (!cfg.gateway_url) {
+      if (!cfg.gateway_url && !(Array.isArray(cfg.brains) && cfg.brains.some(x => x && x.url && x.on !== false))) {
         return { reply: '先在设置里填你自己的 API(地址 + 密钥),我才能用你的大脑陪你聊。', model: 'no_api', tier };
       }
     }
 
-    // 强算力网关（Claude 等，标准 Chat Completions；URL 可填 base，自动补端点）
+    // 多脑网关：按注册表顺序故障转移(自由调度)。一条挂了自动换下一条，最多 9 条。
     const tryGateway = async () => {
       const cfg = (await this.storage.get('config')) || {};
-      const gwBase = cfg.gateway_url || (instanceMode ? null : this.env.NEXUS_GATEWAY_URL);
-      const gwKey = cfg.gateway_key || (instanceMode ? '' : this.env.NEXUS_GATEWAY_KEY);
-      let gwModel = cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || '';
-      if (!gwBase) return null;
-      // 未指定模型（留空或 auto）：联网识别一次，取第一个真实模型并缓存，避免硬传 "auto" 被网关拒
-      if (!gwModel || gwModel === 'auto') {
-        if (cfg._auto_model) gwModel = cfg._auto_model;
-        else {
-          const probe = await this.probeModels({ gateway_url: gwBase, gateway_key: gwKey });
-          if (probe.ok && probe.models.length) { gwModel = probe.models[0]; cfg._auto_model = gwModel; await this.storage.put('config', cfg); }
+      const brains = await this.resolveBrains(instanceMode);
+      if (!brains.length) return null;
+      cfg._auto_models = cfg._auto_models || {};
+      let cacheDirty = false;
+      for (const brain of brains) {
+        let model = brain.model || 'auto';
+        // 未指定模型（留空/auto）：联网识别一次并按 url 缓存，避免硬传 "auto" 被网关拒
+        if (!model || model === 'auto') {
+          if (cfg._auto_models[brain.url]) model = cfg._auto_models[brain.url];
+          else {
+            const probe = await this.probeModels({ gateway_url: brain.url, gateway_key: brain.key });
+            if (probe.ok && probe.models.length) { model = probe.models[0]; cfg._auto_models[brain.url] = model; cacheDirty = true; }
+          }
         }
+        if (!model) model = 'auto';
+        const provider = this.brainProvider(brain.url, model, brain.provider);
+        const tag = brain.label || brain.url;
+        try {
+          const send = (withT) => {
+            const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500 });   // 给推理模型(kimi-k2.6/o1)留 reasoning 预算，否则 content 被截空
+            return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
+          };
+          let r = await send(true);
+          // 推理模型只接受 temperature=1，自定义值 400 → 去掉 temperature 重试一次
+          if (!r.ok && r.status === 400) r = await send(false);
+          if (r.ok) {
+            const d = await r.json();
+            const text = this.parseBrainText(provider, d);
+            if (text && text.trim() && !this.isRefusal(text)) {
+              if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
+              return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
+            }
+            lastErr = `${tag}：回了空/被挡`;
+          } else {
+            const body = await r.text().catch(() => '');
+            lastErr = `${tag} 报错 HTTP ${r.status}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 100) : ''}`;
+          }
+        } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); }
+        // 这条挂了 → 自动换下一条(自由调度 · 故障转移)
       }
-      if (!gwModel) gwModel = 'auto';   // 实在识别不到，保持原行为交给网关自行决定
-      const provider = this.brainProvider(gwBase, gwModel, cfg.gateway_provider);
-      try {
-        const send = (withT) => {
-          const req = this.buildBrainReq(provider, gwBase, gwKey, gwModel, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500 });   // 给推理模型(kimi-k2.6/o1 等)留出 reasoning 预算，否则 content 被截空
-          return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
-        };
-        let r = await send(true);
-        // 推理模型(如 kimi-k2.6 / o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
-        if (!r.ok && r.status === 400) r = await send(false);
-        if (r.ok) {
-          const d = await r.json();
-          const text = this.parseBrainText(provider, d);
-          if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: (gwModel || 'gateway'), tier };
-          lastErr = '你的大脑网关回了空内容或被安全策略挡下';
-        } else {
-          const body = await r.text().catch(() => '');
-          lastErr = `你的大脑网关报错 HTTP ${r.status}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 140) : ''}`;
-        }
-      } catch (e) { lastErr = '连不上你的大脑网关：' + String(e && e.message || e).slice(0, 80); }
+      if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
       return null;
     };
     // CF Workers AI Llama-3.3-70b（免费、CF 内部、稳定）
@@ -1856,6 +1883,11 @@ ${capabilitySelfDescription(true)}
       gateway_model: c.gateway_model || '',
       gateway_key: mask ? (c.gateway_key ? '••••••' + String(c.gateway_key).slice(-4) : '') : (c.gateway_key || ''),
       has_key: !!c.gateway_key,
+      // 多脑注册表(1~9 条 · 自由调度)：key 掩码返回
+      brains: (Array.isArray(c.brains) ? c.brains : []).slice(0, 9).map(x => ({
+        url: x.url || '', model: x.model || '', label: x.label || '', provider: x.provider || '', on: x.on !== false,
+        key: mask ? (x.key ? '••••••' + String(x.key).slice(-4) : '') : (x.key || ''), has_key: !!x.key,
+      })),
       来源: c.gateway_url ? 'app' : (this.env.NEXUS_GATEWAY_URL ? 'cf密钥' : '内置Llama'),
       // 执行脑连接器（真沙箱的手）：只回地址与「是否已配 token」，token 本身永不回传
       exec_url: c.exec_url || '',
@@ -1912,6 +1944,17 @@ ${capabilitySelfDescription(true)}
     // 密钥：空串=清空；掩码开头(•)=不动；其它=更新
     if (b.gateway_key === '') c.gateway_key = '';
     else if (b.gateway_key !== undefined && !/^[•*]/.test(b.gateway_key)) c.gateway_key = String(b.gateway_key).trim();
+    // 多脑注册表(1~9 条):掩码 key 沿用原值;脑列表变则清模型缓存
+    if (Array.isArray(b.brains)) {
+      const prevByUrl = {}; for (const p of (Array.isArray(c.brains) ? c.brains : [])) if (p && p.url) prevByUrl[String(p.url).trim()] = p;
+      c.brains = b.brains.slice(0, 9).map(x => {
+        const url = String(x.url || '').trim();
+        let key = String(x.key || '');
+        if (/^[•*]/.test(key)) key = (prevByUrl[url] && prevByUrl[url].key) || '';   // 掩码 = 沿用原 key，不覆盖
+        return { url, key: key.trim(), model: String(x.model || '').trim(), provider: String(x.provider || '').trim(), label: String(x.label || '').slice(0, 24), on: x.on !== false };
+      }).filter(x => x.url);
+      c._auto_models = {};
+    }
     // 执行脑连接器
     if (b.exec_url !== undefined) c.exec_url = String(b.exec_url || '').trim();
     if (b.exec_token === '') c.exec_token = '';
