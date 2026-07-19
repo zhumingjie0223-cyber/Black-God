@@ -928,11 +928,14 @@ ${capabilitySelfDescription(true)}
       if (!gwModel) gwModel = 'auto';   // 实在识别不到，保持原行为交给网关自行决定
       const gw = /\/(chat\/completions|completions|messages)$/.test(gwBase) ? gwBase : gwBase.replace(/\/+$/, '') + '/chat/completions';
       try {
-        const r = await fetch(gw, {
+        const post = (extra) => fetch(gw, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(gwKey ? { Authorization: 'Bearer ' + gwKey } : {}) },
-          body: JSON.stringify({ model: gwModel, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, temperature }),
+          body: JSON.stringify({ model: gwModel, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, ...extra }),
         });
+        let r = await post({ temperature });
+        // 推理模型(如 kimi-k2.6 / OpenAI o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
+        if (!r.ok && r.status === 400) r = await post({});
         if (r.ok) {
           const d = await r.json();
           const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
@@ -1991,12 +1994,15 @@ ${capabilitySelfDescription(true)}
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 20_000);
     try {
-      const r = await fetch(gw, {
+      const post = (extra) => fetch(gw, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
-        body: JSON.stringify({ model: model || 'auto', messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, temperature: 0.85 }),
+        body: JSON.stringify({ model: model || 'auto', messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 320, ...extra }),
         signal: ac.signal,
       });
+      let r = await post({ temperature: 0.85 });
+      // 推理模型(如 kimi-k2.6 / OpenAI o1)只接受 temperature=1，自定义值会 400；去掉 temperature 重试一次
+      if (!r.ok && r.status === 400) r = await post({});
       if (!r.ok) return { ok: false, err: 'HTTP ' + r.status };
       const d = await r.json();
       const text = d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
