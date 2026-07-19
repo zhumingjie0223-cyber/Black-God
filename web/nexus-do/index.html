@@ -886,6 +886,16 @@ body::before{
   <div class="field" style="margin-top:16px"><label>神枢核心地址（一般不用改）</label><input id="nexusBase" placeholder="留空 = 当前地址"/></div>
 </div>
 
+<div class="sheet" id="sheetBrains">
+  <div class="grab"></div>
+  <div class="sheet-title">大脑舰队 · 神枢调度</div>
+  <div class="sheet-sub">挂 1~9 条 API，神枢<b>按职责秒派</b>、一条挂了自动换下一条。<b>神枢始终主导</b>，底层只是算力。</div>
+  <div id="brainList"></div>
+  <button class="btn ghost" id="brainAddBtn" onclick="brainAdd()" style="margin-top:4px">＋ 加一条脑（最多 9）</button>
+  <div id="brainStatus" style="font-size:12px;color:var(--text-3);margin:10px 0;min-height:16px"></div>
+  <button class="btn" onclick="saveBrains()">保存并生效</button>
+</div>
+
 <div class="sheet" id="sheetExec">
   <div class="grab"></div>
   <div class="sheet-title">执行脑 · 连接器</div>
@@ -1175,7 +1185,7 @@ function go(i) {
 /* ============ Sheet（抽屉 + 拖拽关闭）============ */
 let openS = null;
 function openSheet(id){ const s=$('#'+id); if(!s)return; $('#mask').classList.add('show'); s.classList.add('show'); openS=s; initSheetDrag(s);
-  if(id==='sheetModel') renderModelOpts(); if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); }
+  if(id==='sheetModel') renderModelOpts(); if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); }
 function closeSheet(){ if(openS){ openS.classList.remove('show'); openS=null; } $('#mask').classList.remove('show'); }
 function initSheetDrag(s){
   if (s._drag) return; s._drag = true;
@@ -1582,6 +1592,60 @@ async function saveApi(){
   else if(r&&r.__401) toast('这是主人的私密配置——需以主人身份解锁');
   else toast('保存失败（检查是否在线/已解锁）');
 }
+/* 大脑舰队：1~9 条 API，神枢按职责调度。神枢始终主导，底层只是算力。 */
+const BRAIN_ROLES=['主力','快答','代码','深思'];
+let _brains=[];
+function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function renderBrains(){
+  const el=$('#brainList'); if(!el) return;
+  el.innerHTML=_brains.map((b,i)=>`<div class="brain-card" style="border:1px solid var(--line-2);border-radius:14px;padding:11px;margin-bottom:10px">
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+      <input class="lock-input" style="flex:1;text-align:left;padding:8px;letter-spacing:0" placeholder="标签(如 Kimi快版)" value="${_esc(b.label)}" oninput="_bset(${i},'label',this.value)"/>
+      <select class="lock-input" style="width:88px;padding:8px" onchange="_bset(${i},'role',this.value)">${BRAIN_ROLES.map(r=>`<option${r===(b.role||'主力')?' selected':''}>${r}</option>`).join('')}</select>
+      <label style="font-size:12px;white-space:nowrap"><input type="checkbox" ${b.on!==false?'checked':''} onchange="_bset(${i},'on',this.checked)"/> 启用</label>
+    </div>
+    <textarea rows="1" class="lock-input" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;font-size:12px;letter-spacing:0" placeholder="一键粘贴：地址+key 整段粘这里自动拆" oninput="_bpaste(${i},this.value)"></textarea>
+    <input class="lock-input bfld" data-k="url" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;margin-top:6px;letter-spacing:0" placeholder="地址 https://.../v1" value="${_esc(b.url)}" oninput="_bset(${i},'url',this.value)"/>
+    <input class="lock-input bfld" data-k="key" type="password" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;margin-top:6px;letter-spacing:0" placeholder="API Key" value="${_esc(b.key)}" oninput="_bset(${i},'key',this.value)"/>
+    <input class="lock-input" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;margin-top:6px;letter-spacing:0" placeholder="模型（留空 = 自动识别）" value="${_esc(b.model)}" oninput="_bset(${i},'model',this.value)"/>
+    <div style="text-align:right;margin-top:6px"><span onclick="brainDel(${i})" style="color:var(--danger,#e5484d);font-size:12px;cursor:pointer">删除这条</span></div>
+  </div>`).join('') || '<div style="color:var(--text-3);font-size:13px;padding:8px 0">还没挂脑，点下面加一条。</div>';
+  const addBtn=$('#brainAddBtn'); if(addBtn) addBtn.style.display=_brains.length>=9?'none':'';
+}
+function _bset(i,k,v){ if(_brains[i]) _brains[i][k]=v; }
+function _bpaste(i,raw){
+  raw=(raw||'').trim(); if(!raw||!_brains[i]) return;
+  const urlM=raw.match(/https?:\/\/[^\s|,;'"]+/i);
+  const url=urlM?urlM[0].replace(/\/+$/,''):'';
+  const tok=(urlM?raw.replace(urlM[0],' '):raw).split(/[\s|,;=:：'"]+/).filter(s=>!/^(url|地址|link|token|密钥|key|令牌)$/i.test(s)).filter(s=>s.length>=6).sort((a,b)=>b.length-a.length)[0]||'';
+  if(url) _brains[i].url=url; if(tok) _brains[i].key=tok;
+  // 同步该卡片 DOM
+  const card=$('#brainList').children[i]; if(card){ card.querySelectorAll('.bfld').forEach(inp=>{ const k=inp.getAttribute('data-k'); if(k==='url'&&url) inp.value=url; if(k==='key'&&tok) inp.value=tok; }); }
+  if(url||tok) _bstat('已自动拆分'+(url?' · 地址✓':'')+(tok?' · key✓':''),'var(--ok)');
+}
+function _bstat(m,c){ const el=$('#brainStatus'); if(el){ el.textContent=m; el.style.color=c||'var(--text-3)'; } }
+function brainAdd(){ if(_brains.length>=9){ _bstat('最多 9 条','var(--danger,#e5484d)'); return; } _brains.push({url:'',key:'',model:'',label:'',role:'主力',on:true}); renderBrains(); }
+function brainDel(i){ _brains.splice(i,1); renderBrains(); }
+async function fillBrains(){
+  _bstat('读取当前配置…');
+  const c=await Nexus.getConfig();
+  if(!c){ _bstat('（离线，无法读取服务器配置）','var(--danger,#e5484d)'); _brains=[]; renderBrains(); return; }
+  _brains=(c.brains&&c.brains.length)?c.brains.map(b=>({url:b.url||'',key:b.key||'',model:b.model||'',label:b.label||'',role:b.role||'主力',on:b.on!==false}))
+    : (c.gateway_url?[{url:c.gateway_url,key:c.gateway_key||'',model:c.gateway_model||'',label:'主网关',role:'主力',on:true}]:[]);
+  _bstat(_brains.length?('已挂 '+_brains.length+' 条 · 神枢按职责调度'):'还没挂脑，加一条开始');
+  renderBrains();
+}
+async function saveBrains(){
+  const brains=_brains.filter(b=>(b.url||'').trim()).slice(0,9).map(b=>({
+    url:(b.url||'').trim(), model:(b.model||'').trim(), label:(b.label||'').trim(), role:b.role||'主力', on:b.on!==false,
+    ...(/^[•*]/.test(b.key||'')?{key:b.key}:{key:(b.key||'').trim()})   // 掩码原样回传→后端沿用原 key
+  }));
+  _bstat('保存中…');
+  const r=await Nexus.setConfig({brains});
+  if(r&&r.ok){ const n=(r.brains||[]).filter(x=>x.on!==false).length; const lb=$('#apiLabel'); if(lb) lb.textContent=n?('舰队 · '+n+' 脑调度'):'内置 Llama'; toast('大脑舰队已保存 · '+n+' 条在役'); closeSheet(); }
+  else if(r&&r.__401) _bstat('这是主人的私密配置——需以主人身份解锁','var(--danger,#e5484d)');
+  else _bstat('保存失败（检查是否在线/已解锁）','var(--danger,#e5484d)');
+}
 /* 执行脑连接器：App 内一键连，不碰命令行 */
 // 一键粘贴：把「地址 + token」整段拆分填入两栏。容错任意格式(地址|token、URL=..\nToken=.. 等)
 function parseExecCombo(){
@@ -1757,7 +1821,7 @@ function syncMyApiLabels(){
   }catch(e){}
 }
 // 设置里点「大脑·模型 / 算力接口」:公共用户走自己的 API 编辑器(不是主人的 /config 面板)。
-function openBrainSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetApi'); }
+function openBrainSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetBrains'); }
 function openModelSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetModel'); }
 // 公共模式：左上角「⚙︎ 我的 API」随时改自己的网关
 function ensurePubApiBtn(){

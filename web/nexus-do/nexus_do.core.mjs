@@ -571,16 +571,17 @@ export class ShenshuCore {
     const instanceMode = !!this.env.MULTITENANT && (request && request.headers && request.headers.get('X-Nexus-Role')) === 'instance';
     const tier = this.pickTier(text, caps);
     const agentic = !instanceMode && (tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code'));
+    const role = this.preferredRole(tier, caps);   // 神枢主导:按任务定首选职责,秒派对口脑
     let brainResult;
     if (agentic) {
-      brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier });
+      brainResult = await this.runAgentLoop(baseSystem, text, snap, { temperature: gen.temperature, tier, role });
     } else {
       let webBlock = '';
       if (!instanceMode && this.needsWeb(text)) {
         const found = await this.webSearch(text).catch(() => '');
         if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
       }
-      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, instanceMode });
+      brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, instanceMode, role });
     }
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
@@ -970,15 +971,31 @@ ${capabilitySelfDescription(true)}
     const out = [];
     if (Array.isArray(cfg.brains)) {
       for (const x of cfg.brains.slice(0, 9)) {
-        if (x && x.url && x.on !== false) out.push({ url: String(x.url).trim(), key: String(x.key || '').trim(), model: String(x.model || '').trim() || 'auto', provider: x.provider || '', label: x.label || '' });
+        if (x && x.url && x.on !== false) out.push({ url: String(x.url).trim(), key: String(x.key || '').trim(), model: String(x.model || '').trim() || 'auto', provider: x.provider || '', label: x.label || '', role: x.role || '主力' });
       }
     }
     // 旧单网关 → 追加为一条(去重)；系统主人可回落 env 网关，实例主人只用自己配的
     const legacyUrl = String(cfg.gateway_url || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_URL || ''))).trim();
     if (legacyUrl && !out.some(b => b.url === legacyUrl)) {
-      out.push({ url: legacyUrl, key: cfg.gateway_key || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_KEY || '')), model: (cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || 'auto'), provider: cfg.gateway_provider || '', label: '主网关' });
+      out.push({ url: legacyUrl, key: cfg.gateway_key || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_KEY || '')), model: (cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || 'auto'), provider: cfg.gateway_provider || '', label: '主网关', role: '主力' });
     }
     return out.slice(0, 9);
+  }
+
+  // 神枢主导的职责分派：对口职责的脑排前(秒派),其余作故障转移(总能兜底,永不卡死)。
+  orderBrainsForTask(brains, role) {
+    if (!role || !Array.isArray(brains) || brains.length < 2) return brains;
+    const pri = [], rest = [];
+    for (const b of brains) (b.role === role ? pri : rest).push(b);
+    return pri.concat(rest);
+  }
+  // 按任务算首选职责(不乱:确定性映射)。caps 含 code→代码;heavy/think→深思;light→快答;否则主力。
+  preferredRole(tier, caps) {
+    caps = caps || [];
+    if (caps.includes('code')) return '代码';
+    if (tier === 'heavy' || caps.includes('think')) return '深思';
+    if (tier === 'light') return '快答';
+    return '主力';
   }
 
   async callBrain(system, userMsg, soul, opts = {}) {
@@ -998,7 +1015,8 @@ ${capabilitySelfDescription(true)}
     // 多脑网关：按注册表顺序故障转移(自由调度)。一条挂了自动换下一条，最多 9 条。
     const tryGateway = async () => {
       const cfg = (await this.storage.get('config')) || {};
-      const brains = await this.resolveBrains(instanceMode);
+      // 神枢主导:先按任务职责把对口脑排前(秒派),其余作故障转移
+      const brains = this.orderBrainsForTask(await this.resolveBrains(instanceMode), opts.role);
       if (!brains.length) return null;
       cfg._auto_models = cfg._auto_models || {};
       let cacheDirty = false;
@@ -1885,7 +1903,7 @@ ${capabilitySelfDescription(true)}
       has_key: !!c.gateway_key,
       // 多脑注册表(1~9 条 · 自由调度)：key 掩码返回
       brains: (Array.isArray(c.brains) ? c.brains : []).slice(0, 9).map(x => ({
-        url: x.url || '', model: x.model || '', label: x.label || '', provider: x.provider || '', on: x.on !== false,
+        url: x.url || '', model: x.model || '', label: x.label || '', provider: x.provider || '', role: x.role || '主力', on: x.on !== false,
         key: mask ? (x.key ? '••••••' + String(x.key).slice(-4) : '') : (x.key || ''), has_key: !!x.key,
       })),
       来源: c.gateway_url ? 'app' : (this.env.NEXUS_GATEWAY_URL ? 'cf密钥' : '内置Llama'),
@@ -1951,7 +1969,7 @@ ${capabilitySelfDescription(true)}
         const url = String(x.url || '').trim();
         let key = String(x.key || '');
         if (/^[•*]/.test(key)) key = (prevByUrl[url] && prevByUrl[url].key) || '';   // 掩码 = 沿用原 key，不覆盖
-        return { url, key: key.trim(), model: String(x.model || '').trim(), provider: String(x.provider || '').trim(), label: String(x.label || '').slice(0, 24), on: x.on !== false };
+        return { url, key: key.trim(), model: String(x.model || '').trim(), provider: String(x.provider || '').trim(), label: String(x.label || '').slice(0, 24), role: String(x.role || '主力').slice(0, 8), on: x.on !== false };
       }).filter(x => x.url);
       c._auto_models = {};
     }
