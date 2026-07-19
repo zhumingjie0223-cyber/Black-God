@@ -871,24 +871,50 @@ ${capabilitySelfDescription(true)}
 
   // 执行脑 · 真沙箱的手：把命令送到主人自有服务器上真跑（exec_brain）。
   // 未配 NEXUS_EXEC_URL → 如实告知「未接入」，绝不假装能跑（红线：不许假）。
-  async execRemote(cmd) {
+  // 破坏性命令识别(安全红线:危险操作须二次确认,同 /import?confirm)。保守清单,只拦真正不可逆/毁机的。纯逻辑。
+  dangerReason(cmd) {
+    const c = String(cmd || '');
+    if (/\brm\s+(?:-\w*\s+)*-\w*[rf]\w*\b.*(?:\/(?:\s|$)|\/\*|~|\$HOME|\.\.)/.test(c) || /\brm\s+-[rf]{1,2}\s+\/(?:\s|$)/.test(c)) return '递归强删关键路径';
+    if (/\bmkfs\b|\bmke2fs\b/.test(c)) return '格式化磁盘';
+    if (/\bdd\b[^\n]*\bof=\/dev\//.test(c)) return '裸写磁盘设备';
+    if (/>\s*\/dev\/(?:sd|nvme|vd|hd|mapper)/.test(c)) return '覆写块设备';
+    if (/:\s*\(\s*\)\s*\{.*\|\s*:\s*&\s*\}\s*;\s*:/.test(c) || /:\(\)\{:\|:&\};:/.test(c.replace(/\s/g, ''))) return 'fork 炸弹';
+    if (/\b(?:shutdown|reboot|halt|poweroff)\b/.test(c) || /\binit\s+0\b/.test(c)) return '关机/重启';
+    if (/\bchmod\s+(?:-R\s+)?[0-7]{3,4}\s+\/(?:\s|$)/.test(c) || /\bchown\s+-R\b[^\n]*\s\/(?:\s|$)/.test(c)) return '递归改根权限/属主';
+    if (/(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b/.test(c)) return '下载脚本直接执行';
+    if (/>\s*\/dev\/(?:sda|nvme0)/.test(c) || /\bwipefs\b/.test(c)) return '抹除文件系统签名';
+    return '';
+  }
+  isDangerousCmd(cmd) { return !!this.dangerReason(cmd); }
+  async execRemote(cmd, opts = {}) {
     // 连接器优先读 App 内配置（设置里一键填），回落到环境变量
     const cfg = (this.storage ? await this.storage.get('config') : null) || {};
     const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
     const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
     if (!url) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
+    const command = String(cmd || '');
+    // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
+    if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
+    // 客户端超时兜底:服务器 60 秒,这边 65 秒硬断,绝不让请求悬死
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, 65000) : null;
     try {
       const r = await fetch(url.replace(/\/+$/, '') + '/exec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
-        body: JSON.stringify({ cmd: String(cmd || ''), timeout: 60 }),
+        body: JSON.stringify({ cmd: command, timeout: 60 }),
+        ...(ctl ? { signal: ctl.signal } : {}),
       });
       if (r.status === 401) return { ok: false, note: '执行脑拒绝：token 不对' };
       if (!r.ok) return { ok: false, note: '执行脑返回 ' + r.status };
       const j = await r.json();
       return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null };
     } catch (e) {
-      return { ok: false, note: '连不上执行脑：' + String(e).slice(0, 80) };
+      const msg = String(e);
+      if (/abort/i.test(msg)) return { ok: false, note: '执行脑超时（65 秒无响应），已断开' };
+      return { ok: false, note: '连不上执行脑：' + msg.slice(0, 80) };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
@@ -1996,7 +2022,7 @@ ${capabilitySelfDescription(true)}
         case 'gen_video': out = await this.genVideo(params.prompt || '', params); break;
         case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
-        case 'exec':      out = await this.execRemote(params.command || ''); break;
+        case 'exec':      out = await this.execRemote(params.command || '', { confirm: params.confirm === true }); break;
         case 'watch':     out = await this.createWatch(params.text || ''); break;
         default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
       }
