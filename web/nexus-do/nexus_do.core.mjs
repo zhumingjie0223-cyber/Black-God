@@ -379,6 +379,8 @@ export class ShenshuCore {
       内心独白: (soul.inner_voice || []).slice(-10),
       对自己的观察: (soul.metacognition || []).slice(-5),
       情节记忆: (soul.episodes || []).slice(-12),
+      长期记忆: (soul.longterm || []).length,
+      认知: (() => { const m = soul.user_model || {}; const top = (o, n) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]); return { 常聊: top(m.topics, 3), 偏好: top(m.style, 1), 在意: top(m.entities, 3), 交互数: m.count || 0 }; })(),
       潜意识: (soul.subconscious || []).slice(-10),
       主动记录: (soul.proactive_log || []).slice(-10),
       成长印记: (soul.成长印记 || []).slice(-12),
