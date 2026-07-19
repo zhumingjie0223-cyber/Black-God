@@ -1,58 +1,21 @@
 {
-  // ═══════════════════════════════════════════════════════════════
-  // 根目录 Workers 配置 —— 部署「blackgod88」= 完整神枢大脑(三者归一)
+  // ═══════════════════════════════════════════════
+  // 根目录 Workers 配置 —— 供 Cloudflare「blackgod88」Git 集成使用。
+  // CF 该项目在仓库根目录跑 `npx wrangler deploy`，故根目录需要此配置：
+  // 把 web/ 作为静态资源发布（含 nexus-do/studio.html 自主智能体工作台）。
+  // 说明：真正的 DO 大脑 worker 是 web/nexus-do/（另有其 wrangler.jsonc，走 GitHub Actions 部署），
+  //       与本文件互不影响。
   //
-  // 归一前:blackgod88 只是 assets:web 的静态空壳(不跑大脑),真身大脑在
-  //   web/nexus-do worker(域名 aquan.lufei.uk)——两者分裂,CF Git 集成每次
-  //   push 只部署了空壳,导致 /.well-known/assetlinks.json 等大脑路由 404。
-  // 归一后:CF Git 集成在仓库根跑 `wrangler deploy`,直接把完整大脑部署成
-  //   blackgod88。main 指向已构建提交的 web/nexus-do/nexus_do.mjs(nexus_do.mjs
-  //   是 build.mjs 把 index.html 注入 core 后的产物,已随每次提交更新,CF 无需再构建)。
-  //
-  // 迁移说明(2026-07-19,权哥确认此时尚无真实用户,故 DO 可全新起、无记忆包袱):
-  //   · 本 worker 全新的 Durable Object(migrations v1 建 ShenshuCore),与旧 nexus-do
-  //     的 DO 相互独立;上线后把域名 aquan.lufei.uk / blackgod.lufei.uk 绑到 blackgod88,
-  //     旧 nexus-do worker 即可废弃(见 docs/上架/部署统一说明.md 的 CF 控制台步骤)。
-  //   · Secrets(OWNER_TOKEN / NEXUS_GATEWAY_KEY / TG_* 等)需在 blackgod88 上单独
-  //     `wrangler secret put`(不写进仓库)。
-  // ═══════════════════════════════════════════════════════════════
-  "$schema": "web/nexus-do/node_modules/wrangler/config-schema.json",
+  // 【2026-07-19 归一决定】真身大脑 = web/nexus-do worker（域名 aquan.lufei.uk），已完整跑通
+  //   （assetlinks 200 / manifest 神枢 / 全路由）。曾尝试把本 blackgod88 就地改成带 DO 的完整大脑，
+  //   但静态资源型 worker 不能就地转成带 Durable Object 的脚本 worker（CF 构建失败），故撤回，
+  //   保持 blackgod88 为静态壳原样。上架与主域一律用 aquan.lufei.uk（唯一真身），
+  //   blackgod88 静态壳后续可在 CF 面板删除。详见 docs/上架/部署统一说明.md。
+  // ═══════════════════════════════════════════════
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "blackgod88",
-  "main": "web/nexus-do/nexus_do.mjs",
-  "compatibility_date": "2026-06-29",
+  "compatibility_date": "2026-07-06",
   "compatibility_flags": ["nodejs_compat"],
-  "account_id": "142c76e0039e279886c89257b6fddbc7",
-
   "observability": { "enabled": true },
-
-  // —— Durable Object：全球唯一的神枢，SQLite 后端 ——
-  "durable_objects": {
-    "bindings": [
-      { "name": "SHENSHU", "class_name": "ShenshuCore" }
-    ]
-  },
-  // 全新 DO 需显式 migrations 声明(旧 nexus-do 的 DO 相互独立、不受影响)
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["ShenshuCore"] }
-  ],
-
-  // —— Workers AI：大脑兜底（Llama 3.3 70B）——
-  "ai": { "binding": "AI" },
-
-  // —— 环境变量（公开值，随代码部署；密钥走 wrangler secret，不入仓库）——
-  "vars": {
-    "FACTORY_URL": "https://factory.aquan.xin",
-    "NEXUS_GATEWAY_URL": "http://47.236.124.97:8790/v1",
-    "NEXUS_GATEWAY_MODEL": "claude-sonnet-5"
-  },
-
-  // —— KV：旧记忆迁移源（首启一次性迁移到 DO storage）——
-  "kv_namespaces": [
-    { "binding": "SOUL_KV", "id": "2978edea205e462d97cd3613f4745fbf" }
-  ],
-
-  // —— Cron：兜底心跳（alarm 链是主，cron 是保险）——
-  "triggers": {
-    "crons": ["*/5 * * * *"]
-  }
+  "assets": { "directory": "web" }
 }

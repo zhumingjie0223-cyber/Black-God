@@ -1,7 +1,7 @@
 # Black God · Google Play(海外安卓 / TWA)上架指南与材料包
 
 > 2026-07-19。神枢是 PWA,走 **TWA(Trusted Web Activity)** 把网页壳打成安卓 App 上架 Google Play。
-> 参数:域名 `blackgod.lufei.uk` · 包名 `uk.lufei.aquan.blackgod`(沿用已有,勿改) · 显示名 `Black God`。
+> 参数:域名 `aquan.lufei.uk` · 包名 `uk.lufei.aquan.blackgod`(沿用已有,勿改) · 显示名 `Black God`。
 > 边界:开发者账号、身份验证、证件上传全部**在 Google Play Console 由你本人完成**,证件不经他人之手。
 
 ---
@@ -24,9 +24,10 @@
 ## 二、前置:域名与 PWA(神枢侧已备,你需绑一步)
 
 1. **PWA 就绪**(已具备):`manifest.json`(standalone、图标 192/512/maskable、theme_color)、Service Worker、全站 HTTPS——TWA 的硬性前提已满足。
-2. **自定义域绑定**(你在 Cloudflare 做一步):把 `blackgod.lufei.uk` 作为自定义域绑到神枢 Worker(`blackgod88`)。绑好后:
-   - 应用主页:`https://blackgod.lufei.uk/`
-   - 资产关联:`https://blackgod.lufei.uk/.well-known/assetlinks.json`(神枢已内置该路由,自动返回)
+2. **域名已就绪(无需操作)**:`aquan.lufei.uk` 早已绑在真身大脑 `nexus-do` worker 上并跑通:
+   - 应用主页:`https://aquan.lufei.uk/`
+   - 资产关联:`https://aquan.lufei.uk/.well-known/assetlinks.json`(已验证 **200**,内置路由自动返回)
+   - (注:`blackgod88` 只是静态空壳,已弃用,别往它上面绑;详见 `部署统一说明.md`)
 
 ---
 
@@ -50,11 +51,11 @@ env `ASSETLINKS_JSON` 优先于内置常量。这样打包指纹变化时,改 en
 - **Bubblewrap(命令行)**:
   ```bash
   npm i -g @bubblewrap/cli
-  bubblewrap init --manifest https://blackgod.lufei.uk/manifest.json
-  # 交互里确认:包名 uk.lufei.aquan.blackgod、host blackgod.lufei.uk、App name Black God
+  bubblewrap init --manifest https://aquan.lufei.uk/manifest.json
+  # 交互里确认:包名 uk.lufei.aquan.blackgod、host aquan.lufei.uk、App name Black God
   bubblewrap build     # 产出 app-release-bundle.aab + 签名密钥
   ```
-- **PWABuilder(网页,更省事)**:打开 pwabuilder.com → 输入 `https://blackgod.lufei.uk` → 选 Android(TWA)→ 填包名 `uk.lufei.aquan.blackgod` → 下载 AAB 包。
+- **PWABuilder(网页,更省事)**:打开 pwabuilder.com → 输入 `https://aquan.lufei.uk` → 选 Android(TWA)→ 填包名 `uk.lufei.aquan.blackgod` → 下载 AAB 包。
 
 > 签名密钥(keystore)务必**自己备份保管**——丢了就无法更新应用。首选让 Google Play App Signing 托管签名密钥,你只管上传密钥。
 
@@ -103,16 +104,16 @@ Google Play 要求如实申报数据实践。神枢的模型是「匿名心跳·
 | 用户能否请求删除数据 | **能**,应用内「删除我的数据」(`/unregister`)一键删除;并可「导出我的数据」带走(`/export`) |
 | 数据类型 | 个人信息(昵称)、应用活动(对话/记忆,存于用户自己的边缘实例)、设备标识(粗粒度,识别主人) |
 | 是否收集位置 | 否(仅用 Cloudflare 边缘的粗粒度地区做主人识别,不采精确定位) |
-| 账号删除入口 URL | https://blackgod.lufei.uk/privacy(隐私政策含删除/导出说明) |
+| 账号删除入口 URL | https://aquan.lufei.uk/privacy(隐私政策含删除/导出说明) |
 
-> 隐私政策 URL(必填):`https://blackgod.lufei.uk/privacy`(神枢已内置 `/privacy` 页,含导出/删除条款)。
+> 隐私政策 URL(必填):`https://aquan.lufei.uk/privacy`(神枢已内置 `/privacy` 页,含导出/删除条款)。
 
 ---
 
 ## 六、上架 Checklist(你出●资质截图 / 我出✅材料)
 
 - [ ] ● 注册 Google Play 开发者账号($25),完成身份验证(证件传 Google)
-- [ ] ● 在 Cloudflare 把 `blackgod.lufei.uk` 绑到 Worker `blackgod88`
+- [x] ✅ 域名 `aquan.lufei.uk` 已绑真身 nexus-do 并跑通(assetlinks 200),无需操作
 - [ ] ● 真机截图:手机至少 2~8 张(1080×1920 或更高),含首屏/对话/记忆/设置
 - [ ] ● (可选)预览视频
 - [ ] ● Bubblewrap/PWABuilder 产出 AAB;keystore 备份;若用 Play App Signing,把新 SHA-256 追加进 `ASSETLINKS_JSON`(env)
@@ -129,7 +130,7 @@ Google Play 要求如实申报数据实践。神枢的模型是「匿名心跳·
 
 - **assetlinks 验证失败**:多半是启用了 Play App Signing 但没把「Play 签名证书」的 SHA-256 追加进 assetlinks。把两个指纹(上传密钥 + Play 签名)都放进 `ASSETLINKS_JSON` env 即可。
 - **TWA 顶部出现浏览器地址栏**:说明 assetlinks 没验证通过(域名/包名/指纹三者要完全对上)。
-- **域名没绑好**:`https://blackgod.lufei.uk/.well-known/assetlinks.json` 必须能直接访问返回 JSON,再打包。
+- **域名没绑好**:`https://aquan.lufei.uk/.well-known/assetlinks.json` 必须能直接访问返回 JSON,再打包。
 
 ---
 
