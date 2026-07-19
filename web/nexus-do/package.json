@@ -8,7 +8,7 @@
     "build": "node build.mjs",
     "deploy": "node build.mjs && wrangler deploy",
     "dev": "node build.mjs && wrangler dev",
-    "test": "node build.mjs && node --check nexus_do.mjs && node selftest.mjs && node gateway.test.mjs && node continuity.test.mjs"
+    "test": "node build.mjs && node --check nexus_do.mjs && node selftest.mjs && node gateway.test.mjs && node continuity.test.mjs && node capsec-selftest.mjs"
   },
   "devDependencies": {
     "wrangler": "^3.90.0"
