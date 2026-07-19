@@ -893,7 +893,11 @@ body::before{
   <div id="brainList"></div>
   <button class="btn ghost" id="brainAddBtn" onclick="brainAdd()" style="margin-top:4px">＋ 加一条脑（最多 9）</button>
   <div id="brainStatus" style="font-size:12px;color:var(--text-3);margin:10px 0;min-height:16px"></div>
-  <button class="btn" onclick="saveBrains()">保存并生效</button>
+  <div id="brainHealth" style="margin:2px 0 12px"></div>
+  <div style="display:flex;gap:10px">
+    <button class="btn" onclick="saveBrains()">保存并生效</button>
+    <button class="btn ghost" onclick="testFleet()">测试舰队</button>
+  </div>
 </div>
 
 <div class="sheet" id="sheetExec">
@@ -1022,6 +1026,7 @@ const Nexus = {
   async register(nick, api) { try { const r = await fetch(this.base + '/register', { method:'POST', headers:{'Content-Type':'application/json', ...(this.uid?{'X-Nexus-Uid':this.uid}:{})}, body: JSON.stringify({ uid:this.uid, nick, api_url:(api&&api.url)||'', api_key:(api&&api.key)||'', api_model:(api&&api.model)||'' }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
   async unregister() { try { const r = await fetch(this.base + '/unregister', { method:'POST', headers:{'Content-Type':'application/json', ...(this.uid?{'X-Nexus-Uid':this.uid}:{})}, body: JSON.stringify({ uid:this.uid }) }); return r.ok ? await r.json() : null; } catch(e){ return null; } },
   async stats() { try { const r = await this._fetch('/stats', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
+  async testBrains() { try { const r = await this._fetch('/brains-test', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body:'{}' }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async _fetch(path, opts) {
     const r = await fetch(this.base + path, opts);
     if (r.status === 401) { onUnauthorized(); return null; }
@@ -1643,6 +1648,19 @@ async function saveBrains(){
   if(r&&r.ok){ const n=(r.brains||[]).filter(x=>x.on!==false).length; const lb=$('#apiLabel'); if(lb) lb.textContent=n?('舰队 · '+n+' 脑调度'):'内置 Llama'; toast('大脑舰队已保存 · '+n+' 条在役'); closeSheet(); }
   else if(r&&r.__401) _bstat('这是主人的私密配置——需以主人身份解锁','var(--danger,#e5484d)');
   else _bstat('保存失败（检查是否在线/已解锁）','var(--danger,#e5484d)');
+}
+/* 舰队健康自检:一键测每条脑通不通、锁了什么方言/模型/延迟(不乱·看得见) */
+async function testFleet(){
+  const el=$('#brainHealth'); _bstat('正在逐条真调测试…');
+  if(el) el.innerHTML='<div style="font-size:12px;color:var(--text-3)">测试中…（每条真发一句，稍等）</div>';
+  const r=await Nexus.testBrains();
+  if(!r||!r.brains){ if(el) el.innerHTML='<div style="font-size:12px;color:var(--danger,#e5484d)">测不了（需以主人身份解锁 / 先保存舰队）</div>'; _bstat(''); return; }
+  el.innerHTML=r.brains.map(b=>{
+    const dot=b.ok?'<span style="color:var(--ok,#2FB96B)">●</span>':'<span style="color:var(--danger,#e5484d)">●</span>';
+    const right=b.ok?`${_esc(b.dialect)} · ${_esc(b.model)} · ${b.ms}ms`:_esc(b.err||'挂');
+    return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid var(--line)"><span>${dot} ${_esc(b.label)}</span><span style="color:var(--text-3);text-align:right;max-width:55%">${right}</span></div>`;
+  }).join('');
+  _bstat(`舰队自检：${r.ok}/${r.count} 条在役`, r.ok?'var(--ok)':'var(--danger,#e5484d)');
 }
 /* 执行脑连接器：App 内一键连，不碰命令行 */
 // 一键粘贴：把「地址 + token」整段拆分填入两栏。容错任意格式(地址|token、URL=..\nToken=.. 等)

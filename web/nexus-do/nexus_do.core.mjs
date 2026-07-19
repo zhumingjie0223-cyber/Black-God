@@ -122,7 +122,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/brains-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -162,6 +162,7 @@ export class ShenshuCore {
         if (path === '/config/models' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.probeModels(b)); }
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
+        if (path === '/brains-test' && request.method === 'POST') return json(await this.pingBrains());
         // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
         if (path === '/loop' && request.method === 'GET') return json(await this.handleLoop('GET', {}, url.searchParams));
         if (path === '/loop' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handleLoop('POST', b, url.searchParams)); }
@@ -983,6 +984,45 @@ ${capabilitySelfDescription(true)}
       out.push({ url: legacyUrl, key: cfg.gateway_key || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_KEY || '')), model: (cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || 'auto'), provider: cfg.gateway_provider || '', label: '主网关', role: '主力' });
     }
     return out.slice(0, 9);
+  }
+
+  // 舰队健康自检：对每条脑做最小真调用，返回 通/挂 + 锁定方言 + 模型 + 延迟(不乱·看得见)。
+  async pingBrains() {
+    const cfg = (await this.storage.get('config')) || {};
+    cfg._provider = cfg._provider || {}; cfg._auto_models = cfg._auto_models || {};
+    const brains = await this.resolveBrains(false);
+    const out = [];
+    for (const brain of brains) {
+      const t0 = Date.now();
+      const res = { label: brain.label || brain.url, url: brain.url, model: brain.model || 'auto', ok: false, dialect: '', ms: 0, err: '' };
+      let model = brain.model || cfg._auto_models[brain.url] || 'auto';
+      if (!model || model === 'auto') {
+        const pr = await this.probeModels({ gateway_url: brain.url, gateway_key: brain.key });
+        if (pr.ok && pr.models.length) model = pr.models[0];
+      }
+      res.model = model;
+      const locked = brain.provider || cfg._provider[brain.url] || '';
+      const guess = locked || this.brainProvider(brain.url, model);
+      const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
+      for (const provider of dialects) {
+        try {
+          const call = (withT) => { const req = this.buildBrainReq(provider, brain.url, brain.key, model, '你是神枢', '嗨', { maxTokens: 16, ...(withT ? { temperature: 0.7 } : {}) }); return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) }); };
+          let r = await call(true);
+          if (!r.ok && r.status === 400) r = await call(false);
+          if (r.ok) {
+            const d = await r.json().catch(() => null);
+            const text = this.parseBrainText(provider, d);
+            if (text && text.trim()) { res.ok = true; res.dialect = provider; break; }
+            res.err = '连通但解析空'; if (!locked && provider !== dialects[dialects.length - 1]) continue; break;
+          }
+          if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { res.err = 'HTTP ' + r.status; continue; }
+          const b = await r.text().catch(() => ''); res.err = 'HTTP ' + r.status + (b ? '：' + b.replace(/\s+/g, ' ').slice(0, 50) : ''); break;
+        } catch (e) { res.err = String(e && e.message || e).slice(0, 50); break; }
+      }
+      res.ms = Date.now() - t0;
+      out.push(res);
+    }
+    return { brains: out, count: out.length, ok: out.filter(x => x.ok).length };
   }
 
   // 神枢自己判定每条脑的擅长(用户不用选,这是神枢的事)：从模型名/标签推断职责。
