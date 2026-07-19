@@ -1056,6 +1056,27 @@ ${capabilitySelfDescription(true)}
     if (/mini|flash|turbo|lite|fast|small|nano|8b|air|快/.test(s)) return '快答';
     return '主力';
   }
+  // 模型失败自诊断(反思):把 HTTP 状态/错误体翻成人话,存进健康档、也用于诚实报错。
+  diagnoseErr(status, body) {
+    const b = String(body || '');
+    if (status === 401 || status === 403 || /invalid[_\s-]*api|invalid.*key|unauthor|permission|no.*access|鉴权|密钥/i.test(b)) return '密钥无效/无权限';
+    if (/quota|balance|insufficient|arrears|欠费|余额|额度不足|计费/i.test(b)) return '额度/余额不足';
+    if (status === 429 || /rate.?limit|too many|frequency|限流|频繁/i.test(b)) return '限流(太频),稍后自愈';
+    if (status === 404 || /not found|no such model|does not exist|模型.*(不存在|无效)/i.test(b)) return '地址/模型不对';
+    if (typeof status === 'number' && status >= 500) return '对方服务器故障';
+    if (/timeout|abort|超时/i.test(b)) return '响应超时';
+    if (/回了空|被挡/.test(b)) return '空回复/被安全策略挡';
+    return status ? ('HTTP ' + status) : '连不上';
+  }
+  // 自愈路由(反思自检):近期连败(≥3 且 5 分钟内)的脑降到最后,仍留最后一搏;成功即清零复活。纯函数。
+  rankByHealth(brains, health, now = Date.now()) {
+    if (!Array.isArray(brains) || brains.length < 2) return brains;
+    health = health || {};
+    const bad = (b) => { const h = health[b.url]; return h && (h.fails || 0) >= 3 && (now - (h.ts || 0)) < 300000; };
+    const good = [], degraded = [];
+    for (const b of brains) (bad(b) ? degraded : good).push(b);
+    return good.concat(degraded);
+  }
   // 神枢主导的职责分派：把神枢判定为对口职责的脑排前(秒派),其余作故障转移(总能兜底,永不卡死)。
   orderBrainsForTask(brains, role) {
     if (!role || !Array.isArray(brains) || brains.length < 2) return brains;
@@ -1089,12 +1110,13 @@ ${capabilitySelfDescription(true)}
     // 多脑网关：按注册表顺序故障转移(自由调度)。一条挂了自动换下一条，最多 9 条。
     const tryGateway = async () => {
       const cfg = (await this.storage.get('config')) || {};
-      // 神枢主导:先按任务职责把对口脑排前(秒派),其余作故障转移
-      const brains = this.orderBrainsForTask(await this.resolveBrains(instanceMode), opts.role);
+      cfg._auto_models = cfg._auto_models || {}; cfg._provider = cfg._provider || {}; cfg._health = cfg._health || {};
+      // 神枢主导:先按任务职责把对口脑排前(秒派);再按健康自检把近期连败的脑降到最后(自愈路由)
+      const brains = this.rankByHealth(this.orderBrainsForTask(await this.resolveBrains(instanceMode), opts.role), cfg._health);
       if (!brains.length) return null;
-      cfg._auto_models = cfg._auto_models || {};
       let cacheDirty = false;
       for (const brain of brains) {
+        let diagStatus = 0, diagBody = '';   // 反思:记本条最后一次失败,用于自诊断
         let model = brain.model || 'auto';
         // 未指定模型（留空/auto）：联网识别一次并按 url 缓存，避免硬传 "auto" 被网关拒
         if (!model || model === 'auto') {
@@ -1124,22 +1146,28 @@ ${capabilitySelfDescription(true)}
               const text = this.parseBrainText(provider, d);
               if (text && text.trim() && !this.isRefusal(text)) {
                 if (cfg._provider[brain.url] !== provider) { cfg._provider[brain.url] = provider; cacheDirty = true; }   // 锁定这家的方言
+                const _hh = cfg._health[brain.url]; if (!_hh || _hh.fails) { cfg._health[brain.url] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
                 if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
                 return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
               }
               // 连通但解析空:可能方言选错(解析路径不对)→ 未锁定则试下一种方言
-              lastErr = `${tag}：回了空/被挡`;
+              lastErr = `${tag}：回了空/被挡`; diagBody = '回了空/被挡';
               if (!locked && provider !== dialects[dialects.length - 1]) continue;
               break;
             }
             const body = await r.text().catch(() => '');
+            diagStatus = r.status; diagBody = body;   // 反思:留证供自诊断
             // 404/400 视为"格式可能不对":未锁定则换方言再试;其它(401/403/429/5xx)是真错,不乱换方言
             if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = `${tag}·${provider} HTTP ${r.status}`; continue; }
             lastErr = `${tag} 报错 HTTP ${r.status}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 100) : ''}`;
             break;
-          } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); break; }
+          } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); diagBody = String(e && e.message || e); break; }
         }
-        // 这条(所有方言)都没成 → 自动换下一条脑(自由调度 · 故障转移)
+        // 反思自检:这条(所有方言)都没成 → 记健康(连败计数+自诊断),下次自动降级绕开;成功会清零(自愈)
+        const _hf = cfg._health[brain.url] || {};
+        cfg._health[brain.url] = { fails: (_hf.fails || 0) + 1, ts: Date.now(), 诊断: this.diagnoseErr(diagStatus, diagBody) };
+        cacheDirty = true;
+        // → 自动换下一条脑(自由调度 · 故障转移)
       }
       if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
       return null;
