@@ -1519,6 +1519,17 @@ ${capabilitySelfDescription(true)}
       ck.sort((a, b) => (skills.候选[a].count - skills.候选[b].count) || (skills.候选[a].last_ts - skills.候选[b].last_ts));
       for (const k of ck.slice(0, ck.length - cap)) delete skills.候选[k];
     }
+    // 弱技能自动删除（权哥铁规②：替换弱的、弱技能自动删除，技能库越淘越精、只留强的）：
+    // 未验证 + 强度低(≤毕业基线) + 久未命中(过期) 的僵尸技能自动清除。验证过的永不自动删；常用的(强度随 count 涨)也留。
+    {
+      const now2 = skill.ts || Date.now();
+      const STALE = (this.SKILL_STALE_MS || 30 * 86400000);   // 默认 30 天没再用到即算过期
+      const FLOOR = SKILL_GRADUATE;                            // 强度到毕业基线(=3)还没长起来，且未验证、又过期 → 弱
+      for (const k of Object.keys(skills.技能)) {
+        const s = skills.技能[k];
+        if (!s.验证 && (s.强度 || s.count || 1) <= FLOOR && (now2 - (s.last_ts || now2)) > STALE) delete skills.技能[k];
+      }
+    }
     // 正式技能封顶：超上限才淘汰，按「强度」排（验证/常用的更难被淘汰），不是简单按 count
     const keys = Object.keys(skills.技能);
     if (keys.length > cap) {
