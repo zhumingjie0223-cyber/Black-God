@@ -244,6 +244,19 @@ ok('超上限按强度淘汰最弱最旧', capSks.总数 === 3 && !capSks.技能
   ok('自省·最近结论注入上下文（下次照改）', /今日照改/.test(R.summarizeReflection(rsoul)) && /别再犯/.test(R.summarizeReflection(rsoul)));
   ok('自省·无日志不产噪', R.summarizeReflection({}) === '' && R.summarizeReflection({ 自省日志: [] }) === '');
   ok('自省·空文本不落库', (R.applyReflection({ 自省日志: [] }, '   ', 1).自省日志 || []).length === 0);
+  // 系统自我进化：②怎么改 → 永久进化规则；③要升级 → 升级清单（系统进化,不是模型进化——换脑也带着）
+  const 复盘 = '① 有两次答得太啰嗦。\n② 先给答案再解释,3句内收住;技术词必须配一句人话解释。\n③ 要升级:把精简回话炼成常驻习惯。';
+  const pp = R.parseReflection(复盘);
+  ok('进化·②拆成行为条目', pp.改进.length === 2 && /先给答案/.test(pp.改进[0]) && /人话解释/.test(pp.改进[1]));
+  ok('进化·③拆成升级条目', pp.升级.length === 1 && /常驻习惯/.test(pp.升级[0]));
+  let ev = {};
+  ev = R.applyReflection(ev, 复盘, 100);
+  ok('进化·规则/清单落库', (ev.进化规则 || []).length === 2 && (ev.升级清单 || []).length === 1);
+  ev = R.applyReflection(ev, 复盘, 200);
+  ok('进化·重复自省不重复记规则(去重)', ev.进化规则.length === 2 && ev.升级清单.length === 1);
+  ok('进化·规则注入上下文条条照办', /条条照办/.test(R.summarizeEvolution(ev)) && /先给答案/.test(R.summarizeEvolution(ev)));
+  ok('进化·无规则不产噪', R.summarizeEvolution({}) === '' && R.summarizeEvolution({ 进化规则: [] }) === '');
+  ok('进化·规则封顶20', (() => { let s = {}; for (let i = 0; i < 30; i++) s = R.applyReflection(s, '②\n规则甲乙丙丁第' + i + '条要照办', i); return s.进化规则.length <= 20; })());
 }
 
 // ── 闭环神·环：自主守望管道（解析/排程/到点/执行/通知）──
