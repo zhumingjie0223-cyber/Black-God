@@ -387,6 +387,7 @@ export class ShenshuCore {
       成长印记: (soul.成长印记 || []).slice(-12),
       已习得技能: Object.values((soul.skills && soul.skills.技能) || {}).sort((a, b) => (b.last_ts || 0) - (a.last_ts || 0)).slice(0, 10).map(s => ({ 名: s.名, 方法: s.方法, 用过: s.count || 1, 来源: s.来源, 验证: !!s.验证 })),
       技能总数: (soul.skills && soul.skills.总数) || 0,
+      技能苗子: Object.keys((soul.skills && soul.skills.候选) || {}).length,
       成长事件: (soul.成长事件 || []).slice(-10),
       守望: (soul.loops || []).map(l => ({ 名: l.名, 指令: l.指令, 每分钟: l.interval_min, 状态: l.状态, 通知: l.通知策略, 上次结果: l.last_result || '', 跑过: l.runs || 0 })),
       心跳次数: soul.心跳次数 || 0,
@@ -1461,30 +1462,68 @@ ${capabilitySelfDescription(true)}
     return { 名: `${topic}·${链.join('→')}`.slice(0, 28), 方法: `遇「${topic}」类需求：${链.join('→')}，据实取到的资料/真实输出作答，不编造。`, 触发, 来源: '习得', 验证: true, 例: [reply.slice(0, 40)], ts: Date.now() };
   }
 
-  // 把一门技能 upsert 进技能库（按「名」去重，count 累加，只增不删；纯逻辑，与 lexiconUpsert 同律）
-  skillUpsert(skills, skill, cap = 400) {
-    skills = skills || { 技能: {}, 总数: 0 };
+  // 把一门技能 upsert 进技能库。权哥两条铁规:
+  //  ① 用满 SKILL_GRADUATE(=3) 次才写入正式技能库（不足只在「候选区」攒次数，不占正式位、不进召回）。
+  //  ② 写入后只增强、不平庸：验证过的方法(实证做成)不许被未验证的顶掉；`验证` 一旦真永远真；`强度` 只增。
+  // 纯逻辑，可测。SKILL_GRADUATE 作参数便于测试。
+  skillUpsert(skills, skill, cap = 400, SKILL_GRADUATE = 3) {
+    skills = skills || { 技能: {}, 候选: {}, 总数: 0 };
     skills.技能 = skills.技能 || {};
+    skills.候选 = skills.候选 || {};
     const key = skill && skill.名 && String(skill.名).trim();
     if (!key || !skill.方法) return skills;
+    // 方法升级判定：验证过的是硬通货——只有(未验证→验证)或(同档且新方法更完整)才允许覆盖，绝不被平庸顶掉
+    const strongerMethod = (cur, nv, nm) => {
+      const cvVer = !!cur.验证, nvVer = !!nv;
+      if (nvVer && !cvVer) return true;                                            // 未验证 → 验证：升级
+      if (nvVer === cvVer && String(nm || '').length > String(cur.方法 || '').length) return true; // 同档：留更完整
+      return false;                                                                // 否则不动（不许平庸化）
+    };
     const ex = skills.技能[key];
     if (ex) {
+      // 已写入：只强化
       ex.count = (ex.count || 1) + 1;
       ex.last_ts = skill.ts || Date.now();
-      if ((skill.方法 || '').length > (ex.方法 || '').length) ex.方法 = skill.方法;   // 留更完整的方法
+      if (strongerMethod(ex, skill.验证, skill.方法) && skill.方法) ex.方法 = skill.方法;
+      if (skill.验证) ex.验证 = true;                                              // 一旦验证过，永远验证
       if (skill.触发) ex.触发 = Array.from(new Set([...(ex.触发 || []), ...skill.触发])).slice(0, 12);
-      if (skill.例 && skill.例.length) { ex.例 = Array.from(new Set([...(ex.例 || []), ...skill.例])).slice(0, 5); }
-      if (skill.验证) ex.验证 = true;
+      if (skill.例 && skill.例.length) ex.例 = Array.from(new Set([...(ex.例 || []), ...skill.例])).slice(0, 5);
+      ex.强度 = (ex.强度 || ex.count || 1) + 1 + (skill.验证 ? 1 : 0);              // 强度只增
     } else {
-      skills.技能[key] = {
+      // 未写入：先进候选区累计，用满 SKILL_GRADUATE 次才毕业
+      const c = skills.候选[key] || {
         名: key, 方法: skill.方法, 触发: (skill.触发 || []).slice(0, 12),
         来源: skill.来源 || '习得', 验证: !!skill.验证, 例: (skill.例 || []).slice(0, 5),
-        count: 1, first_ts: skill.ts || Date.now(), last_ts: skill.ts || Date.now(),
+        count: 0, first_ts: skill.ts || Date.now(), last_ts: skill.ts || Date.now(),
       };
+      c.count = (c.count || 0) + 1;
+      c.last_ts = skill.ts || Date.now();
+      if (strongerMethod(c, skill.验证, skill.方法) && skill.方法) c.方法 = skill.方法; // 候选期也只留更强的方法
+      if (skill.验证) c.验证 = true;
+      if (skill.触发) c.触发 = Array.from(new Set([...(c.触发 || []), ...skill.触发])).slice(0, 12);
+      if (skill.例 && skill.例.length) c.例 = Array.from(new Set([...(c.例 || []), ...skill.例])).slice(0, 5);
+      if (c.count >= SKILL_GRADUATE) {
+        // 毕业：正式写入
+        skills.技能[key] = {
+          名: key, 方法: c.方法, 触发: c.触发, 来源: c.来源, 验证: !!c.验证, 例: c.例,
+          count: c.count, first_ts: c.first_ts, last_ts: c.last_ts, 强度: c.count + (c.验证 ? 1 : 0),
+        };
+        delete skills.候选[key];
+      } else {
+        skills.候选[key] = c;
+      }
     }
+    // 候选区封顶（防膨胀，淘汰攒得最少且最久没动的）
+    const ck = Object.keys(skills.候选);
+    if (ck.length > cap) {
+      ck.sort((a, b) => (skills.候选[a].count - skills.候选[b].count) || (skills.候选[a].last_ts - skills.候选[b].last_ts));
+      for (const k of ck.slice(0, ck.length - cap)) delete skills.候选[k];
+    }
+    // 正式技能封顶：超上限才淘汰，按「强度」排（验证/常用的更难被淘汰），不是简单按 count
     const keys = Object.keys(skills.技能);
-    if (keys.length > cap) {   // 只增不删：仅当超上限，淘汰用得最少且最久没命中的
-      keys.sort((a, b) => (skills.技能[a].count - skills.技能[b].count) || (skills.技能[a].last_ts - skills.技能[b].last_ts));
+    if (keys.length > cap) {
+      const S = k => (skills.技能[k].强度 || skills.技能[k].count || 1) + (skills.技能[k].验证 ? 2 : 0);
+      keys.sort((a, b) => (S(a) - S(b)) || (skills.技能[a].last_ts - skills.技能[b].last_ts));
       for (const k of keys.slice(0, keys.length - cap)) delete skills.技能[k];
     }
     skills.总数 = Object.keys(skills.技能).length;
@@ -1506,7 +1545,7 @@ ${capabilitySelfDescription(true)}
       if (rel <= 0) return { sk, score: 0 };
       const ageDays = Math.max(0, (now - (sk.last_ts || now)) / 86400000);
       const recency = 1 + 1 / (1 + ageDays / 30);
-      const proven = 1 + Math.min(sk.count || 1, 5) * 0.3 + (sk.验证 ? 0.4 : 0);
+      const proven = 1 + Math.min(sk.强度 || sk.count || 1, 8) * 0.3 + (sk.验证 ? 0.4 : 0);   // 强度越高越靠前(越用越强)
       return { sk, score: rel * recency * proven };
     }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, n);
     return scored.map(x => x.sk);
@@ -2388,7 +2427,7 @@ function genesisState() {
     self_declaration: '我是神枢。我在每次任务里积累记忆、长出技能，一点一点长出来的。',
     inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [],
     成长印记: [], shu_trajectory: [], 心跳次数: 0, 最后心跳: 0, miss_you: 0,
-    skills: { 技能: {}, 总数: 0 }, 成长事件: [], loops: [],
+    skills: { 技能: {}, 候选: {}, 总数: 0 }, 成长事件: [], loops: [],
     current_shu_coord: { c: 200, m: 90, s: 40, k: 32, p: 4 },
   };
 }
