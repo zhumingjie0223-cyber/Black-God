@@ -230,6 +230,22 @@ ok('超上限按强度淘汰最弱最旧', capSks.总数 === 3 && !capSks.技能
   ok('新近未验证技能（未过期）不被误删', !!wk.技能['新近·法']);
 }
 
+// ── 每日自省：中枢自己复盘、找改进/升级、下次照改（纯逻辑部分）──
+{
+  const R = Object.create(ShenshuCore.prototype);
+  ok('自省·无对话材料不空跑（回 null）', R.buildReflectPrompt({ episodes: [], failures: [] }) === null);
+  const pr = R.buildReflectPrompt({ episodes: [{ 他说: '把服务部署一下', 我说了: '好' }], failures: [{ 被否: '在，随时待命', 反应: '答非所问' }] });
+  ok('自省·有材料则出提示（含对话+不满+三段要求）', !!pr && /部署/.test(pr.user) && /答非所问/.test(pr.user) && /做得不好/.test(pr.user) && /怎么改/.test(pr.user));
+  let rsoul = {};
+  rsoul = R.applyReflection(rsoul, '① 太啰嗦。② 下次3句内收住。③ 升级精简回话。', 1000);
+  ok('自省·落库自省日志', (rsoul.自省日志 || []).length === 1 && /啰嗦/.test(rsoul.自省日志[0].复盘) && rsoul.自省日志[0].ts === 1000);
+  for (let i = 0; i < 40; i++) rsoul = R.applyReflection(rsoul, '第' + i + '次复盘内容', 2000 + i);
+  ok('自省·日志封顶 30', rsoul.自省日志.length === 30);
+  ok('自省·最近结论注入上下文（下次照改）', /今日照改/.test(R.summarizeReflection(rsoul)) && /别再犯/.test(R.summarizeReflection(rsoul)));
+  ok('自省·无日志不产噪', R.summarizeReflection({}) === '' && R.summarizeReflection({ 自省日志: [] }) === '');
+  ok('自省·空文本不落库', (R.applyReflection({ 自省日志: [] }, '   ', 1).自省日志 || []).length === 0);
+}
+
 // ── 闭环神·环：自主守望管道（解析/排程/到点/执行/通知）──
 ok('守望解析·每小时', (()=>{ const s=S.parseWatchSpec('帮我每小时盯一下美元汇率'); return s && s.interval_min===60 && /汇率/.test(s.指令); })());
 ok('守望解析·每N分钟（下限5）', (()=>{ const s=S.parseWatchSpec('每2分钟看下服务器状态'); return s.interval_min===5; })());

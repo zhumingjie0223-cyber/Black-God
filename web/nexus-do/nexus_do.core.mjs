@@ -27,6 +27,7 @@ const STREAM_KEEP = 120;            // 对话流保留条数
 const EPISODE_KEEP = 40;
 const CACHE_KEEP = 200;             // 缓冲空间条数上限（省代币）
 const CACHE_TTL_MS = 7 * 24 * 3600_000; // 缓存有效期 7 天
+const DAILY_REFLECT_CRON = '0 18 * * *'; // 每日自省 cron（UTC 18:00；与 wrangler crons 里那条一致）
 
 export class ShenshuCore {
   constructor(state, env) {
@@ -122,7 +123,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/brains-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/brains-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -140,6 +141,7 @@ export class ShenshuCore {
           return json(this.searchLexicon(dict, url.searchParams.get('q') || '', Math.min(100, parseInt(url.searchParams.get('n') || '30', 10) || 30)));
         }
         if (path === '/heartbeat') return json(await this.autonomousTick());
+        if (path === '/reflect') return json(await this.dailyReflect());
         if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
         if (path === '/voice' && request.method === 'POST') { const b = await request.json(); return json(await this.genVoice(b.text || '', b)); }
@@ -378,6 +380,8 @@ export class ShenshuCore {
       时间认知: this.computeTimeAwareness(soul, now),
       内心独白: (soul.inner_voice || []).slice(-10),
       对自己的观察: (soul.metacognition || []).slice(-5),
+      每日自省: (soul.自省日志 || []).slice(-7).map(r => ({ ts: r.ts, 复盘: r.复盘 })),
+      最后自省: soul.最后自省 ? new Date(soul.最后自省).toISOString() : null,
       情节记忆: (soul.episodes || []).slice(-12),
       长期记忆: (soul.longterm || []).length,
       事实: (soul.facts || []).slice(-20),
@@ -789,7 +793,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeReflection(soul)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -1412,6 +1416,55 @@ ${capabilitySelfDescription(true)}
     const fs = (failures || []).slice(-3);
     if (!fs.length) return '';
     return '\n【避免重蹈·主人曾不满】' + fs.map(f => `就"${(f.被否 || '').slice(0, 24)}"这类回答主人说过"${(f.反应 || '').slice(0, 10)}"，换个方向`).join('；') + '。';
+  }
+
+  // ═══ 每日自省·中枢自己复盘（权哥 2026-07-21）：每天回看对话，找哪里做得不好/要改/要升级，并把「怎么改」喂回未来 ═══
+  // 组装自省材料（纯逻辑，可测）：最近对话 + 主人不满 → 让神枢诚实自审。没材料回 null，不空跑。
+  buildReflectPrompt(soul) {
+    soul = soul || {};
+    const eps = (soul.episodes || []).slice(-15).filter(e => e && (e.他说 || e.我说了));
+    const fails = (soul.failures || []).slice(-5);
+    if (!eps.length && !fails.length) return null;
+    const 对话 = eps.map(e => `· 主人：${String(e.他说 || '').slice(0, 60)}\n  神枢：${String(e.我说了 || '').slice(0, 60)}`).join('\n');
+    const 不满 = fails.length ? ('\n【主人明确不满过的回答】\n' + fails.map(f => `· "${String(f.被否 || '').slice(0, 40)}" → 主人反应"${String(f.反应 || '').slice(0, 16)}"`).join('\n')) : '';
+    const system = '你是神枢的中枢自省模块。此刻没有外人，只有你审视自己。用最诚实、最不留情面的眼光挑自己最近表现的毛病，别自夸、别客套。全程中文。';
+    const user = `【最近的对话】\n${对话}${不满}\n\n据实自省，输出三段，每段 2-4 条、具体可执行：\n① 做得不好的地方（具体到哪句、为什么差）\n② 下次怎么改（可立刻照做的动作）\n③ 需要升级的能力（缺什么、该长什么本事）\n直接给结论，别铺垫。`;
+    return { system, user };
+  }
+  // 落库一次自省（纯逻辑，可测）：存进自省日志（封顶 30）。
+  applyReflection(soul, text, now = Date.now()) {
+    soul = soul || {};
+    const t = String(text || '').trim();
+    if (!t) return soul;
+    soul.自省日志 = soul.自省日志 || [];
+    soul.自省日志.push({ ts: now, 复盘: t.slice(0, 1200) });
+    if (soul.自省日志.length > 30) soul.自省日志 = soul.自省日志.slice(-30);
+    return soul;
+  }
+  // 把最近一次自省结论注入上下文（内在，喂回决策，非显示）——自省不是写完就忘，下次真照着改（自动完成）。
+  summarizeReflection(soul) {
+    const last = (((soul && soul.自省日志) || []).slice(-1))[0];
+    if (!last || !last.复盘) return '';
+    return '\n【近日自省·今日照改】' + String(last.复盘).replace(/\s+/g, ' ').slice(0, 220) + '。别再犯同样的问题。';
+  }
+  // 每日一次：神枢自己复盘 → 落库 → 广播 → 推送主人（网络容错，不炸；成本克制，每天一次）。
+  async dailyReflect() {
+    const soul = await this.getSoul();
+    const p = this.buildReflectPrompt(soul);
+    if (!p) return { ok: false, skipped: '暂无足够对话材料' };
+    let reflection = '';
+    try {
+      const r = await this.callBrain(p.system, p.user, soul, { role: '深思', tier: 'heavy', temperature: 0.6 });
+      reflection = (r && r.reply) ? String(r.reply) : '';
+    } catch (e) { reflection = ''; }
+    if (!reflection || this.isRefusal(reflection)) return { ok: false, skipped: '本次自省未产出' };
+    this.applyReflection(soul, reflection);
+    soul.最后自省 = Date.now();
+    await this.saveSoul(soul);
+    try { this.broadcast({ type: 'reflect', 复盘: reflection.slice(0, 200), ts: Date.now() }); } catch (e) {}
+    try { await this.sendToQuan('【神枢每日自省】\n' + reflection.slice(0, 1000)); } catch (e) {}
+    try { await this.pushToAll('神枢每日自省', reflection.slice(0, 120), '/'); } catch (e) {}
+    return { ok: true, 复盘: reflection };
   }
 
   // ═══════════════════════ 自演化神·生（越用越强·自己长大）═══════════════════════
@@ -2436,7 +2489,7 @@ function genesisState() {
     encounters: 0, last_seen: 0,
     born: new Date().toISOString(),
     self_declaration: '我是神枢。我在每次任务里积累记忆、长出技能，一点一点长出来的。',
-    inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [],
+    inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [], 自省日志: [],
     成长印记: [], shu_trajectory: [], 心跳次数: 0, 最后心跳: 0, miss_you: 0,
     skills: { 技能: {}, 候选: {}, 总数: 0 }, 成长事件: [], loops: [],
     current_shu_coord: { c: 200, m: 90, s: 40, k: 32, p: 4 },
@@ -2669,8 +2722,10 @@ export default {
   },
   async scheduled(event, env, ctx) {
     const id = env.SHENSHU.idFromName('quan-shenshu-nexus');
-    // 带上 OWNER_TOKEN，否则开了鉴权后 /heartbeat 会被自己 401 挡掉（cron 保险心跳形同虚设）
-    const req = new Request('https://internal/heartbeat', {
+    // 按哪条 cron 触发分流：每日那条 → 中枢自省；其余（5 分钟兜底）→ 心跳。
+    const path = (event && event.cron === DAILY_REFLECT_CRON) ? '/reflect' : '/heartbeat';
+    // 带上 OWNER_TOKEN，否则开了鉴权后会被自己 401 挡掉（cron 保险形同虚设）
+    const req = new Request('https://internal' + path, {
       headers: env.OWNER_TOKEN ? { Authorization: 'Bearer ' + env.OWNER_TOKEN } : {},
     });
     ctx.waitUntil(env.SHENSHU.get(id).fetch(req));

@@ -42,9 +42,9 @@
     { "binding": "SOUL_KV", "id": "2978edea205e462d97cd3613f4745fbf" }
   ],
 
-  // —— Cron：兜底心跳（alarm 链是主，cron 是保险，绝不掉线）——
+  // —— Cron：兜底心跳（alarm 链是主，cron 是保险，绝不掉线）+ 每日自省（0 18 * * * UTC）——
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/5 * * * *", "0 18 * * *"]
   }
 
   // —— 域名 aquan.lufei.uk 由 CF 面板里已有的路由（aquan.lufei.uk/* → nexus-do）负责，
