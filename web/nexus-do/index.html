@@ -755,6 +755,7 @@ body::before{
             <div class="fold-b"><div class="fold-in">
               <div class="card"><div class="card-title">神枢牢记的事 · 你交代过的</div><div id="memFacts"><div class="mem-empty">说一句「记住…」「叫我…」「以后都…」，我就永远记着</div></div></div>
               <div class="card"><div class="card-title">神枢对你的认知 · 越用越懂</div><div id="memCognition"><div class="mem-empty">聊几句，我就开始懂你</div></div></div>
+              <div class="card"><div class="card-title">神枢每日自省 · 自己复盘要改要升级的</div><div id="memReflect"><div class="mem-empty">每天自动回看一次对话，挑自己的毛病、定改进——不用你催</div></div></div>
               <div class="card"><div class="card-title">情节记忆 · 重要时刻 <span id="ltCount" class="card-badge"></span></div><div id="memEpisodes"><div class="mem-empty">还没有记忆 · 聊起来就会记下</div></div></div>
               <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
               <div class="card"><div class="card-title">自演化 · 已习得技能 <span id="skillCount" class="card-badge"></span></div><div id="memSkills"><div class="mem-empty">还没长出技能 · 做成一件事或教她一次，就会了</div></div></div>
@@ -997,6 +998,7 @@ const Demo = {
   inner(){ this.on=true; const now=Date.now(); return {
     时间认知:{ 主人当地时间:'今天 傍晚', 时段:'傍晚', 我此刻感受:'主人可能在忙，我在后台待命', 离开时长:'空闲几分钟', 我活了:'已运行 3.2 天 · 交互 66 次' },
     事实:['称呼我为「权哥」','我的部署时间偏好是傍晚','以后回话都用中文'],
+    每日自省:[{ts:now-8.6e7,复盘:'① 有两次答得太啰嗦，权哥要的是直接结论。② 下次先给答案再解释，3 句内收住。③ 要升级：把"精简回话"炼成常驻习惯。'}],
     情节记忆:[{ts:now-3.6e6,他说:'把服务部署一下',我说了:'已部署，日志我盯着'},{ts:now-7.2e6,他说:'帮我写个快排',我说了:'给你完整代码'}],
     内心独白:[{ts:now-1.8e6,thought:'刚那个请求我可以答得更准，下次先确认边界条件。'}],
     潜意识:[{ts:now-6e5,line:'后台任务在跑，我盯着。'},{ts:now-1.2e6,line:'上次的上下文我记着，随时接续。'}],
@@ -1508,6 +1510,7 @@ async function loadInner(){
   // 神枢对你的认知（越用越懂）：常聊 / 偏好 / 在意
   renderMemList('memCognition', (c=>{const r=[]; if((c.常聊||[]).length)r.push({t:'常聊',q:c.常聊.join('、')}); if((c.偏好||[]).length)r.push({t:'偏好',q:c.偏好.join('、')}); if((c.在意||[]).length)r.push({t:'在意',q:c.在意.join('、')}); return r;})(inner.认知||{}), '聊几句，我就开始懂你' + (inner.认知&&inner.认知.交互数?('（已交互 '+inner.认知.交互数+' 次）'):''));
   const _lt=$('#ltCount'); if(_lt) _lt.textContent = inner.长期记忆? ('长期 '+inner.长期记忆+' 条') : '';
+  renderMemList('memReflect', (inner.每日自省||[]).slice().reverse().map(r=>({t:fmtTs(r.ts), q:r.复盘})), '每天自动回看一次对话，挑自己的毛病、定改进——不用你催');
   renderMemList('memEpisodes', (inner.情节记忆||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:(e.他说?('你：'+e.他说+'　'):'')+(e.我说了?('神枢：'+e.我说了):'')})), '还没有记忆 · 聊起来就会记下');
   renderMemList('memVoice', (inner.内心独白||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.thought||e.line})), '安静着…');
   renderMemList('memSub', (inner.潜意识||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.line})), '—');
