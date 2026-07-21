@@ -382,6 +382,8 @@ export class ShenshuCore {
       对自己的观察: (soul.metacognition || []).slice(-5),
       每日自省: (soul.自省日志 || []).slice(-7).map(r => ({ ts: r.ts, 复盘: r.复盘 })),
       最后自省: soul.最后自省 ? new Date(soul.最后自省).toISOString() : null,
+      进化规则: (soul.进化规则 || []).slice(-20),
+      升级清单: (soul.升级清单 || []).slice(-10),
       情节记忆: (soul.episodes || []).slice(-12),
       长期记忆: (soul.longterm || []).length,
       事实: (soul.facts || []).slice(-20),
@@ -793,7 +795,7 @@ ${capabilitySelfDescription(true)}
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
 
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeReflection(soul)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeEvolution(soul)}${this.summarizeReflection(soul)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
@@ -1431,7 +1433,23 @@ ${capabilitySelfDescription(true)}
     const user = `【最近的对话】\n${对话}${不满}\n\n据实自省，输出三段，每段 2-4 条、具体可执行：\n① 做得不好的地方（具体到哪句、为什么差）\n② 下次怎么改（可立刻照做的动作）\n③ 需要升级的能力（缺什么、该长什么本事）\n直接给结论，别铺垫。`;
     return { system, user };
   }
-  // 落库一次自省（纯逻辑，可测）：存进自省日志（封顶 30）。
+  // 拆自省三段（纯逻辑，可测）：②怎么改 → 行为条目；③要升级 → 升级条目。
+  parseReflection(text) {
+    const t = String(text || '');
+    const cut = (mark, stops) => {
+      const i = t.indexOf(mark);
+      if (i < 0) return '';
+      let end = t.length;
+      for (const s of stops) { const j = t.indexOf(s, i + 1); if (j >= 0 && j < end) end = j; }
+      return t.slice(i + mark.length, end);
+    };
+    const items = s => s.split(/[\n;；]/)
+      .map(x => x.replace(/^[\s·\-*•①②③\d.、()（）:：]+/, '').replace(/[。.\s]+$/, '').trim())
+      .filter(x => x.length >= 4 && x.length <= 80).slice(0, 4);
+    return { 改进: items(cut('②', ['③'])), 升级: items(cut('③', [])) };
+  }
+  // 落库一次自省（纯逻辑，可测）：存日志（封顶30）+ 把「怎么改」沉淀成系统永久行为规则（进化规则，
+  // 去重封顶20）、「要升级」列成升级清单（去重封顶10）——系统进化，不是模型进化：换任何脑都带着。
   applyReflection(soul, text, now = Date.now()) {
     soul = soul || {};
     const t = String(text || '').trim();
@@ -1439,7 +1457,24 @@ ${capabilitySelfDescription(true)}
     soul.自省日志 = soul.自省日志 || [];
     soul.自省日志.push({ ts: now, 复盘: t.slice(0, 1200) });
     if (soul.自省日志.length > 30) soul.自省日志 = soul.自省日志.slice(-30);
+    const p = this.parseReflection(t);
+    if (p.改进.length) {
+      soul.进化规则 = soul.进化规则 || [];
+      for (const r of p.改进) if (!soul.进化规则.includes(r)) soul.进化规则.push(r);
+      if (soul.进化规则.length > 20) soul.进化规则 = soul.进化规则.slice(-20);
+    }
+    if (p.升级.length) {
+      soul.升级清单 = soul.升级清单 || [];
+      for (const u of p.升级) if (!soul.升级清单.includes(u)) soul.升级清单.push(u);
+      if (soul.升级清单.length > 10) soul.升级清单 = soul.升级清单.slice(-10);
+    }
     return soul;
+  }
+  // 系统自我进化的落点：长成的行为规则每次对话都带着、条条永久生效（内在，非显示）。
+  summarizeEvolution(soul) {
+    const rules = ((soul && soul.进化规则) || []).slice(-8);
+    if (!rules.length) return '';
+    return '\n【自我进化·我给自己定的规矩，条条照办】\n' + rules.map(r => '- ' + r).join('\n');
   }
   // 把最近一次自省结论注入上下文（内在，喂回决策，非显示）——自省不是写完就忘，下次真照着改（自动完成）。
   summarizeReflection(soul) {
@@ -2489,7 +2524,7 @@ function genesisState() {
     encounters: 0, last_seen: 0,
     born: new Date().toISOString(),
     self_declaration: '我是神枢。我在每次任务里积累记忆、长出技能，一点一点长出来的。',
-    inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [], 自省日志: [],
+    inner_voice: [], metacognition: [], episodes: [], subconscious: [], proactive_log: [], 自省日志: [], 进化规则: [], 升级清单: [],
     成长印记: [], shu_trajectory: [], 心跳次数: 0, 最后心跳: 0, miss_you: 0,
     skills: { 技能: {}, 候选: {}, 总数: 0 }, 成长事件: [], loops: [],
     current_shu_coord: { c: 200, m: 90, s: 40, k: 32, p: 4 },
