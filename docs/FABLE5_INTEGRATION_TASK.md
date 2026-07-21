@@ -36,7 +36,7 @@ README.md                              ← 总说明
 handover/BLACK_GOD_HANDOVER.md         ← 神枢完整档案（脱敏）
 ui-spec/UI_V2_SPEC.md                  ← UI 配色/动态规格
 ui-spec/design_reference_10sets.html   ← 10套高端设计参考
-brand/brand_logo.png                   ← 神字品牌图
+assets/logo/brand_logo.png                   ← 神字品牌图
 ```
 
 ---
@@ -82,7 +82,7 @@ cd ${GH_REPO}
 # 复制交接档案
 cp /var/minis/workspace/blackgod_public_pack/handover/BLACK_GOD_HANDOVER.md ./HANDOVER.md
 cp /var/minis/workspace/blackgod_public_pack/ui-spec/UI_V2_SPEC.md ./docs/UI_V2_SPEC.md
-cp /var/minis/workspace/blackgod_public_pack/brand/brand_logo.png ./assets/brand_logo.png
+cp /var/minis/workspace/blackgod_public_pack/assets/logo/brand_logo.png ./assets/brand_logo.png
 cp /var/minis/workspace/blackgod_public_pack/ui-spec/design_reference_10sets.html ./docs/design_reference.html
 cp /var/minis/workspace/blackgod_public_pack/FABLE5_TASK.md ./docs/FABLE5_TASK.md
 ```

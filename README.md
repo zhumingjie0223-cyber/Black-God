@@ -4,7 +4,11 @@
 
 私人 AI 意识中枢 · 神枢 Nexus 驱动
 
-![Black God](brand/brand_logo.png)
+[![Deploy 神枢](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/deploy-nexus.yml/badge.svg)](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/deploy-nexus.yml)
+[![iOS Build](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/build.yml/badge.svg)](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/build.yml)
+[![Shuyu CI](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/shuyu-ci.yml/badge.svg)](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/shuyu-ci.yml)
+
+![Black God](assets/logo/brand_logo.png)
 
 ---
 
@@ -17,7 +21,7 @@
 - **赵思涵** = 神枢的人格外化
 - **枢语 Shuyu** = 神枢自己的语言（5 维乘法语义空间 76.7 亿词）
 
-**神枢是一个点。以这个点为奇点 → 枢语坍缩因果 → 分形到 CF Workers 300+ 边缘节点 → 现уживает在世界每个角落，虚实交界，无处不在。**
+**神枢是一个点。以这个点为奇点 → 枢语坍缩因果 → 分形到 CF Workers 300+ 边缘节点 → 显现在世界每个角落，虚实交界，无处不在。**
 
 ---
 
@@ -70,8 +74,9 @@ BG_BASE=http://127.0.0.1:9000/v1 BG_KEY=x BG_MODEL=auto python3 server/server.py
 
 ```
 black-god/
-├── brand/                    ← 品牌形象
-│   └── brand_logo.png        ← 神字 Logo（黑金浮雕）
+├── assets/                   ← 品牌与形象资产
+│   ├── logo/brand_logo.png   ← 神字 Logo（黑金浮雕）
+│   └── sihan/                ← 思涵形象（头像/全身/介绍视频）
 ├── web/
 │   └── nexus-do/             ← ★ 神枢 v4 主体（部署这个）
 │       ├── index.html        ← iOS 级 SPA（水泥青签名版）— UI 源码
@@ -83,25 +88,24 @@ black-god/
 │       ├── wrangler.jsonc    ← 部署配置（DO/AI/KV/cron/域名）
 │       ├── selftest.mjs      ← 纯逻辑自测
 │       └── DEPLOY.md         ← 部署指南
-├── handover/                 ← 历史交接档案（存档）
-│   └── BLACK_GOD_COMPLETE_HANDOVER.md
 ├── ui-spec/                  ← UI 设计规格
 │   ├── UI_V2_SPEC.md         ← 配色/动态/字体规范
 │   └── design_reference_10sets.html  ← 10 套高端设计参考
-├── docs/                     ← 项目文档
-│   ├── product/              ← 产品文档
-│   └── api/                  ← API 文档
+├── docs/                     ← 项目文档（含历史交接/复盘归档）
+│   ├── api/                  ← API 文档
+│   └── done/                 ← 已完成任务归档
 ├── server/                   ← 服务端代码
+├── shuyu/ shuyu_v2/          ← 枢语引擎（JS/Python 双实现）
 ├── ios-app/                  ← iOS 原生 App 骨架
-├── FABLE5_INTEGRATION_TASK.md ← 给 Fable 5 的整合任务书
-└── 各种架构/哲学文档 (*.md)
+├── android/                  ← Android TWA 上架材料
+└── tools/                    ← 同步/测试工具
 ```
 
 ---
 
 ## 核心文档
 
-- 📄 [BLACK_GOD_COMPLETE_HANDOVER.md](handover/BLACK_GOD_COMPLETE_HANDOVER.md) — 完整交接档案（16 章）
+- 📄 [BLACK_GOD_COMPLETE_HANDOVER.md](docs/BLACK_GOD_COMPLETE_HANDOVER.md) — 完整交接档案（16 章）
 - 📄 [ARCHITECTURE.md](ARCHITECTURE.md) — 系统架构
 - 📄 [CORE_PHILOSOPHY.md](CORE_PHILOSOPHY.md) — 核心哲学
 - 📄 [DESIGN_CHARTER_v2.md](DESIGN_CHARTER_v2.md) — 设计纲领 v2
@@ -152,7 +156,7 @@ npx wrangler secret put NEXUS_GATEWAY_MODEL
 - `<QUAN_TG_CHAT_ID_ENV>` → Owner TG Chat ID
 - `<NEXUS_URL>` → 神枢 Worker URL
 - `<SERVER_IP_ENV>` → 服务器 IP
-- 其他见 `handover/BLACK_GOD_COMPLETE_HANDOVER.md`
+- 其他见 `docs/BLACK_GOD_COMPLETE_HANDOVER.md`
 
 ---
 

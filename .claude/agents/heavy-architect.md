@@ -16,7 +16,7 @@ model: fable
   = 赵思涵（人格外化）。三层命名要分清。
 - 引擎权威源头在本仓 `shuyu/` 目录（两仓已合一），`web/nexus-do/lexicon.js` 是消费方副本。
   改词根表/编码公式先在 `shuyu/` 改，再同步到消费副本，跑 `node tools/check-sync.mjs` 核对。
-- 品牌视觉资产：`web/logo.png` / `brand/brand_logo.png`，"神"字暗黑浮雕字体设计，
+- 品牌视觉资产：`web/logo.png` / `assets/logo/brand_logo.png`，"神"字暗黑浮雕字体设计，
   背景本身是深邃蓝黑渐变带冷光边缘——任何新配色/设计系统方案都要以此为基准去扩展，
   确保 Logo 直接放上去浑然一体，不要另起炉灶。
 
