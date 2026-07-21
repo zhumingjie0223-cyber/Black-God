@@ -516,11 +516,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2)}
 
 /* —— Toast —— */
-.toast{position:fixed;left:50%;top:calc(var(--safe-top) + 16px);transform:translate(-50%,-24px);z-index:200;
-  padding:11px 18px;border-radius:var(--radius-pill);font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;
+.toast{position:fixed;left:50%;top:calc(var(--safe-top) + 58px);transform:translate(-50%,-24px);z-index:620;
+  max-width:min(88vw,420px);padding:11px 18px;border-radius:var(--radius-pill);font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;
   background:color-mix(in srgb,var(--bg-3) 90%,transparent);border:1px solid var(--line-2);
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:.35s var(--spring);white-space:nowrap;
-  box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  overflow:hidden;text-overflow:ellipsis;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
 /* —— 锁屏门 —— */
