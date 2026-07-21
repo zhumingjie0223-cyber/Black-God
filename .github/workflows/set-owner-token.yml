@@ -1,0 +1,32 @@
+name: 一次性·设置 OWNER_TOKEN
+
+# 一次性运维工作流:借部署流水线已有的 CLOUDFLARE_API_TOKEN,把 OWNER_TOKEN 写进 nexus-do。
+# 值经 workflow_dispatch 输入传入、日志中以 ::add-mask:: 屏蔽;跑完即删本文件。
+on:
+  workflow_dispatch:
+    inputs:
+      value:
+        description: '要设置的 OWNER_TOKEN 值'
+        required: true
+
+jobs:
+  set-secret:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/nexus-do
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm install
+      - name: 写入 OWNER_TOKEN 到 nexus-do(值已屏蔽)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OT: ${{ github.event.inputs.value }}
+        run: |
+          echo "::add-mask::$OT"
+          printf '%s' "$OT" | npx wrangler secret put OWNER_TOKEN --name nexus-do
+          echo "OWNER_TOKEN 已写入 nexus-do。"
