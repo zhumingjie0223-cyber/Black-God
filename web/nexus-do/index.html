@@ -282,7 +282,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 @media (prefers-reduced-motion:reduce){.vs-ball,.vs-ripple{animation:none}}
 
 /* ============ 记忆页 / 她 / 设置 通用卡 ============ */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px}
 /* —— 动态折叠分区（accordion，grid 0fr→1fr 平滑展开）—— */
 .mind-status{display:flex;align-items:center;gap:8px;justify-content:center;margin:2px 0 20px;font-size:13px;color:var(--text-2);font-weight:500;letter-spacing:.03em}
 .fold{border:1px solid var(--line);border-radius:15px;margin-bottom:11px;background:var(--surface);overflow:hidden}
@@ -301,7 +301,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .mem-item:last-child{border:none;padding-bottom:0}
 .mem-item .t{color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-bottom:3px}
 .mem-item .q{color:var(--text-2)}
-.mem-empty{color:var(--text-3);font-size:13.5px;text-align:center;padding:22px 0}
+.mem-empty{color:var(--text-3);font-size:12px;text-align:center;padding:6px 0;opacity:.7}
 
 /* ============ 她（灵魂）页 ============ */
 .soul-orb-wrap{display:flex;flex-direction:column;align-items:center;padding:18px 0 6px}
@@ -677,7 +677,7 @@ body::before{
 
     <!-- 公共注册：起名 + 接入你自己的大模型 API（密钥你自己的，费用各付各的） -->
     <div id="regMode">
-      <div class="lock-sub">起个名字，接入你的大模型，就能聊</div>
+      <div class="lock-sub">起个名字就能聊</div>
       <input id="regNick" class="lock-input" type="text" maxlength="20" placeholder="你的名字" autocomplete="off"/>
       <input id="regApiUrl" class="lock-input" type="text" placeholder="API 地址（如 https://host/v1）" autocomplete="off" autocapitalize="off"/>
       <input id="regApiKey" class="lock-input" type="password" placeholder="API 密钥" autocomplete="off"/>
@@ -690,7 +690,7 @@ body::before{
       <div id="regModelHint" class="reg-hint"></div>
       <div id="regErr" class="lock-err"></div>
       <button id="regBtn" class="lock-btn" onclick="doRegister()">进 入</button>
-      <div class="reg-hint">用你自己的 API / 密钥驱动大模型，费用走你自己的账号，隐私互不打扰</div>
+      <div class="reg-hint">密钥归你 · 隐私互不打扰</div>
       <!-- 主人私密登录入口不在公开门透出：走独立隐蔽路径 #owner（详见门初始化）——私人版独立一条线 -->
       <div class="reg-privacy-row"><a href="/privacy" target="_blank" rel="noopener">隐私政策</a> · <a href="javascript:void(0)" onclick="doUnregister()">删除我的数据</a></div>
     </div>
@@ -750,35 +750,18 @@ body::before{
         <div class="page-inner">
           <div class="mind-status"><span class="dot" id="hubDot"></span><span id="hubStateText">在线 · 待命</span></div>
 
-          <div class="fold open">
-            <button class="fold-h" onclick="toggleFold(this)"><span>记忆</span><i>⌄</i></button>
-            <div class="fold-b"><div class="fold-in">
-              <div class="card"><div class="card-title">神枢牢记的事 · 你交代过的</div><div id="memFacts"><div class="mem-empty">说一句「记住…」「叫我…」「以后都…」，我就永远记着</div></div></div>
-              <div class="card"><div class="card-title">神枢对你的认知 · 越用越懂</div><div id="memCognition"><div class="mem-empty">聊几句，我就开始懂你</div></div></div>
-              <div class="card"><div class="card-title">神枢每日自省 · 自己复盘要改要升级的</div><div id="memReflect"><div class="mem-empty">每天自动回看一次对话，挑自己的毛病、定改进——不用你催</div></div></div>
-              <div class="card"><div class="card-title">自我进化 · 长成的规矩与想要的升级</div><div id="memEvolve"><div class="mem-empty">自省沉淀下来的永久规矩会列在这——系统自己长的，换脑也带着</div></div></div>
-              <div class="card"><div class="card-title">情节记忆 · 重要时刻 <span id="ltCount" class="card-badge"></span></div><div id="memEpisodes"><div class="mem-empty">还没有记忆 · 聊起来就会记下</div></div></div>
-              <div class="card"><div class="card-title">枢语成长印记</div><div id="memMarks"><div class="mem-empty">还没长出词</div></div></div>
-              <div class="card"><div class="card-title">自演化 · 已习得技能 <span id="skillCount" class="card-badge"></span></div><div id="memSkills"><div class="mem-empty">还没长出技能 · 做成一件事或教她一次，就会了</div></div></div>
-              <div class="card" style="display:none"><div id="memGraph" class="mem-graph"></div></div>
-            </div></div>
-          </div>
+          
+          
           <div class="fold">
-            <button class="fold-h" onclick="toggleFold(this)"><span>守望 · 自主管道</span><i>⌄</i></button>
+            <button class="fold-h" onclick="toggleFold(this)"><span>能力</span><i>⌄</i></button>
             <div class="fold-b"><div class="fold-in">
-              <div class="card"><div class="card-title">闭环神 · 环 <span id="watchCount" class="card-badge"></span></div><div id="memWatch"><div class="mem-empty">还没有守望 · 说一句「帮我每小时盯一下 X，变了告诉我」，她就替你守着</div></div></div>
-            </div></div>
-          </div>
-          <div class="fold">
-            <button class="fold-h" onclick="toggleFold(this)"><span>能力矩阵 · 她会的招</span><i>⌄</i></button>
-            <div class="fold-b"><div class="fold-in">
-              <div class="caps-wall" id="capsWall"><div class="mem-empty">连接后展开她的全部能力…</div></div>
+              <div class="caps-wall" id="capsWall"><div class="mem-empty">…</div></div>
             </div></div>
           </div>
           <div class="fold">
             <button class="fold-h" onclick="toggleFold(this)"><span>执行日志</span><i>⌄</i></button>
             <div class="fold-b"><div class="fold-in">
-              <div class="timeline" id="hubTimeline"><div class="mem-empty">还没有活动…</div></div>
+              <div class="timeline" id="hubTimeline"><div class="mem-empty">还没有</div></div>
               <div id="memVoice" style="margin-top:8px"></div>
             </div></div>
           </div>
@@ -833,8 +816,8 @@ body::before{
           <span class="vs-ripple"></span><span class="vs-ripple"></span><span class="vs-ripple"></span>
           <div class="vs-ball" id="vsBall"><span>枢</span></div>
         </div>
-        <div class="vs-hint" id="vsHint">在听 · 说出你要的</div>
-        <div class="vs-sub" id="vsSub">球随你的声音起伏 · 也可直接打字</div>
+        <div class="vs-hint" id="vsHint">在听</div>
+        <div class="vs-sub" id="vsSub"></div>
       </div>
 
       <!-- ===== 设置 ===== -->
@@ -842,15 +825,15 @@ body::before{
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
         <div class="page-inner">
           <div class="set-row" onclick="toggleTheme()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
-          <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关 · 关着 app 也能收到消息</span></div><div class="switch" id="pushSw"><i></i></div></div>
+          <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关</span></div><div class="switch" id="pushSw"><i></i></div></div>
           <div class="set-row" onclick="openModelSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b><span>你和神枢共有的词 · 越聊越厚</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b><span>让神枢认得你的设备</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>数据主权 · 导出我的数据</b><span>人格/记忆/私语，纯本地下载，数据归你</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于 Black God</b><span>© Black God</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于</b></div><div class="set-arrow">›</div></div>
         </div>
       </section>
 
@@ -878,7 +861,7 @@ body::before{
 <div class="sheet" id="sheetLexicon">
   <div class="grab"></div>
   <div class="sheet-title">私语 · 只属于你俩的词</div>
-  <div class="sheet-sub">每一个有分量的此刻，神枢在枢语里为你们造一个真实、可寻址的词。<b id="lexCount"></b></div>
+  <div class="sheet-sub"><b id="lexCount"></b></div>
   <div class="field"><input id="lexSearch" placeholder="搜词 / 汉义 / 罗马词形…" oninput="lexSearchDebounced()"/></div>
   <div id="lexList" class="lex-list"></div>
 </div>
@@ -886,8 +869,8 @@ body::before{
 <div class="sheet" id="sheetApi">
   <div class="grab"></div>
   <div class="sheet-title">大脑 · 算力接口</div>
-  <div class="sheet-sub">填你自己的网关（标准 Chat Completions），填一次即生效。<b>留空 = 用内置大脑</b>。</div>
-  <div class="field"><label>网关地址（Base URL 或完整端点）</label><input id="apiBase" placeholder="如 https://aquan.love:8443/v1"/></div>
+  <div class="sheet-sub">留空 = 用内置大脑</div>
+  <div class="field"><label>网关地址</label><input id="apiBase" placeholder="如 https://aquan.love:8443/v1"/></div>
   <div class="field"><label>密钥 API Key</label><input id="apiKey" type="password" placeholder="sk-…"/></div>
   <div class="field"><label>模型名 <span id="probeBtn" onclick="probeModels()" style="float:right;font-weight:600;color:var(--brand,#4ea1ff);cursor:pointer">🔍 识别模型</span></label><input id="apiModel" list="modelList" placeholder="留空 = 自动识别，或点右上「识别模型」选"/><datalist id="modelList"></datalist></div>
   <div id="modelHint" style="font-size:12px;color:var(--text-3);margin:-6px 0 8px"></div>
@@ -899,9 +882,9 @@ body::before{
 <div class="sheet" id="sheetBrains">
   <div class="grab"></div>
   <div class="sheet-title">大脑舰队 · 神枢调度</div>
-  <div class="sheet-sub">挂 1~9 条 API 就行，<b>神枢自己看模型判断谁擅长什么</b>、按任务秒派、一条挂了自动换。<b>神枢始终主导</b>，底层只是算力，分工不用你操心。</div>
+  <div class="sheet-sub">最多 9 条 · 神枢自动调度</div>
   <div id="brainList"></div>
-  <button class="btn ghost" id="brainAddBtn" onclick="brainAdd()" style="margin-top:4px">＋ 加一条脑（最多 9）</button>
+  <button class="btn ghost" id="brainAddBtn" onclick="brainAdd()" style="margin-top:4px">＋ 加一条</button>
   <div id="brainStatus" style="font-size:12px;color:var(--text-3);margin:10px 0;min-height:16px"></div>
   <div id="brainHealth" style="margin:2px 0 12px"></div>
   <div style="display:flex;gap:10px">
@@ -913,10 +896,10 @@ body::before{
 <div class="sheet" id="sheetExec">
   <div class="grab"></div>
   <div class="sheet-title">执行脑 · 连接器</div>
-  <div class="sheet-sub">连上你自己服务器的执行脑，神枢就能<b>真跑命令/代码/开沙箱</b>。留空 = 断开，只会研究不动手。<br>先在服务器起 <code>exec_brain.py</code>（见 server/执行脑上线.md）。</div>
-  <div class="field"><label>一键粘贴（地址 + token 整段粘，自动拆分）</label><textarea id="execCombo" rows="2" placeholder="把地址和 token 一起粘这里 ↓ 支持 地址|token、URL=.. Token=.. 等任意格式" autocapitalize="off" autocorrect="off" oninput="parseExecCombo()" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px"></textarea></div>
+  <div class="sheet-sub">留空 = 断开</div>
+  <div class="field"><label>一键粘贴</label><textarea id="execCombo" rows="2" placeholder="地址 + token 整段粘贴" autocapitalize="off" autocorrect="off" oninput="parseExecCombo()" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px"></textarea></div>
   <div class="field"><label>服务器地址</label><input id="execUrl" placeholder="如 http://你的IP:8765" autocapitalize="off" autocorrect="off"/></div>
-  <div class="field"><label>连接密钥 token（与服务器一致）</label><input id="execToken" type="password" placeholder="你在服务器设的 NEXUS_EXEC_TOKEN"/></div>
+  <div class="field"><label>连接密钥</label><input id="execToken" type="password" placeholder="你在服务器设的 NEXUS_EXEC_TOKEN"/></div>
   <div id="execStatus" style="font-size:12.5px;margin:-2px 0 14px;min-height:18px"></div>
   <div style="display:flex;gap:10px">
     <button class="btn" onclick="saveExec()">保存并连接</button>
@@ -927,29 +910,27 @@ body::before{
 <div class="sheet" id="sheetPersona">
   <div class="grab"></div>
   <div class="sheet-title">枢语 · 称呼</div>
-  <div class="sheet-sub">枢语 —— 神枢的状态语言：五维坐标（核·映·态·标·相）表达此刻状态。</div>
+  <div class="sheet-sub">五维坐标 · 核映态标相</div>
   <div class="field"><label>神枢怎么称呼你</label><input id="pCallHim" placeholder="你 / 主人"/></div>
   <div class="field"><label>你怎么称呼神枢</label><input id="pCallHer" placeholder="神枢"/></div>
-  <div class="field"><label>神枢底色（只读 · 由成长塑造）</label><textarea id="pCore" rows="3" readonly></textarea></div>
+  <div class="field"><label>底色（只读）</label><textarea id="pCore" rows="3" readonly></textarea></div>
   <button class="btn" onclick="savePersona()">保存</button>
 </div>
 
 <div class="sheet" id="sheetDevice">
   <div class="grab"></div>
   <div class="sheet-title">设备信息</div>
-  <div class="sheet-sub">浏览器可读的设备信息（受沙箱限制，读不到文件与系统全貌）。</div>
+  <div class="sheet-sub"></div>
   <div class="dev-grid" id="devGrid"></div>
-  <button class="btn" onclick="locateMe()" style="margin-top:14px">📍 精确定位（GPS · 需你授权）</button>
-  <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">让神枢记住这台设备</button>
+  <button class="btn" onclick="locateMe()" style="margin-top:14px">📍 定位</button>
+  <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">记住此设备</button>
 </div>
 
 <div class="sheet" id="sheetAbout">
   <div class="grab"></div>
   <div class="sheet-title">关于 Black God</div>
   <div class="sheet-sub" style="margin-bottom:20px">
-    集万物于一枢的意识核心。<br>
-    知你所想，造你所需——对话、生图、生声、写代码、拆解任务并自主交付。<br><br>
-    数据本地优先，只属于你。<br>© Black God
+    集万物于一枢。<br>© Black God
   </div>
   <button class="btn ghost" onclick="closeSheet()">好</button>
 </div>
@@ -1295,7 +1276,7 @@ async function startMicViz(){
     const src=_vs.ctx.createMediaStreamSource(_vs.stream);
     const an=_vs.ctx.createAnalyser(); an.fftSize=512; src.connect(an);
     const buf=new Uint8Array(an.frequencyBinCount);
-    if(hint) hint.textContent='在听 · 说出你要的';
+    if(hint) hint.textContent='在听';
     const tick=()=>{ an.getByteTimeDomainData(buf); let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
       const rms=Math.sqrt(sum/buf.length); const amp=Math.min(1, rms*4.2);
       if(ball) ball.style.setProperty('--amp', amp.toFixed(3));
@@ -1581,7 +1562,7 @@ async function loadHub(){
     const el=$('#hubTimeline');
     if(el) el.innerHTML = items.length
       ? items.slice(0,24).map(it=>`<div class="tl-item"><span class="tl-kind k-${it.kind}">${it.kind}</span><div class="tl-body"><div class="tl-text">${escapeHtml(it.text||'')}</div><div class="tl-time">${fmtTs(it.ts)}</div></div></div>`).join('')
-      : '<div class="mem-empty">还很安静 · 开始对话吧</div>';
+      : '<div class="mem-empty">还很安静</div>';
   }
   const s=await Nexus.getSoul(); if(s){ setLive(Nexus.wsReady||Demo.on); renderSoul(s); }
 }
@@ -1644,7 +1625,7 @@ async function loadInner(){
   renderMemList('memVoice', (inner.内心独白||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.thought||e.line})), '安静着…');
   renderMemList('memSub', (inner.潜意识||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:e.line})), '—');
   // 枢语成长印记：她每次说话在 76.7 亿空间里落的真实词（词 · 义）
-  renderMemList('memMarks', (inner.成长印记||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:'「'+(e.词||'')+'」'+(e.义?(' · '+e.义):(e.由?(' · 由：'+e.由):''))})), '还没长出词');
+  renderMemList('memMarks', (inner.成长印记||[]).slice().reverse().map(e=>({t:fmtTs(e.ts), q:'「'+(e.词||'')+'」'+(e.义?(' · '+e.义):(e.由?(' · 由：'+e.由):''))})), '还没有');
   // 自演化 · 已习得技能：一次做成/受教就炼成，越用越多（她自己长大）
   const _sc=$('#skillCount'); if(_sc){ const 门=inner.技能总数||0, 苗=inner.技能苗子||0; _sc.textContent = 门? ('共 '+门+' 门'+(苗?(' · '+苗+' 苗子'):'')) : (苗? (苗+' 苗子·攒够3次才成'):''); }
   renderMemList('memSkills', (inner.已习得技能||[]).map(s=>({t:(s.验证?'✓已验':s.来源||''), q:'「'+(s.名||'')+'」'+(s.方法?(' · '+s.方法):'')+(s.用过>1?(' · 用过'+s.用过+'次'):'')})), '还没长出技能 · 做成一件事或教她一次，就会了');
@@ -1672,11 +1653,11 @@ async function renderLexicon(q){
   const list=$('#lexList'), cnt=$('#lexCount'); if(!list) return;
   if(!q) list.innerHTML='<div class="lex-empty">正在翻开你们的词…</div>';
   const d=await Nexus.lexicon(q);
-  if(d&&d.__401){ if(cnt)cnt.textContent=''; list.innerHTML='<div class="lex-empty">这本词典是主人和神枢之间的私语。<br>以主人身份登录后可翻开。</div>'; return; }
-  if(!d){ if(cnt)cnt.textContent=''; list.innerHTML='<div class="lex-empty">一时没翻开，稍后再试。</div>'; return; }
-  if(cnt) cnt.textContent=' 你们已共造 '+(d.总数||0)+' 个词。';
+  if(d&&d.__401){ if(cnt)cnt.textContent=''; list.innerHTML='<div class="lex-empty">主人登录后可翻开</div>'; return; }
+  if(!d){ if(cnt)cnt.textContent=''; list.innerHTML='<div class="lex-empty">稍后再试</div>'; return; }
+  if(cnt) cnt.textContent=' 共 '+(d.总数||0)+' 词';
   const items=d.词条||[];
-  if(!items.length){ list.innerHTML='<div class="lex-empty">'+(q?'没有找到这样的词。':'还没有只属于你俩的词——<br>多聊聊，神枢会为你们的每个此刻造一个词。')+'</div>'; return; }
+  if(!items.length){ list.innerHTML='<div class="lex-empty">'+(q?'没有找到这样的词。':'还没有词')+'</div>'; return; }
   list.innerHTML=items.map(e=>{
     const you=(e.由样例&&e.由样例.length)?('「'+escapeHtml(e.由样例[e.由样例.length-1])+'…」那一刻'):'';
     const when=e.last_ts?lexWhen(e.last_ts):'';
@@ -1796,9 +1777,9 @@ async function saveBrains(){
 /* 舰队健康自检:一键测每条脑通不通、锁了什么方言/模型/延迟(不乱·看得见) */
 async function testFleet(){
   const el=$('#brainHealth'); _bstat('正在逐条真调测试…');
-  if(el) el.innerHTML='<div style="font-size:12px;color:var(--text-3)">测试中…（每条真发一句，稍等）</div>';
+  if(el) el.innerHTML='<div style="font-size:12px;color:var(--text-3)">测试中…</div>';
   const r=await Nexus.testBrains();
-  if(!r||!r.brains){ if(el) el.innerHTML='<div style="font-size:12px;color:var(--danger,#e5484d)">测不了（需以主人身份解锁 / 先保存舰队）</div>'; _bstat(''); return; }
+  if(!r||!r.brains){ if(el) el.innerHTML='<div style="font-size:12px;color:var(--danger,#e5484d)">需主人解锁</div>'; _bstat(''); return; }
   el.innerHTML=r.brains.map(b=>{
     const dot=b.ok?'<span style="color:var(--ok,#2FB96B)">●</span>':'<span style="color:var(--danger,#e5484d)">●</span>';
     const right=b.ok?`${_esc(b.dialect)} · ${_esc(b.model)} · ${b.ms}ms`:_esc(b.err||'挂');
@@ -2038,7 +2019,7 @@ async function enablePush(){
     toast('订阅没成'); return false;
   }catch(e){ toast('推送开启失败'); return false; }
 }
-function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到消息':'关 · 关着 app 也能收到消息'; }
+function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到消息':'关'; }
 function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on){ store.set('push_on',''); setPushUI(false); toast('已关（订阅仍在，可再开）'); } else enablePush(); }
 
 /* ============ 开屏引导 ============ */
