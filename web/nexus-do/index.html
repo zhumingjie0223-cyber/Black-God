@@ -369,7 +369,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hub-p-right .hub-live{font-size:15px;font-weight:600;color:var(--cy-1)}
 .hub-p-right .hub-decl{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.6}
 /* 环中盘 —— 万物绕枢、枢自不动 */
-.huanzhong{position:relative;width:280px;height:280px;margin:8px auto 2px}
+.huanzhong{position:relative;width:262px;height:262px;margin:4px auto 0}
 .hz-orbit{position:absolute;inset:22px;border-radius:50%;border:1px solid rgba(230,232,234,.10)}
 .hz-orbit.o2{inset:56px;border-color:rgba(230,232,234,.09)}
 .hz-ring{position:absolute;inset:0;animation:spin 64s linear infinite}
@@ -384,9 +384,9 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hz-hub::before{content:'';position:absolute;inset:-6px;border-radius:50%;z-index:-1;background:radial-gradient(circle,var(--cy-glow),transparent 66%);filter:blur(7px)}
 .hz-hub .glyph{font-family:var(--serif);font-size:40px;font-weight:700;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .hz-still{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:var(--cy-hi);box-shadow:0 0 9px 2px var(--cy-glow);z-index:6}
-.hz-couplet{text-align:center;font-family:var(--serif);font-size:13px;color:var(--cy-1);letter-spacing:.14em;padding-left:.14em;margin:2px 0 15px;opacity:.9}
-.hz-coord{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
-.hz-coord span{font-family:var(--serif);font-size:11.5px;color:var(--text);padding:5px 12px;border:1px solid rgba(230,232,234,.16);border-radius:var(--radius-pill);background:rgba(230,232,234,.04)}
+.hz-couplet{text-align:center;font-family:var(--serif);font-size:11.5px;color:var(--text-3);letter-spacing:.18em;padding-left:.18em;margin:0 0 12px;opacity:.8}
+.hz-coord{display:flex;gap:5px;flex-wrap:nowrap;justify-content:center;margin-bottom:14px;overflow-x:auto;padding:0 4px}
+.hz-coord span{font-family:var(--serif);font-size:10.5px;color:var(--text);padding:4px 9px;border:1px solid var(--line-2);border-radius:var(--radius-pill);background:var(--surface);white-space:nowrap;flex-shrink:0}
 .hz-coord span em{font-style:normal;color:var(--cy-hi);margin-left:5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes counter{to{transform:rotate(-360deg)}}
@@ -995,8 +995,23 @@ body.mood-low .hz-hub,body.mood-low .hub-orb{filter:saturate(.8) brightness(.92)
 .soul-think-line{text-align:center;font-family:var(--serif);font-size:12.5px;color:var(--text-2);margin:2px 0 14px;min-height:18px;opacity:.85}
 .soul-think-line em{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:3px}
 .mind-status{text-align:center;justify-content:center}
+/* ===== 长按消息浮层（ChatGPT 式操作菜单）===== */
+.msg-menu-mask{position:fixed;inset:0;z-index:93;display:none;background:rgba(0,0,0,.30);backdrop-filter:blur(2px)}
+.msg-menu-mask.show{display:block}
+.msg-menu{position:fixed;z-index:94;display:none;flex-direction:column;min-width:150px;padding:5px;border-radius:14px;
+  background:var(--bg-2);border:1px solid var(--line-2);box-shadow:0 18px 50px rgba(0,0,0,.45);animation:menuPop .18s cubic-bezier(.34,1.4,.5,1)}
+.msg-menu.show{display:flex}
+@keyframes menuPop{from{transform:scale(.86);opacity:0}to{transform:scale(1);opacity:1}}
+.msg-menu button{display:flex;align-items:center;gap:9px;border:none;background:none;color:var(--text);font-size:13.5px;
+  padding:9px 12px;border-radius:9px;cursor:pointer;text-align:left;transition:background .12s}
+.msg-menu button:active{background:var(--surface-3);transform:none}
+.msg-menu button.danger{color:var(--err)}
+.msg.pressed .bubble{transform:scale(.97);filter:brightness(1.08)}
+.msg .bubble{transition:transform .18s var(--spring),filter .18s}
 </style>
 <div class="art-mask" id="artMask" onclick="closeArtifact()"></div>
+<div class="msg-menu-mask" id="msgMenuMask" onclick="closeMsgMenu()"></div>
+<div class="msg-menu" id="msgMenu"></div>
 <div class="art-pane" id="artPane">
   <div class="art-head"><b>⚡ 预览舱 · Artifact</b><button class="btn ghost" onclick="closeArtifact()">关闭</button></div>
   <iframe id="artFrame" sandbox="allow-scripts"></iframe>
@@ -1271,7 +1286,7 @@ function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('sh
 const caps = new Set();
 let mode = 'chat';
 const MODE_PH = { chat:'对神枢说出你的目标…', image:'描述要生成的画面…', voice:'输入要合成为语音的文字…', video:'描述要生成的视频画面…' };
-function toggleCap(el){ const c=el.dataset.cap; el.classList.toggle('on'); el.classList.contains('on')?caps.add(c):caps.delete(c); }
+function toggleCap(el){ const c=el.dataset.cap; el.classList.toggle('on'); el.classList.contains('on')?caps.add(c):caps.delete(c); hapTap(); }
 function setMode(el){ mode=el.dataset.mode; $$('.pp-tile.mode').forEach(c=>c.classList.toggle('on', c===el)); $('#inp').placeholder=MODE_PH[mode]||MODE_PH.chat; if(navigator.vibrate)try{navigator.vibrate(4);}catch(e){} }
 function autogrow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
 /* ＋ 面板：所有功能收纳于此，表面只 3 键 */
@@ -1337,6 +1352,7 @@ function pushMsg(role, text, meta, speakable){
   if(speakable && role==='her'){ const sp=document.createElement('button'); sp.className='speak-btn'; sp.textContent='🔊'; sp.title='听她说';
     sp.onclick=()=>speak(sp, text); foot.appendChild(sp); }
   if(foot.childNodes.length) m.appendChild(foot);
+  bindMsgPress(m, role==='me'?'me':'her', ()=>text);
   wrap.appendChild(m); scrollBottom(); return m;
 }
 function scrollBottom(){ const s=$('#chatScroll'); requestAnimationFrame(()=>s.scrollTop=s.scrollHeight); }
@@ -1388,6 +1404,53 @@ function fireSynapse(idx){
   const dots=ring.querySelectorAll('.hz-node .d i'); const d=dots[idx%Math.max(dots.length,1)];
   if(d){ d.classList.add('fire'); setTimeout(()=>d.classList.remove('fire'), 900); }
 }
+/* ===== v3.3 触感体系：轻/中/重 三档统一节奏 ===== */
+const HAP={tap:4, act:8, ok:[6,30,10], warn:[12,40,12]};
+function hapTap(){ hap(HAP.tap); }
+function hapAct(){ hap(HAP.act); }
+function hapOk(){ hap(HAP.ok); }
+
+/* ===== v3.3 长按消息浮层 ===== */
+let _pressT=null, _pressMsg=null;
+function bindMsgPress(m, role, getText){
+  const start=(e)=>{ _pressT=setTimeout(()=>{ m.classList.add('pressed'); hapAct(); openMsgMenu(m, role, getText, e); }, 420); };
+  const cancel=()=>{ clearTimeout(_pressT); };
+  m.addEventListener('touchstart', start, {passive:true});
+  m.addEventListener('touchend', cancel); m.addEventListener('touchmove', cancel);
+  m.addEventListener('mousedown', start); m.addEventListener('mouseup', cancel); m.addEventListener('mouseleave', cancel);
+  m.addEventListener('contextmenu', e=>e.preventDefault());
+}
+function openMsgMenu(m, role, getText, ev){
+  _pressMsg=m;
+  const menu=$('#msgMenu'); const txt=getText();
+  const items=[
+    {ic:'⧉', t:'复制', run:()=>{ navigator.clipboard.writeText(txt).then(()=>toast('已复制')); hapOk(); }},
+  ];
+  if(role==='her'){
+    items.push({ic:'🔊', t:'听她说', run:()=>{ const sp=m.querySelector('.speak-btn'); if(sp) sp.click(); else speakText(txt); }});
+    items.push({ic:'⟳', t:'重新回答', run:()=>{ regenLast(); }});
+  } else {
+    items.push({ic:'↩', t:'重新发送', run:()=>{ $('#inp').value=txt; autogrow($('#inp')); send(); }});
+  }
+  items.push({ic:'✕', t:'删除这条', danger:true, run:()=>{ m.remove(); hapAct(); }});
+  menu.innerHTML=items.map((it,i)=>`<button ${it.danger?'class="danger"':''} data-i="${i}"><span>${it.ic}</span>${it.t}</button>`).join('');
+  menu.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{ closeMsgMenu(); items[i].run(); });
+  const r=m.getBoundingClientRect();
+  menu.style.left=Math.min(Math.max(12, r.left+20), window.innerWidth-170)+'px';
+  const top=r.bottom+8+180>window.innerHeight ? r.top-8-items.length*40 : r.bottom+8;
+  menu.style.top=Math.max(60, top)+'px';
+  $('#msgMenuMask').classList.add('show'); menu.classList.add('show');
+}
+function closeMsgMenu(){ $('#msgMenuMask').classList.remove('show'); $('#msgMenu').classList.remove('show'); if(_pressMsg){ _pressMsg.classList.remove('pressed'); _pressMsg=null; } }
+function speakText(t){ try{ const u=new SpeechSynthesisUtterance(t); u.lang='zh-CN'; speechSynthesis.speak(u); }catch(e){} }
+function regenLast(){
+  // 找最后一条自己发的消息重发（她重新回答）
+  const mine=[...document.querySelectorAll('#msgs .msg.me .bubble')];
+  if(!mine.length){ toast('没有可重发的'); return; }
+  const t=mine[mine.length-1].textContent;
+  $('#inp').value=t; autogrow($('#inp')); send();
+}
+
 /* ===== v3.2 情绪氛围：心绪映射全站光效 ===== */
 function applyMoodAmbience(mood){
   document.body.classList.toggle('mood-high', mood>.62);
@@ -1469,7 +1532,7 @@ async function doVideo(text){
   else pushMsg('her', (res&&(res.说明||res.error))||'…视频这次没成，再试一次？', '视频');
 }
 function handleReply(res){
-  hideTyping();
+  hideTyping(); hapOk();
   const reply = res.reply || '…在呢。';
   let meta = res.model ? ('· '+res.model) : '';
   const el = pushMsg('her', reply, meta, true);
