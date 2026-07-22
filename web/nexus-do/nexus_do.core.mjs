@@ -612,7 +612,7 @@ export class ShenshuCore {
       let webBlock = '';
       if (!instanceMode && this.needsWeb(text)) {
         const found = await this.webSearch(text).catch(() => '');
-        if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造，可注明来源】\n' + found;
+        if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造。结尾用「来源：」列出用到的链接（最多3条）】\n' + found;
       }
       brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, instanceMode, role });
     }
@@ -834,11 +834,30 @@ ${capabilitySelfDescription(true)}
       });
       if (!resp.ok) return '';
       const html = await resp.text();
+      const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
       const out = [];
+      // 结构化解析：标题 + 真实链接 + 摘要（来源可引用，对标 Perplexity/Grok）
+      const blocks = html.split(/class="result\b/).slice(1);
+      for (const b of blocks) {
+        if (out.length >= 6) break;
+        const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+        const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+        if (!am && !sm) continue;
+        let url = am ? am[1] : '';
+        const um = /[?&]uddg=([^&]+)/.exec(url);
+        if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+        if (url.startsWith('//')) url = 'https:' + url;
+        const title = strip(am && am[2]).slice(0, 80);
+        const txt = strip(sm && sm[1]).slice(0, 200);
+        if (!title && !txt) continue;
+        out.push(`${out.length + 1}. ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
+      }
+      if (out.length) return out.join('\n');
+      // 兜底：老式纯摘要解析（页面结构变了也不至于全空）
       const re = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
       let m;
       while ((m = re.exec(html)) && out.length < 6) {
-        const txt = m[1].replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
+        const txt = strip(m[1]);
         if (txt) out.push(`${out.length + 1}. ${txt.slice(0, 220)}`);
       }
       return out.join('\n');

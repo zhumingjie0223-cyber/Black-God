@@ -993,6 +993,9 @@ body.mood-low .hz-hub,body.mood-low .hub-orb{filter:saturate(.8) brightness(.92)
 .cap-card b{display:block;font-size:12.5px;color:var(--text)}
 .cap-card s{display:block;font-size:10.5px;color:var(--text-3);text-decoration:none;margin-top:3px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .cap-card .cap-lock{float:right;font-size:10px;opacity:.6}
+/* 来源引用徽章 */
+.src-pill{display:inline-flex;align-items:center;margin:1px 3px;padding:1px 9px;border-radius:999px;font-size:11px;text-decoration:none;color:var(--cy-1);border:1px solid var(--line-2);background:rgba(230,232,234,.05);vertical-align:baseline;transition:filter .15s}
+.src-pill:active{filter:brightness(1.3)}
 </style>
 <div class="art-mask" id="artMask" onclick="closeArtifact()"></div>
 <div class="art-pane" id="artPane">
@@ -1328,7 +1331,7 @@ function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
   const b=document.createElement('div'); b.className='bubble';
-  if(role==='her' && text && text.indexOf('```')>-1){ renderRich(b, text); } else { b.textContent=text; }
+  if(role==='her' && text && (text.indexOf('```')>-1 || /https?:\/\//.test(text))){ renderRich(b, text); } else { b.textContent=text; }
   m.appendChild(b);
   const foot=document.createElement('div'); foot.className='msg-foot';
   if(meta){ const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=meta; foot.appendChild(mt); }
@@ -1344,7 +1347,7 @@ function renderRich(container, text){
   const parts=text.split(/```(\w*)\n?/);
   // parts: [文本, lang, 代码, 文本, lang, 代码...]
   for(let i=0;i<parts.length;i++){
-    if(i%3===0){ if(parts[i]){ const t=document.createElement('span'); t.textContent=parts[i]; container.appendChild(t); } }
+    if(i%3===0){ if(parts[i]){ appendLinkified(container, parts[i]); } }
     else if(i%3===1){
       const lang=parts[i]||'code', code=parts[i+1]||'';
       const pre=document.createElement('pre'); const c=document.createElement('code'); c.textContent=code.replace(/\n$/,''); pre.appendChild(c); container.appendChild(pre);
@@ -1365,6 +1368,20 @@ function renderRich(container, text){
 }
 function openArtifact(code){ $('#artFrame').srcdoc=code; $('#artMask').classList.add('show'); $('#artPane').classList.add('show'); hap(6); }
 function closeArtifact(){ $('#artMask').classList.remove('show'); $('#artPane').classList.remove('show'); $('#artFrame').srcdoc=''; }
+/* 来源引用：正文里的 URL 变成可点的来源徽章（对标 Perplexity 引用体验） */
+function appendLinkified(container, text){
+  const re=/(https?:\/\/[^\s\u4e00-\u9fff）】」，。；,;]+)/g;
+  let last=0, m, n=0;
+  while((m=re.exec(text))){
+    if(m.index>last){ const t=document.createElement('span'); t.textContent=text.slice(last,m.index); container.appendChild(t); }
+    const a=document.createElement('a'); a.href=m[1]; a.target='_blank'; a.rel='noopener noreferrer'; a.className='src-pill';
+    let host=''; try{ host=new URL(m[1]).hostname.replace(/^www\./,''); }catch(e){ host=m[1].slice(0,24); }
+    a.textContent='🔗 '+host; container.appendChild(a);
+    last=m.index+m[1].length; n++;
+  }
+  if(last<text.length){ const t=document.createElement('span'); t.textContent=text.slice(last); container.appendChild(t); }
+  return n;
+}
 
 /* ===== v3.2 突触脉冲：能力调用时对应维度节点发光 ===== */
 function fireSynapse(idx){
