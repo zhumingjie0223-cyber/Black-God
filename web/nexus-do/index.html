@@ -770,6 +770,12 @@ body::before{
             </div></div>
           </div>
           <div class="fold">
+            <button class="fold-h" onclick="toggleFold(this)"><span>能力矩阵 · 她会的招</span><i>⌄</i></button>
+            <div class="fold-b"><div class="fold-in">
+              <div class="caps-wall" id="capsWall"><div class="mem-empty">连接后展开她的全部能力…</div></div>
+            </div></div>
+          </div>
+          <div class="fold">
             <button class="fold-h" onclick="toggleFold(this)"><span>执行日志</span><i>⌄</i></button>
             <div class="fold-b"><div class="fold-in">
               <div class="timeline" id="hubTimeline"><div class="mem-empty">还没有活动…</div></div>
@@ -980,6 +986,13 @@ body.mood-low .hz-hub,body.mood-low .hub-orb{filter:saturate(.8) brightness(.92)
 .art-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line-2)}
 .art-head b{font-size:13px;color:var(--text)}
 .art-pane iframe{flex:1;border:0;background:#fff}
+/* 能力矩阵卡片墙 */
+.caps-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.cap-card{border:1px solid var(--line-2);border-radius:12px;padding:10px 12px;background:rgba(230,232,234,.03);transition:transform .16s cubic-bezier(.34,1.56,.64,1),border-color .2s;cursor:pointer}
+.cap-card:active{transform:scale(.95)}
+.cap-card b{display:block;font-size:12.5px;color:var(--text)}
+.cap-card s{display:block;font-size:10.5px;color:var(--text-3);text-decoration:none;margin-top:3px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.cap-card .cap-lock{float:right;font-size:10px;opacity:.6}
 </style>
 <div class="art-mask" id="artMask" onclick="closeArtifact()"></div>
 <div class="art-pane" id="artPane">
@@ -1364,6 +1377,22 @@ function applyMoodAmbience(mood){
   document.body.classList.toggle('mood-high', mood>.62);
   document.body.classList.toggle('mood-low', mood<.36);
 }
+/* ===== v3.2 能力矩阵卡片墙 ===== */
+async function loadCapsWall(){
+  const el=$('#capsWall'); if(!el||el.dataset.loaded) return;
+  try{
+    const r=await Nexus._fetch('/capabilities',{headers:Nexus.hdr()});
+    const j=r&&r.ok?await r.json():null;
+    const caps=j&&j.data?j.data:null; if(!caps||!caps.length) return;
+    el.innerHTML=caps.map(c=>{
+      const name=c.name||c.id||'?', desc=c.desc||c.description||'';
+      const lock=c.owner_only?'<span class="cap-lock">🔒</span>':'';
+      return `<div class="cap-card" onclick="capCardTap('${escapeHtml(String(c.id||''))}')">${lock}<b>${escapeHtml(String(name))}</b><s>${escapeHtml(String(desc))}</s></div>`;
+    }).join('');
+    el.dataset.loaded='1';
+  }catch(e){}
+}
+function capCardTap(id){ hap(4); fireSynapse(SYNAPSE_MAP[id]??Math.floor(Math.random()*5)); toast('能力 · '+id); }
 let typingEl=null;
 function showTyping(label){ hideTyping(); const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const t=document.createElement('div'); t.className='msg her';
@@ -1519,7 +1548,7 @@ function renderHzCoord(meaning){
   el.innerHTML=order.map(k=>m[k]?('<span>'+k+'<em>'+escapeHtml(String(m[k]))+'</em></span>'):'').join('');
 }
 async function loadHub(){
-  buildHz(); renderHzCoord();
+  buildHz(); renderHzCoord(); loadCapsWall();
   const inner = await Nexus.getInner();
   if(inner){
     renderHzCoord(inner.坐标含义);

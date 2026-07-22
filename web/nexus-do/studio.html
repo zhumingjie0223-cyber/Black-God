@@ -152,6 +152,22 @@
   }
   .menu{display:none; width:34px;height:34px; place-items:center; border-radius:9px; border:1px solid var(--line2);
     background:var(--panel); cursor:pointer; color:var(--gold)}
+
+  /* ── v3.2 轨道时间线（地铁图）── */
+  .rail{display:flex; align-items:flex-start; padding:18px 10px 8px; overflow-x:auto; gap:0; margin-bottom:6px}
+  .rail .stn{display:flex; flex-direction:column; align-items:center; min-width:86px; flex:1; position:relative}
+  .rail .stn::before{content:''; position:absolute; top:10px; left:-50%; width:100%; height:2px; background:var(--line2)}
+  .rail .stn:first-child::before{display:none}
+  .rail .stn.done::before{background:linear-gradient(90deg,var(--gold2),var(--gold))}
+  .rail .stn .nd{width:22px;height:22px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:700;
+    background:var(--panel2); border:2px solid var(--line2); color:var(--mut); position:relative; z-index:1; transition:all .3s}
+  .rail .stn.done .nd{background:linear-gradient(145deg,var(--gold),var(--gold2)); border-color:var(--gold); color:#1a1206}
+  .rail .stn.active .nd{border-color:var(--gold); color:var(--gold); box-shadow:0 0 0 5px rgba(232,195,122,.15); animation:stnPulse 1.6s ease-in-out infinite}
+  @keyframes stnPulse{50%{box-shadow:0 0 0 9px rgba(232,195,122,.06)}}
+  .rail .stn .lb{font-size:10.5px; color:var(--mut); margin-top:7px; text-align:center; max-width:96px; line-height:1.35;
+    overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+  .rail .stn.done .lb,.rail .stn.active .lb{color:var(--goldsoft)}
+  .rail .stn.active .nd::after{content:''; position:absolute; inset:5px; border-radius:50%; background:var(--gold); animation:blink 1.2s steps(2) infinite}
 </style>
 </head>
 <body>
@@ -240,6 +256,11 @@ function md(s){
 
 function renderPlan(steps, deliverable){
   planSteps = steps; curStep = 0;
+  // v3.2 轨道图：计划步骤化作地铁站点，执行时逐站亮灯推进
+  const rail = document.createElement('div');
+  rail.className = 'rail'; rail.id = 'rail';
+  rail.innerHTML = steps.map((s,i)=>`<div class="stn" data-i="${i}"><div class="nd">${i+1}</div><div class="lb">${esc(s)}</div></div>`).join('');
+  stage.appendChild(rail);
   const rows = steps.map((s,i)=>`<div class="step" data-i="${i}"><span class="num">${i+1}</span><span>${esc(s)}</span></div>`).join('');
   const note = deliverable ? `<div class="deliv-note">交付目标：<b>${esc(deliverable)}</b></div>` : '';
   const el = document.createElement('div');
@@ -249,6 +270,11 @@ function renderPlan(steps, deliverable){
   timeline = document.createElement('div');
   timeline.className = 'timeline';
   stage.appendChild(timeline);
+  syncRail();
+}
+function syncRail(){
+  const stns = stage.querySelectorAll('#rail .stn');
+  stns.forEach((n,i)=>{ n.classList.toggle('done', i<curStep); n.classList.toggle('active', i===curStep); });
 }
 function advanceStep(){
   const rows = stage.querySelectorAll('.plan .step');
@@ -256,10 +282,12 @@ function advanceStep(){
   if(rows[curStep]) rows[curStep].classList.add('done');
   curStep = Math.min(curStep+1, planSteps.length);
   if(rows[curStep]) rows[curStep].classList.add('active');
+  syncRail();
 }
 function markActive(){
   const rows = stage.querySelectorAll('.plan .step');
   if(rows[curStep]) rows[curStep].classList.add('active');
+  syncRail();
 }
 
 function addEvent(kind, tag, headExtra, body, isCode){
