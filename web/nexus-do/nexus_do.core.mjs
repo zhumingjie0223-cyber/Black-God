@@ -16,7 +16,7 @@
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
-import { resolveIdentity, SYSTEM_DO, isSystemOnlyPath } from './tenancy.mjs';
+import { resolveIdentity, SYSTEM_DO, SHADOW_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
@@ -36,11 +36,14 @@ export class ShenshuCore {
     this.storage = state.storage;
     // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
     if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
+    // 影子实例识别:比对自身 DO id 是否等于 shadow-nexus 的 id。
+    // 影子绝不从 SOUL_KV 吸主人的灵魂记忆——那是权哥的私密数据。
+    try { this.isShadow = !!(env.SHENSHU && this.state.id.toString() === env.SHENSHU.idFromName(SHADOW_DO).toString()); } catch (e) { this.isShadow = false; }
     this.state.blockConcurrencyWhile(async () => {
       const nextAlarm = await this.storage.getAlarm();
       if (nextAlarm === null) await this.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
       const migrated = await this.storage.get('_migrated_from_kv');
-      if (!migrated) await this.migrateFromKV();
+      if (!migrated && !this.isShadow) await this.migrateFromKV();
     });
   }
 
@@ -152,7 +155,7 @@ export class ShenshuCore {
           return json(dev);
         }
         // /migrate：仅 POST + 显式 ?force=1 才强制；默认幂等，防误触回滚记忆
-        if (path === '/migrate' && request.method === 'POST') return json(await this.migrateFromKV(url.searchParams.get('force') === '1'));
+        if (path === '/migrate' && request.method === 'POST') return json(this.isShadow ? { skipped: true } : await this.migrateFromKV(url.searchParams.get('force') === '1'));
         // 数据主权：导出(读,安全) / 迁回(写,需 ?confirm=1 且先备份)——数据归你、可带走、可迁移
         if (path === '/export') return json(await this.exportData());
         if (path === '/import' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.importData(b, url.searchParams.get('confirm') === '1')); }
@@ -171,7 +174,7 @@ export class ShenshuCore {
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
-        if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket());
+        if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket(request));
         // 注册统计：只有主人能看「多少人注册在用」
         if (path === '/stats' && request.method === 'GET') return json(await this.getStats());
         return json({ error: 'method not allowed' }, 405);
@@ -191,6 +194,8 @@ export class ShenshuCore {
   }
 
   // 鉴权：配了 OWNER_TOKEN 就强制校验；未配则开放（向后兼容，UI 会提醒设置）
+  // 亦认 SHADOW_TOKEN（影子实例令牌）：顶层 worker 已按令牌路由到独立 DO 实例，
+  // 数据天然隔离——影子令牌只会到达影子实例，绝无跨库可能。
   authOK(request) {
     const expected = this.env.OWNER_TOKEN;
     if (!expected) return true;
@@ -201,13 +206,21 @@ export class ShenshuCore {
     if (!tok) tok = h.get('X-Owner-Token');
     if (!tok) { try { tok = new URL(request.url).searchParams.get('k'); } catch {} }
     // 不接受 Cookie 携带令牌 —— 杜绝跨站请求伪造（CSRF）面
-    return !!tok && this.safeEqual(String(tok), String(expected));
+    if (!tok) return false;
+    if (this.safeEqual(String(tok), String(expected))) return true;
+    // 影子令牌只在顶层 worker 已判定并盖章（X-Nexus-Shadow，客户端伪造会被剥掉）时才认——
+    // 即使影子令牌意外到达系统实例，也进不来。
+    const shadow = this.env.SHADOW_TOKEN;
+    return !!shadow && h.get('X-Nexus-Shadow') === '1' && this.safeEqual(String(tok), String(shadow));
   }
   safeEqual(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
 
   // WebSocket 一次性短期票据：换票需已鉴权（走 Authorization 头），令牌不入 URL。
-  async issueWsTicket() {
-    const ticket = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+  // 票据首字符 = 路由位：影子实例签发 'f'、系统实例签发 'e'（顶层 worker 据此把 WS 升级请求路由回正确实例）。
+  async issueWsTicket(request) {
+    const isShadow = !!(request && request.headers && request.headers.get('X-Nexus-Shadow') === '1');
+    const rand = (crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')).slice(1);
+    const ticket = (isShadow ? 'f' : 'e') + rand;
     const now = Date.now();
     const store = (await this.storage.get('_wstickets')) || {};
     for (const k of Object.keys(store)) if (store[k] < now) delete store[k];   // 清过期
@@ -2750,6 +2763,29 @@ self.addEventListener('fetch', e => {
 // ═══════════════════════ Worker 入口 ═══════════════════════
 export default {
   async fetch(request, env) {
+    // 影子门:持 SHADOW_TOKEN(或影子 WS 票据)→ 独立影子实例。界面功能同主人版,数据完全隔离。
+    let _shadow = false;
+    try {
+      const _u = new URL(request.url);
+      _shadow = resolveShadow({
+        authHeader: request.headers.get('Authorization') || '',
+        xOwnerToken: request.headers.get('X-Owner-Token') || '',
+        kParam: _u.searchParams.get('k') || '',
+        tParam: _u.searchParams.get('t') || '',
+        shadowToken: env.SHADOW_TOKEN || '',
+      });
+    } catch (e) {}
+    if (_shadow) {
+      const h = new Headers(request.headers);
+      h.delete('X-Nexus-Shadow'); h.set('X-Nexus-Shadow', '1');   // 服务器端盖章,客户端伪造无效
+      const id = env.SHENSHU.idFromName(SHADOW_DO);
+      return env.SHENSHU.get(id).fetch(new Request(request, { headers: h }));
+    }
+    // 非影子请求:剥掉伪造的影子章,防止客户端自称影子绕过系统实例鉴权。
+    if (request.headers.get('X-Nexus-Shadow')) {
+      const h = new Headers(request.headers); h.delete('X-Nexus-Shadow');
+      request = new Request(request, { headers: h });
+    }
     // 单租户(默认):所有请求 → 唯一实例。行为与历史完全一致。
     if (!env.MULTITENANT) {
       const id = env.SHENSHU.idFromName(SYSTEM_DO);

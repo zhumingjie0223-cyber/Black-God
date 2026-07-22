@@ -676,7 +676,7 @@ body::before{
 <!-- ===== 门（公共注册 / 主人私密，二选一）===== -->
 <div id="lockgate" class="lockgate">
   <div class="lock-inner">
-    <div class="lock-orb"></div>
+    <div class="lock-orb" onclick="orbSecretTap()"></div>
     <div class="lock-title">Black God</div>
 
     <!-- 公共注册：起名 + 接入你自己的大模型 API（密钥你自己的，费用各付各的） -->
@@ -1967,6 +1967,25 @@ async function openDevice(){ const info=await collectDevice(); window._dev=info;
 function syncDevice(){ if(window._dev){ Nexus.device(window._dev); toast('她记住了这台设备'); closeSheet(); } }
 
 /* ============ 门 · 公共注册 / 主人私密 ============ */
+/* 暗门：登录门神字球 3 秒内连点 5 下 → 掏出私密密码门（桌面 PWA 没地址栏输不了 #owner，走这里）。
+   页面零提示，路人不知道有这扇门；真正防线是密码 + 连错冷却。 */
+let _orbTaps = [];
+function orbSecretTap(){
+  const now = Date.now();
+  _orbTaps = _orbTaps.filter(t => now - t < 3000);
+  _orbTaps.push(now);
+  if(_orbTaps.length >= 5){ _orbTaps = []; hap([10,30,10]); setGateMode('owner'); }
+}
+/* 密码连错保险：错 5 次冷却 10 分钟（存本地，防有人蹲着试密码） */
+function lockCooldownLeft(){
+  const until = +(store.get('unlock_cd') || 0);
+  return until > Date.now() ? Math.ceil((until - Date.now())/60000) : 0;
+}
+function noteUnlockFail(){
+  const n = (+(store.get('unlock_fails') || 0)) + 1;
+  store.set('unlock_fails', String(n));
+  if(n >= 5){ store.set('unlock_cd', String(Date.now() + 600000)); store.set('unlock_fails','0'); }
+}
 function onUnauthorized(){ if(Nexus.mode==='public') return; setGateMode('owner'); showLock(); }
 function toggleRegAdv(){ const a=$('#regAdv'), t=$('#regAdvToggle'); if(!a) return; const open=a.style.display!=='none';
   a.style.display=open?'none':'flex'; if(t) t.textContent = open ? '自带大脑 · 可选 ▾' : '自带大脑 · 可选 ▴'; }
@@ -2093,13 +2112,14 @@ function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
 async function tryUnlock(){
   const v=$('#lockInput').value.trim(); const err=$('#lockErr'), btn=$('#lockBtn');
   if(!v){ err.textContent='输入你的密码'; return; }
+  const cd=lockCooldownLeft(); if(cd){ err.textContent='试错太多次啦，'+cd+' 分钟后再来'; hap(30); return; }
   btn.disabled=true; btn.textContent='验证中…'; err.textContent='';
   let ok=false;
   try{ const r=await fetch(Nexus.base+'/soul',{headers:{Authorization:'Bearer '+v}}); ok=r.ok; }catch(e){ ok=false; }
   btn.disabled=false; btn.textContent='解锁';
-  if(ok){ store.set('owner_token',v); Nexus.token=v; Nexus.mode='owner'; document.body.classList.remove('public-mode'); hideLock(); hap([10,30,10]);
+  if(ok){ store.set('owner_token',v); store.set('unlock_fails','0'); Nexus.token=v; Nexus.mode='owner'; document.body.classList.remove('public-mode'); hideLock(); hap([10,30,10]);
     try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub(); loadOwnerStats();
-  } else { err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30); }
+  } else { noteUnlockFail(); err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30); }
 }
 
 /* ============ Web Push ============ */

@@ -15,6 +15,28 @@
 // 系统主人(权哥)的固定实例名——保持历史值,现有数据零迁移。
 export const SYSTEM_DO = 'quan-shenshu-nexus';
 
+// 影子实例:持 SHADOW_TOKEN 的用户 → 独立实例。界面/功能与主人版一致,数据完全隔离。
+export const SHADOW_DO = 'shadow-nexus';
+
+// 常数时间比较(worker 层用,防时序侧信道)
+export function tokenEqual(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (!a || !b || a.length !== b.length) return false;
+  let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+// 影子判定:请求带 SHADOW_TOKEN(Bearer/X-Owner-Token/?k=),或 WS 票据带影子路由位。
+// WS 升级请求不带令牌,只带一次性票据 ?t= —— 票据首字符是路由位:
+// 'f'=影子实例签发、'e'=系统实例签发(签发时各自固定,非随机,不会串)。
+export function resolveShadow({ authHeader = '', xOwnerToken = '', kParam = '', tParam = '', shadowToken = '' } = {}) {
+  if (!shadowToken) return false;
+  const tok = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (xOwnerToken || kParam || '');
+  if (tok && tokenEqual(tok, shadowToken)) return true;
+  if (tParam && tParam.charAt(0) === 'f') return true;
+  return false;
+}
+
 // uid 白名单:只留安全字符,封顶 64。防止用可控输入拼出别人的实例名或注入。
 export function sanitizeUid(raw) {
   return String(raw || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
