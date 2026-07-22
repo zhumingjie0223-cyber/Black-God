@@ -752,7 +752,17 @@ body::before{
       <section class="page" id="mind">
         <div class="page-head"><div class="page-eyebrow">The Hub · 神枢</div><div class="page-h1">神枢</div></div>
         <div class="page-inner">
+          <!-- 环中盘 · 主页英雄区：万物绕枢，枢自不动（独家视觉，突触脉冲落点）-->
+          <div class="huanzhong">
+            <div class="hz-orbit"></div><div class="hz-orbit o2"></div>
+            <div class="hz-ring" id="hzRing"></div>
+            <div class="hz-hub" id="hubOrb"><span class="glyph">神</span></div>
+            <div class="hz-still"></div>
+          </div>
+          <div class="hz-couplet">万物绕枢 · 枢自不动</div>
+          <div class="hz-coord" id="hzCoord"></div>
           <div class="mind-status"><span class="dot" id="hubDot"></span><span id="hubStateText">在线 · 待命</span></div>
+          <div class="soul-think-line"><span id="soulThink"></span><em id="soulThinkBy"></em></div>
 
           
           
@@ -769,7 +779,7 @@ body::before{
               <div id="memVoice" style="margin-top:8px"></div>
             </div></div>
           </div>
-          <span id="hzRing" style="display:none"></span><span id="hzCoord" style="display:none"></span><span id="hubOrb" style="display:none"></span><span id="hubDecl" style="display:none"></span><span id="soulMood" style="display:none"></span><span id="soulThink" style="display:none"></span><span id="soulThinkBy" style="display:none"></span><span id="timeAware" style="display:none"></span><span id="memSub" style="display:none"></span>
+          <span id="hubDecl" style="display:none"></span><span id="soulMood" style="display:none"></span><span id="timeAware" style="display:none"></span><span id="memSub" style="display:none"></span>
         </div>
       </section>
 
@@ -981,6 +991,10 @@ body.mood-low .hz-hub,body.mood-low .hub-orb{filter:saturate(.8) brightness(.92)
 /* 来源引用徽章 */
 .src-pill{display:inline-flex;align-items:center;margin:1px 3px;padding:1px 9px;border-radius:999px;font-size:11px;text-decoration:none;color:var(--cy-1);border:1px solid var(--line-2);background:rgba(230,232,234,.05);vertical-align:baseline;transition:filter .15s}
 .src-pill:active{filter:brightness(1.3)}
+/* 主页她的一念（内心独白一行）*/
+.soul-think-line{text-align:center;font-family:var(--serif);font-size:12.5px;color:var(--text-2);margin:2px 0 14px;min-height:18px;opacity:.85}
+.soul-think-line em{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:3px}
+.mind-status{text-align:center;justify-content:center}
 </style>
 <div class="art-mask" id="artMask" onclick="closeArtifact()"></div>
 <div class="art-pane" id="artPane">
