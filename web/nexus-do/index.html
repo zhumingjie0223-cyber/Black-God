@@ -1377,9 +1377,12 @@ function applyMoodAmbience(mood){
   document.body.classList.toggle('mood-high', mood>.62);
   document.body.classList.toggle('mood-low', mood<.36);
 }
-/* ===== v3.2 能力矩阵卡片墙 ===== */
+/* ===== v3.2 能力矩阵卡片墙（仅主人可见：路人不给看家底）===== */
 async function loadCapsWall(){
   const el=$('#capsWall'); if(!el||el.dataset.loaded) return;
+  const fold=el.closest('.fold');
+  if(Nexus.mode!=='owner'){ if(fold) fold.style.display='none'; return; }
+  if(fold) fold.style.display='';
   try{
     const r=await Nexus._fetch('/capabilities',{headers:Nexus.hdr()});
     const j=r&&r.ok?await r.json():null;
