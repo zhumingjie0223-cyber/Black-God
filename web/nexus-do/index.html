@@ -1254,6 +1254,14 @@ function go(i) {
     }
     x0=y0=null; locked=null; dx=0;
   }, {passive:true});
+  // iOS 系统手势/来电/通知会触发 touchcancel（touchend 不来）——不接住就卡在两页中间（页面串门）
+  pager.addEventListener('touchcancel', () => {
+    pages.classList.remove('dragging'); go(curPage);
+    x0=y0=null; locked=null; dx=0;
+  }, {passive:true});
+  // 兜底：回到前台/转屏后强制吸附回整页位
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) go(curPage); });
+  window.addEventListener('orientationchange', () => setTimeout(()=>go(curPage), 120));
 })();
 
 /* ============ Sheet（抽屉 + 拖拽关闭）============ */
@@ -2050,7 +2058,7 @@ function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
   let b=$('#pubApiBtn');
   if(!b){ b=document.createElement('div'); b.id='pubApiBtn';
-    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#6FA985;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:80;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.22);color:#6FA985;font-size:11px;padding:4px 9px;border-radius:999px;cursor:pointer;letter-spacing:.02em;opacity:.85';
     b.textContent='⚙︎ 我的 API'; b.onclick=openApiEditor; document.body.appendChild(b); }
 }
 function openApiEditor(){ setGateMode('public'); prefillReg(); showLock(); }
@@ -2059,7 +2067,7 @@ async function loadOwnerStats(){
   const s=await Nexus.stats(); if(!s) return; window._stats=s;
   let pill=$('#statsPill');
   if(!pill){ pill=document.createElement('div'); pill.id='statsPill';
-    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:500;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.28);color:#6FA985;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;letter-spacing:.02em';
+    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:80;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.22);color:#6FA985;font-size:11px;padding:4px 9px;border-radius:999px;cursor:pointer;letter-spacing:.02em;opacity:.85';
     pill.onclick=showStatsSheet; document.body.appendChild(pill); }
   pill.textContent='👥 '+(s.注册总数||0)+' 注册 · '+(s.今日活跃||0)+' 今日';
 }
