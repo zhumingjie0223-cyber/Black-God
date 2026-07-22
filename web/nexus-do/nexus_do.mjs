@@ -998,7 +998,7 @@ ${capabilitySelfDescription(true)}
   brainProvider(base, model, explicit) {
     if (explicit) return explicit;
     const b = String(base || '').toLowerCase(), m = String(model || '').toLowerCase();
-    if (b.includes('anthropic.com') || b.includes('/v1/messages') || m.startsWith('claude')) return 'anthropic';
+    if (b.includes('anthropic.com') || b.includes('/v1/messages') || b.includes('/anthropic') || m.startsWith('claude')) return 'anthropic';
     return 'openai';   // kimi / gpt / deepseek / qwen / glm / groq 等 OpenAI 兼容
   }
 
