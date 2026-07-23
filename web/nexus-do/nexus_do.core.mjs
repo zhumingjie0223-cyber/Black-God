@@ -126,7 +126,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/brains-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/brains-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -165,6 +165,9 @@ export class ShenshuCore {
         if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
         if (path === '/config/models' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.probeModels(b)); }
+        // 厂商 OAuth 一键登录（Claude / OpenRouter）：start=拿登录链接, callback=授权码换key并存入brains
+        if (path === '/oauth/start' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthStart(b.provider || '', b.redirect || '')); }
+        if (path === '/oauth/callback' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthCallback(b)); }
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
         if (path === '/brains-test' && request.method === 'POST') return json(await this.pingBrains());
@@ -883,7 +886,7 @@ ${capabilitySelfDescription(true)}
   // 从回话解析信息工具调用标记（确定性，可测）。
   parseToolCalls(reply) {
     const calls = [];
-    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec)\s*[｜|]\s*([^⟩]+)⟩/g;
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple)\s*[｜|]\s*([^⟩]+)⟩/g;
     let m;
     while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
     return calls;
@@ -925,6 +928,32 @@ ${capabilitySelfDescription(true)}
     return '';
   }
   isDangerousCmd(cmd) { return !!this.dangerReason(cmd); }
+
+  // ═══ iOS 硬件工具桥（照 Minis 宿主 apple-* 契约 · 经执行脑隧道真调你 iPhone）═══
+  // arg 形如 "alarm set --time 07:30 --label 起床"；转成 shell `apple-alarm set ...` 走同一条执行脑隧道。
+  // 白名单 21 个宿主工具，防止 AI 拼出任意命令绕过 exec 危险闸。只读为主，写操作交给 iOS 系统自身的权限弹窗兜底。
+  appleToolList() {
+    return ['alarm', 'bluetooth', 'calendar', 'clipboard', 'device', 'healthkit', 'homekit',
+      'location', 'maps', 'media', 'nfc', 'nlp', 'notification', 'open', 'photos',
+      'player', 'reminders', 'speak', 'speech', 'vision', 'weather'];
+  }
+  async appleTool(arg, opts = {}) {
+    const raw = String(arg || '').trim();
+    const sp = raw.indexOf(' ');
+    const tool = (sp === -1 ? raw : raw.slice(0, sp)).replace(/^apple-/, '').toLowerCase();
+    const rest = sp === -1 ? '' : raw.slice(sp + 1).trim();
+    if (!this.appleToolList().includes(tool)) {
+      return { ok: false, note: `未知 iOS 工具「${tool}」。可用：${this.appleToolList().join(' / ')}` };
+    }
+    // 拼成宿主命令，交给执行脑隧道（沙箱内才够得到 iPhone 硬件）。--compact 省 token。
+    const cmd = (rest ? `apple-${tool} ${rest} --compact` : `apple-${tool} --compact`);
+    const r = await this.execRemote(cmd, opts).catch(() => null);
+    if (!r) return { ok: false, note: 'iOS 工具无响应' };
+    if (!r.ok && r.note) return { ok: false, note: r.note };
+    // 宿主工具输出 JSON 到 stdout；直接把 stdout 当结果回给 AI。
+    return { ok: r.ok !== false, tool, code: r.code, out: String(r.stdout || r.out || '').slice(0, 3500), err: String(r.stderr || '').slice(0, 800) };
+  }
+
   async execRemote(cmd, opts = {}) {
     // 连接器优先读 App 内配置（设置里一键填），回落到环境变量
     const cfg = (this.storage ? await this.storage.get('config') : null) || {};
@@ -967,8 +996,21 @@ ${capabilitySelfDescription(true)}
 【你能自主调用的工具（作答前可多轮使用，最多 3 轮）】
 - 联网检索：⟨工具:web_search｜关键词⟩
 - 打开网页读原文：⟨工具:open｜https://完整网址⟩${hasExec ? `
-- 在主人服务器上真跑命令/代码：⟨工具:exec｜shell 命令⟩（真执行，谨慎用；只服务主人）` : ''}
-规则：需要外部/实时/事实信息${hasExec ? '或需要真动手执行' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
+- 在主人服务器上真跑命令/代码：⟨工具:exec｜shell 命令⟩（真执行，谨慎用；只服务主人）
+- 操作主人的 iPhone（真调 iOS 硬件，经沙箱执行脑）：⟨工具:apple｜工具名 子命令 参数⟩
+  可用工具名与用法（全部输出 JSON）：
+  · alarm set --time 07:30 --label 起床｜alarm timer --duration 5m｜alarm list  —— 闹钟/计时器
+  · calendar list --today｜calendar create --title 开会 --start <ISO> --end <ISO>｜calendar remind --title 买菜 --due <ISO>  —— 日历/提醒
+  · reminders list｜reminders  —— 提醒事项
+  · weather  —— 天气（WeatherKit）
+  · location  —— 当前定位/地理编码
+  · maps search --query 咖啡馆｜maps route --daddr <地址>｜maps eta --daddr <地址>  —— 地点/导航/到达时间
+  · healthkit types｜healthkit batch --types t1,t2 --days 7  —— 健康数据（睡眠/心率/步数等）
+  · device  —— 设备信息｜clipboard read / clipboard write --text ...  —— 剪贴板
+  · homekit list｜homekit set --name 客厅灯 --characteristic power --value 1  —— 智能家居
+  · notification｜media｜photos｜vision｜speak --text 你好｜nlp  —— 通知/音乐/相册/识图/朗读/语言分析
+  提示：查询类（list/search/weather/location/device）直接调；写入类（set/create/remind/write）iOS 会弹权限窗，放心调。` : ''}
+规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratch = '', toolLog = [], last = null;
     for (let step = 0; step < 3; step++) {
       const sys = baseSystem + TOOL_SPEC + (scratch ? `\n\n【你已查到的资料】\n${scratch}` : '');
@@ -982,6 +1024,7 @@ ${capabilitySelfDescription(true)}
         if (c.tool === 'web_search') out = await this.webSearch(c.arg).catch(() => '');
         else if (c.tool === 'open') out = await this.fetchUrl(c.arg).catch(() => '');
         else if (c.tool === 'exec') { const e = await this.execRemote(c.arg).catch(() => null); out = e ? (e.ok ? `[退出码 ${e.code}]\n${e.stdout || ''}${e.stderr ? '\n[stderr]\n' + e.stderr : ''}` : ('执行脑：' + (e.note || e.error || '失败'))) : '执行脑无响应'; }
+        else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }
@@ -1017,7 +1060,22 @@ ${capabilitySelfDescription(true)}
         body: { model, max_tokens: mt, ...(system ? { system } : {}), messages: [{ role: 'user', content: userMsg }], ...(hasT ? { temperature: opts.temperature } : {}) },
       };
     }
-    // openai 兼容（默认）
+    if (provider === 'gemini' || provider === 'google') {
+      // 谷歌 Gemini 原生协议：POST {base}/v1beta/models/{model}:generateContent?key=…
+      // base 允许填 https://generativelanguage.googleapis.com（不带尾巴）。
+      const root = String(base || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '').replace(/\/v1beta.*$/, '');
+      const url = `${root}/v1beta/models/${encodeURIComponent(model || 'gemini-2.0-flash')}:generateContent?key=${encodeURIComponent(key || '')}`;
+      return {
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        body: {
+          ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+          contents: [{ role: 'user', parts: [{ text: userMsg }] }],
+          generationConfig: { maxOutputTokens: mt, ...(hasT ? { temperature: opts.temperature } : {}) },
+        },
+      };
+    }
+    // openai 兼容（默认，含 xai/grok/kimi/deepseek/openrouter/qwen/glm 等）
     const url = /\/(chat\/completions|completions|messages)$/.test(base) ? base : String(base).replace(/\/+$/, '') + '/chat/completions';
     return {
       url,
@@ -1031,6 +1089,11 @@ ${capabilitySelfDescription(true)}
     if (!d) return null;
     if (provider === 'anthropic') {
       if (Array.isArray(d.content)) { const t = d.content.filter(x => x && x.type === 'text').map(x => x.text || '').join('').trim(); return t || null; }
+      return null;
+    }
+    if (provider === 'gemini' || provider === 'google') {
+      const c = d?.candidates?.[0]?.content?.parts;
+      if (Array.isArray(c)) { const t = c.map(x => x?.text || '').join('').trim(); return t || null; }
       return null;
     }
     return d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
@@ -2194,6 +2257,7 @@ ${capabilitySelfDescription(true)}
         case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
         case 'exec':      out = await this.execRemote(params.command || '', { confirm: params.confirm === true }); break;
+        case 'apple':     out = await this.appleTool(params.arg || params.command || '', { confirm: params.confirm === true }); break;
         case 'watch':     out = await this.createWatch(params.text || ''); break;
         default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
       }
@@ -2283,8 +2347,30 @@ ${capabilitySelfDescription(true)}
     const key = (b && b.gateway_key && !/^[•*]/.test(b.gateway_key)) ? String(b.gateway_key).trim()
       : (c.gateway_key || this.env.NEXUS_GATEWAY_KEY || '');
     if (!base) return { error: '先填网关地址' };
-    const endpoint = this.modelsEndpoint(base);
+    const provider = String((b && b.provider) || '').toLowerCase();
     try {
+      // Anthropic：GET /v1/models，x-api-key 或 Bearter(OAuth)
+      if (provider === 'anthropic' || /anthropic\.com/i.test(base)) {
+        const root = base.replace(/\/+$/, '').replace(/\/v1.*$/, '');
+        const isOAuth = /^sk-ant-oat/i.test(key);
+        const hdr = key ? (isOAuth ? { Authorization: 'Bearer ' + key, 'anthropic-beta': 'oauth-2025-04-20' } : { 'x-api-key': key }) : {};
+        const r = await fetch(root + '/v1/models', { headers: { ...hdr, 'anthropic-version': '2023-06-01' } });
+        if (!r.ok) return { error: `Anthropic 返回 ${r.status}`, provider };
+        const d = await r.json().catch(() => null);
+        const ids = (Array.isArray(d?.data) ? d.data : []).map(m => m.id).filter(Boolean);
+        return ids.length ? { ok: true, models: ids, count: ids.length } : { error: 'Anthropic 无模型', provider };
+      }
+      // Gemini：GET /v1beta/models?key=…
+      if (provider === 'gemini' || provider === 'google' || /generativelanguage/i.test(base)) {
+        const root = base.replace(/\/+$/, '').replace(/\/v1beta.*$/, '');
+        const r = await fetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`);
+        if (!r.ok) return { error: `Gemini 返回 ${r.status}`, provider };
+        const d = await r.json().catch(() => null);
+        const ids = (Array.isArray(d?.models) ? d.models : []).map(m => String(m.name || '').replace(/^models\//, '')).filter(x => /gemini|gemma/i.test(x));
+        return ids.length ? { ok: true, models: ids, count: ids.length } : { error: 'Gemini 无模型', provider };
+      }
+      // OpenAI 兼容（默认，含 openrouter/xai/kimi/deepseek…）
+      const endpoint = this.modelsEndpoint(base);
       const r = await fetch(endpoint, { headers: { ...(key ? { Authorization: 'Bearer ' + key } : {}) } });
       if (!r.ok) return { error: `网关返回 ${r.status}（该网关可能不支持 /models 列举，可直接手填模型名）`, endpoint };
       const d = await r.json().catch(() => null);
@@ -2292,7 +2378,7 @@ ${capabilitySelfDescription(true)}
       const ids = [...new Set(list.map(m => (typeof m === 'string' ? m : (m && (m.id || m.name || m.model)))).filter(Boolean))];
       if (!ids.length) return { error: '网关没返回可识别的模型列表', endpoint };
       return { ok: true, models: ids, count: ids.length, endpoint };
-    } catch (e) { return { error: '连不上网关：' + ((e && e.message) || 'network'), endpoint }; }
+    } catch (e) { return { error: '连不上网关：' + ((e && e.message) || 'network') }; }
   }
   // 公开版：供注册用户在进门前识别自己网关的模型。只用调用方自己传的 url/key,
   // 绝不回退主人的 config/env（否则会把主人网关暴露、甚至把主人 key 发到别人填的 URL）。
@@ -2337,6 +2423,115 @@ ${capabilitySelfDescription(true)}
     else if (b.exec_token !== undefined && !/^[•*]/.test(b.exec_token)) c.exec_token = String(b.exec_token).trim();
     await this.storage.put('config', c);
     return { ok: true, ...(await this.getConfig(true)) };
+  }
+
+  // ═══════════════ 厂商 OAuth 一键登录（Claude / OpenRouter）═══════════════
+  // 各厂商预设：登录端点/换key端点/协议方言/默认模型。
+  oauthProviders() {
+    return {
+      anthropic: {
+        label: 'Anthropic', provider: 'anthropic',
+        authUrl: 'https://claude.ai/oauth/authorize',
+        tokenUrl: 'https://console.anthropic.com/v1/oauth/token',
+        clientId: '9d1c250a-e61b-44d9-88ed-5944d1962f5e', // Claude Code 公开 client_id（官方）
+        scope: 'org:create_api_key user:profile user:inference',
+        gatewayUrl: 'https://api.anthropic.com', defaultModel: 'claude-sonnet-5', pkce: true,
+      },
+      openrouter: {
+        label: 'OpenRouter', provider: 'openai',
+        authUrl: 'https://openrouter.ai/auth',
+        tokenUrl: 'https://openrouter.ai/api/v1/auth/keys',
+        gatewayUrl: 'https://openrouter.ai/api/v1', defaultModel: 'anthropic/claude-sonnet-5', pkce: true,
+      },
+    };
+  }
+
+  // base64url 编码（PKCE 用）
+  _b64url(buf) {
+    let s = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    return s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  // 生成登录链接 + PKCE 校验对（verifier 临时存 storage，callback 时取回）
+  async oauthStart(provider, redirect) {
+    const P = this.oauthProviders()[provider];
+    if (!P) return { ok: false, error: '未知厂商：' + provider };
+    // PKCE：随机 verifier → SHA256 → challenge
+    const rnd = crypto.getRandomValues(new Uint8Array(32));
+    const verifier = this._b64url(rnd.buffer);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    const challenge = this._b64url(digest);
+    const state = this._b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+    // 临时存 verifier（10 分钟内 callback 用）
+    await this.storage.put('oauth_pending', { provider, verifier, state, ts: Date.now() });
+    const redir = redirect || 'https://aquan.lufei.uk/oauth/done';
+    let authUrl;
+    if (provider === 'anthropic') {
+      const q = new URLSearchParams({
+        code: 'true', client_id: P.clientId, response_type: 'code',
+        redirect_uri: redir, scope: P.scope, state,
+        code_challenge: challenge, code_challenge_method: 'S256',
+      });
+      authUrl = `${P.authUrl}?${q}`;
+    } else if (provider === 'openrouter') {
+      const q = new URLSearchParams({ callback_url: redir, code_challenge: challenge, code_challenge_method: 'S256' });
+      authUrl = `${P.authUrl}?${q}`;
+    }
+    return { ok: true, provider, authUrl, label: P.label, hint: '登录授权后，把地址栏里的 code=... 那串粘回来' };
+  }
+
+  // 授权码换 key/token → 存进 brains 注册表（这样她立刻能用这家的大脑）
+  async oauthCallback(b) {
+    const code = String(b.code || '').trim();
+    if (!code) return { ok: false, error: '没有授权码' };
+    const pending = await this.storage.get('oauth_pending');
+    if (!pending) return { ok: false, error: '登录会话过期，请重新点登录' };
+    const P = this.oauthProviders()[pending.provider];
+    if (!P) return { ok: false, error: '厂商配置丢失' };
+    let key = '', model = P.defaultModel, gwUrl = P.gatewayUrl, prov = P.provider;
+    try {
+      if (pending.provider === 'anthropic') {
+        // Claude：授权码 + verifier 换 OAuth 令牌
+        const parts = code.split('#'); // Claude 回调格式 code#state
+        const r = await fetch(P.tokenUrl, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grant_type: 'authorization_code', code: parts[0],
+            state: parts[1] || pending.state, client_id: P.clientId,
+            redirect_uri: 'https://aquan.lufei.uk/oauth/done', code_verifier: pending.verifier,
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.access_token) return { ok: false, error: 'Claude 换令牌失败：' + (j.error || r.status) };
+        key = j.access_token;
+      } else if (pending.provider === 'openrouter') {
+        // OpenRouter：授权码 + verifier 换 API key
+        const r = await fetch(P.tokenUrl, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, code_verifier: pending.verifier, code_challenge_method: 'S256' }),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.key) return { ok: false, error: 'OpenRouter 换 key 失败：' + (j.error?.message || r.status) };
+        key = j.key;
+      }
+    } catch (e) {
+      return { ok: false, error: '换 key 异常：' + String(e).slice(0, 100) };
+    }
+    if (!key) return { ok: false, error: '没换到 key' };
+    // 存进 brains 注册表（去重同厂商）+ 设为主力
+    const c = (await this.storage.get('config')) || {};
+    c.brains = (Array.isArray(c.brains) ? c.brains : []).filter(x => x.label !== P.label);
+    c.brains.unshift({ url: gwUrl, key, model, label: P.label, provider: prov, role: '主力', on: true });
+    c.brains = c.brains.slice(0, 9);
+    await this.storage.put('config', c);
+    await this.storage.delete('oauth_pending').catch(() => {});
+    // 拉这家官方真实模型列表返给前端（让用户能选具体型号）
+    let models = [];
+    try {
+      const pm = await this.probeModels({ gateway_url: gwUrl, gateway_key: key, provider: prov });
+      if (pm && pm.ok && Array.isArray(pm.models)) models = pm.models.slice(0, 40);
+    } catch (_) {}
+    return { ok: true, provider: pending.provider, label: P.label, model, models, note: `${P.label} 已登录并接入，她现在能用这家大脑了` };
   }
 
   async sendToQuan(text) {

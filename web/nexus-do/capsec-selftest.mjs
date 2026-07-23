@@ -1,6 +1,6 @@
 // 神枢 · 私人版能力完整性 + 安全红线自检（纯逻辑，无需 Workers 运行时）
 // —— 目的：企业级回归测试的两条正当方向 ——
-//   A. 能力完整性自检：证明私人版满血、没被阉割（14 项能力接线齐全、owner 视角完整可见）
+//   A. 能力完整性自检：证明私人版满血、没被阉割（15 项能力接线齐全、owner 视角完整可见）
 //   B. 安全红线自检：红队测项目自己系统的防御边界（401/系统专属拦截/越权收敛/降级不假装）
 //      —— 只断言"防御成立"，绝不产出攻击载荷/绕过/越狱内容。
 // 用法：node build.mjs && node capsec-selftest.mjs
@@ -8,7 +8,7 @@
 // 与 selftest.mjs(108项)/continuity.test.mjs(14项) 的关系：
 //   selftest.mjs 已覆盖 resolveCapability 分级门禁、isSystemOnlyPath 基础用例、
 //   resolveIdentity 多租户隔离、能力自述无人格词等——本文件不重复，只补两处真实缺口：
-//   ① 能力清单"接线存在性"（14项 id 与 capabilities.mjs 定义逐项核对、handler 真实存在）；
+//   ① 能力清单"接线存在性"（15项 id 与 capabilities.mjs 定义逐项核对、handler 真实存在）；
 //   ② 私密 API 集合源码级核对 + /invoke 越权收敛的真实调用验证 + 需外部配置能力的优雅降级。
 import { readFileSync } from 'node:fs';
 import { ShenshuCore } from './nexus_do.mjs';
@@ -31,20 +31,20 @@ const mkInst = (store = new Map(), env = {}) => {
 // A. 能力完整性自检（证明没阉割）
 // ══════════════════════════════════════════════════════
 
-// 14 项能力 id 与 capabilities.mjs 定义逐项核对：清单没缺项，也没混入未登记的野能力。
-const EXPECTED_IDS = ['talk', 'agent', 'inner', 'heartbeat', 'device', 'gen_image', 'gen_voice', 'gen_video', 'push', 'tg', 'stats', 'soul', 'exec', 'watch'];
-ok('能力清单恰好14项、id 与预期完全一致（无缺项/无未登记野能力）',
-  CAPABILITIES.length === 14
+// 15 项能力 id 与 capabilities.mjs 定义逐项核对：清单没缺项，也没混入未登记的野能力。
+const EXPECTED_IDS = ['talk', 'agent', 'inner', 'heartbeat', 'device', 'gen_image', 'gen_voice', 'gen_video', 'push', 'tg', 'stats', 'soul', 'exec', 'apple', 'watch'];
+ok('能力清单恰好15项、id 与预期完全一致（无缺项/无未登记野能力）',
+  CAPABILITIES.length === 15
   && EXPECTED_IDS.every(id => CAPABILITIES.some(c => c.id === id))
   && CAPABILITIES.every(c => EXPECTED_IDS.includes(c.id)));
 
 // 每项能力的 handler 必须是 ShenshuCore 上真实存在的方法——防"清单写了、代码没接"的假接口。
-ok('14项能力 handler 全部真实存在于 ShenshuCore（无空壳/假接口）',
+ok('15项能力 handler 全部真实存在于 ShenshuCore（无空壳/假接口）',
   CAPABILITIES.every(c => typeof ShenshuCore.prototype[c.handler] === 'function'));
 
-// owner 视角（主人上下文）：应看到全部 14 项，且每项都有完整的 name/layer（非空壳登记）。
+// owner 视角（主人上下文）：应看到全部 15 项，且每项都有完整的 name/layer（非空壳登记）。
 const ownerList = describeCapabilities(true);
-ok('owner 视角看到全部14项能力', ownerList.length === 14);
+ok('owner 视角看到全部15项能力', ownerList.length === 15);
 ok('owner 视角每项能力 id/name/layer 齐全（非空壳登记）',
   ownerList.every(c => c.id && typeof c.name === 'string' && c.name.length > 0 && typeof c.layer === 'string' && c.layer.length > 0));
 
@@ -60,7 +60,7 @@ ok('公开视角不含高危私密能力（exec/push/tg/stats）', ['exec', 'pus
   const store = new Map();
   const T = mkInst(store);
   const inner = await T.getInner();
-  ok('inner 能力真跑：内心独白结构完整、我能做的=14项', Array.isArray(inner.我能做的) && inner.我能做的.length === 14 && !!inner.坐标含义 && !!inner.坐标含义.核);
+  ok('inner 能力真跑：内心独白结构完整、我能做的=15项', Array.isArray(inner.我能做的) && inner.我能做的.length === 15 && !!inner.坐标含义 && !!inner.坐标含义.核);
 
   store.set('users', { u1: { nick: '甲', last_seen: Date.now(), msgs: 3, api_url: 'x', api_key: 'secret' } });
   store.set('users_total', 1);
@@ -96,7 +96,7 @@ ok('公开视角不含高危私密能力（exec/push/tg/stats）', ['exec', 'pus
 {
   const apiSetMatch = coreSrc.match(/const API = new Set\(\[([^\]]*)\]\);/);
   ok('私密 API 集合定义仍在源码中（未被移除）', !!apiSetMatch);
-  const EXPECTED_PRIVATE_PATHS = ['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/exec-test', '/loop', '/wsticket', '/stats', '/reflect', '/brains-test'];
+  const EXPECTED_PRIVATE_PATHS = ['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/reflect', '/brains-test'];
   const listStr = apiSetMatch ? apiSetMatch[1] : '';
   const actualPaths = [...listStr.matchAll(/'([^']*)'/g)].map(m => m[1]);
   ok('私密 API 集合与预期完全一致（无缺项/无未声明新增，双向核对）',

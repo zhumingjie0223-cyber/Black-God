@@ -868,8 +868,21 @@ body::before{
 <div class="sheet" id="sheetModel">
   <div class="grab"></div>
   <div class="sheet-title">大脑 · 模型</div>
-  <div class="sheet-sub">Auto 按任务自动选用最强可用算力。</div>
+  <div class="sheet-sub">选一家 AI 服务商 · 点「登录」一键接入，或手动配。</div>
   <div id="modelOpts"></div>
+  <div style="height:1px;background:var(--line-2);margin:16px 0 12px"></div>
+  <div style="font-size:13px;color:var(--text-3);margin-bottom:10px">＋ 接入 AI 服务商</div>
+  <div id="providerList"></div>
+</div>
+
+<div class="sheet" id="sheetOAuth">
+  <div class="grab"></div>
+  <div class="sheet-title" id="oauthTitle">登录</div>
+  <div class="sheet-sub" id="oauthSub">点下面按钮跳转官方登录，授权后把地址栏 code=… 那串粘回来。</div>
+  <a id="oauthGoBtn" href="#" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:12px">🔗 跳转登录</a>
+  <div class="field"><label>把授权码粘这里</label><input id="oauthCode" placeholder="登录后地址栏 code= 后面那串"/></div>
+  <button class="btn" onclick="oauthFinish()">完成接入</button>
+  <div id="oauthStatus" style="font-size:12px;color:var(--text-3);margin-top:10px;min-height:16px"></div>
 </div>
 
 <div class="sheet" id="sheetLexicon">
@@ -1138,6 +1151,8 @@ const Nexus = {
   async getConfig() { try { const r=await this._fetch('/config',{headers:this.hdr()}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async setConfig(cfg) { try { const r=await this._fetch('/config',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(cfg)}); if(r&&(r.status===401||r.status===403)) return {__401:true}; return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   async probeModels(body) { try { const r=await this._fetch('/config/models',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async oauthStart(provider){ try { const r=await this._fetch('/oauth/start',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({provider})}); if(r&&(r.status===401||r.status===403)) return {__401:true}; return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  async oauthCallback(code){ try { const r=await this._fetch('/oauth/callback',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify({code})}); if(r&&(r.status===401||r.status===403)) return {__401:true}; return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   // 公开识别（注册用户进门前用，不带 owner 令牌、不走 401 拦截）
   async probeModelsPublic(body) { try { const r=await fetch(this.base+'/probe-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
   // 私语词典（主人私密）：不走 _fetch 以免 401 弹锁；401 返回哨兵，前端优雅提示
@@ -1279,7 +1294,7 @@ function go(i) {
 /* ============ Sheet（抽屉 + 拖拽关闭）============ */
 let openS = null;
 function openSheet(id){ const s=$('#'+id); if(!s)return; $('#mask').classList.add('show'); s.classList.add('show'); openS=s; initSheetDrag(s);
-  if(id==='sheetModel') renderModelOpts(); if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); }
+  if(id==='sheetModel'){ renderModelOpts(); renderProviders(); } if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); }
 function closeSheet(){ if(openS){ openS.classList.remove('show'); openS=null; } $('#mask').classList.remove('show'); }
 function initSheetDrag(s){
   if (s._drag) return; s._drag = true;
@@ -1784,6 +1799,81 @@ function renderModelOpts(){
     <div class="oi">${m.ic}</div><div class="ot"><b>${m.name}</b><span>${m.sub}</span></div><div class="opt-check">✓</div></div>`).join('');
 }
 function pickModel(id){ store.set('model',id); const m=MODELS.find(x=>x.id===id); $('#modelLabel').textContent=m?m.name:id; renderModelOpts(); toast('已选：'+(m?m.name:id)); }
+
+/* ===== 厂商接入（Minis 式：每家独立入口）===== */
+const PROVIDERS = [
+  {id:'anthropic', name:'Anthropic (Claude)', ic:'🟣', oauth:true,  sub:'一键登录 · 最聪明'},
+  {id:'openrouter',name:'OpenRouter',         ic:'🔗', oauth:true,  sub:'一键登录 · 一号通全厂'},
+  {id:'openai',    name:'OpenAI (ChatGPT)',   ic:'🟢', oauth:false, sub:'填 key 接入', gw:'https://api.openai.com/v1', model:'gpt-4o', provider:'openai', keyUrl:'https://platform.openai.com/api-keys'},
+  {id:'google',    name:'Google Gemini',      ic:'🔵', oauth:false, sub:'填 key 接入', gw:'https://generativelanguage.googleapis.com', model:'gemini-2.0-flash', provider:'gemini', keyUrl:'https://aistudio.google.com/apikey'},
+  {id:'xai',       name:'xAI (Grok)',         ic:'⚫', oauth:false, sub:'填 key 接入', gw:'https://api.x.ai/v1', model:'grok-2-latest', provider:'openai', keyUrl:'https://console.x.ai'},
+  {id:'moonshot',  name:'Moonshot (Kimi)',    ic:'🌙', oauth:false, sub:'填 key 接入', gw:'https://api.moonshot.cn/v1', model:'kimi-k2-0711-preview', provider:'openai', keyUrl:'https://platform.moonshot.cn/console/api-keys'},
+  {id:'deepseek',  name:'DeepSeek',           ic:'🐋', oauth:false, sub:'填 key 接入', gw:'https://api.deepseek.com/v1', model:'deepseek-chat', provider:'openai', keyUrl:'https://platform.deepseek.com/api_keys'},
+  {id:'qwen',      name:'阿里通义千问',        ic:'🟠', oauth:false, sub:'填 key 接入', gw:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-max', provider:'openai', keyUrl:'https://bailian.console.aliyun.com/?apiKey=1'},
+  {id:'zhipu',     name:'智谱 GLM',            ic:'🔷', oauth:false, sub:'填 key 接入', gw:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-plus', provider:'openai', keyUrl:'https://open.bigmodel.cn/usercenter/apikeys'},
+];
+function renderProviders(){
+  const el=$('#providerList'); if(!el) return;
+  el.innerHTML=PROVIDERS.map(p=>`<div class="opt-row" onclick="pickProvider('${p.id}')" style="cursor:pointer">
+    <div class="oi">${p.ic}</div><div class="ot"><b>${p.name}</b><span>${p.sub}</span></div>
+    <div class="set-arrow" style="color:${p.oauth?'var(--brand,#4ea1ff)':'var(--text-3)'}">${p.oauth?'登录 ›':'配置 ›'}</div></div>`).join('');
+}
+let _oauthProvider='';
+function pickProvider(id){
+  const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
+  if(p.oauth){ startOAuth(id); }
+  else {
+    // 非 OAuth：跳去建 key 页 + 打开手填面板，预置好端点/模型/协议
+    _pendingProv=p;
+    $('#apiBase').value=p.gw; $('#apiModel').value=p.model; $('#apiKey').value='';
+    if(p.keyUrl) window.open(p.keyUrl,'_blank','noopener');
+    openSheet('sheetApi');
+    toast('已打开 '+p.name+' 建 key 页 · 复制 key 粘到下面');
+  }
+}
+let _pendingProv=null;
+async function startOAuth(provider){
+  const p=PROVIDERS.find(x=>x.id===provider);
+  $('#oauthTitle').textContent=(p?p.name:provider)+' · 登录';
+  $('#oauthStatus').textContent='正在生成登录链接…';
+  $('#oauthCode').value='';
+  openSheet('sheetOAuth');
+  const r=await Nexus.oauthStart(provider);
+  if(r&&r.__401){ $('#oauthStatus').textContent='需以主人身份解锁后再登录'; return; }
+  if(r&&r.ok&&r.authUrl){
+    _oauthProvider=provider;
+    $('#oauthGoBtn').href=r.authUrl;
+    $('#oauthStatus').textContent='点上面按钮跳转登录，授权后把 code 粘回来';
+  } else { $('#oauthStatus').textContent=(r&&r.error)||'生成登录链接失败'; }
+}
+async function oauthFinish(){
+  const code=$('#oauthCode').value.trim();
+  if(!code){ $('#oauthStatus').textContent='先把授权码粘进来'; return; }
+  $('#oauthStatus').textContent='正在换取密钥并接入…';
+  const r=await Nexus.oauthCallback(code);
+  if(r&&r.__401){ $('#oauthStatus').textContent='需以主人身份解锁'; return; }
+  if(r&&r.ok){
+    toast((r.label||'厂商')+' 已登录接入！');
+    // 有真实模型列表 → 展示让你选具体型号
+    if(Array.isArray(r.models)&&r.models.length){
+      $('#oauthStatus').innerHTML='✅ 已接入 · 选一个模型：<div id="oauthModels" style="margin-top:8px"></div>';
+      const box=$('#oauthModels');
+      box.innerHTML=r.models.map(m=>`<div class="opt-row" onclick="pickOAuthModel('${m.replace(/'/g,"")}','${r.label||''}')" style="cursor:pointer;padding:8px 10px">
+        <div class="ot"><b style="font-size:13px">${m}</b></div><div class="set-arrow">›</div></div>`).join('');
+    } else {
+      $('#oauthStatus').textContent='✅ '+(r.note||'已接入');
+      setTimeout(()=>{ closeSheet(); }, 1200);
+    }
+  } else { $('#oauthStatus').textContent='❌ '+((r&&r.error)||'接入失败'); }
+}
+async function pickOAuthModel(model,label){
+  // 把选中的具体模型写回该厂商的 brain（改 model 字段）
+  const c=await Nexus.getConfig();
+  const brains=(c&&c.brains)||[];
+  const b=brains.find(x=>x.label===label)||brains[0];
+  if(b){ b.model=model; const r=await Nexus.setConfig({brains}); if(r&&r.ok){ toast('已选模型：'+model); $('#modelLabel').textContent=label+' · '+model; } }
+  closeSheet();
+}
 async function fillApi(){
   $('#nexusBase').value=store.get('nexus_base')||'';
   $('#apiStatus').textContent='读取当前配置…';
@@ -1798,6 +1888,7 @@ async function probeModels(){
   if(!base){ hint.style.color='var(--text-3)'; hint.textContent='先填网关地址再识别'; return; }
   const key=$('#apiKey').value;
   const body={ gateway_url:base }; if(key && !/^[•*]/.test(key)) body.gateway_key=key.trim();
+  if(_pendingProv){ body.provider=_pendingProv.provider; }
   if(btn) btn.textContent='识别中…'; hint.style.color='var(--text-3)'; hint.textContent='正在联网识别…';
   const d=await Nexus.probeModels(body);
   if(btn) btn.textContent='🔍 识别模型';
@@ -1813,6 +1904,7 @@ async function saveApi(){
   const nb=$('#nexusBase').value.trim(); store.set('nexus_base',nb); Nexus.base=nb;
   const key=$('#apiKey').value;
   const body={ gateway_url:$('#apiBase').value.trim(), gateway_model:$('#apiModel').value.trim() };
+  if(_pendingProv){ body.gateway_provider=_pendingProv.provider; }
   if(!/^[•*]/.test(key)) body.gateway_key=key.trim();   // 掩码不回传
   const r=await Nexus.setConfig(body);
   if(r&&r.ok){ $('#apiLabel').textContent = r.gateway_url?('外接 · '+(r.gateway_model||'网关')):'内置 Llama'; toast('已保存 · 大脑已切换'); closeSheet(); }
