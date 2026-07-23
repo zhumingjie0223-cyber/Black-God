@@ -102,6 +102,13 @@ export const CAPABILITIES = [
     owner_only: true,   // 能在真机跑命令，最高危：仅主人、且靠服务器端 token 双重门
   },
   {
+    id: 'apple', name: 'iOS 硬件手', layer: '行动',
+    desc: '经沙箱执行脑真调主人 iPhone 的 21 个宿主工具：闹钟/日历/提醒/天气/定位/导航/健康/剪贴板/智能家居/通知/相册/识图/朗读等（照 Minis 宿主 apple-* 契约；需执行脑隧道，未接入则如实告知）',
+    handler: 'appleTool', argShape: '(arg: "工具名 子命令 参数")',
+    tier: 'system',
+    owner_only: true,   // 直接操作主人私人设备，最高危：仅主人，且经执行脑隧道 token 门
+  },
+  {
     id: 'watch', name: '自主守望（闭环神·环）', layer: '行动',
     desc: '架一条不用人守的常驻管道：她定时自己去取、真调工具推演，有变化就主动推给主人。说「帮我每小时盯一下X」即可织一条。',
     handler: 'createWatch', argShape: '(text: 盯什么·多久一次)',
