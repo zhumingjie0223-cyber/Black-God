@@ -2151,7 +2151,15 @@ async function doRegister(){
   if(!url && !key){ err.textContent='接入你的大模型：填 API 地址 + 密钥'; return; }
   if(!url){ err.textContent='还差 API 地址（如 https://host/v1）'; return; }
   if(!key){ err.textContent='还差 API 密钥'; return; }
-  ensureUid(); btn.disabled=true; btn.textContent='进入中…'; err.textContent='';
+  ensureUid(); btn.disabled=true; btn.textContent='验证密钥…'; err.textContent='';
+  // 门卫：拿这把 key 去问网关「你有哪些模型」——认得出=key 真，验过才放行；错 key 挡门外。
+  const probe=await Nexus.probeModelsPublic({ gateway_url:url, gateway_key:key });
+  if(!probe || !probe.ok){
+    btn.disabled=false; btn.textContent='进入';
+    err.textContent = (probe && probe.error) ? ('密钥或地址无效：'+probe.error) : '密钥无效或网关连不上，进不去';
+    return;
+  }
+  btn.textContent='进入中…';
   const r=await Nexus.register(nick,{url,key,model}); btn.disabled=false; btn.textContent='进入';
   if(r&&r.ok){ store.set('reg_nick',nick); store.set('reg_api_url',url); store.set('reg_api_key',key); store.set('reg_api_model',model);
     Nexus.mode='public'; hideLock(); hap([10,30,10]); initPublicMode(); }
