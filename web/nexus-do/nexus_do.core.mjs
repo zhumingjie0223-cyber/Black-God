@@ -2467,9 +2467,11 @@ ${capabilitySelfDescription(true)}
     const redir = redirect || 'https://aquan.lufei.uk/oauth/done';
     let authUrl;
     if (provider === 'anthropic') {
+      // Claude Code 官方 client_id 只认它注册过的回调地址；用别的地址 claude.ai 直接报 Invalid request format。
+      // 手动 code 流程固定回调 console.anthropic.com/oauth/code/callback，授权后 code 显示在页面上粘回来。
       const q = new URLSearchParams({
         code: 'true', client_id: P.clientId, response_type: 'code',
-        redirect_uri: redir, scope: P.scope, state,
+        redirect_uri: 'https://console.anthropic.com/oauth/code/callback', scope: P.scope, state,
         code_challenge: challenge, code_challenge_method: 'S256',
       });
       authUrl = `${P.authUrl}?${q}`;
@@ -2498,7 +2500,7 @@ ${capabilitySelfDescription(true)}
           body: JSON.stringify({
             grant_type: 'authorization_code', code: parts[0],
             state: parts[1] || pending.state, client_id: P.clientId,
-            redirect_uri: 'https://aquan.lufei.uk/oauth/done', code_verifier: pending.verifier,
+            redirect_uri: 'https://console.anthropic.com/oauth/code/callback', code_verifier: pending.verifier,
           }),
         });
         const j = await r.json();
