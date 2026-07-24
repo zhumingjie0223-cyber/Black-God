@@ -532,7 +532,7 @@ export class ShenshuCore {
       // 情绪强度:坐标态(s)偏离中枢越大越强烈;或命中重要词 → 值得长期记住
       const strong = e.情感烙印 && typeof e.情感烙印.s === 'number' && Math.abs(e.情感烙印.s - 40) > 28;
       if (IMPORTANT.test(txt) || strong) {
-        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true });
+        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec } : {}) });
       }
     }
     if (soul.longterm.length > 200) soul.longterm = soul.longterm.slice(-200);   // 长期记忆封顶 200
@@ -543,6 +543,41 @@ export class ShenshuCore {
   // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
   // 长期记忆(longterm)与近期情节(episodes)一起参与召回——要事沉底但相关时仍会被想起。
   // 纯函数（now 可注入，便于测试）。
+  // 语义嵌入：用主号 CF bge 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
+  async _embed(text) {
+    const acc = this.env.NX_A2 || this.env.NX_A, key = this.env.NX_K2 || this.env.NX_K;
+    if (!acc || !key || !text) return null;
+    try {
+      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/@cf/baai/bge-base-en-v1.5`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: [String(text).slice(0, 500)] }),
+      });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d?.result?.data?.[0] || null;
+    } catch (e) { return null; }
+  }
+
+  // 余弦相似度 ∈ [-1,1]
+  _cosine(a, b) {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+    if (!na || !nb) return 0;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+  }
+
+  // 语义召回：把 query 嵌入，与带向量的记忆算相似度，返回 top-n（补词面召回想不起的近义往事）
+  async retrieveMemoriesSemantic(soul, text, n = 3) {
+    const eps = [...(soul.longterm || []), ...(soul.episodes || [])].filter(e => Array.isArray(e._vec));
+    if (!eps.length || !text) return [];
+    const qv = await this._embed(text);
+    if (!qv) return [];
+    const scored = eps.map(e => ({ e, score: this._cosine(qv, e._vec) }))
+      .filter(x => x.score > 0.55).sort((a, b) => b.score - a.score).slice(0, n);
+    return scored.map(x => x.e);
+  }
+
   retrieveMemories(soul, text, n = 3, now = Date.now(), coord = null) {
     const eps = [...(soul.longterm || []), ...(soul.episodes || [])];
     if (!eps.length || !text) return [];
@@ -642,6 +677,11 @@ export class ShenshuCore {
     const shuMeaning = this.shuTranslate(nextCoord);
     const timeAwareness = this.computeTimeAwareness(snap, now);
     const memories = this.retrieveMemories(snap, text, 3, now, nextCoord);
+    // 语义召回：补词面想不起的近义往事，与词面结果去重合并（失败静默，不阻塞）
+    try {
+      const sem = await this.retrieveMemoriesSemantic(snap, text, 2);
+      for (const m of sem) if (!memories.some(x => x.ts === m.ts)) memories.push(m);
+    } catch (e) {}
     // #1 枢语坐标 → 真影响回话：由坐标推出温度 + 语气令，注入系统与生成参数
     const gen = this.shuToGen(nextCoord);
 
@@ -735,7 +775,9 @@ export class ShenshuCore {
     }
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
-      soul.episodes.push({ ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion });
+      const ep = { ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion };
+      try { const v = await this._embed(text.slice(0, 120)); if (v) ep._vec = v; } catch (e) {}
+      soul.episodes.push(ep);
       this.consolidateMemory(soul);   // 溢出前先把要事沉入长期记忆,再裁 —— 越聊越厚,要事不忘
     }
     await this.saveSoul(soul);
