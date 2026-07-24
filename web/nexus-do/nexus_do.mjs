@@ -1003,45 +1003,132 @@ ${capabilitySelfDescription(true)}
     return false;
   }
 
-  // 真实联网检索：抓 DuckDuckGo HTML 端，解析摘要。与 nexus-studio 同源实现，久经验证。
+  // 真实联网检索：多源兜底管道。单一 DDG HTML 端在 Workers 出口 IP 上经常被限流返空，
+  // 故改为「付费高质量源(owner 配 key 才走) → DDG Lite → DDG HTML → Jina」逐级兜底，任一有结果即返回。
+  // 配置(可选 secret)：SEARCH_PROVIDER=tavily|serper|brave + SEARCH_KEY=<你的 key>。
   async webSearch(query) {
-    try {
-      const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-CN,zh;q=0.9' },
-        cf: { cacheTtl: 60 },
-      });
-      if (!resp.ok) return '';
-      const html = await resp.text();
-      const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
-      const out = [];
-      // 结构化解析：标题 + 真实链接 + 摘要（来源可引用，对标 Perplexity/Grok）
-      const blocks = html.split(/class="result\b/).slice(1);
-      for (const b of blocks) {
-        if (out.length >= 6) break;
-        const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
-        const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
-        if (!am && !sm) continue;
-        let url = am ? am[1] : '';
-        const um = /[?&]uddg=([^&]+)/.exec(url);
-        if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
-        if (url.startsWith('//')) url = 'https:' + url;
-        const title = strip(am && am[2]).slice(0, 80);
-        const txt = strip(sm && sm[1]).slice(0, 200);
-        if (!title && !txt) continue;
-        out.push(`${out.length + 1}. ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
-      }
-      if (out.length) return out.join('\n');
-      // 兜底：老式纯摘要解析（页面结构变了也不至于全空）
-      const re = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      while ((m = re.exec(html)) && out.length < 6) {
-        const txt = strip(m[1]);
-        if (txt) out.push(`${out.length + 1}. ${txt.slice(0, 220)}`);
-      }
-      return out.join('\n');
-    } catch (_) {
-      return '';
+    const q = String(query || '').trim();
+    if (!q) return '';
+    // 1) 付费高质量源(配了 key 才走，对标 Perplexity 检索质量)
+    try { const paid = await this._searchPaid(q); if (paid) return paid; } catch (_) {}
+    // 2) 免费兜底链：任一成功即返回
+    const chain = [() => this._searchDDGLite(q), () => this._searchDDGHtml(q), () => this._searchJina(q)];
+    for (const fn of chain) {
+      try { const r = await fn(); if (r) return r; } catch (_) {}
     }
+    return '';
+  }
+
+  // 真实浏览器请求头，降低被机器人拦截概率
+  get _searchUA() { return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'; }
+
+  // 统一格式化：标题 + 摘要 + 可引用来源链接
+  _fmtResults(items) {
+    const out = [];
+    const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+    for (const it of items || []) {
+      if (out.length >= 6) break;
+      const title = strip(it.title).slice(0, 90);
+      const txt = strip(it.snippet).slice(0, 220);
+      const url = String(it.url || '').trim();
+      if (!title && !txt) continue;
+      out.push(`${out.length + 1}. ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
+    }
+    return out.join('\n');
+  }
+
+  // 付费源：Tavily / Serper / Brave，owner 配 SEARCH_KEY 才启用
+  async _searchPaid(q) {
+    const provider = String(this.env.SEARCH_PROVIDER || '').toLowerCase().trim();
+    const key = String(this.env.SEARCH_KEY || '').trim();
+    if (!provider || !key) return '';
+    if (provider === 'tavily') {
+      const r = await fetch('https://api.tavily.com/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key, query: q, max_results: 6, search_depth: 'basic' }),
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults((j.results || []).map(x => ({ title: x.title, snippet: x.content, url: x.url })));
+    }
+    if (provider === 'serper') {
+      const r = await fetch('https://google.serper.dev/search', {
+        method: 'POST', headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q, num: 6, hl: 'zh-cn' }),
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults((j.organic || []).map(x => ({ title: x.title, snippet: x.snippet, url: x.link })));
+    }
+    if (provider === 'brave') {
+      const r = await fetch('https://api.search.brave.com/res/v1/web/search?count=6&q=' + encodeURIComponent(q), {
+        headers: { 'Accept': 'application/json', 'X-Subscription-Token': key },
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults(((j.web && j.web.results) || []).map(x => ({ title: x.title, snippet: x.description, url: x.url })));
+    }
+    return '';
+  }
+
+  // DuckDuckGo Lite：结构简单、比 html 端更抗封
+  async _searchDDGLite(q) {
+    const resp = await fetch('https://lite.duckduckgo.com/lite/?q=' + encodeURIComponent(q), {
+      headers: { 'User-Agent': this._searchUA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept': 'text/html' },
+      cf: { cacheTtl: 60 },
+    });
+    if (resp.status !== 200) return '';
+    const html = await resp.text();
+    // Lite 端标题锚点与摘要单元格分处不同 <td>，且属性顺序 href 在 class 前，故分别抓取再按序配对。
+    const links = [...html.matchAll(/<a\b([^>]*class=['"]result-link['"][^>]*)>([\s\S]*?)<\/a>/g)];
+    const snips = [...html.matchAll(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/g)];
+    const items = [];
+    for (let i = 0; i < links.length && items.length < 6; i++) {
+      const attrs = links[i][1];
+      const hm = /href=['"]([^'"]+)['"]/.exec(attrs);
+      let url = hm ? hm[1] : '';
+      const um = /[?&]uddg=([^&]+)/.exec(url);
+      if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+      if (url.startsWith('//')) url = 'https:' + url;
+      items.push({ title: links[i][2], snippet: snips[i] ? snips[i][1] : '', url });
+    }
+    return this._fmtResults(items);
+  }
+
+  // DuckDuckGo HTML：老实现，作为二级兜底
+  async _searchDDGHtml(q) {
+    const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), {
+      headers: { 'User-Agent': this._searchUA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept': 'text/html' },
+      cf: { cacheTtl: 60 },
+    });
+    if (resp.status !== 200) return '';
+    const html = await resp.text();
+    const items = [];
+    const blocks = html.split(/class="result\b/).slice(1);
+    for (const b of blocks) {
+      if (items.length >= 6) break;
+      const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+      const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+      if (!am && !sm) continue;
+      let url = am ? am[1] : '';
+      const um = /[?&]uddg=([^&]+)/.exec(url);
+      if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+      if (url.startsWith('//')) url = 'https:' + url;
+      items.push({ title: am && am[2], snippet: sm && sm[1], url });
+    }
+    return this._fmtResults(items);
+  }
+
+  // Jina s.jina.ai：免 key 的 LLM 友好检索，末级兜底
+  async _searchJina(q) {
+    const headers = { 'Accept': 'application/json', 'User-Agent': this._searchUA };
+    if (this.env.JINA_KEY) headers['Authorization'] = 'Bearer ' + String(this.env.JINA_KEY).trim();
+    const resp = await fetch('https://s.jina.ai/?q=' + encodeURIComponent(q), { headers, cf: { cacheTtl: 60 } });
+    if (resp.status !== 200) return '';
+    const j = await resp.json().catch(() => null);
+    const data = j && (j.data || j.results);
+    if (!Array.isArray(data)) return '';
+    return this._fmtResults(data.map(x => ({ title: x.title, snippet: x.description || x.content || x.snippet, url: x.url || x.link })));
   }
 
   // ═══════════════════════ 真 agent 执行环 · plan→调工具→观察→再决→作答 ═══════════════════════

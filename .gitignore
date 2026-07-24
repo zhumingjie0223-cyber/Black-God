@@ -68,3 +68,6 @@ server/data/
 .wrangler
 .dev.vars*
 !.dev.vars.example
+
+# 依赖目录(本地 dry-run 装的 wrangler 等,不入库)
+node_modules/
