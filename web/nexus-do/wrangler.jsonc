@@ -1,12 +1,13 @@
 {
   // ═══════════════════════════════════════════════
-  // 神枢 · nexus-do — Cloudflare Workers 部署配置（生产级）
+  // 神枢 · Black God 公开版 — Cloudflare Workers 部署配置（生产级）
   // 部署：  cd web/nexus-do && npx wrangler deploy
   // 本地跑：npx wrangler dev
-  // 线上：  https://nexus-do.jjiebbay.workers.dev  ·  https://aquan.lufei.uk
+  // 线上：  https://blackgod.lufei.uk （Worker 服务名 blackgod88，由 Git 集成自动部署）
+  // ⚠️ name 必须与 CF 面板里的 Worker 名一致(blackgod88)，否则 Git 构建会在部署阶段直接失败。
   // ═══════════════════════════════════════════════
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nexus-do",
+  "name": "blackgod88",
   "main": "nexus_do.mjs",
   "compatibility_date": "2026-06-29",
   "compatibility_flags": ["nodejs_compat"],

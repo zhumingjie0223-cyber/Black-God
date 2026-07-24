@@ -1,4 +1,6 @@
-name = "nexus-do"
+# ⚠️ 本仓(公开版)部署目标 Worker = blackgod88；实际以 wrangler.jsonc 为准(wrangler 优先读 jsonc)。
+# name 必须与 CF 面板 Worker 名一致，否则 Git 集成构建在部署阶段直接失败。
+name = "blackgod88"
 main = "nexus_do.mjs"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
