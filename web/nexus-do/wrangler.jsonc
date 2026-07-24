@@ -24,6 +24,11 @@
       { "name": "SHENSHU", "class_name": "ShenshuCore" }
     ]
   },
+  // —— DO 迁移（首次部署 DO 类必需，否则部署阶段直接失败）——
+  // 免费版 Workers 的 Durable Object 强制 SQLite 后端，故用 new_sqlite_classes。
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["ShenshuCore"] }
+  ],
 
   // —— Workers AI：大脑兜底（Llama 3.3 70B）——
   "ai": { "binding": "AI" },
