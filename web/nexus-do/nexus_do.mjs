@@ -125,7 +125,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/brains-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -158,6 +158,10 @@ export class ShenshuCore {
         // 数据主权：导出(读,安全) / 迁回(写,需 ?confirm=1 且先备份)——数据归你、可带走、可迁移
         if (path === '/export') return json(await this.exportData());
         if (path === '/import' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.importData(b, url.searchParams.get('confirm') === '1')); }
+        // 逆向借鉴①：Checkpoint 时间旅行回滚
+        if (path === '/checkpoint' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.checkpointCreate(b.label || '')); }
+        if (path === '/checkpoint/list') return json(await this.checkpointList());
+        if (path === '/checkpoint/restore' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.checkpointRestore(b.ts, url.searchParams.get('confirm') === '1' || b.confirm === 1)); }
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '神枢在此，一直在。', '/'); return json(r); }
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
@@ -170,6 +174,7 @@ export class ShenshuCore {
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
         if (path === '/brains-test' && request.method === 'POST') return json(await this.pingBrains());
+        if (path === '/brains/weights') return json({ ok: true, weights: await this.getBrainWeights() });
         // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
         if (path === '/loop' && request.method === 'GET') return json(await this.handleLoop('GET', {}, url.searchParams));
         if (path === '/loop' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handleLoop('POST', b, url.searchParams)); }
@@ -339,6 +344,37 @@ export class ShenshuCore {
   // ═══════════════════════ 存取 ═══════════════════════
   async getSoul() { return (await this.storage.get('soul')) || genesisState(); }
   async saveSoul(soul) { await this.storage.put('soul', soul); }
+
+  // ═══════════════════════ 逆向借鉴①：Checkpoint 时间旅行回滚（源自 Replit chateau 三合一）══════════
+  // 给 soul 状态加"存档点"：聊崩了/人格漂偏了，能一键回退到之前任一存档。
+  // 存 storage 键 ckpt:<ts>，列表键 _ckpt_index（最多留 KEEP 个，超了删最旧）。
+  CKPT_KEEP = 20;
+  async checkpointCreate(label) {
+    const now = Date.now();
+    const soul = await this.getSoul();
+    const key = 'ckpt:' + now;
+    await this.storage.put(key, { ts: now, label: String(label || '').slice(0, 60) || '手动存档', soul });
+    let idx = (await this.storage.get('_ckpt_index')) || [];
+    idx.push({ ts: now, label: String(label || '').slice(0, 60) || '手动存档', key });
+    // 超额删最旧
+    while (idx.length > this.CKPT_KEEP) { const old = idx.shift(); try { await this.storage.delete(old.key); } catch (e) {} }
+    await this.storage.put('_ckpt_index', idx);
+    return { ok: true, ts: now, label: idx[idx.length - 1].label, total: idx.length };
+  }
+  async checkpointList() {
+    const idx = (await this.storage.get('_ckpt_index')) || [];
+    return { ok: true, checkpoints: idx.slice().reverse().map(c => ({ ts: c.ts, label: c.label, when: new Date(c.ts).toISOString() })), total: idx.length };
+  }
+  async checkpointRestore(ts, confirm) {
+    if (!confirm) return { ok: false, error: '回退会覆盖当前状态，须 confirm=1 确认' };
+    const key = 'ckpt:' + parseInt(ts, 10);
+    const snap = await this.storage.get(key);
+    if (!snap || !snap.soul) return { ok: false, error: '找不到该存档点' };
+    // 回退前先自动存一档当前态（可再回来），防手滑
+    await this.checkpointCreate('回退前自动备份');
+    await this.saveSoul(snap.soul);
+    return { ok: true, restored_to: snap.ts, label: snap.label, when: new Date(snap.ts).toISOString() };
+  }
 
   // 对外灵魂（带枢语坐标翻译，UI 直接可用）
   async getSoulPublic(soulIn) {
@@ -1243,6 +1279,34 @@ ${capabilitySelfDescription(true)}
     if (/回了空|被挡/.test(b)) return '空回复/被安全策略挡';
     return status ? ('HTTP ' + status) : '连不上';
   }
+  // ═══════════════════════ 逆向借鉴③：MACE 权重路由（源自 MACE weight_evaluator）══════════
+  // 给每个脑记一个累积权重分[0.05,0.95]：答得好加分、答得差扣分，越用越会挑。
+  // 平滑更新 ω^(t+1)=(1-γ)ω^t + γ·ω_task，γ=0.15。存 storage 键 _brain_weights。
+  async getBrainWeights() { return (await this.storage.get('_brain_weights')) || {}; }
+  // 任务后更新某脑权重。ok=本轮是否成功；latencyMs=耗时（越快越好，软加分）。
+  async updateBrainWeight(url, ok, latencyMs) {
+    if (!url) return;
+    const W = await this.getBrainWeights();
+    const cur = (typeof W[url] === 'number') ? W[url] : 0.5;   // 新脑从中位 0.5 起
+    // ω_task：成功=1，失败=0；再按速度微调（<3s 满分，>15s 打折）
+    let omegaTask = ok ? 1.0 : 0.0;
+    if (ok && typeof latencyMs === 'number') {
+      const speed = latencyMs < 3000 ? 1.0 : latencyMs > 15000 ? 0.4 : (1.0 - (latencyMs - 3000) / 12000 * 0.6);
+      omegaTask = 0.7 + 0.3 * speed;   // 成功基线 0.7，速度贡献 0.3
+    }
+    const gamma = 0.15;
+    let next = (1 - gamma) * cur + gamma * omegaTask;
+    next = Math.max(0.05, Math.min(0.95, next));   // 上下限保护
+    W[url] = Math.round(next * 1000) / 1000;
+    await this.storage.put('_brain_weights', W);
+  }
+  // 按权重给脑排序（高权重排前）。纯函数，不改传入数组。
+  rankByWeight(brains, weights) {
+    if (!Array.isArray(brains) || brains.length < 2) return brains;
+    weights = weights || {};
+    return brains.slice().sort((a, b) => ((weights[b.url] ?? 0.5) - (weights[a.url] ?? 0.5)));
+  }
+
   // 自愈路由(反思自检):近期连败(≥3 且 5 分钟内)的脑降到最后,仍留最后一搏;成功即清零复活。纯函数。
   rankByHealth(brains, health, now = Date.now()) {
     if (!Array.isArray(brains) || brains.length < 2) return brains;
@@ -1286,11 +1350,14 @@ ${capabilitySelfDescription(true)}
     const tryGateway = async () => {
       const cfg = (await this.storage.get('config')) || {};
       cfg._auto_models = cfg._auto_models || {}; cfg._provider = cfg._provider || {}; cfg._health = cfg._health || {};
-      // 神枢主导:先按任务职责把对口脑排前(秒派);再按健康自检把近期连败的脑降到最后(自愈路由)
-      const brains = this.rankByHealth(this.orderBrainsForTask(await this.resolveBrains(instanceMode), opts.role), cfg._health);
+      // 神枢主导:先按任务职责把对口脑排前(秒派);再按健康自检把近期连败的脑降到最后(自愈路由);
+      // 最后按 MACE 累积权重把"历来答得好的脑"提到最前(越用越会挑)。
+      const _bw = await this.getBrainWeights();
+      const brains = this.rankByWeight(this.rankByHealth(this.orderBrainsForTask(await this.resolveBrains(instanceMode), opts.role), cfg._health), _bw);
       if (!brains.length) return null;
       let cacheDirty = false;
       for (const brain of brains) {
+        const _t0 = Date.now();   // MACE:计本条脑耗时,用于权重速度加分
         let diagStatus = 0, diagBody = '';   // 反思:记本条最后一次失败,用于自诊断
         let model = brain.model || 'auto';
         // 未指定模型（留空/auto）：联网识别一次并按 url 缓存，避免硬传 "auto" 被网关拒
@@ -1323,6 +1390,7 @@ ${capabilitySelfDescription(true)}
                 if (cfg._provider[brain.url] !== provider) { cfg._provider[brain.url] = provider; cacheDirty = true; }   // 锁定这家的方言
                 const _hh = cfg._health[brain.url]; if (!_hh || _hh.fails) { cfg._health[brain.url] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
                 if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
+                try { await this.updateBrainWeight(brain.url, true, Date.now() - _t0); } catch (e) {}   // MACE:成功加分
                 return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
               }
               // 连通但解析空:可能方言选错(解析路径不对)→ 未锁定则试下一种方言
@@ -1342,6 +1410,7 @@ ${capabilitySelfDescription(true)}
         const _hf = cfg._health[brain.url] || {};
         cfg._health[brain.url] = { fails: (_hf.fails || 0) + 1, ts: Date.now(), 诊断: this.diagnoseErr(diagStatus, diagBody) };
         cacheDirty = true;
+        try { await this.updateBrainWeight(brain.url, false); } catch (e) {}   // MACE:失败扣分
         // → 自动换下一条脑(自由调度 · 故障转移)
       }
       if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
