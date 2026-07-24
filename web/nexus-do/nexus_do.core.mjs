@@ -1430,7 +1430,8 @@ ${capabilitySelfDescription(true)}
           });
           if (r.ok) {
             const d = await r.json();
-            const text = d?.choices?.[0]?.message?.content || null;
+            const msg = d?.choices?.[0]?.message || {};
+            const text = msg.content || msg.reasoning || null;
             if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'nx-brain', tier };
           } else { lastErr = lastErr || ('大脑 HTTP ' + r.status); }
         } catch (e) { lastErr = lastErr || ('大脑失败：' + String(e && e.message || e).slice(0, 60)); }
