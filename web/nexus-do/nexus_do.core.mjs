@@ -16,7 +16,7 @@
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
-import { resolveIdentity, SYSTEM_DO, SHADOW_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
+import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
@@ -36,9 +36,8 @@ export class ShenshuCore {
     this.storage = state.storage;
     // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
     if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
-    // 影子实例识别:比对自身 DO id 是否等于 shadow-nexus 的 id。
-    // 影子绝不从 SOUL_KV 吸主人的灵魂记忆——那是权哥的私密数据。
-    try { this.isShadow = !!(env.SHENSHU && this.state.id.toString() === env.SHENSHU.idFromName(SHADOW_DO).toString()); } catch (e) { this.isShadow = false; }
+    // 影子已合并进私人版:不再有独立影子实例,统一按私人版处理(可正常吸主人记忆)。
+    this.isShadow = false;
     this.state.blockConcurrencyWhile(async () => {
       const nextAlarm = await this.storage.getAlarm();
       if (nextAlarm === null) await this.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
@@ -886,7 +885,7 @@ ${capabilitySelfDescription(true)}
   // 从回话解析信息工具调用标记（确定性，可测）。
   parseToolCalls(reply) {
     const calls = [];
-    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple)\s*[｜|]\s*([^⟩]+)⟩/g;
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download)\s*[｜|]\s*([^⟩]+)⟩/g;
     let m;
     while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
     return calls;
@@ -995,7 +994,10 @@ ${capabilitySelfDescription(true)}
 
 【你能自主调用的工具（作答前可多轮使用，最多 3 轮）】
 - 联网检索：⟨工具:web_search｜关键词⟩
-- 打开网页读原文：⟨工具:open｜https://完整网址⟩${hasExec ? `
+- 打开网页读原文：⟨工具:open｜https://完整网址⟩
+- 出图（叫内置模型画）：⟨工具:draw｜画面描述⟩（画好我自动附在你回复里，你别描述过程、别贴链接）
+- 出声（叫内置模型念）：⟨工具:speak｜要念的文字⟩（念好我自动附上，你别描述过程）
+- 下载/抓取文件正文：⟨工具:download｜https://完整网址⟩${hasExec ? `
 - 在主人服务器上真跑命令/代码：⟨工具:exec｜shell 命令⟩（真执行，谨慎用；只服务主人）
 - 操作主人的 iPhone（真调 iOS 硬件，经沙箱执行脑）：⟨工具:apple｜工具名 子命令 参数⟩
   可用工具名与用法（全部输出 JSON）：
@@ -1011,18 +1013,21 @@ ${capabilitySelfDescription(true)}
   · notification｜media｜photos｜vision｜speak --text 你好｜nlp  —— 通知/音乐/相册/识图/朗读/语言分析
   提示：查询类（list/search/weather/location/device）直接调；写入类（set/create/remind/write）iOS 会弹权限窗，放心调。` : ''}
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
-    let scratch = '', toolLog = [], last = null;
+    let scratch = '', toolLog = [], last = null, mediaAll = [];
     for (let step = 0; step < 3; step++) {
       const sys = baseSystem + TOOL_SPEC + (scratch ? `\n\n【你已查到的资料】\n${scratch}` : '');
       last = await this.callBrain(sys, text, soul, opts);
       const calls = this.parseToolCalls(last.reply);
-      if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog };
+      if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog, media: mediaAll };
       const obs = [];
       for (const c of calls.slice(0, 2)) {
         try { this.broadcast({ type: 'agent_step', tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
         let out = '';
         if (c.tool === 'web_search') out = await this.webSearch(c.arg).catch(() => '');
         else if (c.tool === 'open') out = await this.fetchUrl(c.arg).catch(() => '');
+        else if (c.tool === 'draw') { const r = await this.genImage(c.arg).catch(() => null); if (r && (r.image || r.imageUrl)) { const u = r.imageUrl || r.image; out = `[已出图｜${c.arg}]`; mediaAll.push({ kind: 'image', url: u }); } else out = '出图失败：' + ((r && r.error) || '未知'); }
+        else if (c.tool === 'speak') { const r = await this.genVoice(c.arg).catch(() => null); if (r && (r.audio || r.audioUrl)) { const u = r.audioUrl || r.audio; out = `[已出声]`; mediaAll.push({ kind: 'audio', url: u }); } else out = '出声失败：' + ((r && r.error) || '未知'); }
+        else if (c.tool === 'download') { const t = await this.fetchUrl(c.arg).catch(() => ''); out = t ? `[已下载并提取正文｜${c.arg}]\n${t}` : '下载失败：无法读取该地址'; }
         else if (c.tool === 'exec') { const e = await this.execRemote(c.arg).catch(() => null); out = e ? (e.ok ? `[退出码 ${e.code}]\n${e.stdout || ''}${e.stderr ? '\n[stderr]\n' + e.stderr : ''}` : ('执行脑：' + (e.note || e.error || '失败'))) : '执行脑无响应'; }
         else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
@@ -1033,7 +1038,7 @@ ${capabilitySelfDescription(true)}
     }
     // 用尽轮数：拿现有资料强制作答（撤下工具指令，避免再要工具）。
     const fin = await this.callBrain(baseSystem + `\n\n【已查到的资料，据此作答、勿再调工具、勿编造】\n${scratch}`, text, soul, opts);
-    return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 3, tool_log: toolLog };
+    return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 3, tool_log: toolLog, media: mediaAll };
   }
 
   // ═══════════════════════ Provider 适配层（集百家之长 · 柱2）═══════════════════════
@@ -2960,7 +2965,7 @@ self.addEventListener('fetch', e => {
 // ═══════════════════════ Worker 入口 ═══════════════════════
 export default {
   async fetch(request, env) {
-    // 影子门:持 SHADOW_TOKEN(或影子 WS 票据)→ 独立影子实例。界面功能同主人版,数据完全隔离。
+    // 影子令牌已合并进私人版:持 SHADOW_TOKEN(或影子 WS 票据)→ 直接进私人实例,与主人共享同一份数据。
     let _shadow = false;
     try {
       const _u = new URL(request.url);
@@ -2973,12 +2978,11 @@ export default {
       });
     } catch (e) {}
     if (_shadow) {
-      const h = new Headers(request.headers);
-      h.delete('X-Nexus-Shadow'); h.set('X-Nexus-Shadow', '1');   // 服务器端盖章,客户端伪造无效
-      const id = env.SHENSHU.idFromName(SHADOW_DO);
-      return env.SHENSHU.get(id).fetch(new Request(request, { headers: h }));
+      // 合并到私人版:影子令牌直接路由到私人实例(SYSTEM_DO),不再独立、不再隔离数据。
+      const id = env.SHENSHU.idFromName(SYSTEM_DO);
+      return env.SHENSHU.get(id).fetch(request);
     }
-    // 非影子请求:剥掉伪造的影子章,防止客户端自称影子绕过系统实例鉴权。
+    // 清掉任何伪造的影子章(历史遗留),统一走私人/公开两版判定。
     if (request.headers.get('X-Nexus-Shadow')) {
       const h = new Headers(request.headers); h.delete('X-Nexus-Shadow');
       request = new Request(request, { headers: h });
