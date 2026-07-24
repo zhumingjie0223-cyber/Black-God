@@ -96,7 +96,7 @@ ok('公开视角不含高危私密能力（exec/push/tg/stats）', ['exec', 'pus
 {
   const apiSetMatch = coreSrc.match(/const API = new Set\(\[([^\]]*)\]\);/);
   ok('私密 API 集合定义仍在源码中（未被移除）', !!apiSetMatch);
-  const EXPECTED_PRIVATE_PATHS = ['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/reflect', '/brains-test', '/brains/weights', '/hijack/collect', '/hijack/script', '/hijack/list'];
+  const EXPECTED_PRIVATE_PATHS = ['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/reflect', '/brains-test', '/brains/weights', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam'];
   const listStr = apiSetMatch ? apiSetMatch[1] : '';
   const actualPaths = [...listStr.matchAll(/'([^']*)'/g)].map(m => m[1]);
   ok('私密 API 集合与预期完全一致（无缺项/无未声明新增，双向核对）',

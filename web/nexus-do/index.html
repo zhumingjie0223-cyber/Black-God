@@ -844,6 +844,7 @@ body::before{
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetRedTeam')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg></div><div class="set-tx"><b>红队工坊</b><span>逆向·渗透·注入·免杀·提权</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
@@ -932,6 +933,56 @@ body::before{
   <div style="display:flex;gap:10px">
     <button class="btn" onclick="saveExec()">保存并连接</button>
     <button class="btn ghost" onclick="testExec()">测试连通</button>
+  </div>
+</div>
+
+<div class="sheet" id="sheetRedTeam">
+  <div class="grab"></div>
+  <div class="sheet-title">🎯 红队工坊</div>
+  <div class="sheet-sub">逆向 · 渗透 · 注入 · 免杀 · 提权 · 五大方向一键生成</div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+    <div style="font-size:11px;color:var(--text-3);padding:4px 0">🔍 逆向 / Hook</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('reverse:frida')">Frida Hook模板</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('reverse:ssl')">SSL Pinning绕过</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('reverse:unpack')">脱壳方案</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('reverse:sign')">Sign签名逆向</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-3);padding:4px 0">💉 渗透 / 漏洞</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('pentest:sqli')">SQL注入载荷库</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('pentest:udf')">MySQL UDF提权</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('pentest:cs')">Cobalt Strike配置</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('pentest:phish')">钓鱼模板</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-3);padding:4px 0">🧵 注入 / 劫持</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('inject:dll')">DLL劫持模板</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('inject:process')">进程注入</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('inject:hollow')">Process Hollowing</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('inject:reflect')">反射式注入</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-3);padding:4px 0">🛡 绕后 / 免杀</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('bypass:uac')">BypassUAC</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('bypass:amsi')">BypassAMSI</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('bypass:av')">免杀AES加载</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('bypass:edr')">EDR绕过Syscall</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-3);padding:4px 0">⬆️ 提权</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('privesc:windows')">Windows提权速查</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('privesc:linux')">Linux提权速查</button>
+      <button class="btn ghost" style="font-size:12px;padding:7px 4px" onclick="rtGen('privesc:token')">令牌窃取提权</button>
+    </div>
+  </div>
+  <div class="field"><label>自定义参数（目标类名/进程名/DLL名等）</label><input id="rtParam" placeholder="com.example.App / explorer.exe / version.dll"/></div>
+  <div id="rtOut" style="display:none;margin-top:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span id="rtDesc" style="font-size:12px;color:var(--brand)"></span>
+      <button class="btn" style="font-size:12px;padding:6px 14px" onclick="rtCopy()">📋 复制</button>
+    </div>
+    <pre id="rtCode" style="background:#0d1117;color:#7ee787;font-size:10.5px;padding:12px;border-radius:10px;overflow-x:auto;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
   </div>
 </div>
 
@@ -2067,6 +2118,23 @@ async function testExec(){
   const r=await Nexus.testExec();
   if(r&&r.ok){ _execStat('✓ 连通 · 执行脑真跑成功：'+(r.detail||'ok'),'var(--ok)'); _execLabel(true); }
   else _execStat('✗ 未连通：'+((r&&r.detail)||'检查服务器是否已起、地址/token 是否一致、端口是否放行'),'var(--err)');
+}
+// ═══ 红队工坊 JS ═══
+async function rtGen(type){
+  const param=$('#rtParam')?.value.trim()||'';
+  const arg=param?type+' '+param:type;
+  const r=await Nexus.api('/redteam',{arg});
+  if(!r||!r.ok){toast(r?.note||'生成失败');return;}
+  $('#rtDesc').textContent=r.desc||'红队脚本';
+  $('#rtCode').textContent=r.script||'';
+  $('#rtOut').style.display='block';
+}
+function rtCopy(){
+  const code=$('#rtCode')?.textContent||'';
+  if(!code){toast('没有脚本');return;}
+  navigator.clipboard.writeText(code).then(()=>toast('✅ 已复制！按需修改参数后使用')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('✅ 已复制');
+  });
 }
 // ═══ 劫持工坊 JS ═══
 async function hijackGen(type){
