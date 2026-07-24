@@ -62,4 +62,14 @@
   //   NEXUS_VIDEO_URL     （可选 secret）外接文生视频网关（CF 无原生视频）
   //   NEXUS_VIDEO_KEY     （可选 secret）视频网关密钥
   //   NEXUS_VIDEO_MODEL   （可选 secret）视频网关模型名
+  //
+  // —— 联网检索（★想让"搜索网页"稳定必配★）——
+  //   免费 DDG 端对数据中心/Workers 出口 IP 会间歇性 202 反爬拦截，靠免费源无法稳定。
+  //   配一个搜索 API key 即走高质量稳定源（推荐 Tavily，免费额度 1000 次/月）：
+  //   SEARCH_PROVIDER     tavily | serper | brave（三选一）
+  //   SEARCH_KEY          对应服务商的 API key
+  //     Tavily：https://tavily.com 注册拿 key → wrangler secret put SEARCH_KEY，
+  //             再 wrangler secret put SEARCH_PROVIDER（填 tavily）
+  //   不配则自动降级到免费兜底链（DDG Lite→DDG HTML→Jina），能通就通、通不了返空。
+  //   JINA_KEY            （可选）配了可提高 Jina 末级兜底额度
 }
