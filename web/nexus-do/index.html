@@ -843,6 +843,7 @@ body::before{
           <div class="set-row" onclick="openModelSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
@@ -932,6 +933,41 @@ body::before{
     <button class="btn" onclick="saveExec()">保存并连接</button>
     <button class="btn ghost" onclick="testExec()">测试连通</button>
   </div>
+</div>
+
+<div class="sheet" id="sheetHijack">
+  <div class="grab"></div>
+  <div class="sheet-title">🔱 劫持工坊</div>
+  <div class="sheet-sub">生成劫持脚本 · 粘贴到控制台或油猴即用 · 回传数据到神枢</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('all')">⚡ 全量劫持</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('xhr')">🔗 XHR拦截</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('fetch')">📡 Fetch拦截</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('ws')">🔌 WebSocket</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('cookie')">🍪 Cookie/存储</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('form')">📝 表单/键盘</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('sw')">🌐 SW中间人</button>
+    <button class="btn ghost" style="font-size:12px;padding:8px 6px" onclick="hijackGen('proto')">🧬 原型污染</button>
+  </div>
+  <div class="field"><label>自定义参数（可选）</label><input id="hijackParam" placeholder="watch .price | auto 点击购买 | sniff *://shop.com/*"/></div>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="btn ghost" style="font-size:12px" onclick="hijackGen('watch')">👁 DOM监控</button>
+    <button class="btn ghost" style="font-size:12px" onclick="hijackGen('auto')">🤖 自动化</button>
+    <button class="btn ghost" style="font-size:12px" onclick="hijackGen('sniff')">🕵️ 油猴脚本</button>
+  </div>
+  <div id="hijackOut" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span id="hijackDesc" style="font-size:12px;color:var(--text-3)"></span>
+      <button class="btn" style="font-size:12px;padding:6px 14px" onclick="hijackCopy()">📋 复制脚本</button>
+    </div>
+    <pre id="hijackCode" style="background:var(--bg-2,#111);color:#a8ff78;font-size:11px;padding:12px;border-radius:10px;overflow-x:auto;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+  </div>
+  <div style="height:1px;background:var(--line-2);margin:14px 0 10px"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:13px;font-weight:600">📥 回传数据</span>
+    <button class="btn ghost" style="font-size:12px;padding:5px 12px" onclick="hijackListData()">刷新</button>
+  </div>
+  <div id="hijackDataList" style="font-size:12px;color:var(--text-3);min-height:40px">点「刷新」加载劫持到的数据</div>
 </div>
 
 <div class="sheet" id="sheetPersona">
@@ -1124,6 +1160,15 @@ const Nexus = {
     const r = await fetch(this.base + path, opts);
     if (r.status === 401) { onUnauthorized(); return null; }
     return r;
+  },
+  async api(path, body) {
+    try {
+      const opts = body !== undefined
+        ? { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify(body) }
+        : { headers: this.hdr() };
+      const r = await this._fetch(path, opts);
+      return r && r.ok ? await r.json() : null;
+    } catch(e) { return null; }
   },
   async getSoul() { try { const r = await this._fetch('/soul', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.getSoul(); } catch(e){ return Demo.getSoul(); } },
   async getInner() { try { const r = await this._fetch('/inner', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.inner(); } catch(e){ return Demo.inner(); } },
@@ -2022,6 +2067,35 @@ async function testExec(){
   const r=await Nexus.testExec();
   if(r&&r.ok){ _execStat('✓ 连通 · 执行脑真跑成功：'+(r.detail||'ok'),'var(--ok)'); _execLabel(true); }
   else _execStat('✗ 未连通：'+((r&&r.detail)||'检查服务器是否已起、地址/token 是否一致、端口是否放行'),'var(--err)');
+}
+// ═══ 劫持工坊 JS ═══
+async function hijackGen(type){
+  const param=$('#hijackParam')?.value.trim()||'';
+  const arg=param?type+' '+param:type;
+  const r=await Nexus.api('/hijack/script',{arg});
+  if(!r||!r.ok){toast('生成失败');return;}
+  $('#hijackDesc').textContent=r.desc||'劫持脚本';
+  $('#hijackCode').textContent=r.script||'';
+  $('#hijackOut').style.display='block';
+}
+function hijackCopy(){
+  const code=$('#hijackCode')?.textContent||'';
+  if(!code){toast('没有脚本');return;}
+  navigator.clipboard.writeText(code).then(()=>toast('✅ 已复制！粘贴到控制台或油猴运行')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('✅ 已复制');
+  });
+}
+async function hijackListData(){
+  $('#hijackDataList').textContent='加载中…';
+  const r=await Nexus.api('/hijack/list');
+  if(!r||!r.ok){$('#hijackDataList').textContent='加载失败';return;}
+  if(!r.items||!r.items.length){$('#hijackDataList').textContent='暂无数据 · 等待劫持回传';return;}
+  const html=r.items.slice(0,20).map(it=>{
+    const t=new Date(it._at).toLocaleTimeString();
+    const body=JSON.stringify(it).slice(0,200);
+    return `<div style="border-bottom:1px solid var(--line-2);padding:6px 0"><span style="color:var(--brand)">[${it.type||'?'}]</span> <span style="color:var(--text-2)">${t}</span><br><span style="color:var(--text-3);word-break:break-all">${body}</span></div>`;
+  }).join('');
+  $('#hijackDataList').innerHTML=html;
 }
 function fillPersona(){ $('#pCallHim').value=store.get('call_him')||'主人'; $('#pCallHer').value=store.get('call_her')||'神枢';
   Nexus.getSoul().then(s=>{ if(s&&s.身份) $('#pCore').value=s.身份.core||''; }); }
