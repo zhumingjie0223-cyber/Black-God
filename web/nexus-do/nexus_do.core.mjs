@@ -1112,7 +1112,7 @@ ${capabilitySelfDescription(true)}
     const hasExec = !!(_cfg.exec_url || this.env.NEXUS_EXEC_URL);
     const TOOL_SPEC = `
 
-【你能自主调用的工具（作答前可多轮使用，最多 3 轮）】
+【你能自主调用的工具（作答前可多轮使用，最多 5 轮）】
 - 联网检索：⟨工具:web_search｜关键词⟩
 - 打开网页读原文：⟨工具:open｜https://完整网址⟩
 - 出图（叫内置模型画）：⟨工具:draw｜画面描述⟩（画好我自动附在你回复里，你别描述过程、别贴链接）
@@ -1134,7 +1134,7 @@ ${capabilitySelfDescription(true)}
   提示：查询类（list/search/weather/location/device）直接调；写入类（set/create/remind/write）iOS 会弹权限窗，放心调。` : ''}
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratch = '', toolLog = [], last = null, mediaAll = [];
-    for (let step = 0; step < 3; step++) {
+    for (let step = 0; step < 5; step++) {
       const sys = baseSystem + TOOL_SPEC + (scratch ? `\n\n【你已查到的资料】\n${scratch}` : '');
       last = await this.callBrain(sys, text, soul, opts);
       const calls = this.parseToolCalls(last.reply);
