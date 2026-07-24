@@ -29,12 +29,7 @@
 
   // —— 环境变量（公开值，随代码部署）——
   "vars": {
-    // 曼谷多模态工厂：生图(Pollinations) / 18情绪语音(edge-tts) / 真视频(ffmpeg)
-    // 神枢优先调它，挂了自动降级到 CF Workers AI，永不失语
-    "FACTORY_URL": "https://factory.aquan.xin",
-    // 主脑：Claude 中转网关（无需key，OpenAI兼容）→ 神枢用 Claude 思考，挂了降级内置 Llama
-    "NEXUS_GATEWAY_URL": "http://47.236.124.97:8790/v1",
-    "NEXUS_GATEWAY_MODEL": "claude-sonnet-5"
+    "IMAGE_MODEL": "@cf/leonardo/phoenix-1.0"
   },
 
   // —— KV：旧记忆迁移源（首启一次性迁移到 DO storage）——

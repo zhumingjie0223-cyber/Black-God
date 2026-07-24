@@ -1416,9 +1416,26 @@ ${capabilitySelfDescription(true)}
       if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
       return null;
     };
-    // CF Workers AI Llama-3.3-70b（免费、CF 内部、稳定）
+    // 大脑：新账号 CF Nemotron-120B（HTTP，马甲变量藏 Secret）
     const tryCF = async () => {
-      if (instanceMode) return null;   // 实例主人不烧系统(权哥)的 CF AI 额度
+      if (instanceMode) return null;
+      const acc = this.env.NX_A || null, key = this.env.NX_K || null;
+      const brainModel = this.env.NX_BRAIN || '@cf/nvidia/nemotron-3-120b-a12b';
+      if (acc && key) {
+        try {
+          const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: brainModel, max_tokens: 1200, temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }] }),
+          });
+          if (r.ok) {
+            const d = await r.json();
+            const text = d?.choices?.[0]?.message?.content || null;
+            if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'nx-brain', tier };
+          } else { lastErr = lastErr || ('大脑 HTTP ' + r.status); }
+        } catch (e) { lastErr = lastErr || ('大脑失败：' + String(e && e.message || e).slice(0, 60)); }
+      }
+      // 二线：主账号 binding Llama（本地免费）
       if (!this.env.AI) return null;
       try {
         const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
@@ -1431,8 +1448,8 @@ ${capabilitySelfDescription(true)}
       return null;
     };
 
-    // light：先免费 CF（省 Key），挂了才上网关；heavy：网关优先，挂了降级 CF
-    const order = tier === 'light' ? [tryCF, tryGateway] : [tryGateway, tryCF];
+    // 网关死了 → 大脑走 CF（Nemotron 主 / Llama 兜底）优先，网关留着以后 Claude 复活再用
+    const order = [tryCF, tryGateway];
     for (const fn of order) { const r = await fn(); if (r) return r; }
 
     // 全失败：诚实报错，绝不吐空壳（信条：永不失真，非永不失语 · 柱3）
@@ -2132,93 +2149,95 @@ ${capabilitySelfDescription(true)}
 
   // ═══════════════════════ 出图 / 出语音 / 出视频（v4）═══════════════════════
   // 出图：CF Workers AI Flux。带神枢世家美学（可用 raw:true 关掉）
+  // 新账号 HTTP 出图（马甲变量，藏 Secret）→ 返回 base64
+  async _assistImage(styled, model) {
+    const acc = this.env.NX_A, key = this.env.NX_K;
+    if (!acc || !key) return null;
+    const m = this.env.IMAGE_MODEL || model || '@cf/leonardo/phoenix-1.0';
+    const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/${m}`, {
+      method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: styled.slice(0, 2000) }),
+    });
+    if (!r.ok) return null;
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const d = await r.json();
+      return d?.result?.image || d?.image || null;
+    }
+    // 二进制图（Phoenix/Lucid）→ 转 base64
+    const buf = await r.arrayBuffer();
+    let bin = ''; const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  // 新账号 HTTP 出语音（马甲变量）→ 返回 base64
+  async _assistVoice(text, opts = {}) {
+    const acc = this.env.NX_A, key = this.env.NX_K;
+    if (!acc || !key) return null;
+    const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/@cf/myshell-ai/melotts`, {
+      method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: text.slice(0, 800), lang: opts.lang || 'zh' }),
+    });
+    if (!r.ok) return null;
+    const d = await r.json().catch(() => null);
+    return d?.result?.audio || d?.audio || null;
+  }
+
   async genImage(prompt, opts = {}) {
     if (!prompt || !prompt.trim()) return { error: '给我一句话，我才知道画什么' };
     // 缓冲：同样的画面画过 → 直接返回，省代币
     if (!opts.nocache) { const c = await this.cacheGet('img', prompt); if (c) return c; }
     const styled = opts.raw ? prompt
       : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
-    // ① 优先：曼谷多模态工厂（Pollinations 免费，画质高）
-    const factory = this.env.FACTORY_URL;
-    if (factory) {
-      try {
-        const r = await fetch(factory.replace(/\/$/, '') + '/gen/image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(this.env.FACTORY_TOKEN ? { 'X-Factory-Token': this.env.FACTORY_TOKEN } : {}) },
-          body: JSON.stringify({ prompt: styled }),
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.ok && d.url) {
-            await this.logCreation('image', prompt);
-            const out = { imageUrl: factory.replace(/\/$/, '') + d.url, prompt, styled, via: 'factory' };
-            await this.cachePut('img', prompt, out);
-            return out;
-          }
-        }
-      } catch (e) { /* 工厂挂了 → 落到 CF 兜底 */ }
-    }
-    // ② 兜底：CF Workers AI flux（永不失语）
-    if (!this.env.AI) return { error: '给我一句话，我才知道画什么' };
+    // 出图：主账号 CF flux（AI binding，原生最快）→ 副账号 CF flux（HTTP，冗余兜底）
     const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
-    try {
-      const r = await this.env.AI.run(model, { prompt: styled.slice(0, 2000), ...(opts.steps ? { steps: Math.min(8, opts.steps) } : {}) });
-      let b64 = r && (r.image || (typeof r === 'string' ? r : null));
-      if (!b64 && r && r.result && r.result.image) b64 = r.result.image;
-      if (!b64) return { error: '这次没画出来，再试一次？' };
+    // ① 主账号：AI binding
+    if (this.env.AI) {
+      try {
+        const r = await this.env.AI.run(model, { prompt: styled.slice(0, 2000), ...(opts.steps ? { steps: Math.min(8, opts.steps) } : {}) });
+        let b64 = r && (r.image || (typeof r === 'string' ? r : null));
+        if (!b64 && r && r.result && r.result.image) b64 = r.result.image;
+        if (b64) {
+          await this.logCreation('image', prompt);
+          const out = { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model, via: 'cf' };
+          await this.cachePut('img', prompt, out);
+          return out;
+        }
+      } catch (e) { /* 落副账号 */ }
+    }
+    // ② 副账号：HTTP 冗余（马甲变量）
+    const b64b = await this._assistImage(styled, model).catch(() => null);
+    if (b64b) {
       await this.logCreation('image', prompt);
-      const out = { image: 'data:image/jpeg;base64,' + b64, prompt, styled, model, via: 'cf' };
+      const out = { image: 'data:image/jpeg;base64,' + b64b, prompt, styled, model, via: 'cf2' };
       await this.cachePut('img', prompt, out);
       return out;
-    } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
+    }
+    return { error: '这次没画出来，再试一次？' };
   }
 
   // 出语音：优先曼谷工厂（edge-tts 18情绪自动分析），CF MeloTTS 兜底
   async genVoice(text, opts = {}) {
     if (!text || !text.trim()) return { error: '没有话可说' };
-    // ① 优先：曼谷工厂，18情绪自动分析
-    const factory = this.env.FACTORY_URL;
-    if (factory) {
+    // 出语音：主账号 CF MeloTTS（binding）→ 副账号 CF MeloTTS（HTTP 冗余）
+    // ① 主账号：AI binding
+    if (this.env.AI) {
       try {
-        const r = await fetch(factory.replace(/\/$/, '') + '/gen/voice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(this.env.FACTORY_TOKEN ? { 'X-Factory-Token': this.env.FACTORY_TOKEN } : {}) },
-          body: JSON.stringify({ text: text.slice(0, 500), context: opts.context || '', emotion: opts.emotion }),
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.ok && d.url) return { audioUrl: factory.replace(/\/$/, '') + d.url, text, emotion: d.emotion, emotionName: d.name, via: 'factory' };
-        }
-      } catch (e) { /* 落 CF 兜底 */ }
+        const r = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: text.slice(0, 800), lang: opts.lang || 'zh' });
+        let b64 = r && (r.audio || (typeof r === 'string' ? r : null));
+        if (b64) return { audio: 'data:audio/mpeg;base64,' + b64, text, via: 'cf' };
+      } catch (e) { /* 落副账号 */ }
     }
-    // ② 兜底：CF MeloTTS
-    if (!this.env.AI) return { error: '没有话可说' };
-    try {
-      const r = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: text.slice(0, 800), lang: opts.lang || 'zh' });
-      let b64 = r && (r.audio || (typeof r === 'string' ? r : null));
-      if (!b64) return { error: '这次没出声，再试一次？' };
-      return { audio: 'data:audio/mpeg;base64,' + b64, text, via: 'cf' };
-    } catch (e) { return { error: String(e && e.message || e).slice(0, 160) }; }
+    // ② 副账号：HTTP 冗余（马甲变量）
+    const b64b = await this._assistVoice(text, opts).catch(() => null);
+    if (b64b) return { audio: 'data:audio/mpeg;base64,' + b64b, text, via: 'cf2' };
+    return { error: '这次没出声，再试一次？' };
   }
 
-  // 出视频：优先曼谷工厂（多帧+ffmpeg运镜合成，真视频），无工厂则降级概念图
+  // 出视频：CF 无原生视频 → 有外接视频网关则用，否则降级概念图
   async genVideo(prompt, opts = {}) {
     if (!prompt || !prompt.trim()) return { error: '给我一句话' };
-    // ① 优先：曼谷工厂真视频
-    const factory = this.env.FACTORY_URL;
-    if (factory) {
-      try {
-        const r = await fetch(factory.replace(/\/$/, '') + '/gen/video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(this.env.FACTORY_TOKEN ? { 'X-Factory-Token': this.env.FACTORY_TOKEN } : {}) },
-          body: JSON.stringify({ prompt }),
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.ok && d.url) { await this.logCreation('video', prompt); return { videoUrl: factory.replace(/\/$/, '') + d.url, prompt, frames: d.frames, via: 'factory' }; }
-        }
-      } catch (e) { /* 落兜底 */ }
-    }
     const gw = this.env.NEXUS_VIDEO_URL;
     if (!gw) {
       const img = await this.genImage(prompt, opts);
