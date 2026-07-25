@@ -6,9 +6,9 @@
   // ═══════════════════════════════════════════════
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "blackgod88",
-  "main": "worker.mjs",
+  "main": "../worker.mjs",
   "compatibility_date": "2026-07-06",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
-  "assets": { "directory": "web", "binding": "ASSETS" }
+  "assets": { "directory": "../web", "binding": "ASSETS" }
 }
