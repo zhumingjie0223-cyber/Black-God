@@ -1,15 +1,14 @@
 /**
- * blackgod88 · Worker 入口
- * 职责：
- *   1. /nx/* → 反向代理到 nexus-do，token 只存 secret，永不下发前端
- *   2. 其余请求 → 交给 CF Assets（静态文件）
- * deploy: 2026-07-25
+ * blackgod88 · Worker 入口 v2
+ * /nx/* → 反向代理到 nexus-do，OWNER_TOKEN 只存 secret
+ * 其余 → 转发到自身静态资产（不依赖 ASSETS binding）
+ * build: __BUILD_TIME__
  */
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    /* ═══ /nx/* → nexus-do 代理；token 只存 secret ═══ */
+    /* ═══ /nx/* → nexus-do 代理 ═══ */
     if (url.pathname.startsWith('/nx/')) {
       const upstream = 'https://nexus-do.jjiebbay.workers.dev'
                      + url.pathname.slice(3) + url.search;
@@ -36,7 +35,7 @@ export default {
       });
     }
 
-    /* 其余交给静态资产 */
+    /* 其余交给 ASSETS */
     return env.ASSETS.fetch(request);
   },
 };
