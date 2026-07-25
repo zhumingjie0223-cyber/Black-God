@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Network_Analyzer\/",
+    "success" : true,
+    "text" : "Text (1017 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nNetwork_Analyzer\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nBurp_Suite_Pro_v1.7.37_Loader_Keygen.zip\t26.1 MB\t8 年前\nBurp_Suite_Pro_v2022.x_New_Loader_Keygen.zip\t146.3 KB\t4 年前\nCharles_KeyGen.jar\t10.6 KB\t8 年前\nFiddler.7z\t6.3 MB\t5 年前\nHTTP_Debugger_Professional_v10.6.rar\t14.3 MB\t9 天前\nHttpSpy.rar\t462.1 KB\t15 年前\nIEInspector.HTTP.Analyzer.Full.Edition.v7.6.4.508.Incl.Keymaker.zip\t9.6 MB\t6 年前\nMicrosoft Network Monitor 3.4 x64.rar\t9.1 MB\t13 年前\nMicrosoft Network Monitor 3.4 x86.rar\t8.7 MB\t13 年前\nMiniSniffer.7z\t44.9 KB\t12 年前\nPackAssist.zip\t371.4 KB\t7 年前\nSmsniff-x64.zip\t129.7 KB\t1 年前\nSmsniff.zip\t96.2 KB\t1 年前\nWSockExpert.zip\t307.9 KB\t10 年前\nWireshark-4.6.6-x64.exe\t98.2 MB\t1 个月前\nWireshark-win32-3.6.24.exe\t58.5 MB\t2 年前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:08:20+07:00",
+  "tool" : "minis-browser-use"
+}

@@ -601,7 +601,7 @@ button{font-family:inherit}
       <div class="divider"></div>
       <div class="w-sub">懂你生活工作的智能助理<br><b>不只是聊天，真正把事做完</b></div>
 
-      <!-- 神枢 · 灵魂状态卡：通过 /nx 代理接 nexus-do，不是静态摆设 -->
+      <!-- 神枢 · 灵魂状态卡：真实接 nexus.jjiebbay.workers.dev /soul，不是静态摆设 -->
       <div class="cascade-panel" id="nexusSoulCard" style="margin:18px 16px 4px">
         <div class="cascade-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>神枢 · 她此刻的状态</span>
@@ -865,41 +865,23 @@ button{font-family:inherit}
 <script src="/push-client.js"></script>
 <script src="/notify-fx.js"></script>
 <script>
-/* ========== 神枢连接层：直连 nexus-do /pub/soul（公开展示端点，无需 token） ========== */
+/* ========== 神枢连接层：真实连接 nexus.jjiebbay.workers.dev ========== */
 const Nexus={
-  base:'https://nexus-do.jjiebbay.workers.dev',
+  base:'https://nexus.jjiebbay.workers.dev',
   pollTimer:null,
   async getSoul(){
     try{
-      const r=await fetch(this.base+'/pub/soul',{method:'GET'});
-      if(!r.ok){
-        const body=await r.text().catch(()=>'');
-        console.warn('[Nexus] /pub/soul 失败',r.status,body.slice(0,200));
-        const el=document.getElementById('nexusSoulCard');
-        if(el)el.dataset.error=r.status;
-        return null;
-      }
-      const d=await r.json();
-      // 把 pub/soul 字段映射到 updateUI 需要的 key
-      return { '心绪':d['心绪'], '亲密度':d['亲密度'], '活力':d['活力'], '技能树': Array(d['技能数']||0).fill(1), encounters:d.encounters };
-    }catch(e){
-      console.error('[Nexus] /pub/soul 异常',e);
-      return null;
-    }
+      const r=await fetch(this.base+'/soul',{method:'GET'});
+      if(!r.ok)return null;
+      return await r.json();
+    }catch(e){return null;}
   },
   async talk(text){
     try{
       const r=await fetch(this.base+'/talk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-      if(!r.ok){
-        const body=await r.text().catch(()=>'');
-        console.warn('[Nexus] /talk 失败',r.status,body.slice(0,200));
-        return null;
-      }
+      if(!r.ok)return null;
       return await r.json();
-    }catch(e){
-      console.error('[Nexus] /talk 异常',e);
-      return null;
-    }
+    }catch(e){return null;}
   },
   updateUI(soul){
     if(!soul)return;
