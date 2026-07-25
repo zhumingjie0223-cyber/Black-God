@@ -3,6 +3,7 @@
  * 职责：
  *   1. /nx/* → 反向代理到 nexus-do，token 只存 secret，永不下发前端
  *   2. 其余请求 → 交给 CF Assets（静态文件）
+ * deploy: 2026-07-25
  */
 export default {
   async fetch(request, env) {
