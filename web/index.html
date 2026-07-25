@@ -601,7 +601,7 @@ button{font-family:inherit}
       <div class="divider"></div>
       <div class="w-sub">懂你生活工作的智能助理<br><b>不只是聊天，真正把事做完</b></div>
 
-      <!-- 神枢 · 灵魂状态卡：真实接 nexus.jjiebbay.workers.dev /soul，不是静态摆设 -->
+      <!-- 神枢 · 灵魂状态卡：通过 /nx 代理接 nexus-do，不是静态摆设 -->
       <div class="cascade-panel" id="nexusSoulCard" style="margin:18px 16px 4px">
         <div class="cascade-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>神枢 · 她此刻的状态</span>
@@ -865,23 +865,39 @@ button{font-family:inherit}
 <script src="/push-client.js"></script>
 <script src="/notify-fx.js"></script>
 <script>
-/* ========== 神枢连接层：真实连接 nexus.jjiebbay.workers.dev ========== */
+/* ========== 神枢连接层：通过同源 /nx 代理，token 不落前端 ========== */
 const Nexus={
-  base:'https://nexus.jjiebbay.workers.dev',
+  base:'/nx',
   pollTimer:null,
   async getSoul(){
     try{
       const r=await fetch(this.base+'/soul',{method:'GET'});
-      if(!r.ok)return null;
+      if(!r.ok){
+        const body=await r.text().catch(()=>'');
+        console.warn('[Nexus] /soul 失败',r.status,body.slice(0,200));
+        const el=document.getElementById('nexusSoulCard');
+        if(el)el.dataset.error=r.status;
+        return null;
+      }
       return await r.json();
-    }catch(e){return null;}
+    }catch(e){
+      console.error('[Nexus] /soul 异常',e);
+      return null;
+    }
   },
   async talk(text){
     try{
       const r=await fetch(this.base+'/talk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-      if(!r.ok)return null;
+      if(!r.ok){
+        const body=await r.text().catch(()=>'');
+        console.warn('[Nexus] /talk 失败',r.status,body.slice(0,200));
+        return null;
+      }
       return await r.json();
-    }catch(e){return null;}
+    }catch(e){
+      console.error('[Nexus] /talk 异常',e);
+      return null;
+    }
   },
   updateUI(soul){
     if(!soul)return;
