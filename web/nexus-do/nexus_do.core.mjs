@@ -141,7 +141,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/exec', '/sandbox/file', '/sandbox/list', '/sandbox/kill', '/sandbox/running', '/agent/dispatch', '/agent/status', '/agent/channel', '/code/gen', '/code/improve']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/search', '/vision', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/exec', '/sandbox/file', '/sandbox/list', '/sandbox/kill', '/sandbox/running', '/agent/dispatch', '/agent/status', '/agent/channel', '/code/gen', '/code/improve']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -164,6 +164,8 @@ export class ShenshuCore {
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
         if (path === '/voice' && request.method === 'POST') { const b = await request.json(); return json(await this.genVoice(b.text || '', b)); }
         if (path === '/video' && request.method === 'POST') { const b = await request.json(); return json(await this.genVideo(b.prompt || '', b)); }
+        if (path === '/search' && request.method === 'POST') { const b = await request.json(); return json(await this.searchWeb(b.query || '', b)); }
+        if (path === '/vision' && request.method === 'POST') { const b = await request.json(); return json(await this.analyzeImage(b.image || b.imageUrl || '', b.prompt || '描述这张图', b)); }
         if (path === '/whoami') {
           const dev = this.readRequestDevice(request);
           try { const soul = await this.getSoul(); soul.device = { ...(soul.device || {}), server_read: dev }; await this.saveSoul(soul); } catch {}
@@ -2222,16 +2224,31 @@ int main() {
           } else { lastErr = lastErr || ('大脑 HTTP ' + r.status); }
         } catch (e) { lastErr = lastErr || ('大脑失败：' + String(e && e.message || e).slice(0, 60)); }
       }
-      // 二线：主账号 binding Llama（本地免费）
+      // 二线：CF Workers AI 免费模型池（逐个尝试，直到成功）
       if (!this.env.AI) return null;
-      try {
-        const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-          messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 300, temperature,
-        });
-        const text = r?.response || r?.result?.response || null;
-        if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'llama-3.3-70b', tier };
-        lastErr = lastErr || 'CF 兜底脑回了空';
-      } catch (e) { lastErr = lastErr || ('CF 兜底脑失败：' + String(e && e.message || e).slice(0, 60)); }
+      const cfModels = [
+        { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'llama-3.3-70b' },
+        { id: '@cf/qwen/qwen2.5-14b-instruct-awq', name: 'qwen2.5-14b' },
+        { id: '@cf/google/gemma-2-9b-it', name: 'gemma-2-9b' },
+        { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'llama-3.1-8b' }
+      ];
+      
+      for (const model of cfModels) {
+        try {
+          const r = await this.env.AI.run(model.id, {
+            messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], 
+            max_tokens: 300, 
+            temperature,
+          });
+          const text = r?.response || r?.result?.response || null;
+          if (text && text.trim() && !this.isRefusal(text)) {
+            return { reply: this.normalizeIdentity(text.trim(), idMode), model: model.name, tier };
+          }
+        } catch (e) { 
+          lastErr = lastErr || (`CF ${model.name} 失败：` + String(e && e.message || e).slice(0, 40)); 
+        }
+      }
+      
       return null;
     };
 
@@ -3007,9 +3024,22 @@ int main() {
     if (!opts.nocache) { const c = await this.cacheGet('img', prompt); if (c) return c; }
     const styled = opts.raw ? prompt
       : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
-    // 出图：主账号 CF flux（AI binding，原生最快）→ 副账号 CF flux（HTTP，冗余兜底）
+    
+    // 免费出图链（按优先级尝试）：
+    // ① Pollinations.ai（最快，无需key，直接返回图片URL）
+    try {
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(styled)}?width=1024&height=1024&nologo=true`;
+      const r = await fetch(pollinationsUrl, { method: 'HEAD' });
+      if (r.ok) {
+        await this.logCreation('image', prompt);
+        const out = { imageUrl: pollinationsUrl, prompt, styled, model: 'pollinations', via: 'free' };
+        await this.cachePut('img', prompt, out);
+        return out;
+      }
+    } catch (e) { /* 继续下一个 */ }
+    
+    // ② CF Flux（AI binding，原生最快）
     const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
-    // ① 主账号：AI binding
     if (this.env.AI) {
       try {
         const r = await this.env.AI.run(model, { prompt: styled.slice(0, 2000), ...(opts.steps ? { steps: Math.min(8, opts.steps) } : {}) });
@@ -3023,7 +3053,7 @@ int main() {
         }
       } catch (e) { /* 落副账号 */ }
     }
-    // ② 副账号：HTTP 冗余（马甲变量）
+    // ③ 副账号：HTTP 冗余（马甲变量）
     const b64b = await this._assistImage(styled, model).catch(() => null);
     if (b64b) {
       await this.logCreation('image', prompt);
@@ -3088,6 +3118,129 @@ int main() {
       if (soul.creations.length > 60) soul.creations = soul.creations.slice(-60);
       await this.saveSoul(soul);
     } catch {}
+  }
+
+  // ═══════════════════════ 搜索（内置免费API）═══════════════════════
+  async searchWeb(query, opts = {}) {
+    if (!query || !query.trim()) return { error: '给我关键词' };
+    const maxResults = opts.maxResults || 5;
+    
+    // DuckDuckGo Instant Answer API（完全免费，无需key）
+    try {
+      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+      const r = await fetch(url, { 
+        headers: { 'User-Agent': 'BlackGod/1.0' },
+        cf: { cacheTtl: 300 } // CF cache 5分钟
+      });
+      if (!r.ok) throw new Error('DDG返回' + r.status);
+      
+      const data = await r.json();
+      const results = [];
+      
+      // 抽象摘要
+      if (data.AbstractText) {
+        results.push({
+          title: data.Heading || query,
+          snippet: data.AbstractText,
+          url: data.AbstractURL || '',
+          source: data.AbstractSource || 'DuckDuckGo'
+        });
+      }
+      
+      // 相关主题
+      if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+        for (const topic of data.RelatedTopics.slice(0, maxResults - 1)) {
+          if (topic.Text && topic.FirstURL) {
+            results.push({
+              title: topic.Text.split(' - ')[0] || topic.Text,
+              snippet: topic.Text,
+              url: topic.FirstURL,
+              source: 'DuckDuckGo'
+            });
+          }
+        }
+      }
+      
+      if (results.length > 0) {
+        return { 
+          query, 
+          results: results.slice(0, maxResults),
+          count: results.length,
+          engine: 'duckduckgo'
+        };
+      }
+      
+      // 无结果 → fallback到简单文本搜索
+      return {
+        query,
+        results: [{
+          title: '搜索：' + query,
+          snippet: '未找到即时答案，建议直接访问搜索引擎查看完整结果',
+          url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+          source: 'fallback'
+        }],
+        count: 1,
+        engine: 'fallback'
+      };
+      
+    } catch (e) {
+      return { 
+        error: '搜索失败：' + String(e.message).slice(0, 60),
+        fallbackUrl: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`
+      };
+    }
+  }
+
+  // ═══════════════════════ 看图（内置CF Vision）═══════════════════════
+  async analyzeImage(imageInput, prompt, opts = {}) {
+    if (!imageInput) return { error: '给我一张图' };
+    
+    // 支持URL或base64
+    let imageUrl = imageInput;
+    if (imageInput.startsWith('data:image')) {
+      // base64 → 需要先上传或直接传给模型
+      // CF Vision支持直接传base64，但需要转成正确格式
+      imageUrl = imageInput;
+    }
+    
+    // CF Llama 3.2 Vision（免费，11B参数）
+    if (this.env.AI) {
+      try {
+        const messages = [
+          { 
+            role: 'user', 
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageUrl } }
+            ]
+          }
+        ];
+        
+        const r = await this.env.AI.run('@cf/meta/llama-3.2-11b-vision-instruct', {
+          messages,
+          max_tokens: 500
+        });
+        
+        const text = r?.response || r?.result?.response || null;
+        if (text && text.trim()) {
+          return {
+            analysis: text.trim(),
+            prompt,
+            model: 'llama-3.2-vision',
+            via: 'cf'
+          };
+        }
+      } catch (e) {
+        // Vision失败 → fallback到纯文本理解
+        return {
+          error: 'vision_unavailable',
+          说明: '图像理解暂时不可用：' + String(e.message).slice(0, 60),
+          fallback: '可以描述图片内容，我用文字帮你理解'
+        };
+      }
+    }
+    
+    return { error: 'CF AI binding未配置' };
   }
 
   // ═══════════════════════ Web Push（后台不掉线的关键）═══════════════════════
