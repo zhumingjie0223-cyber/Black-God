@@ -217,6 +217,36 @@ export class ShenshuCore {
       }
     }
 
+    /* ═══════════════════════════════════════════════════
+       兜底守卫 · API 路径绝不返回 HTML
+       位置：所有真实路由 match 之后、HTML 兜底 return 之前。
+       原因：未匹配路径返回 200+HTML 会让调用方 r.ok===true 但 r.json() 抛
+             SyntaxError，监控全绿、堆栈指向 JSON 解析，故障静默且难定位。
+       ═══════════════════════════════════════════════════ */
+    {
+      const p = path;
+      const accept = request.headers.get('accept') || '';
+      const mode = request.headers.get('sec-fetch-mode') || '';
+      const isNavigate = mode === 'navigate' || accept.includes('text/html');
+
+      if (p.startsWith('/api/') || (accept.includes('application/json') && !isNavigate)) {
+        return new Response(JSON.stringify({
+          error: 'not_found',
+          path: p,
+          hint: '神枢真实路由在根级，无 /api 前缀',
+          routes: ['/health', '/soul', '/talk', '/stats', '/whoami',
+                   '/capabilities', '/config', '/device', '/export', '/inner'],
+        }, null, 2), {
+          status: 404,
+          headers: {
+            ...cors,
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store',
+          },
+        });
+      }
+    }
+
     // —— 默认：公开的 UI 壳（数据要鉴权才拿得到）+ 请求高熵客户端提示 ——
     return new Response(CHAT_HTML, {
       headers: {
