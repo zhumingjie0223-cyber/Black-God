@@ -68,3 +68,5 @@ server/data/
 .wrangler
 .dev.vars*
 !.dev.vars.example
+web/nexus-do/node_modules/
+web/nexus-do/package-lock.json
