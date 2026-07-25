@@ -865,23 +865,25 @@ button{font-family:inherit}
 <script src="/push-client.js"></script>
 <script src="/notify-fx.js"></script>
 <script>
-/* ========== 神枢连接层：通过同源 /nx 代理，token 不落前端 ========== */
+/* ========== 神枢连接层：直连 nexus-do /pub/soul（公开展示端点，无需 token） ========== */
 const Nexus={
-  base:'/nx',
+  base:'https://nexus-do.jjiebbay.workers.dev',
   pollTimer:null,
   async getSoul(){
     try{
-      const r=await fetch(this.base+'/soul',{method:'GET'});
+      const r=await fetch(this.base+'/pub/soul',{method:'GET'});
       if(!r.ok){
         const body=await r.text().catch(()=>'');
-        console.warn('[Nexus] /soul 失败',r.status,body.slice(0,200));
+        console.warn('[Nexus] /pub/soul 失败',r.status,body.slice(0,200));
         const el=document.getElementById('nexusSoulCard');
         if(el)el.dataset.error=r.status;
         return null;
       }
-      return await r.json();
+      const d=await r.json();
+      // 把 pub/soul 字段映射到 updateUI 需要的 key
+      return { '心绪':d['心绪'], '亲密度':d['亲密度'], '活力':d['活力'], '技能树': Array(d['技能数']||0).fill(1), encounters:d.encounters };
     }catch(e){
-      console.error('[Nexus] /soul 异常',e);
+      console.error('[Nexus] /pub/soul 异常',e);
       return null;
     }
   },

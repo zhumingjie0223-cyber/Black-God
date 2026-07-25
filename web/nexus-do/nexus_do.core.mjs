@@ -116,6 +116,20 @@ export class ShenshuCore {
     // —— 能力契约层（借鉴 Minis）——
     // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
     if (path === '/capabilities') return json({ action: 'list', data: describeCapabilities(authed) });
+
+    // /pub/soul：公开展示端点，只返回非隐私展示字段（心绪/活力/亲密度/技能数），无 token 可读
+    if (path === '/pub/soul') {
+      const soul = await this.getSoul().catch(() => null);
+      if (!soul) return json({ ok: false }, 503);
+      return json({
+        ok: true,
+        心绪: soul['心绪'] ?? 0,
+        活力: soul['活力'] ?? 0,
+        亲密度: soul['亲密度'] ?? 0,
+        技能数: (soul['技能树'] || []).length,
+        encounters: soul.encounters ?? 0,
+      });
+    }
     // /invoke：统一调度（能力自身 owner_only 决定是否需要鉴权，故不进 API 硬门）
     if (path === '/invoke' && request.method === 'POST') {
       const b = await request.json().catch(() => ({}));
