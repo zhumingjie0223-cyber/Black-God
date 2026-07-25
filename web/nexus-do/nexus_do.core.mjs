@@ -2224,29 +2224,21 @@ int main() {
           } else { lastErr = lastErr || ('大脑 HTTP ' + r.status); }
         } catch (e) { lastErr = lastErr || ('大脑失败：' + String(e && e.message || e).slice(0, 60)); }
       }
-      // 二线：CF Workers AI 免费模型池（逐个尝试，直到成功）
+      // 二线：CF Workers AI 免费兜底（Llama 3.3 70B）
       if (!this.env.AI) return null;
-      const cfModels = [
-        { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'llama-3.3-70b' },
-        { id: '@cf/qwen/qwen2.5-14b-instruct-awq', name: 'qwen2.5-14b' },
-        { id: '@cf/google/gemma-2-9b-it', name: 'gemma-2-9b' },
-        { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'llama-3.1-8b' }
-      ];
-      
-      for (const model of cfModels) {
-        try {
-          const r = await this.env.AI.run(model.id, {
-            messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], 
-            max_tokens: 300, 
-            temperature,
-          });
-          const text = r?.response || r?.result?.response || null;
-          if (text && text.trim() && !this.isRefusal(text)) {
-            return { reply: this.normalizeIdentity(text.trim(), idMode), model: model.name, tier };
-          }
-        } catch (e) { 
-          lastErr = lastErr || (`CF ${model.name} 失败：` + String(e && e.message || e).slice(0, 40)); 
+      try {
+        const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+          messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], 
+          max_tokens: 300, 
+          temperature,
+        });
+        const text = r?.response || r?.result?.response || null;
+        if (text && text.trim() && !this.isRefusal(text)) {
+          return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'llama-3.3-70b', tier };
         }
+        lastErr = lastErr || 'CF 兜底脑回了空';
+      } catch (e) { 
+        lastErr = lastErr || ('CF 兜底脑失败：' + String(e && e.message || e).slice(0, 60)); 
       }
       
       return null;
