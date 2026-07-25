@@ -7,6 +7,7 @@ on:
       - 'web/**'
       - 'worker.mjs'
       - 'config/wrangler.jsonc'
+      - '.github/workflows/deploy-blackgod88.yml'
   workflow_dispatch:
 
 jobs:
@@ -14,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    defaults:
-      run:
-        working-directory: .
     steps:
       - uses: actions/checkout@v4
 
@@ -27,35 +25,36 @@ jobs:
       - name: Install wrangler
         run: npm install -g wrangler@4 --no-audit --no-fund
 
-      - name: Deploy to Cloudflare Workers
+      - name: Stamp build time into worker.mjs
+        run: sed -i "s/__BUILD_TIME__/$(date -u +%Y%m%dT%H%M%SZ)/" worker.mjs
+
+      - name: Deploy (script + assets + secrets in one shot)
         if: ${{ env.CF_TOKEN != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 142c76e0039e279886c89257b6fddbc7
         run: |
-          # 注入构建时间到 worker.mjs，确保每次 script hash 不同，强制 CF 更新 script
-          sed -i "s/__BUILD_TIME__/$(date -u +%Y%m%dT%H%M%SZ)/" worker.mjs
-          cat worker.mjs | head -4
+          # wrangler deploy 一次性处理 script + assets + ASSETS binding
           wrangler deploy --config config/wrangler.jsonc
-
-      - name: Inject OWNER_TOKEN secret
-        if: ${{ env.CF_TOKEN != '' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: 142c76e0039e279886c89257b6fddbc7
-          OWNER_TOKEN: ${{ secrets.OWNER_TOKEN }}
-        run: echo "$OWNER_TOKEN" | wrangler secret put OWNER_TOKEN --name blackgod88
+          # 在同一步内注入 OWNER_TOKEN，避免被覆盖
+          echo "${{ secrets.OWNER_TOKEN }}" | wrangler secret put OWNER_TOKEN --name blackgod88
 
       - name: Verify /nx/soul proxy
         run: |
-          sleep 5
+          sleep 8
           CODE=$(curl -s -o /dev/null -w "%{http_code}" https://blackgod88.jjiebbay.workers.dev/nx/soul)
           echo "/nx/soul → $CODE"
-          [ "$CODE" = "200" ] || [ "$CODE" = "401" ] && echo "✅ 代理生效" || (echo "❌ 代理异常"; exit 1)
+          if [ "$CODE" = "200" ] || [ "$CODE" = "401" ]; then
+            echo "✅ 代理生效"
+          else
+            echo "❌ 代理异常 (code=$CODE)，完整响应："
+            curl -s https://blackgod88.jjiebbay.workers.dev/nx/soul | head -c 300
+            exit 1
+          fi
 
       - name: Verify no token leak
         run: |
-          COUNT=$(curl -s https://blackgod88.jjiebbay.workers.dev/ | grep -c "OWNER_TOKEN\|Bearer " || true)
+          COUNT=$(curl -s https://blackgod88.jjiebbay.workers.dev/ | grep -c "OWNER_TOKEN\|nexus\.jjiebbay" || true)
           echo "token leak count: $COUNT"
           [ "$COUNT" = "0" ] && echo "✅ 无 token 泄露" || (echo "❌ token 泄露！"; exit 1)
 
