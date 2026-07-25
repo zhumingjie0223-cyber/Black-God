@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Packers\/",
+    "success" : true,
+    "text" : "Text (1796 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nPackers\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nASPack_v2.42.rar\t3.2 MB\t7 年前\nASProtect.SKE.v2.51.build.09.22.beta-RES-incl-kg.7z\t2.3 MB\t8 年前\nCode_Virtualizer_x32_x64_v2.2.2.0_Retail_Licensed.rar\t15.7 MB\t8 年前\nCode_Virtualizer_x32_x64_v3.1.4.0_Retail_Licensed.rar\t32.2 MB\t3 年前\nCode_Virtualizer_x32_x64_v3.1.6.0_Retail_Licensed.7z\t30.2 MB\t1 年前\nCode_Virtualizer_x32_x64_v3.2.3.0_Retail_Licensed.7z\t31 MB\t7 个月前\nObsidium v1.3.6.4_Full_License.rar\t1.5 MB\t15 年前\nObsidium_v1.5.2_Build_11.7z\t13 MB\t11 年前\nObsidium_v1.6.7_Build_1_Retail_Licensed.rar\t15.1 MB\t7 年前\nObsidium_v1.6.9_Build_1_Company_License_with_NetworkLicensing.rar\t15.5 MB\t3 年前\nPECompact_v3.02.2_Final.7z\t1.2 MB\t11 年前\nThe_Enigma_Protector_v6.70_x32.rar\t21.8 MB\t5 年前\nThe_Enigma_Protector_v6.80_x64.rar\t25.8 MB\t5 年前\nThe_Enigma_Protector_v7.40_x32_x64.rar\t52.9 MB\t2 年前\nThemida_x32_x64_v2.4.6.30_Retail_Licensed.rar\t42.3 MB\t8 年前\nThemida_x32_x64_v3.0.4.0_Repacked.rar\t54.3 MB\t6 年前\nThemida_x32_x64_v3.1.8.0_Retail_Licensed.rar\t60.9 MB\t2 年前\nThemida_x32_x64_v3.2.2.22_Retail_Licensed.7z\t61.6 MB\t9 个月前\nThemida_x32_x64_v3.2.4.52_Retail_Licensed.7z\t63.4 MB\t7 个月前\nUPX_v5.2.0_x32.zip\t658.8 KB\t1 个月前\nUPX_v5.2.0_x64.zip\t659.9 KB\t1 个月前\nWinLicense_x32_x64_v2.4.6.30_Retail_Licensed.rar\t44 MB\t8 年前\nWinLicense_x32_x64_v3.1.2.0_Retail_Licensed.rar\t83.7 MB\t4 年前\nWinLicense_x32_x64_v3.1.3.0_Retail_Licensed.rar\t83.1 MB\t4 年前\nWinLicense_x32_x64_v3.1.9.0_Cracked_52pojie.cn.7z\t98.6 MB\t1 个月前\nZProtect.1.4.9.0.Preview.2.RETAIL.INCL_KEYGEN-FFF.rar\t4.9 MB\t10 年前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:07:44+07:00",
+  "tool" : "minis-browser-use"
+}

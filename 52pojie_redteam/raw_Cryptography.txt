@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Cryptography\/",
+    "success" : true,
+    "text" : "Text (655 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nCryptography\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nASM_Calculator_1.12.7z\t53.8 KB\t1 年前\nCryptoTester.zip\t16.3 MB\t9 个月前\nHash & Crypto Detector v1.4.zip\t374 KB\t10 年前\nKeygener_Assistant.rar\t1.4 MB\t8 年前\nPYG密码学综合工具 v5.0.0.5.7z\t2.5 MB\t11 年前\nToolsFx-1.19.0-jdk8-withjre-windows-x86.zip\t99.1 MB\t3 个月前\nToolsFx-1.19.0-withjre-win-x64.zip\t104.9 MB\t3 个月前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:08:28+07:00",
+  "tool" : "minis-browser-use"
+}

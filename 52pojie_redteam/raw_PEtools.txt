@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/PEtools\/",
+    "success" : true,
+    "text" : "Text (1204 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nPEtools\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nCFF_Explorer.zip\t2.1 MB\t14 年前\nDIE_win32_portable_3.21_x86.zip\t21.9 MB\t3 个月前\nDIE_win64_portable_3.21_x64.zip\t24 MB\t3 个月前\nExeinfoPe.zip\t9 MB\t3 个月前\nFixRes.zip\t464.1 KB\t10 年前\nImportREConstructor 1.7e.zip\t998 KB\t10 年前\nImports Fixer v1.6.rar\t929.1 KB\t15 年前\nLordPE.7z\t327.7 KB\t8 年前\nMiTrc_EXE_Explorer_v3.7.5.zip\t12.2 MB\t3 个月前\nOverlay 最终版.rar\t550.9 KB\t15 年前\nPE-bear_0.7.2_qt5_x86_win_vs17.zip\t8 MB\t1 个月前\nPE-bear_0.7.2_qt6_x64_win_vs22.zip\t11.5 MB\t1 个月前\nPE.Explorer.v1.99.R6.7z\t3.1 MB\t12 年前\nPE.Tools.v1.9.762.2018.zip\t1.1 MB\t8 年前\nPEiD 0.95.zip\t3.5 MB\t10 年前\nReloX v1.2.rar\t152 KB\t2 年前\nReloz v1.0.rar\t144.8 KB\t9 年前\nScylla.v.0.9.8.rar\t985.9 KB\t11 年前\nStud_PE.rar\t1 MB\t15 年前\nStudyPE+ x64 111.rar\t4.8 MB\t6 年前\nStudyPE+ x86 111.rar\t4.6 MB\t6 年前\nUIF_origin.rar\t181.8 KB\t9 年前\nUniversal Import Fixer (UIF) v1.2 (FINAL).zip\t188.1 KB\t15 年前\npestudio-9.61.zip\t1 MB\t1 年前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:08:36+07:00",
+  "tool" : "minis-browser-use"
+}

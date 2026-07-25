@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Disassemblers\/",
+    "success" : true,
+    "text" : "Text (1163 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nDisassemblers\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nAS3_Sorcerer_v6.78.7z\t4.9 MB\t4 年前\nC32Asm.rar\t1.1 MB\t15 年前\nC32Asm_v2.0.1.0.rar\t1 MB\t9 年前\nDecompyle++.7z\t708.9 KB\t1 个月前\nDelphiDecompiler.zip\t2.2 MB\t12 年前\nGhidra_12.1.2_PUBLIC_20260605.zip\t546.3 MB\t1 个月前\nHopper_Disassembler_For_Windows_v2.8.7.7z\t30.2 MB\t7 年前\nHopper_Disassembler_for_macOS_5.18.1_CracKed_U2B.zip\t50.9 MB\t1 年前\nHopper_Disassembler_v5.7.7_Full_Version_For_Linux.zip\t68.2 MB\t3 年前\nIDA.txt\t56 B\t2 年前\nIDA_Pro_v8.3_Portable.zip\t461.6 MB\t3 年前\nIDR (Interactive Delphi Reconstructor).rar\t119.5 MB\t4 年前\nIDR (Interactive Delphi Reconstructor)_old.rar\t108.3 MB\t11 年前\nJPEXS_Free_Flash_Decompiler_v26.2.1.zip\t18.9 MB\t1 个月前\nVB.Decompiler.Pro.v11.5.Cracked.by.GautamGreat.rar\t32.5 MB\t5 年前\nVB_Decompiler_Pro_v_10.0_FFF.zip\t13.3 MB\t7 年前\nYogda.1.0.564.zip\t3.6 MB\t14 年前\nZynamics_BinDiff_8.zip\t220.4 MB\t3 年前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:08:04+07:00",
+  "tool" : "minis-browser-use"
+}
