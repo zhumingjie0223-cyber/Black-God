@@ -2224,21 +2224,21 @@ int main() {
           } else { lastErr = lastErr || ('大脑 HTTP ' + r.status); }
         } catch (e) { lastErr = lastErr || ('大脑失败：' + String(e && e.message || e).slice(0, 60)); }
       }
-      // 二线：CF Workers AI 免费兜底（Llama 3.3 70B）
+      // 二线：CF Workers AI 免费兜底（Qwen2.5-72B，比Llama更强）
       if (!this.env.AI) return null;
       try {
-        const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+        const r = await this.env.AI.run('@cf/qwen/qwen2.5-72b-instruct-awq', {
           messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], 
           max_tokens: 300, 
           temperature,
         });
         const text = r?.response || r?.result?.response || null;
         if (text && text.trim() && !this.isRefusal(text)) {
-          return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'llama-3.3-70b', tier };
+          return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'qwen2.5-72b', tier };
         }
-        lastErr = lastErr || 'CF 兜底脑回了空';
+        lastErr = lastErr || 'CF Qwen 兜底脑回了空';
       } catch (e) { 
-        lastErr = lastErr || ('CF 兜底脑失败：' + String(e && e.message || e).slice(0, 60)); 
+        lastErr = lastErr || ('CF Qwen 失败：' + String(e && e.message || e).slice(0, 60)); 
       }
       
       return null;
