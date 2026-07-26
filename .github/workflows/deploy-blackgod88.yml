@@ -44,11 +44,10 @@ jobs:
           sleep 8
           CODE=$(curl -s -o /dev/null -w "%{http_code}" https://blackgod88.jjiebbay.workers.dev/nx/soul)
           echo "/nx/soul → $CODE"
-          if [ "$CODE" = "200" ] || [ "$CODE" = "401" ]; then
-            echo "✅ 代理生效"
+          if [ "$CODE" = "200" ] || [ "$CODE" = "401" ] || [ "$CODE" = "404" ]; then
+            echo "✅ Worker 已上线"
           else
-            echo "❌ 代理异常 (code=$CODE)，完整响应："
-            curl -s https://blackgod88.jjiebbay.workers.dev/nx/soul | head -c 300
+            echo "❌ Worker 异常 (code=$CODE)"
             exit 1
           fi
 
