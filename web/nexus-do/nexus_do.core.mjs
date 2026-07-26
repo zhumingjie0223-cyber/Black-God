@@ -25,6 +25,11 @@ import { NexusSandboxPool, handleSandboxExec, handleSandboxFile, handleSandboxLi
 import { NexusOrchestrator, AgentType, handleAgentDispatch, handleAgentStatus, handleAgentChannel } from './nexus_agent_orchestrator.mjs';
 import { NexusCodeEngine, handleCodeGen, handleCodeImprove } from './nexus_code_engine.mjs';
 import { NexusAPIHub, handleAPIHubSearch, handleAPIHubCall, handleAPIHubStats, handleAPIHubCategories } from './nexus_api_hub.mjs';
+// ─── 191功能集成：Checkpoint + Plan状态机 + 证据黑板 + 研究引擎 ───
+import { CheckpointStore, ModeGate, handleCheckpointSnapshot, handleCheckpointRestore, handleCheckpointList } from './nexus_checkpoint.mjs';
+import { PlanStateMachine, handlePlanGet, handlePlanEdit, handlePlanAdvance } from './nexus_plan_state.mjs';
+import { Blackboard, TaskGraphRunner, handleBlackboardWrite, handleBlackboardRead, handleTaskRun } from './nexus_blackboard.mjs';
+import { ResearchEngine, handleResearch } from './nexus_research.mjs';
 loadCapabilities(LEXICON_DATA);
 
 const ALARM_INTERVAL_MS = 60_000;   // 每分钟自主醒
@@ -251,6 +256,19 @@ export class ShenshuCore {
         if (path === '/api/call'       && request.method === 'POST') return handleAPIHubCall(request, this.apiHub);
         if (path === '/api/stats'      && request.method === 'GET')  return handleAPIHubStats(request, this.apiHub);
         if (path === '/api/categories' && request.method === 'GET')  return handleAPIHubCategories(request, this.apiHub);
+
+        // ─── Checkpoint + Plan状态机 ───
+        if (path === '/nx/checkpoint/snapshot' && request.method === 'POST') return handleCheckpointSnapshot(request, this.storage);
+        if (path === '/nx/checkpoint/restore'  && request.method === 'POST') return handleCheckpointRestore(request, this.storage);
+        if (path === '/nx/checkpoint/list'     && request.method === 'GET')  return handleCheckpointList(request, this.storage);
+        if (path === '/nx/plan/get'     && request.method === 'GET')  return handlePlanGet(request, this.storage);
+        if (path === '/nx/plan/edit'    && request.method === 'POST') return handlePlanEdit(request, this.storage);
+        if (path === '/nx/plan/advance' && request.method === 'POST') return handlePlanAdvance(request, this.storage);
+        // ─── 证据黑板 + 研究引擎 ───
+        if (path === '/nx/blackboard/write' && request.method === 'POST') return handleBlackboardWrite(request, this.env);
+        if (path === '/nx/blackboard/read'  && request.method === 'POST') return handleBlackboardRead(request, this.env);
+        if (path === '/nx/task/run'         && request.method === 'POST') return handleTaskRun(request, this.env);
+        if (path === '/nx/research'         && request.method === 'POST') return handleResearch(request, this.env);
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
