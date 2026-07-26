@@ -1905,6 +1905,177 @@ body {
   border-radius: 999px !important;
   background: rgba(79,
 
+
+/* tab+fold force */
+/* ── 底部Tab导航 ── */
+.tabbar {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 900 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  height: 72px !important;
+  padding: 0 4px !important;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+  box-sizing: content-box !important;
+  background: rgba(10, 14, 13, 0.72) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+  backdrop-filter: blur(22px) saturate(160%) !important;
+  border-top: 1px solid rgba(126, 231, 195, 0.22) !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.55),
+              0 -1px 0 rgba(126, 231, 195, 0.08) inset !important;
+}
+
+.tab {
+  position: relative !important;
+  flex: 1 1 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  height: 72px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  color: var(--text-3) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: color .22s ease !important;
+}
+
+.tab svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.6 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  transition: transform .22s ease, filter .22s ease !important;
+}
+
+.tab span {
+  font-size: 11px !important;
+  line-height: 1 !important;
+  letter-spacing: .02em !important;
+  font-weight: 500 !important;
+}
+
+.tab.on {
+  color: var(--cy-hi) !important;
+}
+
+.tab.on svg {
+  transform: translateY(-1px) !important;
+  filter: drop-shadow(0 0 6px rgba(126, 231, 195, 0.45)) !important;
+}
+
+.tab.on::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 26px !important;
+  height: 4px !important;
+  border-radius: 0 0 4px 4px !important;
+  background: var(--cy-hi) !important;
+  box-shadow: 0 0 10px rgba(126, 231, 195, 0.7) !important;
+}
+
+/* ── 折叠卡片 ── */
+.fold {
+  margin: 8px 0 !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(126, 231, 195, 0.16) !important;
+  background: rgba(18, 24, 22, 0.55) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  overflow: hidden !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.38) !important;
+  transition: border-color .22s ease, box-shadow .22s ease !important;
+}
+
+.fold.open {
+  border-color: rgba(126, 231, 195, 0.34) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.46),
+              0 0 0 1px rgba(126, 231, 195, 0.08) inset !important;
+}
+
+.fold-h {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+  padding: 14px 16px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-1) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: background .2s ease, color .2s ease !important;
+}
+
+.fold-h:active {
+  background: rgba(126, 231, 195, 0.07) !important;
+}
+
+.fold-h i {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  color: var(--cy-hi) !important;
+  font-style: normal !important;
+  transform: rotate(0deg) !important;
+  transform-origin: 50% 50% !important;
+  transition: transform .28s cubic-bezier(.4, 0, .2, 1) !important;
+}
+
+.fold.open .fold-h i {
+  transform: rotate(180deg) !important;
+}
+
+.fold-b {
+  display: grid !important;
+  grid-template-rows: 0fr !important;
+  height: auto !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  transition: grid-template-rows .3s cubic-bezier(.4, 0, .2, 1),
+              opacity .24s ease !important;
+}
+
+.fold-b > * {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 16px 14px !important;
+  color: var(--text-2) !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.fold.open .fold-b {
+  grid-template-rows: 1fr !important;
+  height: auto !important;
+  opacity: 1 !important;
+  border-top: 1px solid rgba(126, 231, 195, 0.12) !important;
+}
 </style>
 <div class="art-mask" id="artMask" onclick="closeArtifact()"></div>
 <div class="msg-menu-mask" id="msgMenuMask" onclick="closeMsgMenu()"></div>
