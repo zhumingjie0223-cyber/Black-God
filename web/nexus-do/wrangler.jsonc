@@ -25,7 +25,7 @@
     ]
   },
   "migrations": [
-    { "tag": "v2", "new_classes": ["AgentStateMachineDO"] }
+    { "tag": "v2", "new_sqlite_classes": ["AgentStateMachineDO"] }
   ],
 
   // —— Workers AI：大脑兜底（Llama 3.3 70B）——
