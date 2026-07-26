@@ -32,7 +32,7 @@ jobs:
         if: ${{ env.CF_TOKEN != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: aef9ce7978ba50dad5e9347010881164
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           # wrangler deploy 一次性处理 script + assets + ASSETS binding
           wrangler deploy --config config/wrangler.jsonc
