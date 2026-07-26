@@ -103,12 +103,21 @@
     0 calc(1px + var(--border-default)) 0 0 rgba(0,0,0,.12),
     0 calc(3px + var(--border-default)) 4px -1.5px var(--shadow-tint);
 
+  --shadow-surface-sm:
+    0 0 0 var(--border-default) rgba(170,225,190,var(--shadow-surface-border-alpha)),
+    0 0 0 var(--border-default) var(--surface-shadow-base),
+    0 0 0 calc(var(--border-default)*2) rgba(0,0,0,.20),
+    0 calc(1px + var(--border-default)) 0 0 rgba(0,0,0,.12),
+    0 calc(3px + var(--border-default)) 4px -1.5px rgba(4,10,6,.52);
+
   --shadow-surface-md:
     0 0 0 var(--border-default) rgba(170,225,190,var(--shadow-surface-border-alpha)),
     0 0 0 var(--border-default) var(--surface-shadow-base),
     0 0 0 calc(var(--border-default)*2) rgba(0,0,0,.24),
     0 calc(1px + var(--border-default)) 0 0 rgba(0,0,0,.14),
-    0 calc(6px + var(--border-default)) 10px -3px var(--shadow-tint);
+    0 calc(6px + var(--border-default)) 10px -3px rgba(4,10,6,.58);
+
+  --glow-neutral-hover:oklch(90% .012 148/.10);
 
   --shadow-surface-lg:
     0 0 0 var(--border-default) rgba(170,225,190,calc(var(--shadow-surface-border-alpha) + .02)),
@@ -1194,7 +1203,7 @@ body::before{
 }
 .send:active{
   transform:scale(.90);
-  box-shadow:var(--shadow-inset-press), var(--glow-accent-pressed);
+  box-shadow:var(--shadow-inset-press), 0 0 0 4px var(--glow-accent-pressed);
   transition:transform var(--dur-instant) var(--ease-snap),
              box-shadow var(--dur-instant) var(--ease-snap);
 }
