@@ -4006,12 +4006,13 @@ export default {
   },
   async scheduled(event, env, ctx) {
     const id = env.SHENSHU.idFromName('quan-shenshu-nexus');
-    // 按哪条 cron 触发分流：每日那条 → 中枢自省；其余（5 分钟兜底）→ 心跳。
     const path = (event && event.cron === DAILY_REFLECT_CRON) ? '/reflect' : '/heartbeat';
-    // 带上 OWNER_TOKEN，否则开了鉴权后会被自己 401 挡掉（cron 保险形同虚设）
     const req = new Request('https://internal' + path, {
       headers: env.OWNER_TOKEN ? { Authorization: 'Bearer ' + env.OWNER_TOKEN } : {},
     });
     ctx.waitUntil(env.SHENSHU.get(id).fetch(req));
   },
 };
+
+// ── Durable Object exports（wrangler 要求所有 DO 在入口 export）──
+export { AgentStateMachineDO } from './nexus_agent_core.mjs';
