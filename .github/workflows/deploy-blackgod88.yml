@@ -1,8 +1,14 @@
 name: Deploy blackgod88
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'web/**'
+      - 'worker.mjs'
+      - 'config/wrangler.jsonc'
+      - '.github/workflows/deploy-blackgod88.yml'
   workflow_dispatch:
-    # 已停用自动触发，blackgod88 合并到 nexus-do 主站，不再单独部署
 
 jobs:
   deploy:
