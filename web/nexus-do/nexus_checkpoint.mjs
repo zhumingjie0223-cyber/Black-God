@@ -77,12 +77,10 @@ export class CheckpointStore {
   static async snapshot(storage, sessionId, meta = {}, sessPrefixArg) {
     const prefix = sessPrefixArg || sessPrefix(sessionId);
 
-    // Grab full state. list() returns a Map of all keys.
-    const all = await storage.list();
+    // Grab this session's state directly by prefix to avoid read amplification.
+    const all = await storage.list({ prefix });
     const state = {};
     for (const [k, v] of all) {
-      // Only capture keys that belong to this session's namespace.
-      if (!k.startsWith(prefix)) continue;
       state[k] = v;
     }
 
@@ -131,37 +129,7 @@ export class CheckpointStore {
     return ckptId;
   }
 
-  /**
-   * Load and reassemble the sharded state for a checkpoint.
-   * @param {DurableObjectStorage} storage
-   * @param {string} sessionId
-   * @param {object} record
-   * @returns {Promise<object>}
-   */
-  static async _loadState(storage, sessionId, record) {
-    const baseKey = ckptKey(sessionId, record.ckptId);
-    const chunkCount = record.chunkCount || 0;
-    const state = {};
-    for (let i = 0; i < chunkCount; i++) {
-      const chunk = await storage.get(baseKey + '_chunk_' + i);
-      if (chunk) {
-        for (const [k, v] of Object.entries(chunk)) state[k] = v;
-      }
-    }
-    return state;
-  }
 
-  /**
-   * Restore storage state from a snapshot.
-   * Only touches keys under the sess_{sessionId}_ prefix so other
-   * sessions in the same Durable Object are unaffected. Both the restored
-   * put and the stale-key delete run inside a single atomic transaction so
-   * a mid-operation failure never leaves storage in a mixed state.
-   * @param {DurableObjectStorage} storage
-   * @param {string} ckptId
-   * @param {string} sessionId
-   * @returns {Promise<{restored:number, deleted:number}>}
-   */
   static async restore(storage, ckptId, sessionId) {
     const record = await storage.get(ckptKey(sessionId, ckptId));
     if (!record) {
