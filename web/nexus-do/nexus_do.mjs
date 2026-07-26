@@ -18,6 +18,9 @@ import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
 import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
+
+// ── Durable Object re-exports（wrangler 静态分析要求在入口顶部）──
+export { AgentStateMachineDO } from './nexus_agent_core.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
 loadCapabilities(LEXICON_DATA);
@@ -4013,6 +4016,3 @@ export default {
     ctx.waitUntil(env.SHENSHU.get(id).fetch(req));
   },
 };
-
-// ── Durable Object exports（wrangler 要求所有 DO 在入口 export）──
-export { AgentStateMachineDO } from './nexus_agent_core.mjs';
