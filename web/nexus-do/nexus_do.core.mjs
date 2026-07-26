@@ -20,10 +20,11 @@ import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './t
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
-// ─── 逆向接入：E2B沙箱 + 14子Agent调度 + 代码生成引擎 ───
+// ─── 逆向接入：E2B沙箱 + 14子Agent调度 + 代码生成引擎 + 1281 API Hub ───
 import { NexusSandboxPool, handleSandboxExec, handleSandboxFile, handleSandboxList, handleSandboxKill, handleSandboxRunning } from './nexus_sandbox.mjs';
 import { NexusOrchestrator, AgentType, handleAgentDispatch, handleAgentStatus, handleAgentChannel } from './nexus_agent_orchestrator.mjs';
 import { NexusCodeEngine, handleCodeGen, handleCodeImprove } from './nexus_code_engine.mjs';
+import { NexusAPIHub, handleAPIHubSearch, handleAPIHubCall, handleAPIHubStats, handleAPIHubCategories } from './nexus_api_hub.mjs';
 loadCapabilities(LEXICON_DATA);
 
 const ALARM_INTERVAL_MS = 60_000;   // 每分钟自主醒
@@ -53,6 +54,9 @@ export class ShenshuCore {
     this.codeEngine = new NexusCodeEngine({
       aiEndpoint: env.NEXUS_GATEWAY_URL || 'https://aquan.lufei.uk/talk',
       ownerToken: env.OWNER_TOKEN || '',
+    });
+    this.apiHub = new NexusAPIHub({
+      cacheTTL: 300000, // 5分钟缓存
     });
     this.state.blockConcurrencyWhile(async () => {
       const nextAlarm = await this.storage.getAlarm();
@@ -141,7 +145,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/search', '/vision', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/exec', '/sandbox/file', '/sandbox/list', '/sandbox/kill', '/sandbox/running', '/agent/dispatch', '/agent/status', '/agent/channel', '/code/gen', '/code/improve']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/search', '/vision', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/exec', '/sandbox/file', '/sandbox/list', '/sandbox/kill', '/sandbox/running', '/agent/dispatch', '/agent/status', '/agent/channel', '/code/gen', '/code/improve', '/api/search', '/api/call', '/api/stats', '/api/categories']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -242,6 +246,11 @@ export class ShenshuCore {
         // ─── 代码生成引擎（Lovable gpt-engineer逆向同款）───
         if (path === '/code/gen'     && request.method === 'POST') return handleCodeGen(request, this.env, this.codeEngine);
         if (path === '/code/improve' && request.method === 'POST') return handleCodeImprove(request, this.env, this.codeEngine);
+        // ─── API Hub 路由 ───
+        if (path === '/api/search'     && request.method === 'GET')  return handleAPIHubSearch(request, this.apiHub);
+        if (path === '/api/call'       && request.method === 'POST') return handleAPIHubCall(request, this.apiHub);
+        if (path === '/api/stats'      && request.method === 'GET')  return handleAPIHubStats(request, this.apiHub);
+        if (path === '/api/categories' && request.method === 'GET')  return handleAPIHubCategories(request, this.apiHub);
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);

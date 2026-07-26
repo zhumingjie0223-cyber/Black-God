@@ -1,0 +1,56 @@
+[
+  {
+    "name": "DownStatus",
+    "url": "https://isitdownstatus.com",
+    "category": "Development",
+    "description": "Check if a website is down",
+    "response_time": 0.28,
+    "auth": "No",
+    "https": "Yes"
+  },
+  {
+    "name": "Dictum",
+    "url": "https://github.com/fisenkodv/dictum",
+    "category": "Personality",
+    "description": "Random quotes and sayings",
+    "response_time": 1.23,
+    "auth": "No",
+    "https": "Yes"
+  },
+  {
+    "name": "IMDbOT",
+    "url": "https://github.com/SpEcHiDe/IMDbOT",
+    "category": "Video",
+    "description": "IMDb movie information",
+    "response_time": 1.6,
+    "auth": "No",
+    "https": "Yes"
+  },
+  {
+    "name": "HTTP Dog",
+    "url": "https://http.dog",
+    "category": "Animals",
+    "description": "HTTP status code dogs",
+    "response_time": 2.13,
+    "auth": "No",
+    "https": "Yes"
+  },
+  {
+    "name": "Drupal.org",
+    "url": "https://www.drupal.org/drupalorg/docs/api",
+    "category": "Open Source Projects",
+    "description": "Drupal CMS API",
+    "response_time": 2.15,
+    "auth": "No",
+    "https": "Yes"
+  },
+  {
+    "name": "Helium",
+    "url": "https://docs.helium.com/api/blockchain/introduction/",
+    "category": "Blockchain",
+    "description": "Helium blockchain data",
+    "response_time": 2.22,
+    "auth": "No",
+    "https": "Yes"
+  }
+]
