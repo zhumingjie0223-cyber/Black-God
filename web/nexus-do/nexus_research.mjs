@@ -115,3 +115,60 @@ export class ResearchEngine {
   buildEvidenceAccount(results = []) {
     return results.map((r) => {
       const quote = (r.snippet || "").slice(0, 240);
+      return {
+        claim: r.claim || r.title || "",
+        source: r.url || r.source || "",
+        quote,
+        confidence: typeof r.score === "number"
+          ? Math.max(0, Math.min(1, r.score))
+          : 0.5,
+        timestamp: new Date().toISOString(),
+      };
+    });
+  }
+}
+
+export async function handleResearch(req, env) {
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Invalid JSON body" }),
+      { status: 400, headers: { "content-type": "application/json" } }
+    );
+  }
+
+  const { query, budget, depth } = body || {};
+
+  if (!query || typeof query !== "string" || !query.trim()) {
+    return new Response(
+      JSON.stringify({ error: "Missing or invalid 'query'" }),
+      { status: 400, headers: { "content-type": "application/json" } }
+    );
+  }
+
+  try {
+    const engine = new ResearchEngine(env);
+    const results = await engine.run(query.trim(), {
+      budget: typeof budget === "number" ? budget : undefined,
+      depth: typeof depth === "number" ? depth : undefined,
+    });
+
+    const evidence = engine.buildEvidenceAccount(results);
+
+    return new Response(
+      JSON.stringify({
+        query: query.trim(),
+        count: evidence.length,
+        evidence,
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Research failed", detail: String(err?.message || err) }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
+  }
+}
