@@ -20,9 +20,14 @@
   // —— Durable Object：全球唯一的神枢，SQLite 后端 ——
   "durable_objects": {
     "bindings": [
-      { "name": "SHENSHU", "class_name": "ShenshuCore" }
+      { "name": "SHENSHU", "class_name": "ShenshuCore" },
+      { "name": "AGENT_STATE_MACHINE", "class_name": "AgentStateMachineDO" }
     ]
   },
+  "migrations": [
+    { "tag": "v1", "new_classes": ["ShenshuCore"] },
+    { "tag": "v2", "new_classes": ["AgentStateMachineDO"] }
+  ],
 
   // —— Workers AI：大脑兜底（Llama 3.3 70B）——
   "ai": { "binding": "AI" },

@@ -1297,7 +1297,36 @@ body::before{
   box-shadow:0 0 0 3px var(--cy-glow), var(--ring-glow-sm) !important;
 }
 
-/* ── 卡片入场动画 ── */
+/* ── 气泡入场动效（Claude iOS逆向） ── */
+@keyframes bubble-in-right{
+  from{transform:translate3d(16px,12px,0);opacity:0;}
+  to{transform:translate3d(0,0,0);opacity:1;}
+}
+@keyframes bubble-in-left{
+  from{transform:translate3d(-16px,12px,0);opacity:0;}
+  to{transform:translate3d(0,0,0);opacity:1;}
+}
+.bubble{
+  animation-duration:var(--dur-slow);
+  animation-timing-function:var(--ease-spring);
+  animation-fill-mode:both;
+  will-change:transform,opacity;
+}
+.bubble--user{animation-name:bubble-in-right;}
+.bubble--assistant{animation-name:bubble-in-left;}
+@media(prefers-reduced-motion:reduce){.bubble{animation:none;}}
+
+/* ── 发送按钮三态 ── */
+.send--sending{background:var(--bg-6)!important;cursor:not-allowed;}
+.send--stop{background:var(--err)!important;}
+.send--sending .ic-send,.send--sending .ic-mic{display:none;}
+.send--stop .ic-send,.send--stop .ic-mic{display:none;}
+.send-spinner{display:none;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+.send-stop-icon{display:none;width:12px;height:12px;background:#fff;border-radius:2px;}
+.send--sending .send-spinner{display:block;}
+.send--stop .send-stop-icon{display:block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
 @keyframes rise-in{
   from{ opacity:0; transform:translateY(10px); }
   to{ opacity:1; transform:none; }
@@ -1784,7 +1813,23 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    ============================================================ */
 'use strict';
 
-/* ══ F1: StreamTypewriter（Claude iOS逆向）══ */
+/* ══ F2: 发送按钮三态状态机（ChatGPT Operator逆向）══ */
+let _sendController = null;
+function setSendState(state){
+  const btn=document.getElementById('sendBtn')||document.querySelector('.send');
+  const inp=document.getElementById('inp');
+  if(!btn)return;
+  btn.classList.remove('send--idle','send--sending','send--stop');
+  btn.classList.add('send--'+state);
+  if(inp)inp.disabled=(state==='sending');
+  btn.dataset.state=state;
+}
+function onStopClick(){
+  _sendController?.abort();
+  setSendState('idle');
+}
+
+
 (function injectCursorCSS(){
   if(typeof document==='undefined')return;
   if(document.getElementById('st-cursor-style'))return;
