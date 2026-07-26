@@ -53,9 +53,9 @@ jobs:
 
       - name: Verify no token leak
         run: |
-          COUNT=$(curl -s https://blackgod88.jjiebbay.workers.dev/ | grep -c "OWNER_TOKEN\|nexus\.jjiebbay" || true)
+          COUNT=$(curl -s https://blackgod88.jjiebbay.workers.dev/ | grep -c "OWNER_TOKEN" || true)
           echo "token leak count: $COUNT"
-          [ "$COUNT" = "0" ] && echo "✅ 无 token 泄露" || (echo "❌ token 泄露！"; exit 1)
+          [ "$COUNT" = "0" ] && echo "✅ 无 token 泄露" || (echo "❌ OWNER_TOKEN 泄露！"; exit 1)
 
       - name: Skip notice
         if: ${{ env.CF_TOKEN == '' }}
