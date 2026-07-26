@@ -20,7 +20,8 @@ import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './t
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 
 // ── Durable Object re-exports（wrangler 静态分析要求在入口顶部）──
-export { AgentStateMachineDO } from './nexus_agent_core.mjs';
+import { AgentStateMachineDO } from './nexus_agent_core.mjs';
+export { AgentStateMachineDO };
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
 loadCapabilities(LEXICON_DATA);
