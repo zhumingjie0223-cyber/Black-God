@@ -20,6 +20,10 @@ import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './t
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
 import LEXICON_DATA from './lexicon_data.js';
+
+// ── DO re-export（wrangler 要求入口文件 export 所有 DO class）──
+import { AgentStateMachineDO } from './nexus_agent_core.mjs';
+export { AgentStateMachineDO };
 loadCapabilities(LEXICON_DATA);
 
 const ALARM_INTERVAL_MS = 60_000;   // 每分钟自主醒
