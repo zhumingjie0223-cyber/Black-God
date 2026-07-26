@@ -176,6 +176,40 @@
   --fg-tertiary:oklch(56.8% .032 148);
   --fg-quaternary:oklch(42.6% .028 148);
 }
+/* ══ F1: OKLCH完整color ramp（Lovable逆向） ══ */
+:root{
+  --bg-1:#050807;--bg-2:#070B09;--bg-3:#0A100C;--bg-4:#0E1512;
+  --bg-5:#121B17;--bg-6:#17221D;--bg-7:#1D2A24;--bg-8:#24332C;
+  --fg-11:#ECEFED;--fg-12:#F6F8F7;--fg-9:#C4CEC8;--fg-8:#ABB7B0;
+  --accent-1:#051810;--accent-9:#3BC77E;--accent-10:#5FD394;--accent-11:#8ADFAF;
+}
+@supports(color:oklch(0 0 0)){
+  :root{
+    --bg-1:oklch(0.120 0.010 155);
+    --bg-2:oklch(0.140 0.011 155);
+    --bg-3:oklch(0.132 0.011 155);
+    --bg-4:oklch(0.160 0.012 155);
+    --bg-5:oklch(0.210 0.014 155);
+    --bg-6:oklch(0.235 0.015 155);
+    --bg-7:oklch(0.262 0.016 155);
+    --bg-8:oklch(0.290 0.017 155);
+    --fg-8:oklch(0.735 0.006 155);
+    --fg-9:oklch(0.815 0.005 155);
+    --fg-11:oklch(0.935 0.003 155);
+    --fg-12:oklch(0.975 0.002 155);
+    --accent-9:oklch(0.720 0.178 156);
+    --accent-10:oklch(0.780 0.150 157);
+    --accent-11:oklch(0.855 0.100 158);
+  }
+}
+:root{
+  --bg-scrim:rgba(5,8,7,0.72);
+  --bg-scrim:color-mix(in oklab,var(--bg-1) 72%,transparent);
+  --surface-glass:rgba(14,21,18,0.68);
+  --surface-glass:color-mix(in oklab,var(--bg-4) 68%,transparent);
+  --focus-ring:rgba(59,199,126,0.55);
+  --focus-ring:color-mix(in oklab,var(--accent-9) 55%,transparent);
+}
 html,body{
   height:100%;
   background:var(--bg);
@@ -1749,6 +1783,37 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
 'use strict';
+
+/* ══ F1: StreamTypewriter（Claude iOS逆向）══ */
+(function injectCursorCSS(){
+  if(typeof document==='undefined')return;
+  if(document.getElementById('st-cursor-style'))return;
+  const s=document.createElement('style');
+  s.id='st-cursor-style';
+  s.textContent=`.st-cursor::after{content:'';display:inline-block;width:0.6ch;height:1em;margin-left:1px;vertical-align:-0.15em;background:var(--accent-9,#3BC77E);animation:st-blink 1s steps(1) infinite;}@keyframes st-blink{50%{opacity:0;}}`;
+  (document.head||document.documentElement).appendChild(s);
+})();
+
+class StreamTypewriter{
+  constructor(el,opts={}){
+    this.el=typeof el==='string'?document.querySelector(el):el;
+    if(this.el==null)throw new Error('StreamTypewriter: target element not found');
+    this.queue=[];this.buffer='';this._timer=null;this._ended=false;
+    this.aborted=false;this.done=false;
+    this.interval=opts.minDelay||16;
+    this.charsPerTick=opts.charsPerTick||1;
+    this.onChar=opts.onChar;this.onComplete=opts.onComplete;
+    this.el.classList.add(opts.cursorClass||'st-cursor');
+  }
+  push(token){if(this.aborted||this.done)return;if(Array.isArray(token))this.queue.push(...token);else if(token!=null)this.queue.push(String(token));this._schedule();return this;}
+  _schedule(){if(this._timer!=null||this.aborted||this.done||this.queue.length===0)return;this._timer=setTimeout(()=>{this._timer=null;this._tick();},this.interval);}
+  _tick(){if(this.aborted)return;let emitted='';for(let i=0;i<this.charsPerTick&&this.queue.length>0;i++)emitted+=this.queue.shift();if(emitted){this.buffer+=emitted;this.el.textContent=this.buffer;if(typeof this.onChar==='function')this.onChar(emitted);}if(this.queue.length>0)this._schedule();else if(this._ended)this._finish();}
+  abort(){if(this.aborted)return;this.aborted=true;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}this.queue.length=0;return this;}
+  flush(){if(this.aborted||this.done)return this.buffer;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}if(this.queue.length>0){this.buffer+=this.queue.join('');this.queue.length=0;this.el.textContent=this.buffer;}if(this._ended)this._finish();return this.buffer;}
+  end(){if(this.aborted||this.done)return;this._ended=true;if(this.queue.length===0&&this._timer==null)this._finish();else this._schedule();return this;}
+  _finish(){if(this.done)return;this.done=true;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}this.el.classList.remove('st-cursor');if(typeof this.onComplete==='function')this.onComplete(this.buffer);}
+}
+
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
