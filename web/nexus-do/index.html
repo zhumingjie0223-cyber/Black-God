@@ -3323,9 +3323,9 @@ function fmtTs(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLoc
 /* ============ 模型 / API / 人格 ============ */
 const MODELS = [
   {id:'auto',      name:'Auto · 智能路由',           ic:'✨', sub:'按任务选当前最强可用算力'},
-  {id:'fable-5',   name:'Fable 5 · 旗舰',           ic:'🔥', sub:'aquan.love · 最强推理', gw:'https://aquan.love/v1', model:'claude-fable-5'},
-  {id:'opus-5',    name:'Claude Opus 5 · 顶级',      ic:'💎', sub:'aquan.love · 旗舰创作', gw:'https://aquan.love/v1', model:'claude-opus-5'},
-  {id:'opus-4-8',  name:'Claude Opus 4.8 · 强力',   ic:'⚡', sub:'aquan.love · 均衡首选', gw:'https://aquan.love/v1', model:'claude-opus-4-8'},
+  {id:'fable-5',   name:'Fable 5 · 旗舰',           ic:'🔥', sub:'接入 aquan.love，模型名：claude-fable-5', model:'claude-fable-5'},
+  {id:'opus-5',    name:'Claude Opus 5 · 顶级',      ic:'💎', sub:'接入 aquan.love，模型名：claude-opus-5', model:'claude-opus-5'},
+  {id:'opus-4-8',  name:'Claude Opus 4.8 · 强力',   ic:'⚡', sub:'接入 aquan.love，模型名：claude-opus-4-8', model:'claude-opus-4-8'},
   {id:'strong',    name:'强算力网关',                 ic:'🔌', sub:'外接自定义网关（需在接口里配）'},
   {id:'cf-qwen',   name:'Qwen2.5 Coder 7B · 免费',  ic:'🟠', sub:'CF Workers AI · 代码首选', cfModel:'@cf/qwen/qwen2.5-coder-7b-instruct'},
   {id:'cf-llama',  name:'Llama 3.1 8B · 免费',      ic:'🦙', sub:'CF Workers AI · 通用对话', cfModel:'@cf/meta/llama-3.1-8b-instruct'},
@@ -3340,15 +3340,11 @@ function pickModel(id){
   store.set('model',id);
   const m=MODELS.find(x=>x.id===id);
   $('#modelLabel').textContent=m?m.name:id;
-  // aquan.love 模型：自动填网关
-  if(m && m.gw){
-    store.set('api_base', m.gw);
-    store.set('api_model', m.model);
-    $('#apiBase') && ($('#apiBase').value = m.gw);
-    $('#apiModel') && ($('#apiModel').value = m.model);
-    $('#apiLabel') && ($('#apiLabel').textContent = m.name);
+  // aquan.love 模型：toast 提示模型名
+  if(m && m.model && m.model.startsWith('claude-')){
+    toast('模型：'+m.model+' · 需在接口设置里配 aquan.love');
   }
-  // CF AI 内置模型：填 /cf-ai
+  // CF AI 内置模型：自动填 /cf-ai
   if(m && m.cfModel){
     store.set('api_base', '/cf-ai');
     store.set('api_model', m.cfModel);
