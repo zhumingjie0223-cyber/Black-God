@@ -3969,5 +3969,118 @@ function bootOwner(){
   };
 })();
 </script>
+
+<script>
+/* BG Wiring Layer v1 */
+function initWiring() {
+  if (window.__bgWired) return;
+  window.__bgWired = true;
+
+  // 白名单动作注册表（P0-2）
+  window.__bgActions = window.__bgActions || {};
+
+  // 工具函数：派发 bg: 命名空间事件
+  window.dispatchBgEvent = function (type, detail) {
+    window.dispatchEvent(new CustomEvent('bg:' + type, { detail: detail || {} }));
+  };
+
+  // 1. 代码块复制按钮 —— 事件委托，不依赖DOM加载时机
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest?.('.cp-btn');
+    if (!btn) return;
+    const code = btn.closest('.codeblk')?.querySelector('code')?.textContent;
+    if (!code) return;
+    const done = () => {
+      // P1-1: 用 dataset.label 存原文，clearTimeout 防竞态
+      if (btn.dataset.label == null) {
+        btn.dataset.label = btn.textContent || 'Copy';
+      }
+      if (btn.__cpTimer) clearTimeout(btn.__cpTimer);
+      btn.textContent = '✓';
+      btn.__cpTimer = setTimeout(() => {
+        btn.textContent = btn.dataset.label || 'Copy';
+        delete btn.dataset.label;
+        btn.__cpTimer = null;
+      }, 1500);
+      window.toast?.('代码已复制', 'success');
+      window.haptic?.('light');
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(() => {
+        window.toast?.('复制失败', 'error');
+      });
+    } else {
+      window.toast?.('复制失败', 'error');
+    }
+  });
+
+  // 2. 事件总线：完成
+  window.addEventListener('bg:done', function () {
+    window.setProgress?.(1);
+    window.haptic?.('done');
+    window.setSendState?.('idle');
+    window.toast?.('已完成', 'success');
+  });
+
+  // 2. 事件总线：错误
+  window.addEventListener('bg:error', function (e) {
+    window.setProgress?.(null);
+    window.haptic?.('error');
+    window.setSendState?.('idle');
+    window.toast?.(e.detail?.msg || '请求失败', 'error');
+  });
+
+  // 2. 事件总线：步骤流
+  window.addEventListener('bg:step', function (e) {
+    const el = document.querySelector('#execLog');
+    if (el) window.renderStepFlow?.(el, e.detail?.steps || []);
+  });
+
+  // 2. 事件总线：进度
+  window.addEventListener('bg:progress', function (e) {
+    window.setProgress?.(e.detail?.v);
+  });
+
+  // 3. AI消息内容：流结束时对指定气泡做一次 md() 渲染
+  window.addEventListener('bg:content', function (e) {
+    const { id, raw, done } = e.detail || {};
+    if (!done) return;
+    let bubble;
+    if (id) {
+      bubble = document.querySelector(`.bubble.assistant[data-id="${id}"]`);
+    } else {
+      // P0-1: 取最后一个 .bubble.assistant
+      const list = document.querySelectorAll('.bubble.assistant');
+      bubble = list[list.length - 1];
+    }
+    if (!bubble) return;
+    const text = raw ?? bubble.dataset.raw;
+    if (!text) return;
+    bubble.dataset.raw = text;
+    delete bubble.dataset.streaming;
+    if (window.md) bubble.innerHTML = window.md(text);
+  });
+
+  // 4. 内联 onclick 替代 —— 事件委托 + 白名单注册表（P0-2）
+  document.addEventListener('click', function (ev) {
+    const el = ev.target.closest?.('[data-bg-action]');
+    if (!el) return;
+    const name = el.dataset.bgAction;
+    if (!Object.prototype.hasOwnProperty.call(window.__bgActions, name)) return;
+    const fn = window.__bgActions[name];
+    if (typeof fn !== 'function') return;
+    ev.preventDefault();
+    try {
+      fn.call(el, ev);
+    } catch (err) {
+      console.error('[bgAction] "' + name + '" 执行失败:', err);
+      window.toast?.('操作失败', 'error');
+    }
+  });
+}
+
+initWiring();
+
+</script>
 </body>
 </html>
