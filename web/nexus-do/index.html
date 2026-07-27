@@ -3322,19 +3322,48 @@ function fmtTs(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLoc
 
 /* ============ 模型 / API / 人格 ============ */
 const MODELS = [
-  {id:'auto', name:'Auto · 智能路由', ic:'✨', sub:'按任务选当前最强可用算力'},
-  {id:'strong', name:'强算力网关', ic:'⚡', sub:'外接 4.8 / Fable5 级（需在接口里配）'},
-  {id:'cf-llama', name:'CF Llama 3.3 70B', ic:'🦙', sub:'Cloudflare 内置 · 免费 · 兜底'},
+  {id:'auto',      name:'Auto · 智能路由',           ic:'✨', sub:'按任务选当前最强可用算力'},
+  {id:'fable-5',   name:'Fable 5 · 旗舰',           ic:'🔥', sub:'aquan.love · 最强推理', gw:'https://aquan.love/v1', model:'claude-fable-5'},
+  {id:'opus-5',    name:'Claude Opus 5 · 顶级',      ic:'💎', sub:'aquan.love · 旗舰创作', gw:'https://aquan.love/v1', model:'claude-opus-5'},
+  {id:'opus-4-8',  name:'Claude Opus 4.8 · 强力',   ic:'⚡', sub:'aquan.love · 均衡首选', gw:'https://aquan.love/v1', model:'claude-opus-4-8'},
+  {id:'strong',    name:'强算力网关',                 ic:'🔌', sub:'外接自定义网关（需在接口里配）'},
+  {id:'cf-qwen',   name:'Qwen2.5 Coder 7B · 免费',  ic:'🟠', sub:'CF Workers AI · 代码首选', cfModel:'@cf/qwen/qwen2.5-coder-7b-instruct'},
+  {id:'cf-llama',  name:'Llama 3.1 8B · 免费',      ic:'🦙', sub:'CF Workers AI · 通用对话', cfModel:'@cf/meta/llama-3.1-8b-instruct'},
+  {id:'cf-mistral',name:'Mistral 7B · 免费',         ic:'🌀', sub:'CF Workers AI · 轻量快速', cfModel:'@cf/mistral/mistral-7b-instruct-v0.2'},
 ];
 function renderModelOpts(){
   const sel = store.get('model')||'auto';
   $('#modelOpts').innerHTML = MODELS.map(m=>`<div class="opt-row ${m.id===sel?'sel':''}" onclick="pickModel('${m.id}')">
     <div class="oi">${m.ic}</div><div class="ot"><b>${m.name}</b><span>${m.sub}</span></div><div class="opt-check">✓</div></div>`).join('');
 }
-function pickModel(id){ store.set('model',id); const m=MODELS.find(x=>x.id===id); $('#modelLabel').textContent=m?m.name:id; renderModelOpts(); toast('已选：'+(m?m.name:id)); }
+function pickModel(id){
+  store.set('model',id);
+  const m=MODELS.find(x=>x.id===id);
+  $('#modelLabel').textContent=m?m.name:id;
+  // aquan.love 模型：自动填网关
+  if(m && m.gw){
+    store.set('api_base', m.gw);
+    store.set('api_model', m.model);
+    $('#apiBase') && ($('#apiBase').value = m.gw);
+    $('#apiModel') && ($('#apiModel').value = m.model);
+    $('#apiLabel') && ($('#apiLabel').textContent = m.name);
+  }
+  // CF AI 内置模型：填 /cf-ai
+  if(m && m.cfModel){
+    store.set('api_base', '/cf-ai');
+    store.set('api_model', m.cfModel);
+    $('#apiBase') && ($('#apiBase').value = '/cf-ai');
+    $('#apiModel') && ($('#apiModel').value = m.cfModel);
+    $('#apiKey') && ($('#apiKey').value = 'CF_INTERNAL');
+    $('#apiLabel') && ($('#apiLabel').textContent = m.name);
+  }
+  renderModelOpts();
+  toast('已选：'+(m?m.name:id));
+}
 
 /* ===== 厂商接入（Minis 式：每家独立入口）===== */
 const PROVIDERS = [
+  {id:'aquan',     name:'aquan.love · 中转',    ic:'🔥', oauth:false, sub:'Fable5 / Opus5 中转站', gw:'https://aquan.love/v1', model:'claude-fable-5', provider:'openai', keyUrl:'https://aquan.love'},
   {id:'anthropic', name:'Anthropic (Claude)', ic:'🟣', oauth:true, canKey:true, sub:'填 key 接入（推荐）· 或一键登录', gw:'https://api.anthropic.com', model:'claude-sonnet-5', provider:'anthropic', keyUrl:'https://console.anthropic.com/settings/keys'},
   {id:'openrouter',name:'OpenRouter',         ic:'🔗', oauth:true,  sub:'一键登录 · 一号通全厂'},
   {id:'openai',    name:'OpenAI (ChatGPT)',   ic:'🟢', oauth:false, sub:'填 key 接入', gw:'https://api.openai.com/v1', model:'gpt-4o', provider:'openai', keyUrl:'https://platform.openai.com/api-keys'},
