@@ -4082,5 +4082,116 @@ function initWiring() {
 initWiring();
 
 </script>
+<script>/* BG Patch Layer v3 */
+function patchSendFlow(){
+  if(window.__sendPatched) return;
+
+  // P1: 先校验三个函数存在，不存在不设标记不 patch
+  if (typeof window.send !== 'function' ||
+      typeof window.handleReply !== 'function' ||
+      typeof window.typeInto !== 'function') {
+    return;
+  }
+
+  window.__sendPatched = true;
+
+  // P1: 保存原函数以便还原
+  const _send = window.__origSend = window.send;
+  const _handleReply = window.__origHandleReply = window.handleReply;
+  const _typeInto = window.__origTypeInto = window.typeInto;
+
+  // patch send()
+  window.send = async function(){
+    window.setSendState?.('sending');
+    window.setProgress?.(0);
+    window.haptic?.('send');
+    let failed = false;
+    try {
+      const r = await _send.apply(this, arguments);
+      window.haptic?.('done');
+      // P4-1: 成功态先满格，300ms 后再归零（不被 finally 抢先清掉）
+      window.setProgress?.(1);
+      setTimeout(() => { window.setProgress?.(0); }, 300);
+      return r;
+    } catch(e){
+      failed = true;
+      window.haptic?.('error');
+      window.toast?.('发送失败','error');
+      // P4-1: 失败分支归零
+      window.setProgress?.(0);
+      // P4-2: 失败分支不会走到 handleReply/typeInto，这里必须解锁
+      window.setSendState?.('idle');
+      throw e;
+    } finally {
+      // P4-1: 只有失败路径才在 finally 归零，成功态交给 300ms 延时
+      if (failed) window.setProgress?.(0);
+    }
+  };
+
+  // patch handleReply()
+  window.handleReply = function(res){
+    const r = _handleReply.apply(this, arguments);
+
+    // P2: reply 用 (res?.reply || '…在呢。')
+    const reply = (res?.reply || '…在呢。');
+
+    // P2: 取最后一条 her 气泡，无兜底
+    const bubbles = document.querySelectorAll('.msg.her .bubble');
+    const el = bubbles[bubbles.length - 1];
+    const id = el && el.dataset ? el.dataset.id : undefined;
+
+    window.dispatchBgEvent?.('content', { text: reply, id });
+    if (res && res.steps) window.dispatchBgEvent?.('step', { steps: res.steps });
+
+    // P2: finish 用 rAF 延迟执行避免时序问题；处理返回 Promise 的情况
+    const finish = () => {
+      requestAnimationFrame(() => {
+        // P4-3: 打字机进行中则不抢跑，交给 typeInto 结束时统一置 idle
+        if (!window.__typing) window.setSendState?.('idle');
+      });
+    };
+    if (r && typeof r.then === 'function') {
+      r.then(finish, finish);
+    } else {
+      finish();
+    }
+
+    return r;
+  };
+
+  // patch typeInto()
+  window.typeInto = function(bubble, text, done){
+    // P4-3: 打字机开始，占用 idle 归属权
+    window.__typing = true;
+
+    const wrapped = function(){
+      // P3: done 幂等
+      if (wrapped.__done) return;
+      wrapped.__done = true;
+      try {
+        const html = window.md?.(text);
+        // P3: if(html) 不是 if(html != null)
+        if (html) bubble.innerHTML = html;
+      } catch(_){}
+      done && done();
+      // P4-3: 打字机结束，先清标志再置 idle
+      window.__typing = false;
+      window.setSendState?.('idle');
+    };
+
+    try {
+      return _typeInto.call(this, bubble, text, wrapped);
+    } catch(e){
+      // 同步抛错时也要释放标志与状态，避免永久卡 sending
+      window.__typing = false;
+      window.setSendState?.('idle');
+      throw e;
+    }
+  };
+}
+
+patchSendFlow();
+initWiring();
+</script>
 </body>
 </html>
