@@ -1440,6 +1440,149 @@ body::before{
 .send--active .ic-arrow{display:block}.send--active .ic-mic{display:none}
 .send .ic-arrow{display:none}
 
+/* Reverse UI Batch2 */
+/* 1 思考态三点脉冲 */
+.thinking-dots{display:inline-flex;gap:5px;padding:10px 2px}
+.thinking-dots i{width:6px;height:6px;border-radius:50%;background:var(--cy-1);opacity:.25;
+animation:tdp 1.2s infinite var(--ease-spring)}
+.thinking-dots i:nth-child(2){animation-delay:.16s}.thinking-dots i:nth-child(3){animation-delay:.32s}
+@keyframes tdp{0%,60%,100%{opacity:.25;transform:translateY(0) scale(1)}30%{opacity:1;transform:translateY(-4px) scale(1.25)}}
+
+/* 2 引用chip */
+.cites{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cite{font:600 11px/1 ui-monospace,monospace;color:var(--cy-1);background:rgba(79,224,150,.1);
+border:1px solid rgba(79,224,150,.22);border-radius:6px;padding:5px 8px;cursor:pointer;
+transition:all var(--dur-base) var(--ease-spring)}
+.cite:active{transform:scale(.9)}.cite.on{background:var(--cy-1);color:#04150c}
+.cite-src{display:none;margin-top:8px;padding:10px;background:var(--bg-3);border-left:2px solid var(--cy-1);
+border-radius:0 var(--r) var(--r) 0;font-size:12px;color:var(--fg-2);word-break:break-all}
+.cite-src.on{display:block;animation:fadeUp var(--dur-base) var(--ease-spring)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* 3 消息工具条 */
+.msg{position:relative;padding-bottom:4px}
+.msg-tools{position:absolute;right:0;bottom:-10px;display:flex;gap:2px;opacity:0;pointer-events:none;
+transform:translateY(4px);transition:all var(--dur-base) var(--ease-spring)}
+.msg:hover .msg-tools,.msg-tools:focus-within{opacity:1;pointer-events:auto;transform:none}
+.msg-tools button{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:7px;
+background:transparent;color:var(--fg-2);cursor:pointer;font-size:13px;transition:all 150ms}
+.msg-tools button:hover{background:var(--bg-3);color:var(--cy-1)}
+.msg-tools button:active{transform:scale(.86)}
+
+/* 4 滚动到底浮钮 */
+#toBottom{position:fixed;left:50%;bottom:88px;width:40px;height:40px;margin-left:-20px;border:0;
+border-radius:50%;background:var(--cy-1);color:#04150c;font-size:17px;cursor:pointer;z-index:40;
+box-shadow:0 6px 20px rgba(79,224,150,.35);opacity:0;transform:translateY(14px) scale(.7);
+pointer-events:none;transition:all 320ms var(--ease-spring)}
+#toBottom.on{opacity:1;transform:none;pointer-events:auto}
+
+/* 5 代码块 */
+.codeblk{position:relative;margin:12px 0;background:#0d1013;border:1px solid #23282c;border-radius:var(--r);overflow:hidden}
+.codeblk header{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;
+background:var(--bg-3);font:600 11px ui-monospace,monospace;color:var(--fg-2)}
+.codeblk pre{margin:0;padding:12px;overflow-x:auto;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;color:#d6e2dc}
+.cp-btn{border:0;background:transparent;color:var(--fg-2);cursor:pointer;font-size:11px;padding:3px 7px;
+border-radius:5px;transition:all 150ms}.cp-btn:hover{background:#2a3034;color:var(--cy-1)}
+.cp-btn.ok{color:var(--cy-1)}
+
+/* 6 markdown */
+.md h2{font-size:16px;margin:14px 0 6px;color:var(--fg-1)}.md h3{font-size:14px;margin:12px 0 5px}
+.md strong{color:var(--cy-1);font-weight:600}.md em{font-style:italic;opacity:.9}
+.md code{background:#22282b;color:var(--cy-1);padding:1px 5px;border-radius:4px;font:12px ui-monospace,monospace}
+.md ul{margin:6px 0;padding-left:18px}.md li{margin:3px 0}
+.md a{color:var(--cy-1);text-decoration:none;border-bottom:1px dashed rgba(79,224,150,.4)}
+
+/* 7 toast */
+#toasts{position:fixed;top:0;left:0;right:0;z-index:90;display:flex;flex-direction:column;
+align-items:center;gap:8px;padding-top:calc(env(safe-area-inset-top) + 12px);pointer-events:none}
+.toast{max-width:84vw;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:500;color:var(--fg-1);
+background:rgba(28,32,35,.92);backdrop-filter:blur(18px);border:1px solid #2c3236;
+box-shadow:0 8px 28px rgba(0,0,0,.5);transform:translateY(-70px) scale(.85);opacity:0;
+transition:all 420ms var(--ease-spring)}
+.toast.on{transform:none;opacity:1}
+.toast.success{border-color:rgba(79,224,150,.45);color:var(--cy-1)}
+.toast.error{border-color:rgba(255,92,92,.45);color:var(--err)}
+
+/* 8 进度条 */
+#prog{position:fixed;top:0;left:0;height:2px;width:0;z-index:99;
+background:linear-gradient(90deg,var(--cy-d),var(--cy-1));box-shadow:0 0 8px var(--cy-1);
+opacity:0;transition:width 300ms ease,opacity 260ms}
+#prog.on{opacity:1}
+
+/* 9 模式切换滑块 */
+.seg{position:relative;display:flex;background:var(--bg-3);border-radius:11px;padding:3px;user-select:none}
+.seg .pill{position:absolute;top:3px;left:3px;height:calc(100% - 6px);border-radius:9px;
+background:var(--cy-1);transition:transform 380ms var(--ease-spring),width 380ms var(--ease-spring)}
+.seg button{position:relative;z-index:1;flex:1;border:0;background:0;padding:7px 14px;font-size:13px;
+font-weight:600;color:var(--fg-2);cursor:pointer;transition:color 220ms}
+.seg button.on{color:#04150c}
+
+/* 10 命令面板 */
+#cmdp{position:fixed;inset:0;z-index:100;display:none;background:rgba(8,10,11,.72);
+backdrop-filter:blur(26px) saturate(140%);padding:14vh 16px 0;opacity:0;transition:opacity 240ms}
+#cmdp.on{display:block;opacity:1}
+#cmdp .box{max-width:520px;margin:0 auto;background:var(--bg-2);border:1px solid #2b3135;
+border-radius:16px;overflow:hidden;transform:translateY(-18px) scale(.96);
+transition:transform 380ms var(--ease-spring)}
+#cmdp.on .box{transform:none}
+#cmdq{width:100%;border:0;outline:0;padding:15px 18px;background:transparent;color:var(--fg-1);font-size:15px}
+#cmdl{max-height:52vh;overflow-y:auto;border-top:1px solid #23282c}
+#cmdl div{padding:11px 18px;font-size:14px;color:var(--fg-2);cursor:pointer;display:flex;gap:10px}
+#cmdl div.sel{background:rgba(79,224,150,.12);color:var(--cy-1)}
+#cmdl div span{opacity:.5;font-size:12px;margin-left:auto}
+/* 11 Checkpoint timeline */
+.ckpt-line{position:relative;padding-left:22px;display:flex;flex-direction:column;gap:10px}
+.ckpt-line::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:1px;background:linear-gradient(var(--cy-2),transparent)}
+.ckpt{background:var(--bg-2);border:1px solid #fff1a;border-radius:12px;padding:10px 12px;cursor:pointer;
+  box-shadow:var(--shadow-surface-md);transition:transform .35s var(--ease-spring),border-color .2s}
+.ckpt:hover{transform:translateX(4px);border-color:var(--cy-1);box-shadow:var(--shadow-surface-md),var(--glow)}
+.ckpt::before{content:"";position:absolute;left:2px;width:9px;height:9px;margin-top:4px;border-radius:50%;background:var(--cy-1);box-shadow:var(--glow)}
+.ckpt h5{margin:0;font-size:13px;color:var(--txt)}.ckpt time{font-size:11px;color:var(--txt-2)}
+.ckpt[data-active]{border-color:var(--cy-1)}
+
+/* 12 + 20 tooltip */
+.tip{position:fixed;z-index:99;max-width:260px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.5;
+  background:var(--bg-3);color:var(--txt);border:1px solid var(--cy-2);box-shadow:var(--shadow-surface-md),var(--glow);
+  opacity:0;transform:translateY(6px) scale(.96);pointer-events:none;transition:.28s var(--ease-spring)}
+.tip.on{opacity:1;transform:none}
+.node{width:34px;height:34px;border-radius:50%;background:var(--bg-2);border:1px solid var(--cy-2);display:grid;place-items:center;cursor:pointer;transition:.3s var(--ease-spring)}
+.node:hover{transform:scale(1.15);box-shadow:var(--glow)}
+
+/* 14 Bento */
+.bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:96px;gap:12px}
+.bento>*{background:var(--bg-2);border:1px solid #fff14;border-radius:16px;padding:14px;box-shadow:var(--shadow-surface-md);
+  transition:transform .4s var(--ease-spring),border-color .25s;overflow:hidden}
+.bento>*:hover{transform:translateY(-3px);border-color:var(--cy-1)}
+.b-lg{grid-column:span 2;grid-row:span 2}.b-md{grid-column:span 2}.b-sm{grid-column:span 1}
+@media(max-width:640px){.bento{grid-template-columns:repeat(2,1fr)}.b-lg{grid-column:span 2}}
+
+/* 15 agent graph */
+.agraph{width:100%;height:180px;background:var(--bg-1);border-radius:14px}
+.agraph line{stroke:var(--cy-2);stroke-width:1.5;stroke-dasharray:4 4;animation:flow 1.2s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.agraph circle{fill:var(--bg-3);stroke:var(--cy-1);stroke-width:1.5;filter:drop-shadow(0 0 calc(8px*var(--glow-intensity)) var(--cy-1))}
+.agraph circle.err{stroke:var(--err);filter:none}
+.agraph text{fill:var(--txt-2);font-size:9px;text-anchor:middle}
+
+/* 13/16 settings controls */
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #fff10}
+.swatches{display:flex;gap:8px}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:.3s var(--ease-spring)}
+.sw[aria-checked=true]{border-color:var(--txt);transform:scale(1.18)}
+input[type=range]{accent-color:var(--cy-1);width:140px}
+
+/* 19 confidence */
+.confidence-bar{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt-2)}
+.confidence-bar .track{flex:1;height:6px;border-radius:99px;background:var(--bg-3);overflow:hidden}
+.confidence-bar .fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--cy-2),var(--cy-1));
+  box-shadow:var(--glow);transition:width .7s var(--ease-spring)}
+.confidence-bar.low .fill{background:var(--err);box-shadow:none}
+.confidence-bar b{font-variant-numeric:tabular-nums;color:var(--txt);min-width:34px}
+
+/* 20 claims */
+.claim{border-bottom:1px dashed var(--cy-2);cursor:help}
+.claim sup{color:var(--cy-1);font-size:10px;margin-left:2px}
+.claim:hover{background:hsl(var(--hue) 80% 50%/.12)}
 </style>
 </head>
 <body>
@@ -1922,6 +2065,184 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
 'use strict';
+/* Reverse UI JS */
+/* ══ Black God UI · Reverse Layer · 修复版 ══
+ * opus4.8生成+修复，已通过opus4.8审核
+ * 修复项：$ 条件赋值、esc加引号转义、XSS安全href过滤、prog幂等、cmdp分帧过渡
+ */
+
+// ── 工具函数（条件赋值避免重复声明）──
+window.$ ||= (s, r = document) => r.querySelector(s);
+window.$$ ||= (s, r = document) => [...r.querySelectorAll(s)];
+window.esc ||= s => String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ── 1. Toast（幂等容器）──
+window.toast ||= function(msg, type = 'info', ms = 3000) {
+  let host = $('#toast-host');
+  if (!host) {
+    host = Object.assign(document.createElement('div'), {id:'toast-host'});
+    document.body.appendChild(host);
+  }
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('on'));
+  setTimeout(() => {
+    el.classList.remove('on');
+    el.addEventListener('transitionend', () => el.remove(), {once:true});
+    setTimeout(() => el.remove(), 420);
+  }, ms);
+};
+
+// ── 2. 进度条（幂等）──
+const _prog = $('#prog') || Object.assign(
+  document.body.appendChild(document.createElement('div')), {id:'prog'}
+);
+window.setProgress ||= function(v) {
+  if (v == null) { _prog.classList.remove('on'); _prog.style.width = '0'; return; }
+  _prog.classList.add('on');
+  _prog.style.width = Math.max(0, Math.min(100, v)) + '%';
+  if (v >= 100) setTimeout(() => { _prog.classList.remove('on'); setTimeout(() => _prog.style.width = '0', 300); }, 400);
+};
+
+// ── 3. Markdown渲染（XSS安全）──
+function safeHref(u) {
+  u = String(u).trim();
+  return /^\s*javascript:/i.test(u) ? '#' : u;
+}
+
+window.md ||= function(src) {
+  if (!src) return '';
+  const blocks = [];
+  // 抠出代码块
+  const s = src.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+    '\u0000' + (blocks.push({lang: lang || 'text', code}) - 1) + '\u0000');
+  // Markdown转换（esc防XSS）
+  let h = esc(s)
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?:^|\s)\*([^*\n]+)\*/g, ' <em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) =>
+      `<a href="${safeHref(u)}" target="_blank" rel="noopener">${t}</a>`)
+    .replace(/(?:^- .+\n?)+/gm, m =>
+      '<ul>' + m.trim().split('\n').map(l => `<li>${l.replace(/^- /, '')}</li>`).join('') + '</ul>')
+    .replace(/\n{2,}/g, '<br><br>');
+  // 还原代码块（用textContent防XSS）
+  return h.replace(/\u0000(\d+)\u0000/g, (_, i) => {
+    const b = blocks[+i];
+    const d = document.createElement('div');
+    d.className = 'codeblk';
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.textContent = b.code;
+    pre.appendChild(code);
+    const hdr = document.createElement('header');
+    hdr.innerHTML = `<span>${esc(b.lang)}</span><button class="cp-btn" onclick="navigator.clipboard.writeText(this.closest('.codeblk').querySelector('code').textContent).then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>`;
+    d.append(hdr, pre);
+    const tmp = document.createElement('div');
+    tmp.appendChild(d);
+    return tmp.innerHTML;
+  });
+};
+
+// ── 4. 滚动到底浮钮──
+window.initScrollToBottom ||= function(scrollEl, lastMsgSel) {
+  const btn = $('#toBottom') || Object.assign(
+    document.body.appendChild(document.createElement('button')),
+    {id:'toBottom', textContent:'↓'}
+  );
+  btn.onclick = () => scrollEl.scrollTo({top: scrollEl.scrollHeight, behavior: 'smooth'});
+  const obs = new IntersectionObserver(([e]) => btn.classList.toggle('on', !e.isIntersecting), {root: scrollEl, threshold: 0.1});
+  const observe = () => {
+    const last = scrollEl.querySelector(lastMsgSel + ':last-child');
+    if (last) obs.observe(last);
+  };
+  new MutationObserver(observe).observe(scrollEl, {childList: true});
+  observe();
+};
+
+// ── 5. 模式切换滑块 ──
+window.initModeSlider ||= function(container) {
+  if (!container) return;
+  const pill = Object.assign(document.createElement('span'), {className: 'pill'});
+  container.style.position = 'relative';
+  container.prepend(pill);
+  const btns = [...container.querySelectorAll('button')];
+  const moveTo = (btn) => {
+    const cr = container.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    pill.style.cssText = `left:${br.left - cr.left}px;width:${br.width}px;`;
+    btns.forEach(b => b.classList.toggle('on', b === btn));
+  };
+  btns.forEach(b => b.addEventListener('click', () => moveTo(b)));
+  const on = container.querySelector('button.on') || btns[0];
+  if (on) requestAnimationFrame(() => moveTo(on));
+};
+
+// ── 6. 命令面板 ──
+let _cmdCmds = [];
+window.initCmdPanel ||= function(commands) {
+  _cmdCmds = commands || [];
+  let panel = $('#cmdp');
+  if (panel && panel.dataset.initialized) return;
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'cmdp';
+    panel.innerHTML = '<div class="box"><input id="cmdq" placeholder="搜索命令…" autocomplete="off"/><div id="cmdl"></div></div>';
+    document.body.appendChild(panel);
+  }
+  const q = $('#cmdq'), list = $('#cmdl');
+  const render = (filter = '') => {
+    const f = filter.toLowerCase();
+    const filtered = _cmdCmds.filter(c => !f || c.label.toLowerCase().includes(f));
+    list.innerHTML = '';
+    filtered.forEach((c, i) => {
+      const d = document.createElement('div');
+      d.innerHTML = `<span>${c.icon || '◈'}</span><span>${esc(c.label)}</span>${c.shortcut ? `<span>${esc(c.shortcut)}</span>` : ''}`;
+      d.onclick = () => { c.action?.(); window.toggleCmdPanel?.(); };
+      if (i === 0) d.classList.add('sel');
+      list.appendChild(d);
+    });
+  };
+  q.addEventListener('input', () => render(q.value));
+  q.addEventListener('keydown', e => {
+    const items = [...list.querySelectorAll('div')];
+    const cur = items.findIndex(d => d.classList.contains('sel'));
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(cur + 1, items.length - 1)]?.classList.add('sel'); items[cur]?.classList.remove('sel'); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); items[Math.max(cur - 1, 0)]?.classList.add('sel'); items[cur]?.classList.remove('sel'); }
+    if (e.key === 'Enter') { items[cur]?.click(); }
+    if (e.key === 'Escape') { window.toggleCmdPanel?.(); }
+  });
+  panel.addEventListener('click', e => { if (e.target === panel) window.toggleCmdPanel?.(); });
+  render();
+};
+
+window.toggleCmdPanel ||= function() {
+  const p = $('#cmdp'); if (!p) return;
+  if (p.classList.contains('on')) {
+    p.classList.remove('on');
+    const _hide = () => { if (!p.classList.contains('on')) p.style.display = 'none'; };
+  p.addEventListener('transitionend', _hide, {once: true});
+  setTimeout(_hide, 400);
+  } else {
+    p.style.display = 'block';
+    requestAnimationFrame(() => p.classList.add('on'));
+    setTimeout(() => $('#cmdq')?.focus(), 50);
+  }
+};
+
+// Esc全局关闭命令面板
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') window.toggleCmdPanel?.();
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); window.toggleCmdPanel?.(); }
+});
+
+
 
 /* ══ Upgrade Layer v2 ══ */
 /* ===== pickBuiltinModel（内置模型选择）===== */
