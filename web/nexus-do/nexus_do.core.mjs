@@ -860,7 +860,7 @@ export class ShenshuCore {
       this.broadcast({ type: 'summon', summoned, ts: now });
     }
 
-    return { reply, soul: pub, shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness, model: brainResult.model, summoned };
+    return { reply, soul: pub, shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness, model: brainResult.model, summoned, ...(brainResult.tool_log && brainResult.tool_log.length ? { steps: brainResult.tool_log.map(s => ({ name: s.name, status: s.status, ms: s.ms })) } : {}), ...(brainResult.agent_steps ? { agent_steps: brainResult.agent_steps } : {}) };
   }
 
   // ═══════════════════════ 枢语坐标演算 ═══════════════════════
