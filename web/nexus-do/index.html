@@ -3211,5 +3211,51 @@ function bootOwner(){
   if(!store.get('onboarded')) showOnboarding();
 }
 </script>
+<!-- 服务条款弹窗（公开版合规）-->
+<style>
+#tosMask{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;z-index:9999;padding:20px}
+#tosMask.show{display:flex}
+#tosBox{max-width:520px;width:100%;background:#14201a;color:#e6e6e6;border:1px solid var(--line-2);
+  border-radius:18px;padding:28px 24px;font-size:14px;line-height:1.7;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#tosBox h3{margin:0 0 14px;font-size:17px;font-weight:600;color:var(--fg-primary,#EAF6EE)}
+#tosBody{max-height:44vh;overflow-y:auto;color:var(--text-3,#66826F);padding-right:4px}
+#tosBody li{margin:7px 0}
+#tosBtns{display:flex;gap:10px;margin-top:20px}
+#tosBtns button{flex:1;padding:12px;border-radius:12px;border:0;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+#tosOk{background:var(--cy-grad);color:#06170E}
+#tosNo{background:var(--surface-2,rgba(170,225,190,.07));color:var(--text-2,#A6C7B2);border:1px solid var(--line)}
+</style>
+<div id="tosMask"><div id="tosBox">
+  <h3>服务条款 · 使用须知</h3>
+  <div id="tosBody"><ul>
+    <li>本服务为 AI 助理，输出内容可能不准确，请勿作为专业（医疗、法律、金融）意见使用。</li>
+    <li>禁止用于违法犯罪、恶意代码、骚扰他人、生成有害或侵权内容。</li>
+    <li>服务对每个访问方实施速率限制（每分钟20次），滥用将被拒绝服务。</li>
+    <li>我们仅记录匿名调用次数用于容量统计，<strong>不存储对话内容</strong>。</li>
+    <li>你的 API 密钥仅保存在本设备，不经过本服务器传输。</li>
+    <li>继续使用即表示你已年满当地法定年龄并同意以上条款。</li>
+  </ul></div>
+  <div id="tosBtns">
+    <button id="tosNo">不同意</button>
+    <button id="tosOk">同意并继续</button>
+  </div>
+</div></div>
+<script>
+(function(){
+  if(typeof window==='undefined')return;
+  var K='tos_accepted_v1';
+  var m=document.getElementById('tosMask');
+  if(!m)return;
+  if(localStorage.getItem(K)!=='1')m.classList.add('show');
+  document.getElementById('tosOk').onclick=function(){
+    localStorage.setItem(K,'1');
+    m.classList.remove('show');
+  };
+  document.getElementById('tosNo').onclick=function(){
+    location.href='about:blank';
+  };
+})();
+</script>
 </body>
 </html>
