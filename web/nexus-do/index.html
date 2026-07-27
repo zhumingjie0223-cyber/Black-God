@@ -4193,5 +4193,143 @@ function patchSendFlow(){
 patchSendFlow();
 initWiring();
 </script>
+<script>
+/* WS Patch Layer */
+/* ===== Black God 接线补丁 v1 (fixed) ===== */
+(function () {
+  if (window.__wsPatchd) return;
+  window.__wsPatchd = true;
+
+  /* ---------- 0. dispatch：显式分支，避免 ?? 双触发 ---------- */
+  function dispatch(name, detail) {
+    if (typeof window.dispatchBgEvent === 'function') {
+      window.dispatchBgEvent(name, detail);
+    } else {
+      document.dispatchEvent(new CustomEvent('bg:' + name, { detail }));
+    }
+  }
+
+  /* ---------- 1. monkey-patch onWSMessage（带重试） ---------- */
+  const WS_PATCH_MAX_RETRY = 5;
+  const WS_PATCH_INTERVAL = 200;
+  let wsPatchTries = 0;
+
+  window.patchWSMessage = function patchWSMessage() {
+    const orig = window.onWSMessage;
+
+    // 已被 patch 过，直接返回
+    if (typeof orig === 'function' && orig.__bgPatched) return true;
+
+    // 尚未定义 → 延迟重试
+    if (typeof orig !== 'function') {
+      if (wsPatchTries < WS_PATCH_MAX_RETRY) {
+        wsPatchTries++;
+        setTimeout(window.patchWSMessage, WS_PATCH_INTERVAL);
+      } else {
+        console.warn('[bg] patchWSMessage 放弃：onWSMessage 未定义（已重试 ' + WS_PATCH_MAX_RETRY + ' 次）');
+      }
+      return false;
+    }
+
+    const wrapped = function (m) {
+      try { orig.call(this, m); } catch (e) { console.error('[bg] onWSMessage', e); }
+      if (!m || typeof m !== 'object') return;
+      switch (m.type) {
+        case 'thinking': dispatch('thinking', { text: m.text, done: !!m.done }); break;
+        case 'step':     dispatch('step', { steps: m.steps || [m] }); break;
+        case 'progress': dispatch('progress', { v: m.value ?? m.v ?? 0 }); break;
+        case 'error':    dispatch('error', { msg: m.message || m.error }); break;
+        case 'done':     dispatch('done', {}); break;
+      }
+      if (m.type !== 'step' && Array.isArray(m.steps) && m.steps.length)
+        dispatch('step', { steps: m.steps });
+    };
+    wrapped.__bgPatched = true;
+    window.onWSMessage = wrapped;
+    return true;
+  };
+
+  /* ---------- 2. 执行日志 #execLog ---------- */
+  const execLog = () => document.querySelector('#execLog') || document.querySelector('.exec-log');
+
+  document.addEventListener('bg:step', (e) => {
+    const box = execLog();
+    if (!box) return;
+    if (typeof window.renderStepFlow === 'function') {
+      window.renderStepFlow(box, e.detail?.steps || []);
+    }
+    box.scrollTop = box.scrollHeight;
+  });
+
+  document.addEventListener('bg:thinking', (e) => {
+    const box = execLog();
+    if (!box) return;
+    let el = box.querySelector('.cot-block[data-live="1"]');
+    if (e.detail?.done) {
+      if (el) {
+        el.removeAttribute('data-live');
+        el.classList.add('collapsed');
+      }
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'cot-block';
+      el.dataset.live = '1';
+      box.appendChild(el);
+    }
+    el.textContent = e.detail?.text || '思考中…';
+    box.scrollTop = box.scrollHeight;
+  });
+
+  /* ---------- 3. CoT 块挂到最新 her 气泡 ---------- */
+  document.addEventListener('bg:thinking', (e) => {
+    const bubble = [...document.querySelectorAll('.msg.her .bubble')].pop();
+    if (!bubble) return;
+    const isDone = !!e.detail?.done;
+    if (typeof window.renderCoTBlock === 'function') {
+      window.renderCoTBlock(bubble, { text: e.detail?.text || '', expanded: !isDone, done: isDone });
+    }
+  });
+
+  /* ---------- 4. Nexus 状态机 ---------- */
+  const setNexus = (s) => {
+    if (typeof window.setNexusState === 'function') window.setNexusState(s);
+  };
+  document.addEventListener('bg:thinking', (e) => setNexus(e.detail?.done ? 'idle' : 'thinking'));
+  document.addEventListener('bg:done',  () => setNexus('idle'));
+  document.addEventListener('bg:error', () => setNexus('error'));
+
+  /* ---------- 5. boot 接线 ---------- */
+  window.__bgActions = Object.assign(window.__bgActions || {}, {
+    clearChat() {
+      const list = document.querySelector('#chatList') || document.querySelector('.chat-list');
+      if (list) list.innerHTML = '';
+      if (typeof window.clearChat === 'function') window.clearChat();
+    },
+    scrollBottom() {
+      const list = document.querySelector('#chatList') || document.querySelector('.chat-list');
+      if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
+    },
+    openSettings() {
+      if (typeof window.openSettings === 'function') {
+        window.openSettings();
+      } else {
+        const btn = document.querySelector('#settingsBtn');
+        if (btn) btn.click();
+      }
+    }
+  });
+
+  const boot = () => {
+    if (typeof window.patchSendFlow === 'function') window.patchSendFlow();
+    if (typeof window.patchWSMessage === 'function') window.patchWSMessage();
+  };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+})();
+
+</script>
 </body>
 </html>
