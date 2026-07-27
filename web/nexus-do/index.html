@@ -4435,6 +4435,76 @@ initWiring();
 
 initWebVitals();
 initSPATracking();
+
+/* Exec Log Functions */
+const EXEC_ICONS = { ok: '✓', error: '⚠', running: '⏱' };
+
+function renderStepFlow(container, steps) {
+  if (!container) return;
+  container.innerHTML = '';
+  const flow = document.createElement('div');
+  flow.className = 'step-flow';
+  (steps || []).forEach(step => {
+    const status = step.status || 'running';
+    const item = document.createElement('div');
+    item.className = 'step-item ' + status;
+    item.dataset.status = status;
+
+    const icon = document.createElement('span');
+    icon.className = 'step-icon';
+    icon.textContent = EXEC_ICONS[status] || '·';
+
+    const name = document.createElement('span');
+    name.className = 'step-name';
+    name.textContent = step.name || '';
+
+    item.appendChild(icon);
+    item.appendChild(name);
+
+    if (step.ms != null) {
+      const ms = document.createElement('span');
+      ms.className = 'step-ms';
+      ms.textContent = step.ms + 'ms';
+      item.appendChild(ms);
+    }
+    flow.appendChild(item);
+  });
+  container.appendChild(flow);
+}
+
+function renderCoTBlock(container, text, isDone) {
+  if (!container) return null;
+  let block = container.querySelector('.cot-block[data-live="1"]');
+  if (!block) {
+    block = document.createElement('div');
+    block.className = 'cot-block';
+    block.dataset.live = '1';
+    container.appendChild(block);
+  }
+  block.textContent = text || '';
+  if (isDone) {
+    block.classList.add('done');
+    delete block.dataset.live;
+  }
+  return block;
+}
+
+function toggleExecLog() {
+  const panel = document.getElementById('execLog');
+  if (!panel) return;
+  const collapsed = panel.classList.toggle('collapsed');
+  const btn = panel.querySelector('.exec-toggle');
+  if (btn) btn.textContent = collapsed ? '▲' : '▼';
+}
 </script>
+
+<!-- Exec Log Panel -->
+<div id="execLog" class="exec-log-panel">
+  <div class="exec-header">
+    <span class="exec-title">执行日志</span>
+    <button class="exec-toggle" onclick="toggleExecLog()">▼</button>
+  </div>
+  <div class="exec-body"></div>
+</div>
 </body>
 </html>
