@@ -8,15 +8,6 @@
     "not_found_handling": "none",
     "run_worker_first": true
   },
-  "kv_namespaces": [
-    {
-      "binding": "RATE_LIMIT",
-      "id": "b8fe73eb47754b2abd872edce797474a"
-    }
-  ],
-  "vars": {
-    "PUBLIC_MODE": "1"
-  },
   "observability": {
     "enabled": true
   }
