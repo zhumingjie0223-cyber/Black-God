@@ -4331,5 +4331,85 @@ initWiring();
 })();
 
 </script>
+<script>
+/* Web Vitals + SPA Tracking */
+/* ===== Web Vitals RUM + SPA Tracking (append after initWiring()) ===== */
+(function () {
+  const TH = { LCP: 2500, FCP: 1800, CLS: 0.1, INP: 200, TTFB: 800 };
+  const rate = (m, v) => (v <= TH[m] ? 'good' : 'bad');
+
+  function report(metric, value) {
+    if (window.Demo?.on) return;                       // demo 模式不上报
+    try {
+      const body = JSON.stringify({
+        metric, value: Math.round(value * 1000) / 1000,
+        rating: rate(metric, value), url: location.href, ts: Date.now()
+      });
+      const blob = new Blob([body], { type: 'application/json' });
+      if (!navigator.sendBeacon?.('/stats', blob)) {
+        fetch('/stats', { method: 'POST', body, keepalive: true,
+          headers: { 'Content-Type': 'application/json' } }).catch(() => {});
+      }
+    } catch (_) { /* 静默 */ }
+  }
+
+  function obs(type, cb, opts) {
+    try { new PerformanceObserver(cb).observe({ type, buffered: true, ...opts }); }
+    catch (_) {}
+  }
+
+  function initWebVitals() {
+    if (window.__bgVitalsInit) return; window.__bgVitalsInit = true;
+
+    const nav = performance.getEntriesByType('navigation')[0];
+    if (nav) report('TTFB', Math.max(0, nav.responseStart - nav.startTime));
+
+    obs('paint', (l) => l.getEntries().forEach(e => {
+      if (e.name === 'first-contentful-paint') report('FCP', e.startTime);
+    }));
+
+    let lcp = 0;
+    obs('largest-contentful-paint', (l) => { lcp = l.getEntries().pop()?.startTime || lcp; });
+
+    let cls = 0;
+    obs('layout-shift', (l) => l.getEntries().forEach(e => { if (!e.hadRecentInput) cls += e.value; }));
+
+    let inp = 0;
+    obs('event', (l) => l.getEntries().forEach(e => {
+      if (e.duration > inp) inp = e.duration;
+    }), { durationThreshold: 40 });
+
+    let flushed = false;                               // 防重复上报（CLS 无自身归零逻辑）
+    const flush = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (flushed) return;
+      flushed = true;
+      if (lcp) { report('LCP', lcp); lcp = 0; }
+      report('CLS', cls);
+      if (inp) { report('INP', inp); inp = 0; }
+    };
+    addEventListener('visibilitychange', flush, { capture: true });
+    addEventListener('pagehide', flush, { capture: true });
+  }
+
+  function initSPATracking() {
+    if (window.__bgSPAInit) return; window.__bgSPAInit = true;
+    const fire = () => { try { window.dispatchBgEvent?.('route', { path: location.pathname }); } catch (_) {} };
+    ['pushState', 'replaceState'].forEach(k => {
+      const orig = history[k];
+      history[k] = function () { const r = orig.apply(this, arguments); fire(); return r; };
+    });
+    addEventListener('popstate', fire);
+    addEventListener('hashchange', fire);
+    fire();
+  }
+
+  initWebVitals();
+  initSPATracking();
+})();
+
+initWebVitals();
+initSPATracking();
+</script>
 </body>
 </html>
