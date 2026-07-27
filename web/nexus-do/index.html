@@ -1345,6 +1345,101 @@ body::before{
     transition-duration:.001ms !important;
   }
 }
+
+/* ══ Upgrade Layer v2 ══ */
+/* ===== Tab 滑动过渡 ===== */
+.tabs-container{overflow:hidden;position:relative;width:100%}
+.tab-panels{display:flex;width:100%;will-change:transform;
+  transition:transform 300ms var(--ease-spring)}
+.tab-panels>.tab-panel{flex:0 0 100%;width:100%;min-width:100%}
+
+/* ===== 3D 品牌字 ===== */
+.brand-3d,.nexus-3d{
+  font-weight:800;letter-spacing:.02em;color:var(--cy-1,#4fe096);
+  text-shadow:
+    0 1px 0 #1a3d2b,
+    0 2px 0 #163529,
+    0 3px 0 #122c23,
+    0 4px 0 #0e231c,
+    0 5px 1px rgba(0,0,0,.35),
+    0 6px 20px rgba(79,224,150,.4);
+}
+.nexus-3d{background:linear-gradient(180deg,#eafff4,#4fe096);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 6px 18px rgba(79,224,150,.35))}
+
+/* ===== CoT 折叠块 ===== */
+.cot-block{
+  position:relative;margin:8px 0;padding:6px 0 6px 12px;
+  border-left:2px solid var(--cy-1,#4fe096);
+  color:var(--txt-3,#8b9299);font-size:13px;line-height:1.5;
+  max-height:2.4em;overflow:hidden;
+  transition:max-height .6s var(--ease-spring),opacity .3s ease;
+}
+.cot-block::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.2em;
+  background:linear-gradient(180deg,transparent,var(--bg-2,#101314));pointer-events:none}
+.cot-block.streaming,.cot-block.expanded{max-height:60em}
+.cot-block.streaming::after,.cot-block.expanded::after{opacity:0}
+.cot-block.streaming{border-left-color:var(--cy-1,#4fe096);opacity:1}
+.cot-block.done{max-height:2.4em;opacity:.65;transition:max-height .6s ease,opacity .6s ease}
+
+/* ===== 执行步骤流 ===== */
+.step-flow{display:flex;flex-direction:column;gap:2px;margin:10px 0}
+.step-item{position:relative;display:flex;gap:10px;padding:8px 10px 8px 0;
+  border-radius:8px;transition:background .2s ease}
+.step-item::before{content:"";position:absolute;left:5px;top:24px;bottom:-2px;
+  width:1px;background:var(--bd-1,#22282a)}
+.step-item:last-child::before{display:none}
+.step-dot{flex:0 0 11px;width:11px;height:11px;margin-top:4px;border-radius:50%;
+  background:var(--txt-3,#5a6167);position:relative;z-index:1}
+.step-body{flex:1;min-width:0}
+.step-title{font-size:13px;color:var(--txt-1,#e6eaec);font-weight:600}
+.step-detail{font-size:12px;color:var(--txt-3,#8b9299);margin-top:2px;
+  white-space:pre-wrap;word-break:break-word}
+.step-item.running{background:rgba(79,224,150,.06)}
+.step-item.running .step-dot{background:var(--cy-1,#4fe096);
+  animation:stepPulse 1.2s ease-in-out infinite}
+@keyframes stepPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(79,224,150,.55)}
+  50%{box-shadow:0 0 0 6px rgba(79,224,150,0)}}
+.step-item.done .step-dot{background:var(--cy-1,#4fe096)}
+.step-item.done .step-dot::after{content:"✓";position:absolute;inset:-3px;
+  font-size:10px;line-height:17px;text-align:center;color:var(--bg-1,#0b0e0f);font-weight:900}
+.step-item.error .step-dot{background:var(--err,#e5645c)}
+.step-item.error .step-title{color:var(--err,#e5645c)}
+
+/* ===== Diff 块 ===== */
+.diff-block{margin:10px 0;border:1px solid var(--bd-1,#22282a);border-radius:10px;
+  overflow:hidden;background:var(--bg-2,#101314)}
+.diff-block pre{margin:0;padding:0;font-size:12.5px;line-height:1.55;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto}
+.diff-line{display:flex;white-space:pre;padding-left:0}
+.diff-ln{flex:0 0 44px;text-align:right;padding:0 8px;user-select:none;
+  color:var(--txt-3,#5a6167);opacity:.7;border-right:1px solid var(--bd-1,#22282a)}
+.diff-code{flex:1;padding:0 10px;color:var(--txt-2,#c2c9cd);border-left:2px solid transparent}
+.diff-add{background:rgba(79,224,150,.12)}
+.diff-add .diff-code{border-left-color:var(--cy-1,#4fe096);color:#d6ffe9}
+.diff-del{background:rgba(229,100,92,.12)}
+.diff-del .diff-code{border-left-color:var(--err,#e5645c);color:#ffd9d6}
+
+/* ===== 轨道状态 ===== */
+.nexus.is-idle .orb{animation:orbBreath 4.6s var(--ease-spring) infinite}
+.nexus.is-thinking .orb-ring{animation:orbSpin .8s linear infinite}
+.nexus.is-thinking .orb-glow{transform:scale(1.35);opacity:.9;
+  transition:transform .4s var(--ease-spring),opacity .4s ease}
+.nexus.is-error .orb-ring{border-color:var(--err,#e5645c);
+  box-shadow:0 0 18px rgba(229,100,92,.5);animation:orbShake .45s ease}
+@keyframes orbShake{0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+/* ===== 发送按钮弹性 ===== */
+.send{transition:transform .3s var(--ease-spring),background .25s ease,opacity .25s ease;
+  transform:scale(.9);opacity:.55}
+.send--active{transform:scale(1);opacity:1;background:var(--cy-1,#4fe096)}
+.send--active .ic-arrow{display:block}.send--active .ic-mic{display:none}
+.send .ic-arrow{display:none}
+
 </style>
 </head>
 <body>
@@ -1550,6 +1645,21 @@ body::before{
   <div class="sheet-title">大脑 · 模型</div>
   <div class="sheet-sub">选一家 AI 服务商 · 点「登录」一键接入，或手动配。</div>
   <div id="modelOpts"></div>
+  <div style="height:1px;background:var(--line-2);margin:16px 0 12px"></div>
+  <!-- 内置模型（Cloudflare AI，Replit多模型路由逆向）-->
+  <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px">内置模型（免费）</div>
+  <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">由 Cloudflare Workers AI 直供 · 无需密钥 · 不出网</div>
+  <div id="builtinModels">
+    <div class="opt-row" data-model="@cf/qwen/qwen2.5-coder-7b-instruct" onclick="pickBuiltinModel(this)">
+      <div class="oi">⚡</div><div class="ot"><b>Qwen2.5 Coder 7B</b><span>代码生成 · 极速</span></div><div class="opt-check">✓</div>
+    </div>
+    <div class="opt-row" data-model="@cf/meta/llama-3.1-8b-instruct" onclick="pickBuiltinModel(this)">
+      <div class="oi">🦙</div><div class="ot"><b>Llama 3.1 8B</b><span>通用对话 · 均衡</span></div><div class="opt-check">✓</div>
+    </div>
+    <div class="opt-row" data-model="@cf/mistral/mistral-7b-instruct-v0.2" onclick="pickBuiltinModel(this)">
+      <div class="oi">🌀</div><div class="ot"><b>Mistral 7B v0.2</b><span>短问答 · 轻量</span></div><div class="opt-check">✓</div>
+    </div>
+  </div>
   <div style="height:1px;background:var(--line-2);margin:16px 0 12px"></div>
   <div style="font-size:13px;color:var(--text-3);margin-bottom:10px">＋ 接入 AI 服务商</div>
   <div id="providerList"></div>
@@ -1812,6 +1922,125 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
 'use strict';
+
+/* ══ Upgrade Layer v2 ══ */
+/* ===== pickBuiltinModel（内置模型选择）===== */
+function pickBuiltinModel(el){
+  document.querySelectorAll('#builtinModels .opt-row').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  const m=el.dataset.model;
+  const set=(id,v)=>{const n=document.getElementById(id);if(n){n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}));}};
+  set('apiBase','/cf-ai'); set('apiKey','CF_INTERNAL'); set('apiModel',m);
+  try{localStorage.setItem('bg.api.base','/cf-ai');localStorage.setItem('bg.api.key','CF_INTERNAL');localStorage.setItem('bg.api.model',m);}catch(e){}
+  if(typeof toast==='function') toast('已切换：'+el.querySelector('b').textContent);
+  if(typeof haptic==='function') haptic('done');
+}
+(function(){
+  const cur=localStorage.getItem('bg.api.model');
+  if(cur){const hit=document.querySelector('#builtinModels .opt-row[data-model="'+cur+'"]');if(hit)hit.classList.add('sel');}
+})();
+
+/* ===== Tab 联动切换 ===== */
+let _tabIdx = 0;
+function switchTab(idx){
+  const panels = document.querySelector('.tab-panels');
+  if(!panels) return;
+  const n = panels.children.length;
+  idx = Math.max(0, Math.min(n - 1, idx));
+  _tabIdx = idx;
+  panels.style.transform = `translateX(${idx * -100}%)`;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>
+    b.classList.toggle('active', i === idx));
+  haptic('send');
+}
+document.querySelectorAll('.tab-btn').forEach((b,i)=>
+  b.addEventListener('click',()=>switchTab(i)));
+
+/* ===== 轨道动画状态 ===== */
+function setNexusState(state){
+  const n = document.querySelector('.nexus');
+  if(!n) return;
+  n.classList.remove('is-idle','is-thinking','is-error');
+  n.classList.add('is-' + (state || 'idle'));
+  if(state === 'error'){ haptic('error');
+    setTimeout(()=>setNexusState('idle'), 900); }
+}
+
+/* ===== 输入时按钮弹性切换 ===== */
+(function(){
+  const inp = document.getElementById('inp');
+  const send = document.querySelector('.send');
+  if(!inp || !send) return;
+  const sync = ()=> send.classList.toggle('send--active', inp.value.trim().length > 0);
+  inp.addEventListener('input', sync);
+  sync();
+})();
+
+/* ===== CoT 块渲染 ===== */
+function renderCoTBlock(el, delta, isDone){
+  if(!el) return;
+  if(delta) el.textContent += delta;
+  if(isDone){
+    el.classList.remove('streaming');
+    el.classList.add('done');
+  }else{
+    el.classList.remove('done');
+    el.classList.add('streaming');
+    el.scrollTop = el.scrollHeight;
+  }
+  if(!el.dataset.bound){
+    el.dataset.bound = '1';
+    el.addEventListener('click',()=>{
+      el.classList.toggle('expanded');
+      if(el.classList.contains('expanded')) el.classList.remove('done');
+      haptic('send');
+    });
+  }
+}
+
+/* ===== 执行步骤流渲染 ===== */
+function renderStepFlow(container, steps){
+  if(!container) return;
+  container.className = 'step-flow';
+  container.innerHTML = (steps || []).map(s => {
+    const st = s.status || 'pending';
+    return `<div class="step-item ${st}">
+      <div class="step-dot"></div>
+      <div class="step-body">
+        <div class="step-title">${esc(s.title || '')}</div>
+        ${s.detail ? `<div class="step-detail">${esc(s.detail)}</div>` : ''}
+      </div></div>`;
+  }).join('');
+  const last = (steps || [])[steps.length - 1];
+  if(last && last.status === 'done') haptic('done');
+  if(last && last.status === 'error') haptic('error');
+}
+function esc(s){
+  return String(s).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+/* ===== Diff 渲染（配套） ===== */
+function renderDiff(container, text){
+  if(!container) return;
+  const lines = String(text).split('\n');
+  let ln = 0;
+  container.className = 'diff-block';
+  container.innerHTML = '<pre>' + lines.map(l => {
+    const cls = l[0] === '+' ? 'diff-add' : l[0] === '-' ? 'diff-del' : '';
+    ln++;
+    return `<div class="diff-line ${cls}"><span class="diff-ln">${ln}</span>` +
+           `<span class="diff-code">${esc(l)}</span></div>`;
+  }).join('') + '</pre>';
+}
+
+/* ===== 触觉反馈 ===== */
+function haptic(type){
+  if(!navigator.vibrate) return;
+  const map = { send:[10], done:[10,50,10], error:[30,20,30] };
+  try{ navigator.vibrate(map[type] || [10]); }catch(e){}
+}
+
 
 /* ══ F2: 发送按钮三态状态机（ChatGPT Operator逆向）══ */
 let _sendController = null;

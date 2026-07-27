@@ -81,6 +81,32 @@ export class ShenshuCore {
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
+    // ── /cf-ai : Cloudflare Workers AI 代理（私人版专属，Replit多模型路由逆向）──
+    if (path === '/cf-ai') {
+      if (request.method === 'OPTIONS') return cors(new Response(null, { status: 204 }));
+      if (request.method !== 'POST') return cors(json({ error: 'method_not_allowed' }, 405));
+      const auth = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim() || url.searchParams.get('token') || '';
+      if (!this.env.OWNER_TOKEN || auth !== this.env.OWNER_TOKEN) return cors(json({ error: 'unauthorized' }, 401));
+      if (!this.env.AI) return cors(json({ error: 'ai_binding_missing' }, 503));
+      const ALLOWED = new Set(['@cf/qwen/qwen2.5-coder-7b-instruct','@cf/meta/llama-3.1-8b-instruct','@cf/mistral/mistral-7b-instruct-v0.2']);
+      let body; try { body = await request.json(); } catch { return cors(json({ error: 'bad_json' }, 400)); }
+      const model = body.model || '@cf/qwen/qwen2.5-coder-7b-instruct';
+      if (!ALLOWED.has(model)) return cors(json({ error: 'model_not_allowed', model }, 400));
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      if (!messages.length) return cors(json({ error: 'messages_required' }, 400));
+      const opts = { messages, max_tokens: Math.min(body.max_tokens || 2048, 4096) };
+      if (body.temperature != null) opts.temperature = body.temperature;
+      try {
+        if (body.stream) {
+          const stream = await this.env.AI.run(model, { ...opts, stream: true });
+          return cors(new Response(stream, { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' }}));
+        }
+        const r = await this.env.AI.run(model, opts);
+        const text = r?.response ?? r?.result?.response ?? '';
+        return cors(json({ model, response: text, choices: [{ message: { role: 'assistant', content: text } }] }));
+      } catch (e) { return cors(json({ error: 'ai_failed', detail: String(e?.message || e) }, 502)); }
+    }
+
     // —— 公开端点（不含任何隐私）——
     if (path === '/health') {
       const secure = !!this.env.OWNER_TOKEN;
