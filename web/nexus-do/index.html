@@ -2065,6 +2065,168 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
 'use strict';
+/* Reverse UI Batch3 */
+window.renderCheckpoints ||= function(container, points) {
+  if (!container) return;
+  container.innerHTML = '';
+  const line = document.createElement('div');
+  line.className = 'ckpt-line';
+  points.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'ckpt-item' + (p.active ? ' ckpt-active' : '');
+    const dot = document.createElement('span');
+    dot.className = 'ckpt-dot';
+    const label = document.createElement('span');
+    label.className = 'ckpt-label';
+    label.textContent = p.label;
+    const ts = document.createElement('span');
+    ts.className = 'ckpt-ts';
+    ts.textContent = p.ts;
+    item.appendChild(dot);
+    item.appendChild(label);
+    item.appendChild(ts);
+    item.onclick = () => window.onCheckpointClick && window.onCheckpointClick(p.id);
+    line.appendChild(item);
+  });
+  container.appendChild(line);
+};
+
+window.initNodeTooltips ||= function() {
+  let tip = null;
+  const ensureTip = () => {
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'tip';
+      tip.style.position = 'fixed';
+      document.body.appendChild(tip);
+    }
+    return tip;
+  };
+  const hide = () => { if (tip) tip.classList.remove('tip-show'); };
+  document.querySelectorAll('.node[data-tip]').forEach(node => {
+    if (node._tipBound) return;
+    node._tipBound = true;
+    const show = () => {
+      const t = ensureTip();
+      t.textContent = node.getAttribute('data-tip');
+      t.classList.add('tip-show');
+      const r = node.getBoundingClientRect();
+      t.style.left = (r.left + r.width/2 - t.offsetWidth/2) + 'px';
+      t.style.top = (r.top - t.offsetHeight - 8) + 'px';
+    };
+    node.addEventListener('mouseover', show);
+    node.addEventListener('mouseout', hide);
+    node.addEventListener('touchstart', show);
+    node.addEventListener('touchend', hide);
+  });
+};
+
+
+
+window.THEMES ||= [
+  {name:'森林',hue:152},{name:'海洋',hue:210},{name:'暗红',hue:0},
+  {name:'紫',hue:270},{name:'橙',hue:30},{name:'青',hue:185},
+  {name:'粉',hue:330},{name:'黄',hue:60},{name:'灰',hue:200}
+];
+
+window.applyTheme ||= function(hue) {
+  document.documentElement.style.setProperty('--hue', hue);
+  try { localStorage.setItem('theme-hue', hue); } catch(e) {}
+};
+
+window.renderThemePicker ||= function(container) {
+  if (!container) return;
+  container.innerHTML = '';
+  window.THEMES.forEach(t => {
+    const sw = document.createElement('div');
+    sw.className = 'theme-swatch';
+    sw.style.cssText = `display:inline-block;width:28px;height:28px;border-radius:50%;margin:4px;cursor:pointer;background:hsl(${t.hue},60%,50%);border:2px solid transparent`;
+    sw.title = t.name;
+    sw.onclick = () => {
+      window.applyTheme(t.hue);
+      container.querySelectorAll('.theme-swatch').forEach(s => s.style.borderColor = 'transparent');
+      sw.style.borderColor = '#fff';
+    };
+    container.appendChild(sw);
+  });
+  let saved = NaN;
+  try { saved = parseInt(localStorage.getItem('theme-hue')); } catch(e) {}
+  if (!isNaN(saved)) window.applyTheme(saved);
+};
+
+window.initBento ||= function(container, caps) {
+  if (!container) return;
+  container.innerHTML = '';
+  container.style.display = 'grid';
+  container.style.gridTemplateColumns = 'repeat(4,1fr)';
+  container.style.gap = '12px';
+  caps.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'bento-card bento-' + c.size;
+    const span = c.size === 'lg' ? 2 : 1;
+    card.style.cssText = `grid-column:span ${span};grid-row:span ${span};padding:16px;border-radius:12px;background:rgba(255,255,255,.05);transition:transform .2s`;
+    const iconEl = document.createElement('div');
+    iconEl.className = 'bento-icon';
+    iconEl.innerHTML = c.icon;
+    const nameEl = document.createElement('div');
+    nameEl.className = 'bento-name';
+    nameEl.textContent = c.name;
+    const descEl = document.createElement('div');
+    descEl.className = 'bento-desc';
+    descEl.textContent = c.desc;
+    card.appendChild(iconEl);
+    card.appendChild(nameEl);
+    card.appendChild(descEl);
+    card.onmouseenter = () => card.style.transform = 'translateY(-3px)';
+    card.onmouseleave = () => card.style.transform = '';
+    container.appendChild(card);
+  });
+};
+
+window.renderAgentGraph ||= function(svgEl, agents, edges) {
+  if (!svgEl) return;
+  svgEl.innerHTML = '';
+  const W = svgEl.clientWidth || 400, H = svgEl.clientHeight || 300;
+  const pos = {};
+  agents.forEach((a, i) => {
+    const angle = (i / agents.length) * Math.PI * 2;
+    pos[a.id] = { x: W/2 + Math.cos(angle)*W*0.35, y: H/2 + Math.sin(angle)*H*0.35 };
+  });
+  const ns = 'http://www.w3.org/2000/svg';
+  edges.forEach(([f, t]) => {
+    if (!pos[f] || !pos[t]) return;
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', pos[f].x); line.setAttribute('y1', pos[f].y);
+    line.setAttribute('x2', pos[t].x); line.setAttribute('y2', pos[t].y);
+    line.setAttribute('stroke', 'rgba(255,255,255,.3)'); line.setAttribute('stroke-width', '1.5');
+    svgEl.appendChild(line);
+  });
+  agents.forEach(a => {
+    const g = document.createElementNS(ns, 'g');
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', pos[a.id].x); c.setAttribute('cy', pos[a.id].y); c.setAttribute('r', 20);
+    c.setAttribute('fill', a.status === 'error' ? '#e74c3c' : 'rgba(255,255,255,.08)');
+    c.setAttribute('stroke', a.status === 'running' ? '#50c878' : (a.status === 'error' ? '#e74c3c' : '#888'));
+    c.setAttribute('stroke-width', a.status === 'running' ? 3 : 1.5);
+    const txt = document.createElementNS(ns, 'text');
+    txt.setAttribute('x', pos[a.id].x); txt.setAttribute('y', pos[a.id].y + 35);
+    txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', '#fff'); txt.setAttribute('font-size', '11');
+    txt.textContent = a.label;
+    g.appendChild(c); g.appendChild(txt);
+    svgEl.appendChild(g);
+  });
+};
+
+window.initGlowSlider ||= function(input) {
+  if (!input) return;
+  const saved = localStorage.getItem('glow-intensity');
+  if (saved !== null) { input.value = saved; document.documentElement.style.setProperty('--glow-intensity', saved); }
+  input.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--glow-intensity', input.value);
+    try { localStorage.setItem('glow-intensity', input.value); } catch(e) {}
+  });
+};
+
 /* Reverse UI JS */
 /* ══ Black God UI · Reverse Layer · 修复版 ══
  * opus4.8生成+修复，已通过opus4.8审核
