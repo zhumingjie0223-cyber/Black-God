@@ -140,6 +140,32 @@ ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const rWs = await T.execWorkspace('status', {}); ok('工作区·无容器返回未绑定', rWs.ok === false && /未绑定/.test(rWs.note || '')); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const rBad = await T.execEditFile({ path: '../etc/passwd', search: 'a', replace: 'b' }); ok('文件编辑·拒绝路径穿越', rBad.ok === false && /非法/.test(rBad.note || '')); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const rEmpty = await T.execEditFile({ path: '', search: 'a', replace: 'b' }); ok('文件编辑·缺path报错', rEmpty.ok === false && /缺少/.test(rEmpty.note || '')); }
+const T = Object.create(ShenshuCore.prototype);
+T.env = {};
+
+ok(
+  'execCodeNav 缺少 symbol',
+  (await T.execCodeNav('def', {})).ok === false &&
+    (await T.execCodeNav('def', {})).note.includes('缺少')
+);
+
+ok(
+  'execCodeNav 仅支持 def/refs',
+  (await T.execCodeNav('x', { symbol: 'a' })).ok === false &&
+    (await T.execCodeNav('x', { symbol: 'a' })).note.includes('仅支持')
+);
+
+ok(
+  'execBrowse url 必须 http/https',
+  (await T.execBrowse({ url: 'ftp://x' })).ok === false &&
+    (await T.execBrowse({ url: 'ftp://x' })).note.includes('http')
+);
+
+ok(
+  'execBrowse 容器未绑定',
+  (await T.execBrowse({ url: 'https://example.com' })).ok === false &&
+    (await T.execBrowse({ url: 'https://example.com' })).note.includes('未绑定')
+);
 
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');

@@ -1,0 +1,8 @@
+{
+  "name": "nexus-task-runner",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "latest"
+  }
+}

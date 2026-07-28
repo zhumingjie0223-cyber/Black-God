@@ -466,6 +466,70 @@ export class ShenshuCore {
     }
   }
 
+async execCodeNav(kind, payload = {}) {
+  if (kind !== 'def' && kind !== 'refs') {
+    return { ok: false, note: 'kind 仅支持 def/refs' };
+  }
+  
+  const { symbol, path } = payload;
+  if (!symbol) {
+    return { ok: false, note: '缺少 symbol' };
+  }
+  
+  const targetPath = path || '/tmp/ws';
+  if (targetPath.includes('..')) {
+    return { ok: false, note: '路径非法' };
+  }
+  
+  const r = await this._containerFetch('/' + kind, { symbol, path: targetPath });
+  
+  if (r.note) {
+    return { ok: false, note: r.note };
+  }
+  
+  if (r.ok && r.count > 0 && r.results && r.results.length > 0) {
+    const first = r.results[0];
+    return {
+      ...r,
+      summary: `找到 ${r.count} 处，第一处 ${first.path}:${first.line}`
+    };
+  }
+  
+  return r;
+}
+
+async execBrowse(payload = {}) {
+  const { url, actions, screenshot, timeout } = payload;
+  
+  if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+    return { ok: false, note: 'url 必须是 http/https' };
+  }
+  
+  const reqBody = {
+    url,
+    actions: Array.isArray(actions) ? actions : undefined,
+    screenshot: typeof screenshot === 'boolean' ? screenshot : undefined,
+    timeout
+  };
+  
+  const r = await this._containerFetch('/browse', reqBody);
+  
+  if (r.note) {
+    return { ok: false, note: r.note };
+  }
+  
+  const text = r.text ? r.text.substring(0, 4000) : r.text;
+  
+  return {
+    ok: r.ok,
+    title: r.title,
+    url: r.url,
+    text,
+    screenshot: r.screenshot,
+    actionErrors: r.actionErrors
+  };
+}
+
   // git 工作区操作：ensure/status/pull/push，token 服务端拼接绝不入参
   async execWorkspace(action, payload = {}) {
     if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器执行脑未绑定（wrangler containers 未部署）' };
@@ -685,6 +749,13 @@ export class ShenshuCore {
       if (cmd === 'loop') {
         if (!body.cmd) return json({ ok: false, error: '缺少 cmd 字段' });
         return json(await this.execDevLoop(body.cmd, { confirm: body.confirm === true }));
+      }
+      if (cmd === 'def' || cmd === 'refs') {
+        return json(await this.execCodeNav(cmd, body));
+      }
+
+      if (cmd === 'browse') {
+        return json(await this.execBrowse(body));
       }
       if (cmd === 'ws') return json(await this.execWorkspace(body.action, body));
       if (cmd === 'str_replace') {
