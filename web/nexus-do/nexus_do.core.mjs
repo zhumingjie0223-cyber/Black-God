@@ -1045,6 +1045,42 @@ ${capabilitySelfDescription(true)}
   // 真实联网检索：抓 DuckDuckGo HTML 端，解析摘要。与 nexus-studio 同源实现，久经验证。
   async webSearch(query) {
     try {
+      // 优先尝试 Tavily API
+      const tavilyKey = this.env.TAVILY_KEY;
+      if (tavilyKey) {
+        try {
+          const tavilyResp = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              api_key: tavilyKey,
+              query,
+              search_depth: 'basic',
+              max_results: 6,
+              include_answer: true
+            }),
+            cf: { cacheTtl: 60 }
+          });
+          if (tavilyResp.ok) {
+            const data = await tavilyResp.json();
+            const out = [];
+            if (data.answer) { out.push(`摘要：${data.answer}`); out.push(''); }
+            if (data.results && data.results.length > 0) {
+              data.results.forEach((r, idx) => {
+                const n = idx + 1;
+                const title = (r.title || '').slice(0, 80);
+                const content = (r.content || '').slice(0, 200);
+                const url = r.url || '';
+                if (title || content) {
+                  out.push(`[${n}] ${title ? title + ' — ' : ''}${content}${url ? '\n   来源: ' + url : ''}`);
+                }
+              });
+            }
+            if (out.length > 0) return out.join('\n');
+          }
+        } catch (_) { /* Tavily 失败，降级 */ }
+      }
+      // DuckDuckGo 兜底
       const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
         headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-CN,zh;q=0.9' },
         cf: { cacheTtl: 60 },
@@ -1053,7 +1089,6 @@ ${capabilitySelfDescription(true)}
       const html = await resp.text();
       const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
       const out = [];
-      // 结构化解析：标题 + 真实链接 + 摘要（来源可引用，对标 Perplexity/Grok）
       const blocks = html.split(/class="result\b/).slice(1);
       for (const b of blocks) {
         if (out.length >= 6) break;
@@ -1067,20 +1102,17 @@ ${capabilitySelfDescription(true)}
         const title = strip(am && am[2]).slice(0, 80);
         const txt = strip(sm && sm[1]).slice(0, 200);
         if (!title && !txt) continue;
-        out.push(`${out.length + 1}. ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
+        out.push(`[${out.length + 1}] ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
       }
       if (out.length) return out.join('\n');
-      // 兜底：老式纯摘要解析（页面结构变了也不至于全空）
       const re = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
       let m;
       while ((m = re.exec(html)) && out.length < 6) {
         const txt = strip(m[1]);
-        if (txt) out.push(`${out.length + 1}. ${txt.slice(0, 220)}`);
+        if (txt) out.push(`[${out.length + 1}] ${txt.slice(0, 220)}`);
       }
       return out.join('\n');
-    } catch (_) {
-      return '';
-    }
+    } catch (_) { return ''; }
   }
 
   // ═══════════════════════ 真 agent 执行环 · plan→调工具→观察→再决→作答 ═══════════════════════
