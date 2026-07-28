@@ -4599,7 +4599,7 @@ initWiring();
     if (!bubble) return;
     const isDone = !!e.detail?.done;
     if (typeof window.renderCoTBlock === 'function') {
-      window.renderCoTBlock(bubble, { text: e.detail?.text || '', expanded: !isDone, done: isDone });
+      window.renderCoTBlock(bubble, e.detail?.text || '', isDone);
     }
   });
 
