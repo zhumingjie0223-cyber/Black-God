@@ -407,24 +407,97 @@ export class ShenshuCore {
   // 给 soul 状态加"存档点"：聊崩了/人格漂偏了，能一键回退到之前任一存档。
   // 存 storage 键 ckpt:<ts>，列表键 _ckpt_index（最多留 KEEP 个，超了删最旧）。
   CKPT_KEEP = 20;
+  async execViaGitHub(cmd) {
+    const owner = 'zhumingjie0223-cyber', repo = 'Black-God', workflowFile = 'exec-shell.yml';
+    if (cmd.length > 500) return { ok: false, error: '命令过长（最多500字符）' };
+    const dangerous = ['rm -rf /', 'rm -fr /', ':(){ :|:& };:', 'mkfs', 'dd if=/dev/zero', '> /dev/sda'];
+    for (const p of dangerous) { if (cmd.includes(p)) return { ok: false, error: '危险命令已拦截' }; }
+    const gh = (path, opts = {}) => fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+      ...opts, headers: { 'Authorization': `Bearer ${this.env.GITHUB_API}`, 'Accept': 'application/vnd.github+json', 'User-Agent': 'Black-God-Nexus', ...(opts.headers || {}) }
+    });
+    try {
+      const triggerTime = Date.now();
+      const dr = await gh(`/actions/workflows/${workflowFile}/dispatches`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: 'main', inputs: { cmd } }) });
+      if (!dr.ok) return { ok: false, error: `触发失败: ${dr.status}` };
+      await new Promise(r => setTimeout(r, 2000));
+      let run = null;
+      for (let i = 0; i < 8; i++) {
+        const rr = await gh('/actions/runs?event=workflow_dispatch&per_page=5');
+        if (!rr.ok) break;
+        const d = await rr.json();
+        const found = (d.workflow_runs || []).find(r => r.name === 'Execute Shell Command' && new Date(r.created_at).getTime() >= triggerTime - 5000);
+        if (found && found.status === 'completed') { run = found; break; }
+        await new Promise(r => setTimeout(r, 3000));
+      }
+      if (!run) return { ok: false, error: '执行超时，未在30秒内完成' };
+      const jr = await gh(`/actions/runs/${run.id}/jobs`);
+      const job = (await jr.json()).jobs?.[0];
+      if (!job) return { ok: false, error: '未找到 job' };
+      const lr = await gh(`/actions/jobs/${job.id}/logs`);
+      if (!lr.ok) return { ok: false, error: `日志获取失败: ${lr.status}` };
+      const logs = await lr.text();
+      const lines = logs.split('\n');
+      const out = []; let inOut = false;
+      for (const line of lines) {
+        if (line.includes('##[group]Command Output')) { inOut = true; continue; }
+        if (line.includes('##[endgroup]')) { inOut = false; continue; }
+        if (inOut) out.push(line.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+/, ''));
+      }
+      return { ok: true, output: out.join('\n').trim(), conclusion: job.conclusion };
+    } catch(err) { return { ok: false, error: err.message }; }
+  }
+
   async handleExecRoute(request) {
-    const body = await request.json();
-    const { cmd, action } = body;
-    if (cmd === 'str_replace') return json({ ok: false, note: '前端编辑器需传入 file 字段' });
-    if (cmd === 'git') {
-      let gitCmd;
-      if (action === 'status') gitCmd = 'git -C /root/project status --short';
-      else if (action === 'push') gitCmd = 'git -C /root/project push';
-      else if (action === 'log') gitCmd = 'git -C /root/project log --oneline -10';
-      else if (action && action.startsWith('commit:')) {
-        const msg = action.substring(7);
-        const escapedMsg = `'${msg.replace(/'/g, "'\\''")}'`;
-        gitCmd = `git -C /root/project add -A && git -C /root/project commit -m ${escapedMsg}`;
-      } else return json({ ok: false, note: '未知 git action' });
-      const result = await this.execRemote(gitCmd);
-      return json({ ok: result.ok, output: result.stdout || result.stderr || result.note });
+    try {
+      const body = await request.json();
+      const { cmd, action } = body;
+      if (cmd === 'shell') {
+        if (!body.cmd) return json({ ok: false, error: '缺少 cmd 字段' });
+        const result = await this.execViaGitHub(body.cmd);
+        return json(result);
+      }
+      if (cmd === 'str_replace') {
+        const { target, search, replace } = body;
+        if (!['soul', 'config'].includes(target)) return json({ ok: false, note: 'target 只支持 soul/config' });
+        const obj = await this.storage.get(target);
+        if (!obj) return json({ ok: false, note: `${target} 不存在` });
+        const original = JSON.stringify(obj);
+        const modified = original.replace(new RegExp(search, 'g'), replace);
+        let parsed;
+        try { parsed = JSON.parse(modified); } catch(e) { return json({ ok: false, note: '替换后 JSON 格式错误，已回滚' }); }
+        await this.storage.put(target, parsed);
+        return json({ ok: true, output: '已替换并保存' });
+      }
+      if (cmd === 'git') {
+        const cfg = await this.storage.get('config') || {};
+        const gitRepo = cfg.git_repo;
+        if (!gitRepo) return json({ ok: false, note: '未配置 git_repo，在设置里填 owner/repo' });
+        const [owner, repo] = gitRepo.split('/');
+        if (!owner || !repo) return json({ ok: false, note: 'git_repo 格式错误，需要 "owner/repo"' });
+        const token = this.env.GITHUB_API;
+        if (!token) return json({ ok: false, note: '未配置 GITHUB_API token' });
+        const gh = (path) => fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Nexus-Workers' }
+        });
+        if (action === 'status' || action === 'log') {
+          const n = action === 'log' ? 10 : 5;
+          const r = await gh(`/commits?per_page=${n}`);
+          if (!r.ok) return json({ ok: false, note: `GitHub API 错误: ${r.status}` });
+          const commits = await r.json();
+          const output = commits.map(c => `${c.sha.substring(0,7)} ${c.commit.message.split('\n')[0]}`).join('\n');
+          return json({ ok: true, output });
+        }
+        if (action === 'push') return json({ ok: false, note: 'Workers 环境无法直接推送，请在本地执行' });
+        if (action && action.startsWith('commit:')) {
+          const msg = action.substring(7);
+          return json({ ok: false, note: `提交请在本地执行：git commit -m "${msg}"` });
+        }
+        return json({ ok: false, note: `不支持的 git action: ${action}` });
+      }
+      return json({ ok: false, note: `不支持的命令: ${cmd}` });
+    } catch(error) {
+      return json({ ok: false, note: `执行错误: ${error.message}` });
     }
-    return json({ ok: false, note: '未知命令' });
   }
 
   async checkpointCreate(label) {
