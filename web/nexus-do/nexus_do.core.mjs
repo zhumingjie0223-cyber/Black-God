@@ -449,6 +449,101 @@ export class ShenshuCore {
     return out.join('\n').trim();
   }
 
+  // 容器执行脑统一请求：封装 getByName + fetch，调用方不感知容器细节
+  async _containerFetch(path, bodyObj) {
+    if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器执行脑未绑定（wrangler containers 未部署）' };
+    try {
+      const c = this.env.EXEC_CONTAINER.getByName('exec-main');
+      const r = await c.fetch(new Request('http://container' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj || {}),
+      }));
+      if (!r.ok) return { ok: false, note: '容器返回 ' + r.status };
+      return await r.json();
+    } catch (e) {
+      return { ok: false, note: '容器异常：' + String(e && e.message || e).slice(0, 80) };
+    }
+  }
+
+  // git 工作区操作：ensure/status/pull/push，token 服务端拼接绝不入参
+  async execWorkspace(action, payload = {}) {
+    if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器执行脑未绑定（wrangler containers 未部署）' };
+    const dir = '/tmp/ws/Black-God';
+    const cloneUrl = `https://x-access-token:${this.env.GITHUB_API}@github.com/zhumingjie0223-cyber/Black-God.git`;
+    let cmd;
+    if (action === 'ensure') {
+      cmd = `if [ ! -d ${dir}/.git ]; then git clone ${cloneUrl} ${dir}; fi && cd ${dir} && git config user.email zhumingjie0223@github.com && git config user.name zhumingjie0223-cyber && git pull --ff-only`;
+    } else if (action === 'status') {
+      cmd = `cd ${dir} && git status --short && git log --oneline -5`;
+    } else if (action === 'pull') {
+      cmd = `cd ${dir} && git pull --ff-only`;
+    } else if (action === 'push') {
+      const msg = String(payload.message || 'nexus container edit').replace(/'/g, "'\\''");
+      cmd = `cd ${dir} && git add -A && git commit -m '${msg}' && git push`;
+    } else {
+      return { ok: false, note: 'action 仅支持 ensure/status/pull/push' };
+    }
+    const r = await this._containerFetch('/exec', { cmd, timeout: 60 });
+    if (r && r.note) return { ok: false, note: r.note };
+    return { ok: !!(r && r.ok), output: String((r && r.stdout) || '') + String((r && r.stderr) || ''), code: r && r.code };
+  }
+
+  // 精准编辑容器工作区文件：search 全文件唯一才替换，防误改
+  async execEditFile(payload = {}) {
+    let p = String(payload.path || '');
+    if (!p) return { ok: false, note: '缺少 path' };
+    if (p.includes('..')) return { ok: false, note: '路径非法（不允许 ..）' };
+    if (!p.startsWith('/')) p = '/tmp/ws/Black-God/' + p.replace(/^\/+/, '');
+    const r = await this._containerFetch('/edit', { path: p, search: String(payload.search ?? ''), replace: String(payload.replace ?? '') });
+    if (r && r.ok) return { ok: true, note: `已替换 1 处（${p}，${r.size} 字节）` };
+    const map = { not_found: '没找到这段原文，一字不差再试', not_unique: `原文出现 ${r.count} 处，不唯一，补上下文再试`, bad_path: '路径被容器拒绝', file_not_found: '文件不存在' };
+    return { ok: false, note: map[r && r.error] || ('编辑失败：' + ((r && (r.note || r.error)) || '未知')) };
+  }
+
+  // 自我修正执行循环（对标 Devin plan→act→observe→retry）：失败让大脑改命令重试，最多3轮，全程留痕
+  async execDevLoop(cmd, opts = {}) {
+    const attempts = [];
+    let currentCmd = String(cmd || '');
+    if (!currentCmd) return { ok: false, note: '命令为空' };
+    const rec = (c, r) => {
+      attempts.push({ cmd: c, code: r ? r.code : undefined, stderr: r && r.stderr ? String(r.stderr).slice(0, 200) : '' });
+    };
+    let r = await this.execRemote(currentCmd, { confirm: opts.confirm === true });
+    if (r && r.need_confirm) return r;   // 危险门透传，绝不绕过
+    rec(currentCmd, r);
+    if (r && r.ok) return { ok: true, code: r.code, stdout: r.stdout, stderr: r.stderr, attempts, via: r.via };
+
+    for (let i = 0; i < 3; i++) {
+      const soul = await this.getSoul();
+      const systemPrompt = '你是 shell 排错专家。用户给你一条失败的命令、退出码和输出。你只输出修正后的单行命令，包在 ```bash 代码块里，不要任何解释。如果修不了（缺权限/缺硬件/命令本身无意义），只回复一行 GIVEUP。';
+      const userMsg = '命令：' + currentCmd +
+        '\n退出码：' + (r ? r.code : '') +
+        '\nstderr：' + ((r && r.stderr) || '').slice(0, 800) +
+        '\nstdout：' + ((r && r.stdout) || '').slice(0, 800);
+      const brain = await this.callBrain(systemPrompt, userMsg, soul, { tier: 'light' }).catch(() => null);
+      if (!brain || !brain.reply || /GIVEUP/.test(brain.reply)) break;
+      const reply = String(brain.reply);
+      let newCmd = '';
+      const fence = reply.match(/```bash\s*([\s\S]*?)```/i);
+      if (fence) {
+        const lines = fence[1].split('\n').map(s => s.trim()).filter(Boolean);
+        if (lines.length) newCmd = lines[0];
+      }
+      if (!newCmd) {
+        const lines = reply.split('\n').map(s => s.trim()).filter(Boolean);
+        if (lines.length) newCmd = lines[0];
+      }
+      if (!newCmd || newCmd === currentCmd) break;   // 提取不到或原地打转都终止
+      if (this.dangerReason(newCmd)) { attempts.push({ cmd: newCmd, skipped: 'danger' }); break; }   // 修正循环绝不自动跑危险命令
+      currentCmd = newCmd;
+      r = await this.execRemote(currentCmd, { confirm: true });
+      rec(currentCmd, r);
+      if (r && r.ok) return { ok: true, code: r.code, stdout: r.stdout, stderr: r.stderr, attempts, via: r.via };
+    }
+    return { ok: false, note: '自我修正 3 轮未成功', attempts, lastError: { code: r ? r.code : undefined, stderr: r ? r.stderr : undefined } };
+  }
+
   // 异步派发：只触发 workflow，不等结果，任务入队等心跳回收
   async execDispatchGH(cmd) {
     const workflowFile = 'exec-shell.yml';
@@ -582,10 +677,16 @@ export class ShenshuCore {
       const { cmd, action } = body;
       if (cmd === 'shell') {
         if (!body.cmd) return json({ ok: false, error: '缺少 cmd 字段' });
-        // 异步派发：立即返回，结果由心跳回收后推送到对话
-        const result = await this.execDispatchGH(body.cmd);
+        // 容器同步优先，容器传输异常内部自动落 GitHub 异步，调用方无感
+        const result = await this.execRemote(body.cmd, { confirm: body.confirm === true });
         return json(result);
       }
+      if (cmd === 'edit') return json(await this.execEditFile(body));
+      if (cmd === 'loop') {
+        if (!body.cmd) return json({ ok: false, error: '缺少 cmd 字段' });
+        return json(await this.execDevLoop(body.cmd, { confirm: body.confirm === true }));
+      }
+      if (cmd === 'ws') return json(await this.execWorkspace(body.action, body));
       if (cmd === 'str_replace') {
         const { target, search, replace } = body;
         if (!['soul', 'config'].includes(target)) return json({ ok: false, note: 'target 只支持 soul/config' });
@@ -2076,23 +2177,13 @@ int main() {
     if (!url && !this.env.EXEC_CONTAINER && !this.env.GITHUB_API) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
     // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
     if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
-    // 内置容器执行脑：真 bash、能装包，异常时落 GitHub 兜底
+    // 内置容器执行脑：真 bash、能装包，传输异常时落 GitHub 兜底
     if (!url && this.env.EXEC_CONTAINER) {
-      try {
-        const c = this.env.EXEC_CONTAINER.getByName('exec-main');
-        const r = await c.fetch(new Request('http://container/exec', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cmd: command, timeout: 60 }),
-        }));
-        if (r.ok) {
-          const j = await r.json();
-          return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null, via: 'container' };
-        }
-        console.log('容器执行脑返回', r.status, '落 GitHub 兜底');
-      } catch (e) {
-        console.log('容器执行脑异常，落 GitHub 兜底:', e && e.message);
+      const j = await this._containerFetch('/exec', { cmd: command, timeout: 60 });
+      if (j && !j.note) {
+        return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null, via: 'container' };
       }
+      console.log('容器执行脑异常，落 GitHub 兜底:', j && j.note);
     }
     // 外部执行脑未接入（或容器兜底）但有 GITHUB_API：走内置 GitHub Actions 异步派发
     if (!url) return await this.execDispatchGH(command);

@@ -136,6 +136,10 @@ ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
   const r = await T.execRemote('rm -rf /'); ok('执行脑·危险命令未确认→拦下要二次确认(不真跑)', r.ok === false && r.need_confirm === true && !!r.danger); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('rm -rf /'); ok('执行脑·未接入优先于危险判定(先说未接入)', r.ok === false && /未接入/.test(r.note || '') && !r.need_confirm); }
 { const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execRemote('rm -rf /'); ok('执行脑·容器路径危险命令仍先弹need_confirm', r && r.need_confirm === true && !r.ok); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execDevLoop('rm -rf /', {}); ok('修正循环·危险命令透传确认门', r && r.need_confirm === true); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const rWs = await T.execWorkspace('status', {}); ok('工作区·无容器返回未绑定', rWs.ok === false && /未绑定/.test(rWs.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const rBad = await T.execEditFile({ path: '../etc/passwd', search: 'a', replace: 'b' }); ok('文件编辑·拒绝路径穿越', rBad.ok === false && /非法/.test(rBad.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const rEmpty = await T.execEditFile({ path: '', search: 'a', replace: 'b' }); ok('文件编辑·缺path报错', rEmpty.ok === false && /缺少/.test(rEmpty.note || '')); }
 
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');
