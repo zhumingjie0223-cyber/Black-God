@@ -4838,6 +4838,15 @@ if __name__ == '__main__':
   • 绕后/免杀：bypass:uac | bypass:amsi | bypass:av <方式> | bypass:edr
   • 提权：privesc:windows | privesc:linux | privesc:token
   示例：⟨工具:redteam｜reverse:frida com.example.MainActivity⟩ / ⟨工具:redteam｜bypass:uac⟩ / ⟨工具:redteam｜privesc:linux suid⟩
+- 吾爱精华分析工具库（JS逆向/爬虫/Android/iOS/加密/工具）：⟨工具:redteam｜pojie:工具名 [目标]⟩
+  • JS分析：pojie:jsvmp（JSVMP追踪+Base64+RC4）| pojie:jsvmp2（深度分析）| pojie:ast（AST扣代码）| pojie:vmp（VMP反编译）| pojie:webpack（Webpack复用）| pojie:webenv（补环境）
+  • 爬虫/抓包：pojie:cdp（CDP调试突破）| pojie:slider（极验3代滑块）| pojie:m4s（视频下载插件）
+  • 加解密：pojie:aes（AES-CBC工具）| pojie:sslkey（TLS密钥提取）
+  • Android：pojie:antif（绕过反检测）| pojie:soload（SO加载追踪）| pojie:dbdec（数据库解密）
+  • iOS/macOS：pojie:dylib（动态库注入）
+  • 工具：pojie:pypack（Pyinstaller重打包）
+  触发时机：用户问JS加密/混淆分析 → pojie:jsvmp；问滑块验证码 → pojie:slider；问AES解密 → pojie:aes；问frida抓包 → pojie:sslkey；问webpack/补环境 → pojie:webpack/webenv；问so加载/frida → pojie:antif或soload；问pyinstaller逆向 → pojie:pypack；问下载B站视频 → pojie:m4s
+  示例：⟨工具:redteam｜pojie:jsvmp https://target.com⟩ / ⟨工具:redteam｜pojie:slider https://demo.geetest.com⟩
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratch = '', toolLog = [], last = null, mediaAll = [];
     for (let step = 0; step < 5; step++) {
