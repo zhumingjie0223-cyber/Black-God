@@ -233,9 +233,14 @@ html,body{
   }
 }
 #app{
-  opacity:1;
-  animation:pageIn 0.4s var(--ease-out) forwards;
+  opacity:0;
+  transform:translateY(8px);
+  transition:opacity .4s var(--ease-out), transform .4s var(--ease-out);
 }
+#app.shown{ opacity:1; transform:none; }
+/* 动画/JS 都没跑起来时的最终兜底：0.6s 后强制可见 */
+@media all { #app{ animation:appFallback 0s linear .6s forwards; } }
+@keyframes appFallback{ to{ opacity:1; transform:none; } }
 button,input,textarea{font-family:inherit;color:inherit}
 ::selection{background:var(--cy-glow);color:#fff}
 ::-webkit-scrollbar{width:0;height:0}
@@ -3918,6 +3923,8 @@ function typeInto(bubble, text, done){
 
 /* ============ 启动 ============ */
 (function boot(){
+  // 首屏可见性：不依赖 CSS 动画时钟，立即淡入
+  try{ requestAnimationFrame(function(){ var a=document.getElementById('app'); if(a) a.classList.add('shown'); }); }catch(e){ var a=document.getElementById('app'); if(a) a.classList.add('shown'); }
   // 最先设分页数（哪怕后面出错，布局也不会错位/漏页）
   try{ $('#pages').style.setProperty('--pages', PAGES); }catch(e){}
   // —— 模式无关的 UI 初始化 ——
