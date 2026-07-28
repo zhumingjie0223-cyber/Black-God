@@ -2063,13 +2063,12 @@ int main() {
     const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
     const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
     const command = String(cmd || '');
+    // 彻底未接入（无外部地址也无 GITHUB_API）：优先如实告知，先于危险判定
+    if (!url && !this.env.GITHUB_API) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
     // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
     if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
-    // 外部执行脑未接入：有 GITHUB_API 就走内置 GitHub Actions 异步派发
-    if (!url) {
-      if (this.env.GITHUB_API) return await this.execDispatchGH(command);
-      return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
-    }
+    // 外部执行脑未接入但有 GITHUB_API：走内置 GitHub Actions 异步派发
+    if (!url) return await this.execDispatchGH(command);
     // 客户端超时兜底:服务器 60 秒,这边 65 秒硬断,绝不让请求悬死
     const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, 65000) : null;
