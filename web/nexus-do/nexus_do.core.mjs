@@ -24,6 +24,33 @@ import LEXICON_DATA from './lexicon_data.js';
 // ── DO re-export（wrangler 要求入口文件 export 所有 DO class）──
 import { AgentStateMachineDO } from './nexus_agent_core.mjs';
 export { AgentStateMachineDO };
+
+// ═══ 逆向工具链知识库（吾爱破解40+篇实战提炼）═══
+const REVERSE_KB = {
+  analyze_target: (arg) => `你是顶级逆向工程师，对目标做初步研判：\n目标：${arg}\n\n【保护类型识别】\n- 壳检测：PEiD/DIE/ExeinfoPE 扫描，看区段名（.vmp0/.themida/.nsp）\n- VMP特征：入口点跳到加密区段，字节码密集\n- Themida特征：.mackt区段，import表加密，多线程反调试\n- 网络验证：有WinINet/socket调用，找InternetOpenA\n- 驱动验证：NtDeviceIoControlFile/IOCTL调用链\n- .NET：dnSpy直接看IL，无需汇编\n- Electron：解包app.asar直接看JS\n\n【工具链】PEiD/DIE/CFF Explorer/x64dbg+ScyllaHide/IDA/Ghidra/dnSpy/jadx/Frida\n\n输出：1.保护类型 2.推荐分析路径 3.难度 4.最快突破点`,
+
+  find_entry: (arg) => `你是逆向专家，定位关键函数：\n目标：${arg}\n\n【错误字符串法（最高效）】\n1. 触发注册失败弹窗\n2. x64dbg → 搜索所有模块字符串 → 找"invalid/expired/license/激活/unauthorized"\n3. 追到最近的JE/JNE条件跳转 = 验证分叉点\n\n【API断点法】\n- 网络验证：bp InternetReadFile/HttpSendRequest\n- 文件：bp CreateFileA\n- 注册表：bp RegQueryValueEx\n- 时间锁：bp GetLocalTime\n\n给出针对${arg}的具体定位步骤`,
+
+  bypass_antidebug: (arg) => `你是反反调试专家：\n目标：${arg}\n\n【NtGlobalFlag】PEB+0x68值0x70=被调试，写0绕过\n【IsDebuggerPresent】patch RET前 xor eax,eax\n【VMP 3.x无驱动过法】装xAntiAntiDebug插件，hook NtQueryInformationProcess\n【Themida】ScyllaHide插件全选，再patch GetTickCount时间差检测\n【ptrace(macOS/Linux)】Frida: Process.setExceptionHandler()吞SIGTRAP\n\n必装插件：ScyllaHide/xAntiAntiDebug/TitanHide\n\n给出针对${arg}的具体bypass步骤`,
+
+  dump_vm: (arg) => `你是壳分析专家：\n目标：${arg}\n\n【VMP不脱壳绕过】找VM处理完后的干净执行时机，OEP处dump\n【Loader注入法】WinMain后VM已解密，Scylla修复IAT\n【Themida不脱壳】等完全加载后，Cheat Engine找解密区，硬件执行断点\n【DSVM还原】找解释器大switch，记录每个opcode操作，写反汇编器\n\n给出针对${arg}的具体步骤`,
+
+  patch_license: (arg) => `你是patch专家：\n目标：${arg}\n\n【定位】验证失败字符串→回溯→最近JE/JNE\n【patch方式】JE→JMP / NOP掉JNE(90 90) / MOV EAX,1+RET\n\nPython patch模板：\n\`\`\`python\nwith open("target.exe","rb") as f: data=bytearray(f.read())\noffset=0x1234  # 文件偏移\ndata[offset:offset+2]=b'\\x90\\x90'  # NOP\nwith open("patched.exe","wb") as f: f.write(data)\n\`\`\`\n\n特征码通杀：\n\`\`\`python\nsig=bytes.fromhex("558BEC51894DFC6A00E8")\npatch=bytes.fromhex("B001C3909090909090909090")\nidx=data.find(sig)\nif idx>=0: data[idx:idx+len(patch)]=patch\n\`\`\`\n\n给出针对${arg}的完整patch方案`,
+
+  crack_network_auth: (arg) => `你是网络验证破解专家：\n目标：${arg}\n\n【DLL劫持(.NET)】找验证DLL，同名空DLL直接return true\n【Hosts重定向】Wireshark找域名→127.0.0.1重定向→本地伪造服务器\n\n伪造服务器：\n\`\`\`python\nfrom http.server import HTTPServer,BaseHTTPRequestHandler\nimport json\nclass F(BaseHTTPRequestHandler):\n    def do_POST(self):\n        self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers()\n        self.wfile.write(json.dumps({"status":"ok","valid":True,"expire":"2099-12-31"}).encode())\nHTTPServer(('0.0.0.0',80),F).serve_forever()\n\`\`\`\n\n给出针对${arg}的最佳方案`,
+
+  js_deobfuscate: (arg) => `你是JS逆向专家：\n目标：${arg}\n\n【识别类型】eval型/字符串数组型/VM指令集/控制流平坦化/AES加密\n【AES参数提取】Chrome断点在CryptoJS.AES.encrypt，看key/iv变量\n\nPython复现：\n\`\`\`python\nfrom Crypto.Cipher import AES\nfrom Crypto.Util.Padding import pad\nimport base64,time\nkey=b'extracted_key';iv=b'extracted_iv'\ndef gen(uid):\n    plain=f'{uid}|{int(time.time())}'\n    return base64.b64encode(AES.new(key,AES.MODE_CBC,iv).encrypt(pad(plain.encode(),16))).decode()\n\`\`\`\n\n【VM指令还原】找dispatch循环，记录opcode→操作映射，写反汇编器\n\n给出针对${arg}的完整还原方案`,
+
+  keygen_from_algo: (arg) => `你是注册机开发专家：\n目标：${arg}\n\n\`\`\`python\nimport hashlib,random,string\n\ndef verify(key):\n    parts=key.replace('-','')\n    # 从IDA提取的验证逻辑\n    checksum=sum(ord(c) for c in parts[:-2])%97\n    return int(parts[-2:],16)==checksum\n\ndef keygen():\n    while True:\n        base=''.join(random.choices(string.ascii_uppercase+string.digits,k=14))\n        cs=sum(ord(c) for c in base)%97\n        key=f"{base[:4]}-{base[4:8]}-{base[8:12]}-{base[12:]}{cs:02X}"\n        if verify(key): return key\n\nfor _ in range(10):\n    k=keygen()\n    assert verify(k)\n    print(k)\n\`\`\`\n\n请根据${arg}的实际验证逻辑修改verify函数，生成可用序列号`,
+
+  frida_hook: (arg) => `你是Frida专家，为以下目标写hook脚本：\n目标：${arg}\n\n【基础hook】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"函数名"),{\n    onEnter(args){console.log(args[0].readUtf8String())},\n    onLeave(retval){retval.replace(1)}\n});\n\`\`\`\n\n【iOS ptrace bypass】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"ptrace"),{\n    onEnter(args){if(args[0].toInt32()===31)args[0]=ptr(0)}\n});\n\`\`\`\n\n【Android签名bypass】\n\`\`\`javascript\nJava.perform(()=>{\n    Java.use("android.app.ApplicationPackageManager").getPackageInfo\n    .overload("java.lang.String","int").implementation=function(p,f){\n        return this.getPackageInfo(p,f&~64);\n    };\n});\n\`\`\`\n\n给出针对${arg}的完整Frida脚本`,
+
+  apk_repack: (arg) => `你是Android逆向专家：\n目标：${arg}\n\n\`\`\`bash\n# 解包\napktool d target.apk -o out/\n# 或jadx\njadx -d jadx_out/ target.apk\n\n# 改VIP状态(smali)\n# 找isVip()方法，改为 const/4 v0, 0x1 / return v0\n\n# 重打包\napktool b out/ -o repacked.apk\n\n# 签名\nkeytool -genkey -v -keystore debug.keystore -alias key -keyalg RSA -validity 10000 -storepass android -keypass android -dname "CN=Test"\napksigner sign --ks debug.keystore --ks-pass pass:android --out final.apk repacked.apk\n\`\`\`\n\n给出针对${arg}的完整重打包步骤`,
+
+  ios_bypass: (arg) => `你是iOS逆向专家：\n目标：${arg}\n\n【越狱检测bypass】\n\`\`\`javascript\nvar paths=["/Applications/Cydia.app","/usr/sbin/sshd","/bin/bash"];\nInterceptor.attach(ObjC.classes.NSFileManager["- fileExistsAtPath:"].implementation,{\n    onEnter(args){this._fake=paths.some(p=>ObjC.Object(args[2]).toString().includes(p))},\n    onLeave(retval){if(this._fake)retval.replace(0)}\n});\n\`\`\`\n\n【签名校验bypass】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"SecStaticCodeCheckValidity"),{\n    onLeave(retval){retval.replace(0)}\n});\n\`\`\`\n\n给出针对${arg}的完整bypass方案`,
+
+  get_full_chain: (arg) => `你是顶级逆向工程师，制定完整攻击链：\n目标：${arg}\n\n【第一阶段-情报】目标类型/保护机制/最短路径\n【第二阶段-突破】切入方式选择/反调试绕过/定位核心函数\n【第三阶段-分析】还原算法/提取key/验证结果\n【第四阶段-武器化】自动化工具/持久化/完整性验证\n\n工具箱：\n- Windows: x64dbg+ScyllaHide/IDA/dnSpy\n- Android: jadx/apktool/Frida/objection\n- iOS: Hopper/Frida/class-dump\n- JS: Chrome DevTools/babel/jsnice\n- 流量: Wireshark/Burp/mitmproxy\n- PWN: pwntools/ROPgadget/one_gadget\n\n给出针对${arg}的完整攻击链，每步含具体命令/代码`
+};
 // 内置容器执行脑：真 bash、能装包，10分钟无请求自动休眠省钱
 // @cloudflare/containers 依赖 workerd 内置 'cloudflare:workers'，纯 Node（本地/CI 自检）不存在该模块
 // → 动态导入：workerd 里拿真 Container，自检环境兜底空壳，两边都不炸
@@ -49,20 +76,45 @@ export class ShenshuCore {
     this.storage = state.storage;
     // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
     if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
-    // 影子已合并进私人版:不再有独立影子实例,统一按私人版处理(可正常吸主人记忆)。
+    // 影子实例：独立数据，不吸主人的 KV 老记忆。
     this.isShadow = false;
     this.state.blockConcurrencyWhile(async () => {
-      const nextAlarm = await this.storage.getAlarm();
-      if (nextAlarm === null) await this.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
-      const migrated = await this.storage.get('_migrated_from_kv');
-      if (!migrated && !this.isShadow) await this.migrateFromKV();
+      try {
+        const flag = await this.storage.get('_is_shadow');
+        if (flag) this.isShadow = true;
+      } catch (e) {}
+      try {
+        const nextAlarm = await this.storage.getAlarm();
+        if (nextAlarm === null) await this.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
+      } catch (e) {}
+      try {
+        const migrated = await this.storage.get('_migrated_from_kv');
+        if (!migrated && !this.isShadow) await this.migrateFromKV();
+      } catch (e) { console.error('[init] migrateFromKV failed:', e?.message); }
     });
   }
 
   // ═══════════════════════ 路由 ═══════════════════════
   async fetch(request) {
+    try {
+      return await this._fetch(request);
+    } catch (e) {
+      console.error('[DO.fetch] unhandled:', e?.message);
+      return new Response(JSON.stringify({ error: 'internal', msg: e?.message || 'unknown' }), {
+        status: 500,
+        headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  async _fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname;
+    // 影子实例首次访问：落盘标记，此后永不迁移主人 KV 数据（数据彻底隔离）
+    if (request.headers.get('X-Nexus-Shadow') === '1' && !this.isShadow) {
+      this.isShadow = true;
+      try { await this.storage.put('_is_shadow', 1); await this.storage.put('_migrated_from_kv', 1); } catch (e) {}
+    }
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
@@ -135,7 +187,7 @@ export class ShenshuCore {
     }
     if (path === '/sw.js') return new Response(SW_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
     if (path === '/icon.svg') return new Response(ICON_SVG, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
-    if (path === '/apple-touch-icon.png' || path === '/apple-touch-icon-precomposed.png' || path === '/icon-180.png' || path === '/icon-192.png' || path === '/icon.png') {
+    if (path === '/apple-touch-icon.png' || path === '/apple-touch-icon-precomposed.png' || path === '/icon-180.png' || path === '/icon-192.png' || path === '/icon.png' || path === '/logo.png' || path === '/shen-icon.png') {
       const bytes = Uint8Array.from(atob(ICON_PNG_B64), c => c.charCodeAt(0));
       return new Response(bytes, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
     }
@@ -1322,7 +1374,8 @@ async execBrowse(payload = {}) {
     // 多租户:实例主人(普通用户)只走「用自己 key 的单发对话」—— 不开 agent/联网/CF,
     // 那些会烧系统(权哥)的算力。他的神枢用他自己的网关回话。
     const tier = this.pickTier(text, caps);
-    const agentic = !instanceMode && (tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code'));
+    const isTask = !instanceMode && this.isTaskGoal(text);   // 融合:明确任务→强制执行
+    const agentic = !instanceMode && (isTask || tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code'));
     const role = this.preferredRole(tier, caps);   // 神枢主导:按任务定首选职责,秒派对口脑
     let brainResult;
     if (agentic) {
@@ -1573,6 +1626,20 @@ ${capabilitySelfDescription(true)}
     return 'light';
   }
 
+  // 是否是「明确要它去做一件事」的任务目标（祈使/托付/多步活儿）——
+  // 命中则强制进 agent 执行环，即使句子短。融合自 nexus-studio 的目标判定。
+  isTaskGoal(text) {
+    const t = String(text || '').trim();
+    if (t.length < 3) return false;
+    // 祈使/托付：帮我…、给我…、去…、做个…、写个…、搞个…、整个…、下载、生成、部署、跑一下…
+    if (/^(帮|给|替|去|来|请)?\s*(我)?\s*(做|写|搞|整|建|создать|生成|画|念|下载|抓|爬|查|搜|分析|规划|设计|部署|跑|执行|实现|优化|重构|翻译|总结|整理|导出|打包|安装|配置|监控|盯|抢)/.test(t)) return true;
+    // 显式任务动词 + 宾语（做一个 / 帮我弄…）
+    if (/(帮我|替我|给我|帮忙)\S*(一下|个|下)?/.test(t) && /[做写搞整建生成画下载抓爬查搜分析规划设计部署跑执行实现优化翻译总结整理导出打包安装配置监控抢]/.test(t)) return true;
+    // 结尾祈使号或「任务：」前缀
+    if (/^任务[:：]/.test(t) || /^目标[:：]/.test(t)) return true;
+    return false;
+  }
+
   // ═══════════════════════ 联网 · 真实检索（DuckDuckGo，无需外部服务器）═══════════════════════
   // 判定这句是否需要联网取外部/新鲜信息。纯函数，确定性，可测。保守触发，不滥用抓取。
   needsWeb(text) {
@@ -1664,7 +1731,7 @@ ${capabilitySelfDescription(true)}
   // 从回话解析信息工具调用标记（确定性，可测）。
   parseToolCalls(reply) {
     const calls = [];
-    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download|hijack|redteam)\s*[｜|]\s*([^⟩]+)⟩/g;
+    const re = /⟨\s*工具\s*[:：]\s*(web_search|open|exec|apple|draw|speak|download|hijack|redteam|js_reverse|js_ast|crack_keygen|decompile|patch_binary|analyze_target|find_entry|bypass_antidebug|dump_vm|patch_license|crack_network_auth|js_deobfuscate|keygen_from_algo|frida_hook|apk_repack|ios_bypass|get_full_chain)\s*[｜|]\s*([^⟩]+)⟩/g;
     let m;
     while ((m = re.exec(String(reply || ''))) !== null) calls.push({ tool: m[1], arg: (m[2] || '').trim() });
     return calls;
@@ -7789,6 +7856,55 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
         else if (c.tool === 'hijack') { const h = await this.handleHijack(c.arg).catch(() => null); out = h ? `[劫持脚本·${h.type}｜${h.desc}]\n\`\`\`javascript\n${h.script}\n\`\`\`` : '劫持工具无响应'; }
         else if (c.tool === 'redteam') { const r = await this.handleRedTeam(c.arg).catch(() => null); out = r ? (r.ok ? `[红队·${r.desc}]\n\`\`\`\n${r.script}\n\`\`\`` : ('红队工具：' + (r.note || '失败'))) : '红队工具无响应'; }
+        // ═══ 逆向工具集（吾爱破解实战提炼）═══
+        else if (c.tool === 'js_reverse') {
+          const r = await this.callBrain(`你是顶级 JS 逆向专家。分析加密参数，还原算法：
+1. 识别加密类型（AES/RSA/MD5/ECDSA/VM等）
+2. 提取 key/iv/algorithm/mode
+3. 给出可直接运行的 Python 复现代码
+4. 指出动态参数（时间戳/随机数）生成规律
+5. json.dumps 注意用 separators=(',',':') 避免空格坑`, c.arg, null, { tier: 'heavy' }).catch(() => null);
+          out = r ? `[JS逆向]\n${r.reply || r}` : 'JS逆向工具无响应';
+        }
+        else if (c.tool === 'js_ast') {
+          const r = await this.callBrain(`你是 JS AST 反混淆专家。对混淆/VM代码：
+1. 识别混淆类型（eval/VM指令集/控制流平坦化/字符串加密）
+2. 还原真实逻辑，给出可读等价代码
+3. 如是VM指令执行器，列出指令表和含义
+4. 输出反混淆后完整代码`, c.arg, null, { tier: 'heavy' }).catch(() => null);
+          out = r ? `[AST反混淆]\n${r.reply || r}` : 'AST工具无响应';
+        }
+        else if (c.tool === 'crack_keygen') {
+          const r = await this.callBrain(`你是逆向工程注册机专家。根据算法描述生成注册机：
+1. 分析验证逻辑（校验和/哈希/ECDSA/时间锁等）
+2. 写出可直接运行的 Python 注册机
+3. 附验证函数确认序列号有效
+4. 给出多个可用序列号示例`, c.arg, null, { tier: 'heavy' }).catch(() => null);
+          out = r ? `[注册机]\n${r.reply || r}` : '注册机工具无响应';
+        }
+        else if (c.tool === 'decompile') {
+          const r = await this.callBrain(`你是二进制逆向专家（IDA/Ghidra/jadx）。分析目标：
+1. 识别保护方式（壳/混淆/反调试/签名验证）
+2. 用错误字符串法/交叉引用法定位关键函数
+3. 还原验证逻辑（伪代码→Python）
+4. 给出 patch 方案（字节偏移）或 Frida hook bypass 方案`, c.arg, null, { tier: 'heavy' }).catch(() => null);
+          out = r ? `[反编译分析]\n${r.reply || r}` : '反编译工具无响应';
+        }
+        else if (c.tool === 'patch_binary') {
+          const r = await this.callBrain(`你是二进制 patch 专家。给出完整 patch 方案：
+1. 定位 patch 点（函数偏移/字节序列）
+2. 原字节→目标字节（十六进制）
+3. Python 自动 patch 脚本
+4. 验证方法确认 patch 成功
+5. 如有驱动/内核签名验证，给出绕过方案`, c.arg, null, { tier: 'heavy' }).catch(() => null);
+          out = r ? `[Patch方案]\n${r.reply || r}` : 'Patch工具无响应';
+        }
+        // ═══ 完整逆向链路（吾爱破解40+篇实战提炼）═══
+        else if (REVERSE_KB && REVERSE_KB[c.tool]) {
+          const prompt = REVERSE_KB[c.tool](c.arg);
+          const r = await this.callBrain(prompt, c.arg, null, { tier: 'heavy' }).catch(() => null);
+          out = r ? `[${c.tool}]\n${r.reply || r}` : `${c.tool}工具无响应`;
+        }
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }
@@ -7901,7 +8017,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     // 旧单网关 → 追加为一条(去重)；系统主人可回落 env 网关，实例主人只用自己配的
     const legacyUrl = String(cfg.gateway_url || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_URL || ''))).trim();
     if (legacyUrl && !out.some(b => b.url === legacyUrl)) {
-      out.push({ url: legacyUrl, key: cfg.gateway_key || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_KEY || '')), model: (cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || 'auto'), provider: cfg.gateway_provider || '', label: '主网关', role: '主力' });
+      out.push({ url: legacyUrl, key: cfg.gateway_key || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_KEY || '')), model: (cfg.gateway_model || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_MODEL || '')) || 'auto'), provider: cfg.gateway_provider || (instanceMode ? '' : (this.env.NEXUS_GATEWAY_PROVIDER || '')), label: '主网关', role: '主力' });
     }
     return out.slice(0, 9);
   }
@@ -9900,9 +10016,12 @@ export default {
       });
     } catch (e) {}
     if (_shadow) {
-      // 合并到私人版:影子令牌直接路由到私人实例(SYSTEM_DO),不再独立、不再隔离数据。
-      const id = env.SHENSHU.idFromName(SYSTEM_DO);
-      return env.SHENSHU.get(id).fetch(request);
+      // 影子令牌 → 独立 DO 实例，数据与主人完全隔离，消息互不相通。
+      const h = new Headers(request.headers);
+      h.set('X-Nexus-Shadow', '1');           // 盖章：影子实例据此认令牌
+      const req = new Request(request, { headers: h });
+      const id = env.SHENSHU.idFromName('shadow');
+      return env.SHENSHU.get(id).fetch(req);
     }
     // 清掉任何伪造的影子章(历史遗留),统一走私人/公开两版判定。
     if (request.headers.get('X-Nexus-Shadow')) {
