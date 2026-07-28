@@ -565,6 +565,151 @@ async execBrowse(payload = {}) {
     return { ok: false, note: map[r && r.error] || ('编辑失败：' + ((r && (r.note || r.error)) || '未知')) };
   }
 
+  async execAgentTask(task, opts = {}) {
+    if (!task || typeof task !== 'string' || task.trim() === '') {
+      return { ok: false, note: '任务为空' };
+    }
+
+    const transcript = [];
+    const maxSteps = 8;
+    let parseErrorCount = 0;
+
+    const systemPrompt = '你是自主执行 agent。你在一个有真 shell/git/文件编辑/代码导航/浏览器的沙箱里干活（工作区 /tmp/ws/Black-God）。每一步你只输出一个 JSON 对象（不要 markdown 代码块，不要任何其他文字）：{"action":"shell|edit|read|write|browse|def|refs|ws|finish", "args":{...}, "reason":"这步干嘛（20字内）"}。动作参数：shell→{cmd}; edit→{path,search,replace}; read→{path}; write→{path,content}; browse→{url,actions?}; def/refs→{symbol,path?}; ws→{action:"ensure|status|pull|push",message?}; finish→{summary:"任务完成情况"}。规则：一次只干一件事；每步基于上一步结果决定；危险命令（rm -rf /、mkfs 等）绝对禁止；任务完成或确认无法完成时输出 finish。';
+
+    for (let step = 1; step <= maxSteps; step++) {
+      let userPrompt = '任务：' + task + '\n\n已执行步骤：\n';
+      if (transcript.length === 0) {
+        userPrompt += '（无，这是第一步）';
+      } else {
+        userPrompt += transcript.map((t, i) => {
+          const argStr = JSON.stringify(t.args).slice(0, 150);
+          const resStr = JSON.stringify(t.result).slice(0, 300);
+          return `#${i + 1} ${t.action} ${argStr} → ${resStr}`;
+        }).join('\n');
+      }
+
+      let brain;
+      try {
+        const soul = await this.getSoul();
+        brain = await this.callBrain(systemPrompt, userPrompt, soul, { tier: 'heavy' });
+      } catch (err) {
+        return { ok: false, note: '大脑无响应', steps: transcript };
+      }
+
+      if (!brain || !brain.reply) {
+        return { ok: false, note: '大脑无响应', steps: transcript };
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(brain.reply);
+      } catch (e) {
+        const match = brain.reply.match(/\{[^]*\}/);
+        if (match) {
+          try {
+            parsed = JSON.parse(match[0]);
+          } catch (e2) {
+            parsed = null;
+          }
+        } else {
+          parsed = null;
+        }
+      }
+
+      if (!parsed) {
+        parseErrorCount++;
+        transcript.push({
+          step,
+          action: 'parse_error',
+          args: {},
+          ok: false,
+          result: { raw: brain.reply.slice(0, 200) }
+        });
+        if (parseErrorCount >= 2) {
+          return { ok: false, note: '大脑输出无法解析', steps: transcript };
+        }
+        continue;
+      }
+
+      parseErrorCount = 0;
+
+      const { action, args = {}, reason } = parsed;
+
+      if (action === 'finish') {
+        return {
+          ok: true,
+          summary: String(args.summary || '完成'),
+          steps: transcript,
+          stepCount: step
+        };
+      }
+
+      const validActions = ['shell', 'edit', 'read', 'write', 'browse', 'def', 'refs', 'ws'];
+      if (!validActions.includes(action)) {
+        transcript.push({
+          step,
+          action: 'invalid',
+          args: {},
+          ok: false,
+          result: { raw: brain.reply.slice(0, 200) }
+        });
+        continue;
+      }
+
+      let execResult;
+      try {
+        switch (action) {
+          case 'shell':
+            execResult = await this.execRemote(args.cmd, { confirm: opts.confirm === true });
+            if (execResult.need_confirm) {
+              return execResult;
+            }
+            break;
+          case 'edit':
+            execResult = await this.execEditFile(args);
+            break;
+          case 'read':
+            execResult = await this._containerFetch('/read', args);
+            break;
+          case 'write':
+            execResult = await this._containerFetch('/write', args);
+            break;
+          case 'browse':
+            execResult = await this.execBrowse(args);
+            break;
+          case 'def':
+          case 'refs':
+            execResult = await this.execCodeNav(action, args);
+            break;
+          case 'ws':
+            execResult = await this.execWorkspace(args.action, args);
+            break;
+          default:
+            execResult = { ok: false, note: '未知动作' };
+        }
+      } catch (err) {
+        transcript.push({
+          step,
+          action,
+          args: JSON.stringify(args).slice(0, 150),
+          ok: false,
+          error: String(err).slice(0, 200)
+        });
+        continue;
+      }
+
+      transcript.push({
+        step,
+        action,
+        args: JSON.stringify(args).slice(0, 150),
+        ok: execResult.ok !== false,
+        result: JSON.stringify(execResult).slice(0, 300)
+      });
+    }
+
+    return { ok: false, note: '8 步未完成任务', steps: transcript, partial: true };
+  }
+
   // 自我修正执行循环（对标 Devin plan→act→observe→retry）：失败让大脑改命令重试，最多3轮，全程留痕
   async execDevLoop(cmd, opts = {}) {
     const attempts = [];
@@ -756,6 +901,10 @@ async execBrowse(payload = {}) {
 
       if (cmd === 'browse') {
         return json(await this.execBrowse(body));
+      }
+      if (cmd === 'agent') {
+        if (!body.task) return json({ ok: false, error: '缺少 task 字段' });
+        return json(await this.execAgentTask(body.task, { confirm: body.confirm === true }));
       }
       if (cmd === 'ws') return json(await this.execWorkspace(body.action, body));
       if (cmd === 'str_replace') {

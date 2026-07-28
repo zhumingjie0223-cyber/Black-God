@@ -167,6 +167,9 @@ ok(
     (await T.execBrowse({ url: 'https://example.com' })).note.includes('未绑定')
 );
 
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r1 = await T.execAgentTask('', {}); ok('自主任务·空任务拒绝', r1.ok === false && /为空/.test(r1.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r2 = await T.execAgentTask('做个网页', {}); ok('自主任务·无环境优雅失败不抛异常', r2.ok === false); }
+
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');
 ok('owner_only 能力：匿名拒绝', resolveCapability('soul', false).ok === false && resolveCapability('soul', false).reason === 'owner_only');
