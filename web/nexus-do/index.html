@@ -2419,8 +2419,10 @@ function pickBuiltinModel(el){
   if(typeof haptic==='function') haptic('done');
 }
 (function(){
-  const cur=localStorage.getItem('bg.api.model');
-  if(cur){const hit=document.querySelector('#builtinModels .opt-row[data-model="'+cur+'"]');if(hit)hit.classList.add('sel');}
+  try{
+    const cur=localStorage.getItem('bg.api.model');
+    if(cur){const hit=document.querySelector('#builtinModels .opt-row[data-model="'+cur+'"]');if(hit)hit.classList.add('sel');}
+  }catch(e){}
 })();
 
 /* ===== Tab 联动切换 ===== */
@@ -4432,9 +4434,6 @@ initWiring();
   initWebVitals();
   initSPATracking();
 })();
-
-initWebVitals();
-initSPATracking();
 
 /* Exec Log Functions */
 const EXEC_ICONS = { ok: '✓', error: '⚠', running: '⏱' };
