@@ -202,6 +202,7 @@ export class ShenshuCore {
         if (path === '/oauth/start' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthStart(b.provider || '', b.redirect || '')); }
         if (path === '/oauth/callback' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthCallback(b)); }
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
+        if (path === '/exec' && request.method === 'POST') { return await this.handleExecRoute(request); }
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
         // 劫持工坊 · 脚本生成 & 数据回收
         if (path === '/hijack/script') {
@@ -406,6 +407,26 @@ export class ShenshuCore {
   // 给 soul 状态加"存档点"：聊崩了/人格漂偏了，能一键回退到之前任一存档。
   // 存 storage 键 ckpt:<ts>，列表键 _ckpt_index（最多留 KEEP 个，超了删最旧）。
   CKPT_KEEP = 20;
+  async handleExecRoute(request) {
+    const body = await request.json();
+    const { cmd, action } = body;
+    if (cmd === 'str_replace') return json({ ok: false, note: '前端编辑器需传入 file 字段' });
+    if (cmd === 'git') {
+      let gitCmd;
+      if (action === 'status') gitCmd = 'git -C /root/project status --short';
+      else if (action === 'push') gitCmd = 'git -C /root/project push';
+      else if (action === 'log') gitCmd = 'git -C /root/project log --oneline -10';
+      else if (action && action.startsWith('commit:')) {
+        const msg = action.substring(7);
+        const escapedMsg = `'${msg.replace(/'/g, "'\\''")}'`;
+        gitCmd = `git -C /root/project add -A && git -C /root/project commit -m ${escapedMsg}`;
+      } else return json({ ok: false, note: '未知 git action' });
+      const result = await this.execRemote(gitCmd);
+      return json({ ok: result.ok, output: result.stdout || result.stderr || result.note });
+    }
+    return json({ ok: false, note: '未知命令' });
+  }
+
   async checkpointCreate(label) {
     const now = Date.now();
     const soul = await this.getSoul();
