@@ -1346,6 +1346,18 @@ body::before{
   }
 }
 
+/* —— BG Safe Globals Bootstrap —— */
+window.$ = window.$ || ((s) => document.querySelector(s));
+window.$$ = window.$$ || ((s) => document.querySelectorAll(s));
+window.store = window.store || (() => {
+  let mem = {}, ls = null;
+  try { ls = window.localStorage; ls.setItem('__t','1'); ls.removeItem('__t'); } catch(e) { ls = null; }
+  return {
+    get: k => { try { return ls ? ls.getItem(k) : (k in mem ? mem[k] : null); } catch(e){ return mem[k] ?? null; } },
+    set: (k,v) => { try { ls ? ls.setItem(k,v) : (mem[k]=v); } catch(e){ mem[k]=v; } },
+  };
+})();
+
 /* ══ Upgrade Layer v2 ══ */
 /* ===== Tab 滑动过渡 ===== */
 .tabs-container{overflow:hidden;position:relative;width:100%}
@@ -2065,8 +2077,16 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
 'use strict';
-/* Reverse UI Batch3 */
-window.renderCheckpoints ||= function(container, points) {
+window.__bgSafeInit ||= function(){
+  try {
+    const cur = localStorage.getItem('bg.api.model');
+    if (cur) {
+      const hit = document.querySelector('#builtinModels .opt-row[data-model="'+cur+'"]');
+      if (hit) hit.classList.add('sel');
+    }
+  } catch (e) {}
+};
+window.__bgSafeInit();
   if (!container) return;
   container.innerHTML = '';
   const line = document.createElement('div');
@@ -2573,18 +2593,10 @@ class StreamTypewriter{
   _finish(){if(this.done)return;this.done=true;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}this.el.classList.remove('st-cursor');if(typeof this.onComplete==='function')this.onComplete(this.buffer);}
 }
 
-const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
-
-/* —— 安全存储（沙箱内退回内存）—— */
-const store = (() => {
-  let mem = {}, ls = null;
-  try { ls = window.localStorage; ls.setItem('__t','1'); ls.removeItem('__t'); } catch(e) { ls = null; }
-  return {
-    get: k => { try { return ls ? ls.getItem(k) : (k in mem ? mem[k] : null); } catch(e){ return mem[k] ?? null; } },
-    set: (k,v) => { try { ls ? ls.setItem(k,v) : (mem[k]=v); } catch(e){ mem[k]=v; } },
-  };
-})();
+/* —— 安全全局已在 Upgrade Layer 前初始化 —— */
+window.$ = window.$ || ((s) => document.querySelector(s));
+window.$$ = window.$$ || ((s) => document.querySelectorAll(s));
+window.store = window.store || window.store;
 
 /* —— 演示模式（没后端也能玩到真实效果）—— */
 const Demo = {
