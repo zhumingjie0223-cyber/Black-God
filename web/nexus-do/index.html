@@ -1775,6 +1775,8 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑舰队</b><span id="modelLabel">神枢自动调度</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetCheckpoint')"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="set-tx"><b>存档点</b><span>记忆快照与回滚</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openStrReplace()"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></div><div class="set-tx"><b>代码编辑器</b><span>SEARCH/REPLACE 可视化</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openGitOps()"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path></svg></div><div class="set-tx"><b>Git 操作</b><span>状态/提交/推送/日志</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetRedTeam')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg></div><div class="set-tx"><b>红队工坊</b><span>逆向·渗透·注入·免杀·提权</span></div><div class="set-arrow">›</div></div>
@@ -1819,6 +1821,38 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <div id="apiStatus" style="font-size:12px;color:var(--text-3);margin:-4px 0 12px"></div>
   <button class="btn" onclick="saveApi()">保存</button>
   <div class="field" style="margin-top:16px"><label>神枢核心地址（一般不用改）</label><input id="nexusBase" placeholder="留空 = 当前地址"/></div>
+</div>
+
+<div id="sheetStrReplace" class="sheet">
+  <div class="grab"></div>
+  <div class="sheet-title">编辑器 · SEARCH/REPLACE</div>
+  <div style="padding:16px;">
+    <div style="margin-bottom:4px;color:var(--text-2);font-size:13px;">搜索内容</div>
+    <textarea id="strSearchInput" rows="12" style="background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);border-radius:8px;padding:10px;font-family:monospace;font-size:13px;width:100%;box-sizing:border-box;margin-bottom:10px;resize:vertical;"></textarea>
+    <div style="margin-bottom:4px;color:var(--text-2);font-size:13px;">替换为</div>
+    <textarea id="strReplaceInput" rows="12" style="background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);border-radius:8px;padding:10px;font-family:monospace;font-size:13px;width:100%;box-sizing:border-box;margin-bottom:10px;resize:vertical;"></textarea>
+    <div style="display:flex;gap:8px;padding:0 0 20px;">
+      <button class="btn" onclick="execStrReplace()" style="flex:1;">执行替换</button>
+      <button class="btn" onclick="closeSheet('sheetStrReplace')" style="flex:1;background:var(--surface-2);">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="sheetGitOps" class="sheet">
+  <div class="grab"></div>
+  <div class="sheet-title">Git 操作</div>
+  <div style="padding:16px;">
+    <div style="margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:13px;color:var(--text-2);">仓库：<span id="gitRepoDisplay" style="color:var(--text);font-family:monospace;">未配置仓库</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button class="btn" onclick="gitOp('status')">查看状态</button>
+      <button class="btn" onclick="commitGit()">提交当前改动</button>
+      <button class="btn" onclick="gitOp('push')">推送</button>
+      <button class="btn" onclick="gitOp('log')">查看最近10条 log</button>
+    </div>
+    <div style="margin-bottom:4px;color:var(--text-2);font-size:13px;">操作结果</div>
+    <pre id="gitResultDisplay" style="background:#000;color:#0f0;padding:12px;border-radius:8px;font-size:12px;font-family:monospace;max-height:300px;overflow:auto;margin:0 0 20px;white-space:pre-wrap;word-break:break-all;">等待操作...</pre>
+    <button class="btn" onclick="closeSheet('sheetGitOps')" style="width:100%;background:var(--surface-2);">关闭</button>
+  </div>
 </div>
 
 <div class="sheet" id="sheetCheckpoint">
@@ -5046,6 +5080,39 @@ window.renderGrounding = function(container, text) {
     const textNode = document.createTextNode(text.slice(lastIndex));
     container.appendChild(textNode);
   }
+};
+</script>
+<script>
+window.openStrReplace = function() { openSheet('sheetStrReplace'); };
+window.execStrReplace = async function() {
+  const searchVal = document.getElementById('strSearchInput').value;
+  const replaceVal = document.getElementById('strReplaceInput').value;
+  if (!searchVal) { toast('请输入搜索内容'); return; }
+  try {
+    await Nexus._fetch('/exec', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cmd:'str_replace', search:searchVal, replace:replaceVal }) });
+    toast('替换完成'); closeSheet('sheetStrReplace');
+  } catch(err) { toast('替换失败'); }
+};
+
+window.openGitOps = function() {
+  const repo = localStorage.getItem('GIT_REPO') || (window.Nexus && window.Nexus.config && window.Nexus.config.GIT_REPO) || '未配置仓库';
+  document.getElementById('gitRepoDisplay').textContent = repo;
+  document.getElementById('gitResultDisplay').textContent = '等待操作...';
+  openSheet('sheetGitOps');
+};
+window.gitOp = async function(action) {
+  const display = document.getElementById('gitResultDisplay');
+  display.textContent = '执行中...';
+  try {
+    const res = await Nexus._fetch('/exec', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cmd:'git', action }) });
+    const data = await res.json();
+    display.textContent = data.output || data.result || JSON.stringify(data, null, 2);
+  } catch(err) { display.textContent = '错误: ' + err.message; toast('操作失败'); }
+};
+window.commitGit = async function() {
+  const msg = await uiPrompt('输入提交信息', 'update');
+  if (!msg) return;
+  await gitOp('commit:' + msg);
 };
 </script>
 </body>
