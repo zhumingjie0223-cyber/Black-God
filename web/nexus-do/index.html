@@ -1346,17 +1346,6 @@ body::before{
   }
 }
 
-/* —— BG Safe Globals Bootstrap —— */
-window.$ = window.$ || ((s) => document.querySelector(s));
-window.$$ = window.$$ || ((s) => document.querySelectorAll(s));
-window.store = window.store || (() => {
-  let mem = {}, ls = null;
-  try { ls = window.localStorage; ls.setItem('__t','1'); ls.removeItem('__t'); } catch(e) { ls = null; }
-  return {
-    get: k => { try { return ls ? ls.getItem(k) : (k in mem ? mem[k] : null); } catch(e){ return mem[k] ?? null; } },
-    set: (k,v) => { try { ls ? ls.setItem(k,v) : (mem[k]=v); } catch(e){ mem[k]=v; } },
-  };
-})();
 
 /* ══ Upgrade Layer v2 ══ */
 /* ===== Tab 滑动过渡 ===== */
@@ -2073,6 +2062,17 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 </div>
 
 <script>
+/* —— BG Safe Globals Bootstrap —— */
+window.$ = window.$ || ((s) => document.querySelector(s));
+window.$$ = window.$$ || ((s) => document.querySelectorAll(s));
+window.store = window.store || (() => {
+  let mem = {}, ls = null;
+  try { ls = window.localStorage; ls.setItem('__t','1'); ls.removeItem('__t'); } catch(e) { ls = null; }
+  return {
+    get: k => { try { return ls ? ls.getItem(k) : (k in mem ? mem[k] : null); } catch(e){ return mem[k] ?? null; } },
+    set: (k,v) => { try { ls ? ls.setItem(k,v) : (mem[k]=v); } catch(e){ mem[k]=v; } },
+  };
+})();
 /* ============================================================
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
