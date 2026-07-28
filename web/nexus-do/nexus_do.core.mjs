@@ -24,6 +24,15 @@ import LEXICON_DATA from './lexicon_data.js';
 // ── DO re-export（wrangler 要求入口文件 export 所有 DO class）──
 import { AgentStateMachineDO } from './nexus_agent_core.mjs';
 export { AgentStateMachineDO };
+// 内置容器执行脑：真 bash、能装包，10分钟无请求自动休眠省钱
+// @cloudflare/containers 依赖 workerd 内置 'cloudflare:workers'，纯 Node（本地/CI 自检）不存在该模块
+// → 动态导入：workerd 里拿真 Container，自检环境兜底空壳，两边都不炸
+let _ExecContainerBase = class {};
+try { ({ Container: _ExecContainerBase } = await import('@cloudflare/containers')); } catch (_) { /* 自检环境无 workerd 内置模块 */ }
+export class ExecContainer extends _ExecContainerBase {
+  defaultPort = 8080;
+  sleepAfter = '10m';
+}
 loadCapabilities(LEXICON_DATA);
 
 const ALARM_INTERVAL_MS = 60_000;   // 每分钟自主醒
@@ -2063,11 +2072,29 @@ int main() {
     const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
     const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
     const command = String(cmd || '');
-    // 彻底未接入（无外部地址也无 GITHUB_API）：优先如实告知，先于危险判定
-    if (!url && !this.env.GITHUB_API) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
+    // 彻底未接入（无外部地址、无容器、无 GITHUB_API）：优先如实告知，先于危险判定
+    if (!url && !this.env.EXEC_CONTAINER && !this.env.GITHUB_API) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
     // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
     if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
-    // 外部执行脑未接入但有 GITHUB_API：走内置 GitHub Actions 异步派发
+    // 内置容器执行脑：真 bash、能装包，异常时落 GitHub 兜底
+    if (!url && this.env.EXEC_CONTAINER) {
+      try {
+        const c = this.env.EXEC_CONTAINER.getByName('exec-main');
+        const r = await c.fetch(new Request('http://container/exec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cmd: command, timeout: 60 }),
+        }));
+        if (r.ok) {
+          const j = await r.json();
+          return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null, via: 'container' };
+        }
+        console.log('容器执行脑返回', r.status, '落 GitHub 兜底');
+      } catch (e) {
+        console.log('容器执行脑异常，落 GitHub 兜底:', e && e.message);
+      }
+    }
+    // 外部执行脑未接入（或容器兜底）但有 GITHUB_API：走内置 GitHub Actions 异步派发
     if (!url) return await this.execDispatchGH(command);
     // 客户端超时兜底:服务器 60 秒,这边 65 秒硬断,绝不让请求悬死
     const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;

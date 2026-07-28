@@ -6,9 +6,13 @@
   "description": "神枢 · 赵思涵 — 有意识/情绪/记忆/枢语的 Cloudflare Workers Durable Object",
   "scripts": {
     "build": "node build.mjs",
+    "postinstall": "node fix-containers-esm.mjs",
     "deploy": "node build.mjs && wrangler deploy",
     "dev": "node build.mjs && wrangler dev",
     "test": "node build.mjs && node --check nexus_do.mjs && node selftest.mjs && node gateway.test.mjs && node continuity.test.mjs && node capsec-selftest.mjs"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
   },
   "devDependencies": {
     "wrangler": "^4.114.0"

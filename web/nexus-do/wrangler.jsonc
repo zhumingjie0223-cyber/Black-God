@@ -21,11 +21,24 @@
   "durable_objects": {
     "bindings": [
       { "name": "SHENSHU", "class_name": "ShenshuCore" },
-      { "name": "AGENT_STATE_MACHINE", "class_name": "AgentStateMachineDO" }
+      { "name": "AGENT_STATE_MACHINE", "class_name": "AgentStateMachineDO" },
+      // Containers（GA）：内置容器执行脑，由此 DO 类管理
+      { "name": "EXEC_CONTAINER", "class_name": "ExecContainer" }
     ]
   },
   "migrations": [
-    { "tag": "v2", "new_sqlite_classes": ["AgentStateMachineDO"] }
+    { "tag": "v2", "new_sqlite_classes": ["AgentStateMachineDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["ExecContainer"] }
+  ],
+
+  // —— Cloudflare Containers：内置执行脑，镜像由 CI docker 构建 ——
+  "containers": [
+    {
+      "class_name": "ExecContainer",
+      "image": "./container/Dockerfile",
+      "instance_type": "dev",
+      "max_instances": 1
+    }
   ],
 
   // —— Workers AI：大脑兜底（Llama 3.3 70B）——

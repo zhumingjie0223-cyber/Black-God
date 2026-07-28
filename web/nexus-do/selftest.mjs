@@ -135,6 +135,7 @@ ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => ({ exec_url: 'http://x:8765', exec_token: 't' }) };
   const r = await T.execRemote('rm -rf /'); ok('执行脑·危险命令未确认→拦下要二次确认(不真跑)', r.ok === false && r.need_confirm === true && !!r.danger); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('rm -rf /'); ok('执行脑·未接入优先于危险判定(先说未接入)', r.ok === false && /未接入/.test(r.note || '') && !r.need_confirm); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execRemote('rm -rf /'); ok('执行脑·容器路径危险命令仍先弹need_confirm', r && r.need_confirm === true && !r.ok); }
 
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');
