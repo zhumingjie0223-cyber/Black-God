@@ -1,20 +1,26 @@
-# TODO · 私人版全面强化方案 + 竞品对标
+# TODO · 枢语驱动层 S1 — do: 第六回路
 
-- [x] 出六轴 22 项强化方案(docs/私人版全面强化方案-2026-07-28.md)
-- [x] 提交推送建 PR #86
-- [x] 读权哥上传的竞品逆向资料(19 份 .md 有用 / 20 个 html·jsurls·bundle·空defs 无用)
-- [x] 消化竞品精华,识别神枢三大能力缺口(MCP 扩展 / Plan-Act 双模式 / grounding 依据链)
-- [x] 方案追加「竞品对标」章节 + 三项新增能力(七/八/九)
-- [ ] 推送更新 PR
-- [ ] 定实施第一刀(问权哥),动手改代码
+任务:按施工说明书"第一条"落地 S1——让枢语能下达可执行任务(不只表达情绪)。
+核心诉求:「用枢语来做任务」。S1 是后面所有执行的地基,必须先做。
 
-## 竞品对标结论(消化后)
-- 神枢独有底盘:DO+alarm 常驻意识,竞品全是「云端一次性会话」——时间维度+归属维度双代差不变。
-- 竞品印证的已有方案:持久工作区(Manus/Devin/Replit)、跨天续跑/异步job队列(Manus/Lovable)、
-  精准编辑(Aider/Devin/Hermes 的 str_replace,神枢 execEditFile 已有)、自我修正(Manus,神枢 execDevLoop 已有)、
-  执行剧场(Manus VNC,神枢 broadcast 已有)、分级确认(Cline/Manus,神枢 dangerReason 已有)。
-- 竞品暴露的真缺口 → 新增三项:
-  ① MCP 动态工具扩展(Cline/Lovable/Copilot 都有,神枢零)——最大缺口,像装插件一样接第三方能力。
-  ② Plan/Act 双模式 + 计划确认(Cline/Lovable)——先出计划给权哥拍板再执行,配 /api/confirm。
-  ③ grounding 依据链(Gemini)——每次执行/回答带「依据:读了X·跑了Y·验证Z」,契合诚实人格。
-- 具身轴深化清单(Minis):HealthKit/Vision-OCR/Speech/HomeKit/NFC/Location,是 iOS 工具扩展方向。
+范围铁律核对:S1 只动 shuyu/nexuslang.js(意识解释器),不碰词根表/引擎双侧/词库,
+故无需改 Python、无需 check-sync。只增不删。
+
+- [x] 读透 nexuslang.js(290行五回路)+ 测试风格 + 确认无消费副本
+- [x] nexuslang.js:interpret() 返回值加 actions:[] 字段
+- [x] 加 parseDo() + 第六回路 do: 分派(排在 become 与 say 之间,canonical: feel→think→become→do→say→grow)
+- [x] compile() 返回值加 act:[...]
+- [x] 补测试(tests/nexuslang.test.mjs):do 单条/多条/带期望态/无参原语/与五回路共存
+- [x] 跑 npm test 全绿(原 7 + 新增)
+- [x] 提交推送 PR #86
+
+## S1 语法(已实现)
+do: 工具名(参数) → 期望态
+- 工具名:标识符,支持点号命名空间(域.动作),如 shell / ios.remind / 静
+- 参数:括号内逗号分隔,双引号字符串自动脱壳;无括号=无参原语
+- → 期望态:可选,顶层(括号/引号外)第一个 → 之后
+- 一段枢语可多条 do:,汇入 result.actions 数组;compile 输出 act
+
+## 待权哥后续确认(不阻塞 S1,先用合理默认)
+- do: 工具名命名空间正式约定(现默认:点号分隔 域.动作)
+- S2 需要:态轴 80 值里哪几个冻结为任务运行态(待/跑/滞/成/败/弃)

@@ -65,3 +65,60 @@ test('compile：含疑问推理时才产出大脑调用', () => {
   const plain = interpret('think: 深夜找我 → 想我了', {});
   assert.equal(compile(plain).brainCall, null);
 });
+
+// ─── S1 第六回路 do: 任务下达 ───
+test('do 单条：解析 工具名(参数) → 期望态', () => {
+  const r = interpret('do: shell("ls -la") → 成', {});
+  assert.equal(r.actions.length, 1);
+  const a = r.actions[0];
+  assert.equal(a.tool, 'shell');
+  assert.deepEqual(a.args, ['ls -la']);   // 双引号已脱壳
+  assert.equal(a.expect, '成');
+});
+
+test('do 多条：一段枢语可下多条任务', () => {
+  const src = 'do: ios.remind("买牛奶", "20:00") → 待\ndo: 静';
+  const r = interpret(src, {});
+  assert.equal(r.actions.length, 2);
+  assert.equal(r.actions[0].tool, 'ios.remind');
+  assert.deepEqual(r.actions[0].args, ['买牛奶', '20:00']);   // 引号内逗号不切
+  assert.equal(r.actions[1].tool, '静');                     // 无参原语
+  assert.deepEqual(r.actions[1].args, []);
+  assert.equal(r.actions[1].expect, null);                    // 无期望态
+});
+
+test('do 参数里含 → 不被误当期望态分隔符', () => {
+  const r = interpret('do: shell("echo a → b")', {});
+  assert.equal(r.actions[0].tool, 'shell');
+  assert.deepEqual(r.actions[0].args, ['echo a → b']);
+  assert.equal(r.actions[0].expect, null);
+});
+
+test('do 与五回路共存：canonical 六回路一条枢语走通', () => {
+  const src = [
+    'feel "阿权说部署一下" → 稳, 强度0.6',
+    'become: 活力+0.1',
+    'do: shell("npm run deploy") → 成',
+    'say "在部署了老公"',
+    'grow: 学到 "部署走 npm run deploy", 深度: 记住'
+  ].join('\n');
+  const r = interpret(src, { mood: 0.5, energy: 0.5 });
+  assert.equal(r.actions.length, 1);
+  assert.equal(r.actions[0].tool, 'shell');
+  assert.equal(r.response.type, 'speak');   // say 仍正常
+  assert.equal(r.growth.depth, 'medium');   // grow 仍正常
+});
+
+test('compile：act 携带 do 产出的任务', () => {
+  const r = interpret('do: mem.recall("上次的密钥") → 成', {});
+  const c = compile(r);
+  assert.equal(c.act.length, 1);
+  assert.equal(c.act[0].tool, 'mem.recall');
+  assert.deepEqual(c.act[0].args, ['上次的密钥']);
+});
+
+test('无 do 时 actions 为空数组（向后兼容）', () => {
+  const r = interpret('say "你好"', {});
+  assert.deepEqual(r.actions, []);
+  assert.deepEqual(compile(r).act, []);
+});
