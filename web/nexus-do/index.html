@@ -2099,7 +2099,7 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 <div class="msg-menu" id="msgMenu"></div>
 <div class="art-pane" id="artPane">
   <div class="art-head"><b>⚡ 预览舱 · Artifact</b><button class="btn ghost" onclick="closeArtifact()">关闭</button></div>
-  <iframe id="artFrame" sandbox="allow-scripts"></iframe>
+  <iframe id="artFrame" sandbox="allow-scripts allow-same-origin"></iframe>
 </div>
 
 <script>
@@ -2987,7 +2987,9 @@ function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
   const b=document.createElement('div'); b.className='bubble';
-  if(role==='her' && text && (text.indexOf('```')>-1 || /https?:\/\//.test(text))){ renderRich(b, text); } else { b.textContent=text; }
+  if(role==='her' && text && /\[\d+\]/.test(text)){ renderGrounding(b, text); }
+  else if(role==='her' && text && (text.indexOf('```')>-1 || /https?:\/\//.test(text))){ renderRich(b, text); } 
+  else { b.textContent=text; }
   m.appendChild(b);
   const foot=document.createElement('div'); foot.className='msg-foot';
   if(meta){ const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=meta; foot.appendChild(mt); }
@@ -5004,6 +5006,47 @@ async function confirmExec(cmd) {
   } catch (e) { hideTyping(); toast('执行出错'); }
 }
 
+</script>
+<script>
+window.renderGrounding = function(container, text) {
+  container.innerHTML = '';
+  const pattern = /\[(\d+)\]\s+(.+?)\s+—\s+(.+?)\n\s+来源:\s+(https?:\/\/[^\s]+)/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const textNode = document.createTextNode(text.slice(lastIndex, match.index));
+      container.appendChild(textNode);
+    }
+    const [_, num, title, content, url] = match;
+    const card = document.createElement('div');
+    card.style.cssText = 'border-left:3px solid rgb(16,185,129);background:rgba(16,185,129,0.06);border-radius:8px;padding:8px 12px;margin:4px 0;';
+    const badge = document.createElement('span');
+    badge.style.cssText = 'display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:rgb(16,185,129);color:#fff;border-radius:50%;font-size:11px;margin-right:6px;vertical-align:middle;';
+    badge.textContent = num;
+    const titleSpan = document.createElement('strong');
+    titleSpan.textContent = title;
+    titleSpan.style.marginRight = '8px';
+    const contentSpan = document.createElement('span');
+    contentSpan.textContent = content;
+    contentSpan.style.color = '#666';
+    const link = document.createElement('a');
+    link.href = url;
+    link.textContent = url;
+    link.target = '_blank';
+    link.style.cssText = 'color:var(--cy);text-decoration:underline;display:block;margin-top:4px;font-size:12px;word-break:break-all;';
+    card.appendChild(badge);
+    card.appendChild(titleSpan);
+    card.appendChild(contentSpan);
+    card.appendChild(link);
+    container.appendChild(card);
+    lastIndex = pattern.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    const textNode = document.createTextNode(text.slice(lastIndex));
+    container.appendChild(textNode);
+  }
+};
 </script>
 </body>
 </html>
