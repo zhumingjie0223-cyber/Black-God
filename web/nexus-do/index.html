@@ -2077,7 +2077,7 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
    神枢 · 客户端（完整版，绝不再截断）
    ============================================================ */
 'use strict';
-window.__bgSafeInit ||= function(){
+window.__bgSafeInit = window.__bgSafeInit || function(){
   try {
     const cur = localStorage.getItem('bg.api.model');
     if (cur) {
@@ -2087,6 +2087,8 @@ window.__bgSafeInit ||= function(){
   } catch (e) {}
 };
 window.__bgSafeInit();
+
+window.renderCheckpoints = window.renderCheckpoints || function(container, points) {
   if (!container) return;
   container.innerHTML = '';
   const line = document.createElement('div');
@@ -2111,7 +2113,7 @@ window.__bgSafeInit();
   container.appendChild(line);
 };
 
-window.initNodeTooltips ||= function() {
+window.initNodeTooltips = window.initNodeTooltips || function() {
   let tip = null;
   const ensureTip = () => {
     if (!tip) {
@@ -2143,18 +2145,18 @@ window.initNodeTooltips ||= function() {
 
 
 
-window.THEMES ||= [
+window.THEMES = window.THEMES || [
   {name:'森林',hue:152},{name:'海洋',hue:210},{name:'暗红',hue:0},
   {name:'紫',hue:270},{name:'橙',hue:30},{name:'青',hue:185},
   {name:'粉',hue:330},{name:'黄',hue:60},{name:'灰',hue:200}
 ];
 
-window.applyTheme ||= function(hue) {
+window.applyTheme = window.applyTheme || function(hue) {
   document.documentElement.style.setProperty('--hue', hue);
   try { localStorage.setItem('theme-hue', hue); } catch(e) {}
 };
 
-window.renderThemePicker ||= function(container) {
+window.renderThemePicker = window.renderThemePicker || function(container) {
   if (!container) return;
   container.innerHTML = '';
   window.THEMES.forEach(t => {
@@ -2174,7 +2176,7 @@ window.renderThemePicker ||= function(container) {
   if (!isNaN(saved)) window.applyTheme(saved);
 };
 
-window.initBento ||= function(container, caps) {
+window.initBento = window.initBento || function(container, caps) {
   if (!container) return;
   container.innerHTML = '';
   container.style.display = 'grid';
@@ -2203,7 +2205,7 @@ window.initBento ||= function(container, caps) {
   });
 };
 
-window.renderAgentGraph ||= function(svgEl, agents, edges) {
+window.renderAgentGraph = window.renderAgentGraph || function(svgEl, agents, edges) {
   if (!svgEl) return;
   svgEl.innerHTML = '';
   const W = svgEl.clientWidth || 400, H = svgEl.clientHeight || 300;
@@ -2237,7 +2239,7 @@ window.renderAgentGraph ||= function(svgEl, agents, edges) {
   });
 };
 
-window.initGlowSlider ||= function(input) {
+window.initGlowSlider = window.initGlowSlider || function(input) {
   if (!input) return;
   const saved = localStorage.getItem('glow-intensity');
   if (saved !== null) { input.value = saved; document.documentElement.style.setProperty('--glow-intensity', saved); }
@@ -2254,13 +2256,13 @@ window.initGlowSlider ||= function(input) {
  */
 
 // ── 工具函数（条件赋值避免重复声明）──
-window.$ ||= (s, r = document) => r.querySelector(s);
-window.$$ ||= (s, r = document) => [...r.querySelectorAll(s)];
-window.esc ||= s => String(s).replace(/[&<>"']/g, c =>
-  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+window.$ = window.$ || ((s, r = document) => r.querySelector(s));
+window.$$ = window.$$ || ((s, r = document) => [...r.querySelectorAll(s)]);
+window.esc = window.esc || (s => String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 
 // ── 1. Toast（幂等容器）──
-window.toast ||= function(msg, type = 'info', ms = 3000) {
+window.toast = window.toast || function(msg, type = 'info', ms = 3000) {
   let host = $('#toast-host');
   if (!host) {
     host = Object.assign(document.createElement('div'), {id:'toast-host'});
@@ -2282,7 +2284,7 @@ window.toast ||= function(msg, type = 'info', ms = 3000) {
 const _prog = $('#prog') || Object.assign(
   document.body.appendChild(document.createElement('div')), {id:'prog'}
 );
-window.setProgress ||= function(v) {
+window.setProgress = window.setProgress || function(v) {
   if (v == null) { _prog.classList.remove('on'); _prog.style.width = '0'; return; }
   _prog.classList.add('on');
   _prog.style.width = Math.max(0, Math.min(100, v)) + '%';
@@ -2295,7 +2297,7 @@ function safeHref(u) {
   return /^\s*javascript:/i.test(u) ? '#' : u;
 }
 
-window.md ||= function(src) {
+window.md = window.md || function(src) {
   if (!src) return '';
   const blocks = [];
   // 抠出代码块
@@ -2333,7 +2335,7 @@ window.md ||= function(src) {
 };
 
 // ── 4. 滚动到底浮钮──
-window.initScrollToBottom ||= function(scrollEl, lastMsgSel) {
+window.initScrollToBottom = window.initScrollToBottom || function(scrollEl, lastMsgSel) {
   const btn = $('#toBottom') || Object.assign(
     document.body.appendChild(document.createElement('button')),
     {id:'toBottom', textContent:'↓'}
@@ -2349,7 +2351,7 @@ window.initScrollToBottom ||= function(scrollEl, lastMsgSel) {
 };
 
 // ── 5. 模式切换滑块 ──
-window.initModeSlider ||= function(container) {
+window.initModeSlider = window.initModeSlider || function(container) {
   if (!container) return;
   const pill = Object.assign(document.createElement('span'), {className: 'pill'});
   container.style.position = 'relative';
@@ -2368,7 +2370,7 @@ window.initModeSlider ||= function(container) {
 
 // ── 6. 命令面板 ──
 let _cmdCmds = [];
-window.initCmdPanel ||= function(commands) {
+window.initCmdPanel = window.initCmdPanel || function(commands) {
   _cmdCmds = commands || [];
   let panel = $('#cmdp');
   if (panel && panel.dataset.initialized) return;
@@ -2404,7 +2406,7 @@ window.initCmdPanel ||= function(commands) {
   render();
 };
 
-window.toggleCmdPanel ||= function() {
+window.toggleCmdPanel = window.toggleCmdPanel || function() {
   const p = $('#cmdp'); if (!p) return;
   if (p.classList.contains('on')) {
     p.classList.remove('on');
