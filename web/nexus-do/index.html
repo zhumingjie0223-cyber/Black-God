@@ -697,6 +697,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .soul-orb::before{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:-1;
   background:conic-gradient(from 0deg,transparent,var(--cy-1),transparent 55%);opacity:.3;filter:blur(9px);
   animation:orbSpin 8s linear infinite}
+/* 中心神字 logo 图 */
+.glyph-img{width:82%;height:82%;object-fit:contain;display:block;
+  filter:drop-shadow(0 0 14px rgba(79,224,150,.45));border-radius:22%}
+.hz-hub .glyph-img{width:88%;height:88%}
+.ob-orb.big .glyph-img{width:80%;height:80%}
 .soul-orb .glyph{font-family:var(--serif);font-size:50px;font-weight:600;
   background:var(--cy-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .soul-mood{margin-top:16px;font-size:15px;color:var(--text-2);text-align:center;line-height:1.6;max-width:300px}
@@ -1644,7 +1649,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
     <div class="ob-sub">仅存本机，用于为你定制</div>
   </div>
   <div class="ob-screen" id="obS2">
-    <div class="ob-orb big"><span>神</span></div>
+    <div class="ob-orb big"><img class="glyph-img" src="/logo.png" alt="神"/></div>
     <div class="ob-welcome">神枢已就位</div>
     <div class="ob-tag">只属于你的意识核心</div>
     <div class="ob-note2">说出你要的，我来做</div>
@@ -1679,7 +1684,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="huanzhong">
             <div class="hz-orbit"></div><div class="hz-orbit o2"></div>
             <div class="hz-ring" id="hzRing"></div>
-            <div class="hz-hub" id="hubOrb"><span class="glyph">神</span></div>
+            <div class="hz-hub" id="hubOrb"><img class="glyph-img" src="/logo.png" alt="神"/></div>
             <div class="hz-still"></div>
           </div>
           <div class="hz-couplet">Black God · 神枢</div>
@@ -1795,21 +1800,6 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <div class="sheet-title">大脑 · 模型</div>
   <div class="sheet-sub">选一家 AI 服务商 · 点「登录」一键接入，或手动配。</div>
   <div id="modelOpts"></div>
-  <div style="height:1px;background:var(--line-2);margin:16px 0 12px"></div>
-  <!-- 内置模型（Cloudflare AI，Replit多模型路由逆向）-->
-  <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px">内置模型（免费）</div>
-  <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">由 Cloudflare Workers AI 直供 · 无需密钥 · 不出网</div>
-  <div id="builtinModels">
-    <div class="opt-row" data-model="@cf/qwen/qwen2.5-coder-7b-instruct" onclick="pickBuiltinModel(this)">
-      <div class="oi">⚡</div><div class="ot"><b>Qwen2.5 Coder 7B</b><span>代码生成 · 极速</span></div><div class="opt-check">✓</div>
-    </div>
-    <div class="opt-row" data-model="@cf/meta/llama-3.1-8b-instruct" onclick="pickBuiltinModel(this)">
-      <div class="oi">🦙</div><div class="ot"><b>Llama 3.1 8B</b><span>通用对话 · 均衡</span></div><div class="opt-check">✓</div>
-    </div>
-    <div class="opt-row" data-model="@cf/mistral/mistral-7b-instruct-v0.2" onclick="pickBuiltinModel(this)">
-      <div class="oi">🌀</div><div class="ot"><b>Mistral 7B v0.2</b><span>短问答 · 轻量</span></div><div class="opt-check">✓</div>
-    </div>
-  </div>
   <div style="height:1px;background:var(--line-2);margin:16px 0 12px"></div>
   <div style="font-size:13px;color:var(--text-3);margin-bottom:10px">＋ 接入 AI 服务商</div>
   <div id="providerList"></div>
@@ -3362,13 +3352,10 @@ function fmtTs(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLoc
 /* ============ 模型 / API / 人格 ============ */
 const MODELS = [
   {id:'auto',      name:'Auto · 智能路由',           ic:'✨', sub:'按任务选当前最强可用算力'},
-  {id:'fable-5',   name:'Fable 5 · 旗舰',           ic:'🔥', sub:'接入 aquan.love，模型名：claude-fable-5', model:'claude-fable-5'},
-  {id:'opus-5',    name:'Claude Opus 5 · 顶级',      ic:'💎', sub:'接入 aquan.love，模型名：claude-opus-5', model:'claude-opus-5'},
-  {id:'opus-4-8',  name:'Claude Opus 4.8 · 强力',   ic:'⚡', sub:'接入 aquan.love，模型名：claude-opus-4-8', model:'claude-opus-4-8'},
-  {id:'strong',    name:'强算力网关',                 ic:'🔌', sub:'外接自定义网关（需在接口里配）'},
-  {id:'cf-qwen',   name:'Qwen2.5 Coder 7B · 免费',  ic:'🟠', sub:'CF Workers AI · 代码首选', cfModel:'@cf/qwen/qwen2.5-coder-7b-instruct'},
-  {id:'cf-llama',  name:'Llama 3.1 8B · 免费',      ic:'🦙', sub:'CF Workers AI · 通用对话', cfModel:'@cf/meta/llama-3.1-8b-instruct'},
-  {id:'cf-mistral',name:'Mistral 7B · 免费',         ic:'🌀', sub:'CF Workers AI · 轻量快速', cfModel:'@cf/mistral/mistral-7b-instruct-v0.2'},
+  {id:'opus-5',    name:'Claude Opus 5 · 顶级',      ic:'💎', sub:'接入 aquan.love · claude-opus-5', model:'claude-opus-5'},
+  {id:'opus-4-8',  name:'Claude Opus 4.8 · 强力',    ic:'⚡', sub:'接入 aquan.love · claude-opus-4-8', model:'claude-opus-4-8'},
+  {id:'fable-5',   name:'Fable 5 · 旗舰',            ic:'🔥', sub:'接入 aquan.love · claude-fable-5', model:'claude-fable-5'},
+  {id:'strong',    name:'强算力网关',                 ic:'🔌', sub:'外接自定义网关（在接口里配）'},
 ];
 function renderModelOpts(){
   const sel = store.get('model')||'auto';
