@@ -342,6 +342,8 @@ export class ShenshuCore {
     const now = Date.now();
     soul.心跳次数 = (soul.心跳次数 || 0) + 1;
     soul.最后心跳 = now;
+    // 回收 GitHub Actions 异步执行结果（失败不阻断心跳）
+    try { await this.execPollGH(); } catch (e) { console.log('execPoll error:', e && e.message); }
 
     const lastSeen = soul.last_seen || now;
     const hoursQuiet = (now - lastSeen) / 3600000;
@@ -407,6 +409,124 @@ export class ShenshuCore {
   // 给 soul 状态加"存档点"：聊崩了/人格漂偏了，能一键回退到之前任一存档。
   // 存 storage 键 ckpt:<ts>，列表键 _ckpt_index（最多留 KEEP 个，超了删最旧）。
   CKPT_KEEP = 20;
+  // GitHub API 统一请求封装（原 execViaGitHub 内部 gh() 提取而来，逻辑不变）
+  async ghApi(path, opts = {}) {
+    const owner = 'zhumingjie0223-cyber', repo = 'Black-God';
+    return fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+      ...opts,
+      headers: {
+        'Authorization': `Bearer ${this.env.GITHUB_API}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'Black-God-Nexus',
+        ...(opts.headers || {})
+      }
+    });
+  }
+
+  // 危险命令拦截列表（派发与旧同步实现共用）
+  ghDangerList() {
+    return ['rm -rf /', 'rm -fr /', ':(){ :|:& };:', 'mkfs', 'dd if=/dev/zero', '> /dev/sda'];
+  }
+
+  // 从 Actions 原始日志中提取 Command Output 段（原逻辑不变）
+  parseGHLogs(logs) {
+    const lines = String(logs || '').split('\n');
+    const out = []; let inOut = false;
+    for (const line of lines) {
+      if (line.includes('##[group]Command Output')) { inOut = true; continue; }
+      if (line.includes('##[endgroup]')) { inOut = false; continue; }
+      if (inOut) out.push(line.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+/, ''));
+    }
+    return out.join('\n').trim();
+  }
+
+  // 异步派发：只触发 workflow，不等结果，任务入队等心跳回收
+  async execDispatchGH(cmd) {
+    const workflowFile = 'exec-shell.yml';
+    const command = String(cmd || '');
+    if (command.length > 500) return { ok: false, error: '命令过长（最多500字符）' };
+    for (const p of this.ghDangerList()) {
+      if (command.includes(p)) return { ok: false, error: '危险命令已拦截' };
+    }
+    if (!this.env.GITHUB_API) return { ok: false, error: 'GITHUB_API 未配置' };
+    try {
+      const triggerTime = Date.now();
+      const dr = await this.ghApi(`/actions/workflows/${workflowFile}/dispatches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: 'main', inputs: { cmd: command } })
+      });
+      if (!dr.ok) return { ok: false, error: `触发失败: ${dr.status}` };
+      // 入队：心跳每分钟来捞一次结果
+      const pending = (await this.storage.get('pending_execs')) || [];
+      pending.push({ triggerTime, cmd: command, attempts: 0 });
+      await this.storage.put('pending_execs', pending);
+      return { ok: true, pending: true, note: '⏳ 已派发执行，约1-2分钟出结果，完成后自动推送到对话' };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // 结果回收：由 autonomousTick 每分钟调用，单任务失败不影响其他任务与心跳
+  async execPollGH() {
+    const pending = (await this.storage.get('pending_execs')) || [];
+    if (!pending.length) return;
+    const remain = [];
+    for (const task of pending) {
+      try {
+        const rr = await this.ghApi('/actions/runs?event=workflow_dispatch&per_page=5');
+        if (!rr.ok) {
+          task.attempts = (task.attempts || 0) + 1;
+          if (task.attempts <= 10) remain.push(task);
+          else await this.execPushResult(task.cmd, `❌ 执行结果获取失败：Actions 列表接口返回 ${rr.status}`);
+          continue;
+        }
+        const d = await rr.json();
+        const run = (d.workflow_runs || []).find(r =>
+          r.name === 'Execute Shell Command' &&
+          new Date(r.created_at).getTime() >= task.triggerTime - 5000
+        );
+        // 还没起来或还在跑：累加重试，超 10 次（约10分钟）判失败
+        if (!run || run.status !== 'completed') {
+          task.attempts = (task.attempts || 0) + 1;
+          if (task.attempts > 10) {
+            await this.execPushResult(task.cmd, '❌ 执行超时：10 分钟内未取到结果，任务已放弃');
+          } else {
+            remain.push(task);
+          }
+          continue;
+        }
+        // 已完成：取 job → 取日志 → 提取输出
+        const jr = await this.ghApi(`/actions/runs/${run.id}/jobs`);
+        const job = (await jr.json()).jobs?.[0];
+        if (!job) { await this.execPushResult(task.cmd, '❌ 执行完成但未找到 job'); continue; }
+        const lr = await this.ghApi(`/actions/jobs/${job.id}/logs`);
+        if (!lr.ok) { await this.execPushResult(task.cmd, `❌ 日志获取失败: ${lr.status}`); continue; }
+        const output = this.parseGHLogs(await lr.text());
+        await this.execPushResult(task.cmd, '✅ 执行完成\n```\n' + output + '\n```');
+      } catch (e) {
+        task.attempts = (task.attempts || 0) + 1;
+        if (task.attempts <= 10) remain.push(task);
+        else { try { await this.execPushResult(task.cmd, '❌ 执行结果回收异常：' + (e && e.message)); } catch (_) {} }
+      }
+    }
+    await this.storage.put('pending_execs', remain);
+  }
+
+  // 把执行结果写进对话流 + 实时广播 + 桌面推送
+  async execPushResult(cmd, reply) {
+    const now = Date.now();
+    const text = '[shell] ' + cmd;
+    let stream = (await this.storage.get('stream')) || [];
+    stream.push({ ts: now, text, reply, emotion: 'calm', model: 'exec-gh' });
+    if (stream.length > STREAM_KEEP) stream = stream.slice(-STREAM_KEEP);
+    await this.storage.put('stream', stream);
+    try { this.broadcast({ type: 'new_talk', text, reply, ts: now }); } catch (_) {}
+    try { await this.pushToAll('执行完成', String(cmd).slice(0, 50) + ' 出结果了'); } catch (_) {}
+  }
+
+  // @deprecated 已被 execDispatchGH + execPollGH 取代（同步等待必超 Workers 30s 限制）
+  // 仅为兼容旧引用保留，勿在新代码中调用
   async execViaGitHub(cmd) {
     const owner = 'zhumingjie0223-cyber', repo = 'Black-God', workflowFile = 'exec-shell.yml';
     if (cmd.length > 500) return { ok: false, error: '命令过长（最多500字符）' };
@@ -453,7 +573,8 @@ export class ShenshuCore {
       const { cmd, action } = body;
       if (cmd === 'shell') {
         if (!body.cmd) return json({ ok: false, error: '缺少 cmd 字段' });
-        const result = await this.execViaGitHub(body.cmd);
+        // 异步派发：立即返回，结果由心跳回收后推送到对话
+        const result = await this.execDispatchGH(body.cmd);
         return json(result);
       }
       if (cmd === 'str_replace') {
@@ -1941,10 +2062,14 @@ int main() {
     const cfg = (this.storage ? await this.storage.get('config') : null) || {};
     const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
     const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
-    if (!url) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
     const command = String(cmd || '');
     // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
     if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
+    // 外部执行脑未接入：有 GITHUB_API 就走内置 GitHub Actions 异步派发
+    if (!url) {
+      if (this.env.GITHUB_API) return await this.execDispatchGH(command);
+      return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
+    }
     // 客户端超时兜底:服务器 60 秒,这边 65 秒硬断,绝不让请求悬死
     const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, 65000) : null;
