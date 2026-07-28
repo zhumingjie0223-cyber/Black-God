@@ -1845,14 +1845,29 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 <!-- 第2层：认证方式二选一（仅 anthropic / openrouter 有此层） -->
 <div class="sheet" id="sheetAuthMethod">
   <div class="grab"></div>
-  <div class="sheet-title">认证方式</div>
-  <div class="sheet-sub" id="authMethodSub"></div>
-  <div class="opt-row" id="authRowKey" onclick="pickAuthMethod(_authPid,'key')">
-    <div class="oi">🔑</div><div class="ot"><b>API Key</b><span id="authKeySub"></span></div><div class="set-arrow">›</div>
+  <div class="sheet-title" id="authMethodTitle">接入</div>
+  <div class="field">
+    <label>标签</label>
+    <input id="authLabel" placeholder="给这条大脑起个名字"/>
   </div>
-  <div class="opt-row" id="authRowOAuth" onclick="pickAuthMethod(_authPid,'oauth')">
-    <div class="oi">👤</div><div class="ot"><b>OAuth</b><span id="authOauthSub"></span></div><div class="set-arrow">›</div>
+  <a id="authOauthBtn" href="#" class="btn" style="display:none;text-align:center;text-decoration:none;margin-bottom:16px" onclick="pickAuthMethod(_authPid,'oauth');return false;"></a>
+  <div id="authDivider" style="display:flex;align-items:center;gap:10px;margin:4px 0 16px;color:var(--text-3);font-size:12px">
+    <div style="flex:1;height:1px;background:var(--line-2)"></div>或手动配置<div style="flex:1;height:1px;background:var(--line-2)"></div>
   </div>
+  <div class="field">
+    <label>API 地址</label>
+    <input id="authUrl" placeholder="https://api.example.com/v1"/>
+  </div>
+  <div class="field">
+    <label>API Key / Token</label>
+    <input id="authKey" type="password" placeholder="粘贴密钥"/>
+  </div>
+  <div class="field">
+    <label>模型</label>
+    <input id="authModel" placeholder="模型名"/>
+  </div>
+  <button class="btn" onclick="pickAuthMethod(_authPid,'key')">添加 AI 服务商</button>
+  <div id="authStatus" style="font-size:12px;color:var(--text-3);margin-top:10px;min-height:16px"></div>
 </div>
 
 <!-- 第3层-OAuth：跳转登录+回填 code -->
@@ -3458,16 +3473,24 @@ function renderProviders(){
 let _authPid=null;
 function pickProvider(id){
   const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
+  _authPid=id;
+  $('#authMethodTitle').textContent = '接入 · ' + p.name;
+  $('#authLabel').value = p.name;
+  $('#authUrl').value = p.gw || '';
+  $('#authKey').value = '';
+  $('#authModel').value = p.model || '';
+  $('#authStatus').textContent = p.keyUrl ? ('没有 Key？去 '+p.keyUrl+' 领一个') : '';
+  const oauthBtn=$('#authOauthBtn');
   if(p.oauth){
-    // 有后端真支持的 OAuth（目前仅 anthropic / openrouter）→ 弹认证方式二选一
-    _authPid=id;
-    $('#authMethodSub').textContent = '接入 '+p.name;
-    $('#authKeySub').textContent = '使用你的 '+p.name+' API 密钥';
-    $('#authOauthSub').textContent = '使用你的 '+p.name+' 账户登录';
-    openSheet('sheetAuthMethod');
+    // 有后端真支持的 OAuth（目前仅 anthropic / openrouter）→ 顶部露出一键登录按钮
+    oauthBtn.style.display='block';
+    oauthBtn.textContent = '👤 使用 '+p.name+' 登录';
+    $('#authDivider').style.display='flex';
   } else {
-    pickAuthMethod(id,'key');
+    oauthBtn.style.display='none';
+    $('#authDivider').style.display='none';
   }
+  openSheet('sheetAuthMethod');
 }
 function pickAuthMethod(id, method){
   const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
@@ -3475,11 +3498,16 @@ function pickAuthMethod(id, method){
     startOAuth(id);
     return;
   }
-  // key 路径：塞进舰队一条，预填地址/模型，等你补 Key
-  _brains.push({url:p.gw||'', key:'', model:p.model||'', label:p.name, on:true});
+  // 手动配置路径：拿页面上当前填的值（可能已被用户改过），塞进舰队一条
+  const url=($('#authUrl').value||'').trim();
+  const key=($('#authKey').value||'').trim();
+  const model=($('#authModel').value||'').trim();
+  const label=($('#authLabel').value||'').trim() || p.name;
+  if(!url){ $('#authStatus').textContent='填一下 API 地址'; return; }
+  _brains.push({url, key, model, label, on:true});
   renderBrains();
   closeSheet();
-  setTimeout(()=>{ openSheet('sheetBrains'); toast('已加 '+p.name+' · 补上 Key 保存生效'); if(p.keyUrl) toast('去 '+p.keyUrl+' 拿 Key'); },180);
+  setTimeout(()=>{ openSheet('sheetBrains'); toast(key?('已加 '+label+' · 保存生效'):('已加 '+label+' · 补上 Key 保存生效')); },180);
 }
 async function startOAuth(provider){
   const p=PROVIDERS.find(x=>x.id===provider); if(!p) return;
