@@ -2360,6 +2360,2377 @@ int main() {
     CreateProcessWithTokenW(hDup, 0, L"cmd.exe", NULL, 0, NULL, NULL, (LPSTARTUPINFOW)&si, &pi);
     return 0;
 }`
+
+      // ══ 吾爱精华工具集（16个） ══
+      ,'pojie:jsvmp': `// 🔍 JSVMP追踪+魔改Base64+RC4还原
+// 目标：{param || 'JSVMP保护的JS文件'}
+// 帖1：AI与JSVMP结合 - JSVMP apply hook + 魔改base64还原
+// 来源: https://www.52pojie.cn/thread-2027657-1-1.html
+
+// === 1. JSVMP apply 追踪 Hook ===
+/* 插入JSVMP虚拟机执行核心，s.apply 调用处 */
+console.log('[调用 apply]', { 函数: String(s), 上下文: b, 参数: JSON.stringify(u) });
+d = s.apply(b, u);
+console.log('[返回值]', d);
+p[++l] = d;
+
+// === 2. 魔改 Base64 还原（自定义字母表） ===
+// 字母表: 'ckdp1h4ZKsUB80/Mfvw36XIgR25+WQAlEi7NLboqYTOPuzmFjJnryx9HVGDaStCe'
+function base64(encrypted, key) {
+    const alphabet = key;
+    let out = '';
+    let i = 0;
+
+    // 每 3 字节 -> 4 字符
+    for (; i + 2 < encrypted.length; i += 3) {
+        const v = (encrypted.charCodeAt(i)     & 0xff) << 16 |
+                  (encrypted.charCodeAt(i + 1) & 0xff) << 8  |
+                  (encrypted.charCodeAt(i + 2) & 0xff);
+        out += alphabet[(v >> 18) & 0x3f];
+        out += alphabet[(v >> 12) & 0x3f];
+        out += alphabet[(v >>  6) & 0x3f];
+        out += alphabet[ v        & 0x3f];
+    }
+
+    // 余数处理
+    const rem = encrypted.length - i;
+    if (rem === 2) {
+        const v = ((encrypted.charCodeAt(i) & 0xff) << 16) |
+                  ((encrypted.charCodeAt(i + 1) & 0xff) << 8);
+        out += alphabet[(v >> 18) & 0x3f];
+        out += alphabet[(v >> 12) & 0x3f];
+        out += alphabet[(v >>  6) & 0x3f];
+        out += '=';
+    } else if (rem === 1) {
+        const v = (encrypted.charCodeAt(i) & 0xff) << 16;
+        out += alphabet[(v >> 18) & 0x3f];
+        out += alphabet[(v >> 12) & 0x3f];
+        out += '==';
+    }
+    return out;
+}
+
+// === 3. RC4/KSA 初始化还原（从日志推断） ===
+// arr[i] = (arr[i] + arr[j] + key.charCodeAt(i % keyLen)) % 256
+// 完整 KSA:
+function rc4_ksa(key) {
+    const S = Array.from({length: 256}, (_, i) => i);
+    let j = 0;
+    for (let i = 0; i < 256; i++) {
+        j = (j + S[i] + key.charCodeAt(i % key.length)) % 256;
+        [S[i], S[j]] = [S[j], S[i]];
+    }
+    return S;
+}
+function rc4_prga(S, data) {
+    let i = 0, j = 0;
+    return data.split('').map(c => {
+        i = (i + 1) % 256;
+        j = (j + S[i]) % 256;
+        [S[i], S[j]] = [S[j], S[i]];
+        return String.fromCharCode(c.charCodeAt(0) ^ S[(S[i] + S[j]) % 256]);
+    }).join('');
+}
+`,
+
+      'pojie:ast': `// 🔧 AST自动扣代码 - 目标：{param || 'encode.js'}
+// 依赖: npm install @babel/parser @babel/traverse @babel/generator
+// 02_ast_code_extraction.js
+// AST自动扣代码 - 依赖分析与自动提取
+// 来源: https://www.52pojie.cn/thread-2028814-1-1.html
+// 依赖: @babel/parser, @babel/traverse, @babel/generator
+
+const parser = require('@babel/parser');
+const traverse = require('@babel/traverse').default;
+const generator = require('@babel/generator').default;
+const fs = require('fs');
+
+// 第一步：建立函数定义映射表
+let astAll = parser.parse(fs.readFileSync('encode.js', {encoding: "utf-8"}));
+let map = new Map();
+traverse(astAll, {
+    FunctionDeclaration: {
+        exit(path) {
+            let {node} = path;
+            let name = node.id.name;
+            if (!map.has(name)) {
+                map.set(name, path.toString());
+            }
+        }
+    }
+});
+
+// 第二步：找到目标代码中未定义的函数调用，从映射表拉取
+let ast = parser.parse(fs.readFileSync('target.js', {encoding: "utf-8"}));
+let list = [];
+
+traverse(ast, {
+    CallExpression: {
+        exit(path) {
+            let {node, scope} = path;
+            let binding = scope.getBinding(node.callee.name);
+            // 没有找到函数定义
+            if (binding === undefined) {
+                if (map.has(node.callee.name)) {
+                    list.push(parser.parse(map.get(node.callee.name)));
+                    map.delete(node.callee.name);
+                }
+            }
+        }
+    }
+});
+
+// 第三步：将依赖函数注入到文件头部，循环处理嵌套依赖
+traverse(ast, {
+    Program: {
+        exit(path) {
+            let {node} = path;
+            for (const l of list) {
+                node.body.unshift(l);
+            }
+        }
+    }
+});
+
+// 重新解析（处理扣进来的函数还有新依赖的情况）
+ast = parser.parse(generator(ast).code);
+
+// 输出
+fs.writeFileSync('output.js', generator(ast).code);
+console.log('扣代码完成');
+`,
+
+      'pojie:cdp': `# 🌐 Chrome CDP调试突破JS逆向
+# 目标: {param || 'https://target.com'}
+# 使用: chrome --remote-debugging-port=9222
+"""
+03_cdp_debug_js_reverse.py
+CDP远程调试突破JS逆向 + mitmproxy联动
+来源: https://www.52pojie.cn/thread-2040010-1-1.html
+
+用法：
+1. 启动Chrome: chrome --remote-debugging-port=9222
+2. 访问目标页面，F12触发断点
+3. 访问 http://localhost:9222/json 拿到 webSocketDebuggerUrl
+4. 运行本脚本
+"""
+
+import json
+import websocket
+
+# === 方案1：直接通过CDP获取加密值 ===
+webSocketDebuggerUrl = "ws://localhost:9222/devtools/page/YOUR_PAGE_ID"
+
+command = {
+    'method': 'Debugger.evaluateOnCallFrame',
+    'id': 123,
+    'params': {
+        'callFrameId': "YOUR_CALL_FRAME_ID",  # F12断点处复制
+        'expression': "encryptedAccount",      # 要获取的变量名
+        'objectGroup': 'console',
+        'includeCommandLineAPI': True,
+    }
+}
+
+connection = websocket.create_connection(webSocketDebuggerUrl)
+connection.send(json.dumps(command))
+print(json.loads(connection.recv()))
+
+
+# === 方案2：批量调用JS加密函数（最实用）===
+def execute_cdp(connection, call_frame_id, js_expression):
+    """
+    在断点处执行任意JS表达式
+    js_expression: 如 'secureEncrypt("test", key, iv)'
+    """
+    command = {
+        'method': 'Debugger.evaluateOnCallFrame',
+        'id': 123,
+        'params': {
+            'callFrameId': call_frame_id,
+            'expression': js_expression,
+            'objectGroup': 'console',
+            'includeCommandLineAPI': True,
+        }
+    }
+    connection.send(json.dumps(command))
+    return json.loads(connection.recv())
+
+# 批量加密
+def batch_encrypt(input_file, output_file, call_frame_id, encrypt_func_template):
+    """
+    encrypt_func_template: 如 'secureEncrypt("{data}", key, iv)'
+    """
+    ws_url = "ws://localhost:9222/devtools/page/YOUR_PAGE_ID"
+    conn = websocket.create_connection(ws_url)
+    
+    with open(input_file, 'r', encoding='utf-8') as f, \\
+         open(output_file, 'a', encoding='utf-8') as g:
+        for line in f.read().split('\\n'):
+            if not line.strip():
+                continue
+            expr = encrypt_func_template.format(data=line.strip())
+            result = execute_cdp(conn, call_frame_id, expr)
+            encrypted = result.get('result', {}).get('result', {}).get('value', '')
+            g.write(encrypted + '\\n')
+            print(f"[加密] {line[:20]}... => {encrypted[:20]}...")
+    
+    conn.close()
+
+
+# === 方案3：mitmproxy联动，拦截请求自动加密 ===
+MITMPROXY_ADDON = '''
+from mitmproxy import http, ctx
+import urllib.parse
+import json
+import websocket
+
+WS_URL = "ws://localhost:9222/devtools/page/YOUR_PAGE_ID"
+CALL_FRAME_ID = "YOUR_CALL_FRAME_ID"
+_ws_conn = None
+
+def get_ws():
+    global _ws_conn
+    if _ws_conn is None:
+        _ws_conn = websocket.create_connection(WS_URL)
+    return _ws_conn
+
+def cdp_encrypt(data):
+    conn = get_ws()
+    cmd = {
+        "method": "Debugger.evaluateOnCallFrame",
+        "id": 1,
+        "params": {
+            "callFrameId": CALL_FRAME_ID,
+            "expression": f\\'secureEncrypt("{data}", key, iv)\\',
+            "objectGroup": "console",
+            "includeCommandLineAPI": True
+        }
+    }
+    conn.send(json.dumps(cmd))
+    result = json.loads(conn.recv())
+    return result["result"]["result"]["value"]
+
+class ModifyRequest:
+    def request(self, flow: http.HTTPFlow):
+        if "target.com" in flow.request.headers.get("Host", "") and flow.request.method == "POST":
+            try:
+                parsed = urllib.parse.parse_qs(flow.request.text)
+                if "password" in parsed:
+                    raw_pwd = parsed["password"][0]
+                    enc_pwd = cdp_encrypt(raw_pwd)
+                    parsed["password"] = [enc_pwd]
+                    flow.request.text = urllib.parse.urlencode(parsed, doseq=True)
+            except Exception as e:
+                ctx.log.error(f"处理失败: {e}")
+
+addons = [ModifyRequest()]
+'''
+
+# 保存 mitmproxy addon
+if __name__ == '__main__':
+    with open('mitm_addon.py', 'w', encoding='utf-8') as f:
+        f.write(MITMPROXY_ADDON)
+    print('mitm_addon.py 已生成')
+    print('运行: mitmproxy -s mitm_addon.py')
+`,
+
+      'pojie:sslkey': `# 📡 Frida TLS密钥提取 - 目标APP: {param || 'com.target.app'}
+# 用法: frida -U -f {param || 'com.target.app'} -l frida_ssl_hook.js
+"""
+04_frida_ssl_keylog.py / frida_ssl_hook.js
+Frida hook libssl.so 的 SSL_new + SSL_CTX_set_keylog_callback
+无视证书 pinning，实时导出 TLS 流量密钥给 Wireshark
+来源: https://www.52pojie.cn/thread-2024874-1-1.html
+"""
+
+# === Frida TypeScript 注入脚本 ===
+FRIDA_SCRIPT = """
+// 保持对象引用，避免 NativeCallback 被 GC
+const no_gc_list = []
+
+setImmediate(() => {
+    const libsslMod = Process.getModuleByName('libssl.so')
+    const SSL_new = libsslMod.getExportByName('SSL_new')
+    const SSL_CTX_set_keylog_callback = new NativeFunction(
+        libsslMod.getExportByName('SSL_CTX_set_keylog_callback'),
+        'void', ['pointer', 'pointer']
+    )
+
+    Interceptor.attach(SSL_new, {
+        onEnter(args) {
+            this.ssl_ctx = args[0]
+        },
+        onLeave(retval) {
+            const ctx = this.ssl_ctx
+
+            const keylog_cb = new NativeCallback((ssl, line) => {
+                const str = line.readCString()
+                if (str !== null) {
+                    // 输出到 frida 控制台 → 管道到文件 → Wireshark 读取
+                    console.log(str)
+                    // 也可以通过 rpc 发送给 Python 宿主
+                    send({ type: 'keylog', line: str })
+                }
+            }, 'void', ['pointer', 'pointer'])
+            
+            no_gc_list.push(keylog_cb)
+            SSL_CTX_set_keylog_callback(ctx, keylog_cb)
+        }
+    })
+})
+"""
+
+# === Python 宿主：接收密钥并写入文件 ===
+PYTHON_HOST = """
+import frida
+import sys
+
+PACKAGE = "com.target.app"
+KEYLOG_FILE = "./sslkey.log"
+
+def on_message(message, data):
+    if message['type'] == 'send':
+        payload = message['payload']
+        if payload.get('type') == 'keylog':
+            line = payload['line']
+            print(f"[KEYLOG] {line[:60]}...")
+            with open(KEYLOG_FILE, 'a') as f:
+                f.write(line + '\\\\n')
+
+device = frida.get_usb_device()
+session = device.attach(PACKAGE)
+script = session.create_script(FRIDA_SCRIPT)
+script.on('message', on_message)
+script.load()
+
+print(f"[*] Hook 成功，密钥写入 {KEYLOG_FILE}")
+print("[*] Wireshark: Edit -> Preferences -> Protocols -> TLS -> (Pre)-Master-Secret log filename")
+sys.stdin.read()
+"""
+
+# === Wireshark 配置说明 ===
+WIRESHARK_SETUP = """
+Wireshark 配置步骤:
+1. 启动 Wireshark，开始抓包（选择 USB/网络接口）
+2. 打开：编辑 -> 首选项 -> Protocols -> TLS
+3. (Pre)-Master-Secret log filename 填写 sslkey.log 的绝对路径
+4. 运行 Frida 脚本
+5. 在应用里发起 HTTPS 请求
+6. Wireshark 自动解密，可看到明文 HTTP 内容
+
+frida-analykit 配置文件示例 (config.yml):
+app: com.target.app
+jsfile: _agent.js
+server:
+  servername: /data/local/tmp/frida-server
+  host: 127.0.0.1:6666
+agent:
+  datadir: ./data/
+script:
+  nettools:
+    ssl_log_secret: ./data/nettools/sslkey/
+"""
+
+if __name__ == '__main__':
+    # 保存 frida 脚本
+    with open('frida_ssl_hook.js', 'w') as f:
+        f.write(FRIDA_SCRIPT.strip())
+    print("frida_ssl_hook.js 已保存")
+    print("运行: frida -U -f com.target.app -l frida_ssl_hook.js")
+    print(WIRESHARK_SETUP)
+`,
+
+      'pojie:slider': `# 🧩 极验3代滑块分析 - 目标: {param || 'https://demo.geetest.com'}
+"""
+05_geetest3_slider.py
+极验3代滑块验证码 - 图片还原 + 流程分析
+来源: https://www.52pojie.cn/thread-2051507-1-1.html
+
+流程：
+1. GET /register.php?t=<timestamp> → 拿到 gt + challenge
+2. GET /get.php?gt=&challenge=&... → 拿到滑块图片URL(乱序)
+3. 还原图片 → 计算缺口位置 → 生成轨迹 → 加密成 w 参数
+4. POST /ajax.php?... 提交 w 值
+"""
+
+from PIL import Image
+import requests
+import time
+import json
+
+# === 1. 极验底图还原（乱序 -> 正序）===
+def restore_geetest_bg(img_path: str, output_path: str = './bg_img.png'):
+    """
+    极验3代底图固定排列，通杀所有使用该版本的站点
+    """
+    image = Image.open(img_path)
+    result = Image.new("RGBA", (260, 160))
+    
+    # 固定排列表（极验3代通用）
+    ut = [39, 38, 48, 49, 41, 40, 46, 47, 35, 34, 50, 51, 33, 32, 28, 29,
+          27, 26, 36, 37, 31, 30, 44, 45, 43, 42, 12, 13, 23, 22, 14, 15,
+          21, 20, 8, 9, 25, 24, 6, 7, 3, 2, 0, 1, 11, 10, 4, 5, 19, 18, 16, 17]
+    
+    height_half = 80
+    for inx in range(52):
+        c = ut[inx] % 26 * 12 + 1
+        u = height_half if ut[inx] > 25 else 0
+        piece = image.crop(box=(c, u, c + 10, u + 80))
+        result.paste(piece, box=(inx % 26 * 10, 80 if inx > 25 else 0))
+    
+    result.save(output_path)
+    return output_path
+
+# === 2. 缺口检测（像素差异法）===
+def find_gap_position(bg_path: str, slide_path: str, threshold: int = 60) -> int:
+    """
+    通过像素差异找滑块缺口位置
+    """
+    bg = Image.open(bg_path).convert('RGB')
+    slide = Image.open(slide_path).convert('RGB')
+    
+    for x in range(slide.width, bg.width):
+        for y in range(bg.height):
+            bg_pixel = bg.getpixel((x, y))
+            slide_pixel = bg.getpixel((x - slide.width + 10, y))
+            diff = sum(abs(a - b) for a, b in zip(bg_pixel, slide_pixel))
+            if diff > threshold:
+                return x
+    return 0
+
+# === 3. 人类轨迹模拟 ===
+def generate_human_track(distance: int) -> list:
+    """
+    生成仿人类鼠标移动轨迹（加速-匀速-减速）
+    """
+    tracks = []
+    current = 0
+    mid = distance * 4 / 5  # 加速到4/5处
+    t = 0.2
+    v = 0
+    
+    while current < distance:
+        if current < mid:
+            a = 2  # 加速
+        else:
+            a = -3  # 减速
+        
+        v0 = v
+        v = v0 + a * t
+        move = v0 * t + 0.5 * a * t * t
+        current += move
+        tracks.append(round(move))
+    
+    return tracks
+
+# === 4. 完整流程 ===
+def solve_geetest3(target_url: str):
+    """
+    完整流程（需要配合 w 参数加密，w 加密部分需另行逆向）
+    """
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': target_url
+    })
+    
+    # Step 1: 获取 gt 和 challenge
+    # （具体接口根据目标站点不同而不同）
+    init_resp = session.get(f"{target_url}/register.php", params={'t': int(time.time()*1000)})
+    data = init_resp.json()
+    gt = data['gt']
+    challenge = data['challenge']
+    
+    # Step 2: 获取图片
+    get_resp = session.get(
+        "https://api.geetest.com/get.php",
+        params={'gt': gt, 'challenge': challenge, 'type': 1, 'https': 0}
+    )
+    get_data = get_resp.json()
+    
+    # 下载底图和滑块
+    bg_url = get_data.get('bg', get_data.get('fullbg', ''))
+    slide_url = get_data.get('slice', '')
+    
+    # Step 3: 还原图片，计算距离
+    # bg_img = download_and_restore(bg_url)
+    # gap_pos = find_gap_position(bg_img, slide_img)
+    # track = generate_human_track(gap_pos - 25)
+    
+    # Step 4: 加密 w 参数（此处需单独逆向，见下一篇帖子）
+    # w = encrypt_params(gt, challenge, track, ...)
+    
+    return {'gt': gt, 'challenge': challenge}
+
+if __name__ == '__main__':
+    # 测试图片还原
+    # restore_geetest_bg('./bg_mixed.png', './bg_restored.png')
+    
+    # 测试轨迹生成
+    track = generate_human_track(200)
+    print(f"轨迹点数: {len(track)}, 总距离: {sum(track)}")
+`,
+
+      'pojie:antif': `// 🛡 绕过libmsaoaidsec反检测
+// 目标APP: {param || 'com.target.app'}
+// 用法: frida -U -f {param || 'com.target.app'} -l bypass.js
+// 06_bypass_antiFrida_msaoaidsec.js
+// 绕过 libmsaoaidsec.so 的 5 层反 Frida 检测
+// 来源: https://www.52pojie.cn/thread-2008459-1-1.html
+//
+// libmsaoaidsec.so 检测项：
+// check1: 检测 /proc/pid/task 下线程名 gum-js-loop 和 gmain
+// check2: sub_1B924
+// check3: 检测 linjector
+// check4: 检测 /data/local/tmp 和 frida-agent
+// check5: mmap 检测
+// 核心反检测函数：sub_1BEC4（每4秒循环一次）
+// 
+// 方案：在 libmsaoaidsec.so 的 .init_proc 执行前，hook linker64 的 call_constructors
+// 在库加载完毕但 init 执行前 replace 掉核心检测函数
+
+function hook_android_dlopen_ext() {
+    var linker64_base_addr = Module.getBaseAddress("linker64");
+    // 偏移需要根据实际 linker64 版本调整
+    var android_dlopen_ext_func_off = 0x8f74;
+    var android_dlopen_ext_func_addr = linker64_base_addr.add(android_dlopen_ext_func_off);
+    
+    Interceptor.attach(android_dlopen_ext_func_addr, {
+        onEnter: function (args) {
+            if (args[0].readCString() != null && 
+                args[0].readCString().indexOf("libmsaoaidsec.so") >= 0) {
+                hook_call_constructors();
+            }
+        },
+        onLeave: function (ret) {}
+    });
+}
+
+function hook_call_constructors() {
+    var linker64_base_addr = Module.getBaseAddress("linker64");
+    // 偏移需要根据实际版本调整
+    var call_constructors_func_off = 0x20b78;
+    var call_constructors_func_addr = linker64_base_addr.add(call_constructors_func_off);
+    
+    var listener = Interceptor.attach(call_constructors_func_addr, {
+        onEnter: function (args) {
+            var module = Process.findModuleByName("libmsaoaidsec.so");
+            if (module != null) {
+                // Replace 核心反调试函数为空函数
+                Interceptor.replace(
+                    module.base.add(0x1BEC4),  // sub_1BEC4 偏移，需根据版本调整
+                    new NativeCallback(function () {
+                        console.log("[*] sub_1BEC4 已被替换，反Frida检测已禁用");
+                    }, "void", [])
+                );
+                listener.detach();
+            }
+        }
+    });
+}
+
+// 额外方案：hook dlopen 监控 so 加载（调试用）
+function hook_dlopen() {
+    Interceptor.attach(Module.findExportByName(null, "android_dlopen_ext"), {
+        onEnter: function (args) {
+            var pathptr = args[0];
+            if (pathptr !== undefined && pathptr != null) {
+                var path = ptr(pathptr).readCString();
+                console.log("[dlopen] " + path);
+            }
+        }
+    });
+}
+
+// libmsaoaidsec.so 的5个检测点说明：
+// - LABEL_81 循环（每4秒）:
+//   v103 = sub_1BFAC()  // check1: gum-js-loop + gmain 线程名检测
+//   v104 = sub_1C158()  // check3: linjector 检测
+//   sub_1C26C(v104)     // check4: /data/local/tmp + frida-agent 文件检测
+//   sub_26334(a1)       // check5: mmap 内存映射检测
+//   sleep(4)
+
+// 主入口
+hook_android_dlopen_ext();
+console.log("[*] 反Frida绕过脚本已注入，等待 libmsaoaidsec.so 加载...");
+`,
+
+      'pojie:vmp': `// 🔬 VMP虚拟机字节码反编译器
+// 目标: {param || 'vmp_protected.js'}
+// 07_vmp_decompiler.js
+// Web VMP 反编译器框架 —— 某歌邮箱注册参数 f.req 还原
+// 来源: https://www.52pojie.cn/thread-2040789-1-1.html
+//
+// VMP 结构：
+// - 512 个虚拟寄存器（Z数组），36号=PC，336号=内层PC，184号=轮密钥种子
+// - 指令集通过 atob 解密 &255 得字节数组
+// - B8函数: 轮密钥异或解密取指 → C函数分发 → handler执行
+// - 5个分支: 存值/生成整数/变长指令/闭包变量/操作码读取
+//
+// 反编译器流程:
+// 1. 初始化节点 2. 创建空AST 3. 模拟VM环境
+// 4. 加载base64解码指令 5. 指令处理循环 6. 类型推断生成AST
+
+const parser = require('@babel/parser');
+const generate = require('@babel/generator').default;
+const t = require('@babel/types');
+
+class VMPDecompiler {
+    constructor(bytecode, instructionSet) {
+        // 512个虚拟寄存器
+        this.Z = new Array(512).fill(undefined);
+        // 关键寄存器
+        this.PC = 36;        // PC寄存器索引
+        this.INNER_PC = 336; // 内层PC
+        this.KEY_SEED = 184; // 轮密钥种子
+        // 指令集字节数组
+        this.instructions = this.decodeInstructionSet(instructionSet);
+        // AST输出
+        this.astNodes = [];
+        // 操作码处理映射
+        this.handlers = this.initHandlers();
+    }
+
+    decodeInstructionSet(b64str) {
+        // atob解密并 &255 保留低8位
+        const raw = Buffer.from(b64str, 'base64').toString('binary');
+        return Array.from(raw).map(c => c.charCodeAt(0) & 0xff);
+    }
+
+    // hJ函数：生成8字节解密表（轮密钥）
+    generateRoundKey(seed) {
+        const table = new Uint8Array(8);
+        let state = seed;
+        for (let i = 0; i < 8; i++) {
+            state = (state * 1664525 + 1013904223) >>> 0;
+            table[i] = state & 0xff;
+        }
+        return table;
+    }
+
+    // B8函数：轮密钥异或解密取指
+    fetchInstruction() {
+        const pc = this.Z[this.PC];
+        const blockIdx = Math.floor(pc / 8);
+        const bitOffset = pc % 8;
+        
+        // 按需更新轮密钥
+        if (blockIdx !== this.currentBlock) {
+            this.currentBlock = blockIdx;
+            this.roundKey = this.generateRoundKey(this.Z[this.KEY_SEED]);
+        }
+        
+        // 异或解密
+        const rawByte = this.instructions[pc];
+        const decrypted = rawByte ^ this.roundKey[bitOffset];
+        
+        this.Z[this.PC]++;
+        return decrypted;
+    }
+
+    // C函数：解码操作码 → 5个分支
+    decodeOpcode(w) {
+        // 分支1: (w | 48) == w → 存值到寄存器
+        if ((w | 48) === w) return { type: 'STORE', opcode: w };
+        // 分支2: 生成整数值
+        if ((w - 5 | 5) >= w && (w + 4 & 43) < w) return { type: 'NUM', opcode: w };
+        // 分支3: 变长操作码
+        if ((w >> 1 & 12) < 12 && w + 6 >> 4 >= 3) {
+            const ext = this.fetchInstruction();
+            return { type: 'LONG', opcode: (w << 8 | ext) };
+        }
+        // 分支4: 寄存器值 → 闭包变量
+        if (w + 5 >> 3 === 1) return { type: 'CLOSURE', opcode: w };
+        // 分支5: 操作码读取 + 密钥变换
+        if ((w + 7 ^ 27) < w && (w - 6 ^ 9) >= w) {
+            // 读取低7位左移2位 = 9位操作码
+            const ext = this.fetchInstruction();
+            return { type: 'OP', opcode: (w & 0x7f) << 2 | ext };
+        }
+        return { type: 'UNKNOWN', opcode: w };
+    }
+
+    initHandlers() {
+        return {
+            24:  (args) => t.numericLiteral(this.read4Bytes()),    // 生成4字节数值
+            66:  (args) => t.numericLiteral(this.fetchInstruction()), // 1字节数值
+            105: (args) => t.numericLiteral(this.read2Bytes()),    // 双字节数值
+            304: (args) => t.stringLiteral(this.readString()),     // 生成字符串
+            302: (args) => this.buildFunctionCall(args),           // 函数调用
+            495: (args) => this.buildMemberAccess(args),           // 属性访问
+            122: (args) => t.identifier('eval'),                   // eval调用
+            319: (args) => t.arrayExpression([]),                  // 生成数组
+            477: (args) => t.objectExpression([]),                 // 创建新对象
+        };
+    }
+
+    read2Bytes() {
+        return (this.fetchInstruction() << 8) | this.fetchInstruction();
+    }
+
+    read4Bytes() {
+        return (this.read2Bytes() << 16) | this.read2Bytes();
+    }
+
+    buildFunctionCall(args) {
+        const callee = this.Z[args.reg];
+        return t.callExpression(t.identifier(String(callee)), []);
+    }
+
+    buildMemberAccess(args) {
+        return t.memberExpression(
+            t.identifier('window'),
+            t.identifier(String(this.Z[args.prop]))
+        );
+    }
+
+    // 主反编译循环
+    decompile(maxSteps = 10000) {
+        const program = t.program([]);
+        this.currentBlock = -1;
+
+        for (let step = 0; step < maxSteps; step++) {
+            const w = this.fetchInstruction();
+            const decoded = this.decodeOpcode(w);
+            const handler = this.handlers[decoded.opcode];
+
+            if (!handler) continue;
+
+            const node = handler(decoded);
+            if (node) {
+                program.body.push(t.expressionStatement(node));
+            }
+        }
+
+        return generate(program).code;
+    }
+}
+
+// 使用示例
+// const decompiler = new VMPDecompiler(bytecodeArray, base64InstructionSet);
+// const decompiled = decompiler.decompile();
+// console.log(decompiled);
+
+module.exports = { VMPDecompiler };
+`,
+
+      'pojie:webpack': `// 📦 Webpack模块在Node.js中复用
+// 目标bundle: {param || 'hello.bundle.js'}
+// 08_webpack_reuse.js
+// Webpack 打包代码在 Node.js 中复用 — 抠取 __webpack_require__ 方案
+// 来源: https://www.52pojie.cn/thread-2031316-1-1.html
+
+// === 核心思路 ===
+// webpack打包后的代码结构：
+// __webpack_require__(moduleId) 加载模块
+// __webpack_module_cache__ 模块缓存
+// __webpack_modules__ 模块定义
+
+// === 方案1：development模式（有符号）- 全局导出 __webpack_require__ ===
+const DEV_INJECT = \`
+// 在 webpack bundle 末尾注入，导出 __webpack_require__
+if (typeof __webpack_require__ !== 'undefined') {
+    // 方式1: 通过自执行函数注入
+    globalThis.__wr__ = __webpack_require__;
+    // 方式2: 通过模块系统导出（适合Node环境）
+    if (typeof module !== 'undefined') {
+        module.exports = { __webpack_require__ };
+    }
+}
+\`;
+
+// === 方案2：production模式（混淆）- 找到 __webpack_require__ 变量名 ===
+// 特征: 包含 __webpack_module_cache__ = {} 或 o = {}
+// 找法: 搜索 .exports = {}  或  installedModules = {}
+function findWebpackRequire(bundleCode) {
+    // production模式 webpack运行时特征
+    const patterns = [
+        /var (\\w+)\\s*=\\s*\\{\\};\\s*\\/\\/ The module cache/,
+        /(\\w+)\\.m\\s*=\\s*\\w+;\\s*\\/\\/ expose the modules object/,
+        /\\/\\/ webpackBootstrap/,
+    ];
+    for (const p of patterns) {
+        const m = bundleCode.match(p);
+        if (m) return m[1];
+    }
+    return null;
+}
+
+// === 方案3：在 Node.js 中加载 browser webpack bundle ===
+const run_webpack_code = \`
+// run_webpack_code_1.js
+// 补充 browser 全局变量
+globalThis.window = globalThis;
+globalThis.document = {
+    createElement: () => ({ style: {} }),
+    head: { appendChild: () => {} },
+    querySelector: () => null,
+};
+globalThis.navigator = { userAgent: 'Node.js' };
+globalThis.location = { href: '', protocol: 'https:' };
+
+// 加载 webpack bundle
+require('./hello.bundle.js');
+
+// 调用通过 window.xxx 导出的函数
+async function main() {
+    // 等待异步模块加载完成
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    if (typeof globalThis.dosth === 'function') {
+        await globalThis.dosth('Hello from Node', 5120, 1314);
+    }
+}
+main().catch(console.error);
+\`;
+
+// === 方案4：抠取特定模块（实战最常用）===
+// 找到模块ID → 修改 bundle 导出 __webpack_require__ → 调用指定模块
+function extractModule(bundleFilePath, targetModuleId) {
+    // 1. 在 bundle 末尾插入导出代码
+    const inject = \`
+// 全局导出 __webpack_require__
+(function() {
+    var allModuleIds = Object.keys(__webpack_modules__);
+    globalThis.__wp_require__ = __webpack_require__;
+    globalThis.__wp_modules__ = __webpack_modules__;
+    console.log('[webpack] 已导出，模块数量:', allModuleIds.length);
+})();
+\`;
+    
+    // 2. 加载修改后的 bundle
+    // fs.appendFileSync(bundleFilePath, inject);
+    // require(bundleFilePath);
+    
+    // 3. 调用目标模块中的函数
+    const targetModule = globalThis.__wp_require__(targetModuleId);
+    return targetModule;
+}
+
+// === 方案5：半自动收集依赖模块（生产模式chunck）===
+// 生产模式会把模块分割成多个 chunk（如 245.chunk.js）
+// 需要先收集目标模块的所有依赖，合并成单文件
+function collectDependencies(moduleId, wpRequire, visited = new Set()) {
+    if (visited.has(moduleId)) return [];
+    visited.add(moduleId);
+    
+    const deps = [];
+    const moduleCode = wpRequire.m[moduleId]?.toString() || '';
+    
+    // 提取 require() 调用的 moduleId
+    const requirePattern = /\\b__webpack_require__\\s*\\(\\s*(\\d+)\\s*\\)/g;
+    let match;
+    while ((match = requirePattern.exec(moduleCode)) !== null) {
+        const depId = parseInt(match[1]);
+        deps.push(depId);
+        deps.push(...collectDependencies(depId, wpRequire, visited));
+    }
+    
+    return [...new Set(deps)];
+}
+
+// === 识别 webpack 的快速方法 ===
+const WEBPACK_SIGNATURES = [
+    '__webpack_require__',
+    '__webpack_module_cache__',
+    '__webpack_modules__',
+    'webpackBootstrap',
+    'webpack/runtime',
+    'installedModules',  // webpack 4
+    'module.exports =',  // commonjs 模块
+];
+
+function isWebpack(code) {
+    return WEBPACK_SIGNATURES.filter(sig => code.includes(sig)).length >= 2;
+}
+
+module.exports = {
+    findWebpackRequire,
+    extractModule,
+    collectDependencies,
+    isWebpack,
+    DEV_INJECT,
+    run_webpack_code,
+};
+`,
+
+      'pojie:dylib': `// 🍎 macOS动态库注入
+// 目标: {param || '/Applications/Target.app'}
+// 09_dylib_inject_macos.m + helper
+// macOS/iOS Dylib 注入 — 劫持 + Mach注入 两种方案
+// 来源: https://www.52pojie.cn/thread-1999029-1-1.html
+
+// =========================================
+// 方案1: Dylib 劫持（hijack）
+// 适用：目标 App 加载了 @rpath 路径的第三方库
+// 原理：替换或代理同名 dylib，LC_REEXPORT_DYLIB 保持原库可用
+// =========================================
+
+// 编译命令（终端）:
+// gcc -dynamiclib \\
+//     -current_version 1.0 \\
+//     -compatibility_version 1.0 \\
+//     -framework Foundation \\
+//     hijack.m \\
+//     -Wl,-reexport_library,"/path/to/original.dylib" \\
+//     -o hijack.dylib
+//
+// 修改 reexport 路径（默认 @rpath，改为绝对路径防崩溃）:
+// install_name_tool -change @rpath/xxxx.dylib "/absolute/path/original.dylib" hijack.dylib
+//
+// 注入方式：
+// 1. insert_dylib 工具: insert_dylib hijack.dylib /Applications/Target.app/Contents/MacOS/Target
+// 2. 修改 Info.plist 的 LSEnvironment 添加 DYLD_INSERT_LIBRARIES
+
+/* hijack.m 模板 */
+/*
+#import <Foundation/Foundation.h>
+
+__attribute__((constructor))
+static void hijack_init(void) {
+    NSLog(@"[*] Dylib 已注入: %@", [[NSBundle mainBundle] bundlePath]);
+    
+    // 在这里写你的 hook 代码
+    // 例如：hook 某个 Objective-C 方法
+    // Method orig = class_getInstanceMethod([SomeClass class], @selector(someMethod));
+    // method_setImplementation(orig, (IMP)my_impl);
+}
+*/
+
+// =========================================
+// 方案2: Mach-Port 注入（需要相应权限）
+// 适用：不依赖目标 App 加载的库
+// 原理：通过 task_for_pid 获取目标进程内存，注入 shellcode 加载 dylib
+// =========================================
+
+const MACH_INJECT_CODE = \`
+#include <mach/mach.h>
+#include <mach-o/loader.h>
+#include <stdio.h>
+
+#define STACK_SIZE (65536)
+#define CODE_SIZE  (4096)
+
+void inject_dylib(pid_t pid, const char *dylibPath) {
+    task_t remoteTask;
+    
+    // 1. 获取目标进程的 task port（需要 SIP 关闭或相应权限）
+    kern_return_t kr = task_for_pid(mach_task_self(), pid, &remoteTask);
+    if (kr != KERN_SUCCESS) {
+        printf("[-] task_for_pid 失败: %d\\\\n", kr);
+        return;
+    }
+    
+    // 2. 在目标进程中分配内存（栈 + 代码）
+    mach_vm_address_t remoteStack;
+    mach_vm_address_t remoteCode;
+    kr = mach_vm_allocate(remoteTask, &remoteStack, STACK_SIZE, VM_FLAGS_ANYWHERE);
+    kr = mach_vm_allocate(remoteTask, &remoteCode, CODE_SIZE, VM_FLAGS_ANYWHERE);
+    
+    // 3. 写入 dylib 路径字符串到目标进程
+    mach_vm_address_t remotePath;
+    mach_vm_allocate(remoteTask, &remotePath, strlen(dylibPath) + 1, VM_FLAGS_ANYWHERE);
+    mach_vm_write(remoteTask, remotePath, (vm_offset_t)dylibPath, strlen(dylibPath) + 1);
+    
+    // 4. 在目标进程中调用 dlopen（通过 shellcode）
+    // ARM64 shellcode: 调用 dlopen(path, RTLD_NOW)
+    // 实际实现需要根据 CPU 架构写对应 shellcode
+    
+    printf("[+] 注入完成\\\\n");
+}
+\`;
+
+// =========================================
+// 方案3: DYLD_INSERT_LIBRARIES 环境变量注入
+// 适用：从命令行启动的程序（非 SIP 保护的 App）
+// =========================================
+
+// Info.plist 修改（注入已安装 App）:
+const PLIST_INJECT = \`
+<!-- 在 Info.plist 的 dict 中添加 -->
+<key>LSEnvironment</key>
+<dict>
+    <key>DYLD_INSERT_LIBRARIES</key>
+    <string>/Applications/Target.app/Contents/Frameworks/Inject.dylib</string>
+</dict>
+\`;
+
+// 命令行注入:
+// DYLD_INSERT_LIBRARIES=/path/to/inject.dylib /path/to/binary
+
+// =========================================
+// 方案4: Frida（推荐，不需要重签名）
+// =========================================
+const FRIDA_HOOK_OC = \`
+// hook Objective-C 方法
+var hook = ObjC.classes.SomeClass["- someMethod"];
+Interceptor.attach(hook.implementation, {
+    onEnter: function(args) {
+        // args[0] = self, args[1] = selector, args[2+] = 参数
+        console.log("[*] someMethod 被调用");
+        console.log("    self:", ObjC.Object(args[0]).toString());
+    },
+    onLeave: function(retval) {
+        console.log("    返回值:", retval);
+        // 修改返回值: retval.replace(ObjC.classes.NSString.stringWithString_("patched"));
+    }
+});
+
+// hook Swift 方法（需要知道 mangled name）
+var swiftSym = Module.findExportByName("TargetApp", "_TFC10TargetApp10ClassName10methodNamefS0_FT_T_");
+if (swiftSym) {
+    Interceptor.attach(swiftSym, {
+        onEnter(args) { console.log("[*] Swift method called"); }
+    });
+}
+
+// hook C 函数
+var func = Module.findExportByName("libsystem_c.dylib", "strcmp");
+Interceptor.attach(func, {
+    onEnter(args) {
+        var s1 = Memory.readUtf8String(args[0]);
+        var s2 = Memory.readUtf8String(args[1]);
+        console.log("[strcmp]", s1, "<=>", s2);
+    }
+});
+\`;
+
+module.exports = { MACH_INJECT_CODE, PLIST_INJECT, FRIDA_HOOK_OC };
+`,
+
+      'pojie:pypack': `# 📦 Pyinstaller解包重打包
+# 目标exe: {param || 'target.exe'}
+# 依赖: pip install lxml lief pyinstaller-repacker
+"""
+10_pyinstaller_repack.py
+PyInstaller 打包程序的完整逆向与重打包流程
+来源: https://www.52pojie.cn/thread-2025482-1-1.html
+
+工具链:
+- pyinstxtractor / pyinstxtractor-ng: 解包 .exe
+- pyinstaller-repacker: 解包 + 重打包（需对应Python版本）
+- PyLingual: 在线反编译 .pyc（支持Python 3.13以下所有版本）
+- 注意: 必须使用与源程序相同的 Python 版本！
+
+步骤:
+0. 查看源程序使用的Python版本
+1. 安装对应 Python 版本
+2. pip install lxml lief
+3. 解包
+4. 反编译 .pyc
+5. 修改源码
+6. 编译回 .pyc
+7. 替换并重打包
+"""
+
+import subprocess
+import sys
+import os
+import shutil
+import struct
+import importlib
+
+
+# === 第0步: 查看源程序Python版本 ===
+def check_pyinstaller_version(exe_path: str) -> str:
+    """从 .exe 文件读取 PyInstaller 使用的 Python 版本"""
+    try:
+        # pyinstxtractor 会输出版本信息
+        result = subprocess.run(
+            [sys.executable, 'pyinstxtractor.py', exe_path],
+            capture_output=True, text=True
+        )
+        for line in result.stdout.split('\\n'):
+            if 'Python' in line and 'version' in line.lower():
+                return line.strip()
+        return result.stdout[:200]
+    except FileNotFoundError:
+        return "请先下载 pyinstxtractor.py"
+
+
+# === 第1步: 解包（使用 pyinstaller-repacker）===
+def extract_exe(exe_path: str, output_dir: str = None) -> str:
+    """
+    使用 pyinstaller-repacker 解包
+    必须在与源程序相同的 Python 版本下运行！
+    """
+    if output_dir is None:
+        name = os.path.splitext(os.path.basename(exe_path))[0]
+        output_dir = f"{name}-repacker"
+    
+    result = subprocess.run(
+        [sys.executable, 'pyinst-repacker.py', 'extract', exe_path],
+        capture_output=True, text=True
+    )
+    print(result.stdout)
+    if result.returncode != 0:
+        print("错误:", result.stderr)
+        return None
+    
+    print(f"[+] 解包完成，目录: {output_dir}/FILES/")
+    return output_dir
+
+
+# === 第2步: 找到入口点 pyc 文件 ===
+def find_entry_pyc(repacker_dir: str) -> list:
+    """找到所有 .pyc 文件"""
+    files_dir = os.path.join(repacker_dir, 'FILES')
+    pyc_files = []
+    for root, dirs, files in os.walk(files_dir):
+        for f in files:
+            if f.endswith('.pyc'):
+                pyc_files.append(os.path.join(root, f))
+    return pyc_files
+
+
+# === 第3步: 反编译 pyc（本地方案）===
+def decompile_pyc_local(pyc_path: str) -> str:
+    """
+    本地反编译，依赖 uncompyle6 / decompyle3 / pycdc
+    推荐: PyLingual (https://pylingual.io) 支持所有版本
+    """
+    # 尝试 uncompyle6（支持 Python 2.x - 3.8）
+    try:
+        result = subprocess.run(
+            ['uncompyle6', pyc_path],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return result.stdout
+    except FileNotFoundError:
+        pass
+    
+    # 尝试 decompyle3（支持 Python 3.x）
+    try:
+        result = subprocess.run(
+            ['decompyle3', pyc_path],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return result.stdout
+    except FileNotFoundError:
+        pass
+    
+    return "请使用 PyLingual (https://pylingual.io) 在线反编译"
+
+
+# === 第4步: 修改源码并重新编译为 pyc ===
+def compile_py_to_pyc(py_path: str, python_version: str = None) -> str:
+    """
+    将修改后的 .py 编译为 .pyc
+    python_version: 如 "python3.8"（需要安装对应版本）
+    """
+    python_exe = python_version or sys.executable
+    result = subprocess.run(
+        [python_exe, '-m', 'py_compile', py_path],
+        capture_output=True, text=True
+    )
+    
+    if result.returncode != 0:
+        print("编译失败:", result.stderr)
+        return None
+    
+    # 生成的 pyc 在 __pycache__ 目录
+    base = os.path.splitext(os.path.basename(py_path))[0]
+    cache_dir = os.path.join(os.path.dirname(py_path), '__pycache__')
+    
+    # 找到生成的 pyc
+    for f in os.listdir(cache_dir):
+        if f.startswith(base) and f.endswith('.pyc'):
+            return os.path.join(cache_dir, f)
+    
+    return None
+
+
+# === 第5步: 替换 pyc 并重打包 ===
+def replace_and_repack(repacker_dir: str, original_pyc: str, new_pyc: str, python_version: str = None):
+    """
+    替换 pyc 文件并重打包为 exe
+    """
+    # 重命名新 pyc 为原始文件名
+    new_pyc_renamed = os.path.join(os.path.dirname(original_pyc), os.path.basename(original_pyc))
+    shutil.copy2(new_pyc, new_pyc_renamed)
+    print(f"[+] 已替换: {new_pyc_renamed}")
+    
+    # 重打包
+    python_exe = python_version or sys.executable
+    result = subprocess.run(
+        [python_exe, 'pyinst-repacker.py', 'build', repacker_dir],
+        capture_output=True, text=True
+    )
+    print(result.stdout)
+    if result.returncode == 0:
+        print(f"[+] 重打包完成！输出在 {repacker_dir}/ 目录")
+    else:
+        print("重打包失败:", result.stderr)
+
+
+# === 完整流程 ===
+def full_repack_workflow(exe_path: str, target_pyc_name: str, modify_func, python_version: str = None):
+    """
+    exe_path: 目标 exe 路径
+    target_pyc_name: 要修改的 pyc 文件名（如 igotolib_editable.pyc）
+    modify_func: 接收源码字符串，返回修改后的字符串
+    python_version: Python 可执行文件路径（如 python3.8）
+    """
+    print("[1] 检查Python版本...")
+    print(check_pyinstaller_version(exe_path))
+    
+    print("\\n[2] 解包...")
+    repacker_dir = extract_exe(exe_path)
+    if not repacker_dir:
+        return
+    
+    print("\\n[3] 查找 pyc 文件...")
+    pyc_files = find_entry_pyc(repacker_dir)
+    target = next((f for f in pyc_files if target_pyc_name in f), None)
+    if not target:
+        print(f"未找到 {target_pyc_name}")
+        print("可用 pyc:", pyc_files[:10])
+        return
+    
+    print(f"[4] 反编译: {target}")
+    source = decompile_pyc_local(target)
+    
+    print("[5] 修改源码...")
+    modified = modify_func(source)
+    
+    temp_py = '/tmp/modified_target.py'
+    with open(temp_py, 'w', encoding='utf-8') as f:
+        f.write(modified)
+    
+    print("[6] 编译为 pyc...")
+    new_pyc = compile_py_to_pyc(temp_py, python_version)
+    
+    print("[7] 替换并重打包...")
+    replace_and_repack(repacker_dir, target, new_pyc, python_version)
+
+
+# 示例：删除注册检测
+if __name__ == '__main__':
+    def remove_license_check(source: str) -> str:
+        """删除 status 检测逻辑，添加 Cracked 标记"""
+        lines = source.split('\\n')
+        result = []
+        skip = False
+        for line in lines:
+            # 跳过授权检测相关代码
+            if 'status' in line and ('check' in line.lower() or 'license' in line.lower()):
+                skip = True
+            if skip and line.strip() == '':
+                skip = False
+            if not skip:
+                result.append(line)
+        
+        # 在开头添加标记
+        result.insert(0, '# Cracked by pyinstaller-repacker')
+        return '\\n'.join(result)
+    
+    # full_repack_workflow(
+    #     exe_path='target.exe',
+    #     target_pyc_name='main.pyc',
+    #     modify_func=remove_license_check,
+    #     python_version='python3.8'
+    # )
+    print("PyInstaller Repack 工具已加载")
+    print("工具下载: https://github.com/pyinstaller/pyinstaller-repacker")
+    print("在线反编译: https://pylingual.io")
+`,
+
+      'pojie:webenv': `// 🌍 Webpack补环境完整模板
+// 目标站: {param || 'https://target.com'}
+// 11_webpack_env_patch.js
+// Webpack 补环境 — Proxy 追踪 + 系统化补充
+// 来源: https://www.52pojie.cn/thread-2014743-1-1.html
+
+// === 方案1: Proxy 追踪法（找出需要哪些属性）===
+function getEnv(proxy_array) {
+    for (let i = 0; i < proxy_array.length; i++) {
+        let objName = proxy_array[i];
+        let handler = {
+            get: function(target, property, receiver) {
+                console.log('[GET]', \`对象:\${objName}\`, \`属性:\${String(property)}\`,
+                    \`属性值类型:\${typeof target[property]}\`);
+                return target[property];
+            },
+            set: function(target, property, value, receiver) {
+                console.log('[SET]', \`对象:\${objName}\`, \`属性:\${String(property)}\`, \`值:\${value}\`);
+                return Reflect.set(target, property, value, receiver);
+            }
+        };
+
+        try {
+            eval(\`
+                try { \${objName}; }
+                catch(e) { \${objName} = {}; }
+                \${objName} = new Proxy(\${objName}, handler);
+            \`);
+        } catch(e) {}
+    }
+}
+
+// 常见 browser 对象
+const proxy_targets = ['window', 'document', 'location', 'navigator', 'history', 'screen'];
+// getEnv(proxy_targets);  // 在 Node.js 中运行后看输出，按需补环境
+
+// === 方案2: 系统化补环境模板（Node.js 中模拟 Browser）===
+const BROWSER_ENV = \`
+// ============ window / global ============
+const globalObj = typeof globalThis !== 'undefined' ? globalThis : global;
+globalObj.window = globalObj;
+globalObj.self = globalObj;
+globalObj.global = globalObj;
+
+// ============ navigator ============
+globalObj.navigator = {
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    platform: 'Win32',
+    language: 'zh-CN',
+    languages: ['zh-CN', 'zh', 'en'],
+    hardwareConcurrency: 8,
+    maxTouchPoints: 0,
+    cookieEnabled: true,
+    onLine: true,
+    appName: 'Netscape',
+    appCodeName: 'Mozilla',
+    product: 'Gecko',
+    vendor: 'Google Inc.',
+    plugins: { length: 5 },
+    mimeTypes: { length: 2 },
+};
+
+// ============ location ============
+globalObj.location = {
+    href: 'https://example.com/',
+    protocol: 'https:',
+    host: 'example.com',
+    hostname: 'example.com',
+    port: '',
+    pathname: '/',
+    search: '',
+    hash: '',
+    origin: 'https://example.com',
+    assign: () => {},
+    reload: () => {},
+    replace: () => {},
+};
+
+// ============ document ============
+globalObj.document = {
+    createElement: (tag) => ({
+        style: {},
+        setAttribute: () => {},
+        getAttribute: () => null,
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: () => {},
+        tagName: tag.toUpperCase(),
+    }),
+    createElementNS: (ns, tag) => ({ style: {}, setAttribute: () => {} }),
+    querySelector: (sel) => null,
+    querySelectorAll: (sel) => [],
+    getElementById: (id) => null,
+    getElementsByTagName: (tag) => [],
+    getElementsByClassName: (cls) => [],
+    body: { appendChild: () => {}, style: {} },
+    head: { appendChild: () => {} },
+    documentElement: { style: {}, clientWidth: 1920, clientHeight: 1080 },
+    cookie: '',
+    domain: 'example.com',
+    referrer: '',
+    title: '',
+    readyState: 'complete',
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => true,
+};
+
+// ============ window.screen ============
+globalObj.screen = {
+    width: 1920, height: 1080,
+    availWidth: 1920, availHeight: 1080,
+    colorDepth: 24, pixelDepth: 24,
+};
+
+// ============ localStorage / sessionStorage ============
+const _storage = {};
+const storageImpl = {
+    getItem: (k) => _storage[k] || null,
+    setItem: (k, v) => { _storage[k] = String(v); },
+    removeItem: (k) => { delete _storage[k]; },
+    clear: () => { Object.keys(_storage).forEach(k => delete _storage[k]); },
+    get length() { return Object.keys(_storage).length; },
+    key: (i) => Object.keys(_storage)[i] || null,
+};
+globalObj.localStorage = storageImpl;
+globalObj.sessionStorage = { ...storageImpl };
+
+// ============ XMLHttpRequest ============
+globalObj.XMLHttpRequest = class XMLHttpRequest {
+    open(method, url) { this._url = url; this._method = method; }
+    send(data) { console.log('[XHR]', this._method, this._url); }
+    setRequestHeader() {}
+    addEventListener() {}
+    getResponseHeader() { return null; }
+};
+
+// ============ fetch ============
+globalObj.fetch = async (url, opts) => {
+    console.log('[fetch]', url);
+    return { ok: true, json: async () => ({}), text: async () => '' };
+};
+
+// ============ setTimeout / setInterval ============
+// Node.js 本身已有，确保全局可用
+globalObj.setTimeout = setTimeout;
+globalObj.setInterval = setInterval;
+globalObj.clearTimeout = clearTimeout;
+globalObj.clearInterval = clearInterval;
+
+// ============ atob / btoa ============
+globalObj.atob = (b64) => Buffer.from(b64, 'base64').toString('binary');
+globalObj.btoa = (str) => Buffer.from(str, 'binary').toString('base64');
+
+// ============ crypto ============
+const nodeCrypto = require('crypto');
+globalObj.crypto = {
+    getRandomValues: (arr) => {
+        const bytes = nodeCrypto.randomBytes(arr.byteLength);
+        arr.set(new arr.constructor(bytes.buffer));
+        return arr;
+    },
+    subtle: {},
+    randomUUID: () => nodeCrypto.randomUUID(),
+};
+
+// ============ WebAssembly（简单占位）============
+if (typeof WebAssembly === 'undefined') {
+    globalObj.WebAssembly = {
+        instantiate: async () => ({ instance: { exports: {} } }),
+        compile: async () => ({}),
+    };
+}
+
+console.log('[*] Browser 环境补充完成');
+\`;
+
+module.exports = { getEnv, BROWSER_ENV, proxy_targets };
+`,
+
+      'pojie:aes': `# 🔑 AES-CBC加解密工具
+# 目标文件: {param || 'encrypted.js'}
+# 用法: python aes_tool.py d {param || 'input.js'} output.js
+"""
+12_aes_cbc_tool.py
+AES-CBC 加解密通用工具 + Typora JS解密案例
+来源: https://www.52pojie.cn/thread-1999159-1-1.html
+
+特点: Typora 用 AES-256-CBC, IV 在密文前16字节, Base64编码存储
+同类目标: 很多 Electron/Node.js 程序用类似方案保护 JS 文件
+"""
+
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from base64 import b64decode, b64encode
+from os import urandom
+import argparse
+import struct
+import os
+
+# ================================================================
+# Typora 案例：从逆向拿到的 AES-256 密钥
+# ================================================================
+TYPORA_KEY = bytes.fromhex(
+    '4E E1 B3 82 94 9A 02 4B 80 2F 52 B4 B4 FE 57 F1'
+    'BE F4 08 53 10 92 56 E2 C2 0D EC A3 DD 8D D5 6D'.replace(' ','')
+)
+
+def decrypt_script(b64_data: bytes, key: bytes = TYPORA_KEY) -> str:
+    """
+    解密格式: Base64( IV[16] + AES_CBC_PKCS7(code) )
+    """
+    raw = b64decode(b64_data)
+    iv = raw[:16]
+    ciphertext = raw[16:]
+    cipher = AES.new(key=key, iv=iv, mode=AES.MODE_CBC)
+    decrypted = unpad(cipher.decrypt(ciphertext), 16, 'pkcs7')
+    return decrypted.decode('utf-8')
+
+def encrypt_script(code: str, key: bytes = TYPORA_KEY) -> bytes:
+    """
+    加密格式: Base64( IV[16] + AES_CBC_PKCS7(code) )
+    """
+    iv = urandom(16)
+    cipher = AES.new(key=key, iv=iv, mode=AES.MODE_CBC)
+    encrypted = iv + cipher.encrypt(pad(code.encode(), 16, 'pkcs7'))
+    return b64encode(encrypted)
+
+# ================================================================
+# 通用 AES 工具类（支持多种配置）
+# ================================================================
+class AESToolkit:
+    def __init__(self, key: bytes, mode='CBC', padding='pkcs7'):
+        self.key = key
+        self.mode = getattr(AES, f'MODE_{mode}')
+        self.padding = padding
+        self.key_size = len(key)
+    
+    def encrypt(self, plaintext: str, iv: bytes = None) -> dict:
+        """加密，返回 {iv_hex, cipher_hex, b64}"""
+        if iv is None:
+            iv = urandom(16)
+        cipher = AES.new(key=self.key, iv=iv, mode=self.mode)
+        padded = pad(plaintext.encode(), AES.block_size, self.padding)
+        encrypted = cipher.encrypt(padded)
+        return {
+            'iv_hex': iv.hex(),
+            'cipher_hex': encrypted.hex(),
+            'b64': b64encode(iv + encrypted).decode(),
+            'cipher_b64': b64encode(encrypted).decode(),
+        }
+    
+    def decrypt(self, ciphertext: bytes, iv: bytes) -> str:
+        """解密"""
+        cipher = AES.new(key=self.key, iv=iv, mode=self.mode)
+        return unpad(cipher.decrypt(ciphertext), AES.block_size, self.padding).decode()
+    
+    def decrypt_b64(self, b64_str: str, iv_prefix=True) -> str:
+        """从 Base64 解密（iv_prefix: IV是否在密文前16字节）"""
+        raw = b64decode(b64_str)
+        if iv_prefix:
+            iv, ciphertext = raw[:16], raw[16:]
+        else:
+            raise ValueError("请手动提供 IV")
+        return self.decrypt(ciphertext, iv)
+
+# ================================================================
+# 常见逆向场景：从 JS/Wasm 里提取密钥
+# ================================================================
+
+def find_aes_key_patterns(js_code: str) -> list:
+    """
+    在 JS 代码里搜索可能的 AES 密钥模式
+    """
+    import re
+    patterns = []
+    
+    # 16/24/32 字节 hex 字符串
+    hex_keys = re.findall(r'["\\']([0-9a-fA-F]{32,64})["\\']', js_code)
+    for k in hex_keys:
+        if len(k) in (32, 48, 64):  # 128/192/256 bit
+            patterns.append({'type': 'hex', 'value': k, 'bits': len(k) * 4})
+    
+    # 字节数组 [0x4e, 0xe1, ...]
+    byte_arrays = re.findall(r'\\[(?:0x[0-9a-fA-F]{1,2},?\\s*){16,32}\\]', js_code)
+    for arr in byte_arrays:
+        nums = re.findall(r'0x([0-9a-fA-F]{1,2})', arr)
+        if len(nums) in (16, 24, 32):
+            hex_str = ''.join(n.zfill(2) for n in nums)
+            patterns.append({'type': 'byte_array', 'value': hex_str, 'bits': len(nums) * 8})
+    
+    # CryptoJS.enc.Utf8.parse('xxxxx')
+    utf8_keys = re.findall(r'enc\\.Utf8\\.parse\\(["\\'](.{16,32})["\\']', js_code)
+    for k in utf8_keys:
+        patterns.append({'type': 'utf8', 'value': k, 'hex': k.encode().hex()})
+    
+    return patterns
+
+# ================================================================
+# Electron/ASAR 打包文件操作
+# ================================================================
+def list_asar(asar_path: str):
+    """列出 .asar 文件内容（需安装 asar: npm i -g asar）"""
+    import subprocess
+    result = subprocess.run(['asar', 'list', asar_path], capture_output=True, text=True)
+    return result.stdout
+
+# 使用流程（Typora 案例）：
+# 1. 备份: cp app.asar app.asar.old
+# 2. 解包: asar e app.asar source/
+# 3. 找到 License.js（被 AES 加密的文件）
+# 4. 解密: python aes_tool.py d License.js License_dec.js
+# 5. 修改 License_dec.js（删除授权检测）
+# 6. 加密: python aes_tool.py e License_dec.js License.js
+# 7. 重打包: asar p source app.asar
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='AES-CBC 加解密工具')
+    parser.add_argument('mode', choices=['e', 'd'], help='e=加密 d=解密')
+    parser.add_argument('input_file', help='输入文件')
+    parser.add_argument('output_file', help='输出文件')
+    parser.add_argument('--key', help='十六进制密钥（不填用Typora内置密钥）')
+    args = parser.parse_args()
+    
+    key = bytes.fromhex(args.key) if args.key else TYPORA_KEY
+    
+    with open(args.input_file, 'rb') as f:
+        data = f.read()
+    
+    if args.mode == 'd':
+        result = decrypt_script(data, key).encode()
+    else:
+        result = encrypt_script(data.decode(), key)
+    
+    with open(args.output_file, 'wb') as f:
+        f.write(result)
+    
+    print(f'[+] 完成 → {args.output_file}')
+`,
+
+      'pojie:dbdec': `# 💬 数据库文件解密分析
+# 目标: {param || 'Backup.db'}
+# 用法: python decrypt.py decrypt_db {param || 'Backup.db'} <hex_key>
+"""
+13_wechat_backup_decrypt.py
+解密 Windows 微信备份文件（SQLite 数据库）
+来源: https://www.52pojie.cn/thread-2021739-1-1.html
+
+Windows 微信备份格式：
+- 文件：BAK_0_TEXT, BAK_0_MULTI 等
+- 加密：AES-256-CBC (SQLite 数据库加密) / AES-128-ECB (消息数据)
+- 密钥获取：通过 Frida hook com.tencent.mm.jniinterface.AesEcb 或内存搜索
+
+用法:
+1. adb + frida hook 获取密钥（见下方 hook.js）
+2. python wechat_decrypt.py <backup.db> <hex_key>
+"""
+
+import hmac
+import ctypes
+import hashlib
+import struct
+from Crypto.Cipher import AES
+import blackboxprotobuf  # pip install bbpb
+from pprint import pprint
+
+
+# === 1. 解密 SQLite 加密数据库（BAK_*.db 文件）===
+def decrypt_sqlite_db(path: str, password: bytes, output_path: str = None):
+    """
+    微信 SQLite 数据库解密
+    密码格式: bytes（通常是从内存 dump 出来的 32 字节 key）
+    """
+    KEY_SIZE = 32
+    DEFAULT_ITER = 64000
+    DEFAULT_PAGESIZE = 4096
+    SQLITE_FILE_HEADER = b"SQLite format 3\\x00"
+
+    with open(path, "rb") as f:
+        blist = f.read()
+
+    salt = blist[:16]
+    key = hashlib.pbkdf2_hmac("sha1", password, salt, DEFAULT_ITER, KEY_SIZE)
+    page1 = blist[16:DEFAULT_PAGESIZE]
+
+    # 验证 MAC
+    mac_salt = bytes([x ^ 0x3a for x in salt])
+    mac_key = hashlib.pbkdf2_hmac("sha1", key, mac_salt, 2, KEY_SIZE)
+    hash_mac = hmac.new(mac_key, digestmod="sha1")
+    hash_mac.update(page1[:-32])
+    hash_mac.update(bytes(ctypes.c_int(1)))
+
+    if hash_mac.digest() != page1[-32:-12]:
+        raise RuntimeError("Wrong Password - MAC 校验失败")
+
+    print("[+] 密码正确，开始解密...")
+
+    pages = [blist[i:i+DEFAULT_PAGESIZE] for i in range(DEFAULT_PAGESIZE, len(blist), DEFAULT_PAGESIZE)]
+    pages.insert(0, page1)
+
+    output_path = output_path or f"{path}.dec.db"
+    with open(output_path, "wb") as f:
+        f.write(SQLITE_FILE_HEADER)
+        for page in pages:
+            iv = page[-48:-32]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            f.write(cipher.decrypt(page[:-48]))
+            f.write(page[-48:])
+
+    print(f"[+] 解密完成: {output_path}")
+    return output_path
+
+
+# === 2. 解密消息数据文件（BAK_0_TEXT 等）===
+def decrypt_message_chunk(filename: str, offset: int, length: int, key: bytes) -> dict:
+    """
+    解密单个消息片段
+    key: 16字节 AES-128 密钥
+    """
+    with open(filename, 'rb') as f:
+        f.seek(offset)
+        raw = f.read(length)
+
+    cipher = AES.new(key, AES.MODE_ECB)
+    decrypted = cipher.decrypt(raw)
+
+    # 用 protobuf 解析
+    message, typedef = blackboxprotobuf.decode_message(decrypted)
+    return message
+
+
+# === 消息 protobuf 结构 ===
+# field 1: type (消息类型: 1=文本, 3=图片, 43=视频...)
+# field 3.1: 发送者 wxid
+# field 4.1: 接收者 wxid
+# field 5.1: 消息内容
+# field 7: CreateTime (Unix timestamp)
+# field 16: MsgSvrId
+# field 17: MsgSequence
+FIELD_MAP = {
+    '1': 'msg_type',
+    '3': 'sender',  # {'1': 'wxid_xxx'}
+    '4': 'receiver',  # {'1': 'wxid_xxx'}
+    '5': 'content',  # {'1': '消息内容'}
+    '7': 'create_time',
+    '16': 'msg_svr_id',
+    '17': 'msg_sequence',
+    '18': 'sequence',
+}
+
+def parse_message(msg: dict) -> dict:
+    """解析消息字段"""
+    result = {}
+    for k, name in FIELD_MAP.items():
+        if k in msg:
+            val = msg[k]
+            if isinstance(val, dict) and '1' in val:
+                result[name] = val['1']
+            else:
+                result[name] = val
+    return result
+
+
+# === Frida Hook 脚本（获取 AES 密钥）===
+FRIDA_HOOK_JS = """
+function hookTest1(){
+    function printhex(arr) {
+        let ss = ''
+        for(let i=0; i < arr.length; i++){
+            var num = arr[i]
+            if (num < 0) num = 0xFF + num + 1;  // 补码计算
+            ss += num.toString(16).toUpperCase().padStart(2, '0') + ((i+1)%16 ? ' ' : '\\\\n')
+        }
+        console.log(ss)
+    }
+
+    // Hook AES 加密类
+    let C68396j = Java.use("e41.j");  // 注意: 类名可能因版本不同而变化
+    C68396j["h0"].implementation = function (bArr, z15, bArr2) {
+        console.log(\`\\\\n=== AES 调用 ===\`)
+        console.log('密钥 bArr:')
+        printhex(bArr)
+        console.log('数据 bArr2:')
+        printhex(bArr2)
+        let result = this["h0"](bArr, z15, bArr2);
+        console.log(\`结果:\`)
+        printhex(result._a.value)
+        return result;
+    };
+}
+
+Java.perform(function(){
+    hookTest1();
+});
+"""
+
+# === 使用说明 ===
+if __name__ == '__main__':
+    import sys
+    
+    print("=== 微信备份解密工具 ===")
+    print()
+    print("步骤1: 用 Frida hook 获取密钥")
+    print("  adb connect 192.168.x.x")
+    print("  adb push frida-server /data/local/tmp/")
+    print("  adb shell chmod +x /data/local/tmp/frida-server")
+    print("  adb shell su -c '/data/local/tmp/frida-server &'")
+    print("  frida -U 微信 -l hook.js")
+    print()
+    print("步骤2: 解密 SQLite 数据库")
+    print("  python wechat_decrypt.py decrypt_db <db_file> <hex_key>")
+    print()
+    print("步骤3: 解密消息数据")
+    print("  python wechat_decrypt.py decrypt_msg <BAK_0_TEXT> <offset> <length> <hex_key>")
+    
+    # 保存 Frida hook 脚本
+    with open('wechat_hook.js', 'w', encoding='utf-8') as f:
+        f.write(FRIDA_HOOK_JS)
+    print("\\n[+] wechat_hook.js 已生成")
+    
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'decrypt_db' and len(sys.argv) >= 4:
+            db_path = sys.argv[2]
+            key = bytes.fromhex(sys.argv[3].replace(' ',''))
+            decrypt_sqlite_db(db_path, key)
+        elif sys.argv[1] == 'decrypt_msg' and len(sys.argv) >= 6:
+            filename = sys.argv[2]
+            offset = int(sys.argv[3])
+            length = int(sys.argv[4])
+            key = bytes.fromhex(sys.argv[5].replace(' ',''))
+            msg = decrypt_message_chunk(filename, offset, length, key)
+            parsed = parse_message(msg)
+            pprint(parsed)
+`,
+
+      'pojie:jsvmp2': `// 🔬 JS虚拟机深度分析 - 操作码映射
+// 目标: {param || 'vmp_target.js'}
+// 14_jsvmp_deep_analysis.js
+// JSVMP 深度分析 — 虚拟机解释器逆向 + 字节码追踪 + 环境补充
+// 来源: https://www.52pojie.cn/thread-2023103-1-1.html
+//
+// JSVMP 结构 (以某Q JSVMP为例):
+// - d[] : 虚拟寄存器数组
+// - n[] : 字节码/指令集数组 (g 是当前指令指针)
+// - o函数 : 解释器核心，switch(opcode) 执行各指令
+// - switch case 0~60+: 各种操作 (赋值/运算/函数调用/跳转等)
+
+// === 1. 调试插桩：在解释器 switch 前加日志追踪每条指令 ===
+const JSVMP_TRACER = \`
+// 在 for(;;) switch(aaaa) 前插入
+aaaa = n[++g];
+console.log(g, 'opcode-->', aaaa);  // 打印 PC 和 操作码
+\`;
+
+// === 2. 完整 JSVMP 最小实现（用于理解结构）===
+function runVM(bytecode) {
+    const stack = [];
+    const labels = {};
+    let ip = 0;
+    let callStack = [];
+
+    // 第一遍：记录所有 LABEL 位置
+    for (let i = 0; i < bytecode.length; i++) {
+        const [op, arg] = bytecode[i];
+        if (op === "LABEL") labels[arg] = i;
+    }
+
+    let currentFrame = { vars: {}, returnValue: undefined };
+
+    while (ip < bytecode.length) {
+        const [op, ...args] = bytecode[ip];
+
+        switch (op) {
+            case "LABEL": ip++; break;
+            case "JUMP": ip = labels[args[0]]; break;
+            case "PUSH": stack.push(args[0]); ip++; break;
+            case "LOAD_VAR": stack.push(currentFrame.vars[args[0]]); ip++; break;
+            case "STORE_VAR": currentFrame.vars[args[0]] = stack.pop(); ip++; break;
+            case "ADD": { const b = stack.pop(), a = stack.pop(); stack.push(a + b); ip++; break; }
+            case "CALL": {
+                const funcLabel = labels[args[0]];
+                const newFrame = { vars: {}, returnValue: undefined };
+                // 简化: 假设2个参数 a, b
+                ['a','b'].reverse().forEach(p => { newFrame.vars[p] = stack.pop(); });
+                callStack.push({ ip: ip + 1, frame: currentFrame });
+                currentFrame = newFrame;
+                ip = funcLabel + 1;
+                break;
+            }
+            case "RET": {
+                const rv = stack.pop();
+                const prev = callStack.pop();
+                currentFrame = prev.frame;
+                ip = prev.ip;
+                stack.push(rv);
+                break;
+            }
+            case "CALL_BUILTIN": {
+                if (args[0] === "console.log") console.log(stack.pop());
+                ip++;
+                break;
+            }
+            default: throw new Error(\`Unknown opcode: \${op}\`);
+        }
+    }
+}
+
+// === 3. 从日志提取指令集语义（批量分析）===
+function analyzeVMPLogs(logText) {
+    // 输入: 打印的日志格式 "g --> opcode -- 索引入参N -- 索引出参M -- 指令集 [op, a1, a2...]"
+    const lines = logText.split('\\n');
+    const instructions = [];
+    
+    for (const line of lines) {
+        const m = line.match(/o--> (\\d+) -- 索引入参(\\d+) -- 索引出参(\\d+) 执行差值(\\d+) -- 指令集\\s+(.+)/);
+        if (m) {
+            instructions.push({
+                opcode: parseInt(m[1]),
+                startIdx: parseInt(m[2]),
+                endIdx: parseInt(m[3]),
+                diff: parseInt(m[4]),
+                operands: eval(m[5]),  // 解析 [op, a1, a2...]
+            });
+        }
+    }
+    return instructions;
+}
+
+// === 4. 某Q JSVMP 补环境模板 ===
+const QQ_ENV = \`
+window = globalThis;
+window.global = undefined;
+window.navigator = {};
+window.location = {
+    constructor: '',
+    host: 'y.qq.com',
+};
+
+// Proxy 追踪缺失的环境变量
+function getEnvs(proxyObjs) {
+    for (let i = 0; i < proxyObjs.length; i++) {
+        const handler = {
+            get: function(target, property, receiver) {
+                if (typeof target[property] === 'undefined') {
+                    console.log('[ENV MISS] GET', proxyObjs[i], '.', property);
+                }
+                return target[property];
+            },
+            set: function(target, property, value, receiver) {
+                return Reflect.set(target, property, value, receiver);
+            }
+        };
+        try {
+            eval(\\\`\\\${proxyObjs[i]} = new Proxy(\\\${proxyObjs[i]} || {}, handler)\\\`);
+        } catch(e) {}
+    }
+}
+getEnvs(['window', 'document', 'location', 'navigator', 'history', 'screen']);
+\`;
+
+// === 5. Webpack 自吐模块（提取加密函数）===
+const WEBPACK_SELF_DUMP = \`
+// 在 webpack 模块加载函数中添加日志
+function d(t) {
+    console.log('调用模块 --->', t);
+    var a = {};
+    if (a[t]) return a[t].exports;
+    
+    var r = a[t] = {
+        i: t,      // 模块 id
+        l: false,  // 是否已加载
+        exports: {}
+    };
+    
+    // 执行模块: e[t] 是模块工厂函数
+    e[t].call(r.exports, r, r.exports, d);
+    r.l = true;
+    return r.exports;
+}
+
+// 关键: 通过修改 webpack require 导出所有模块
+// 在 bundle 执行完后:
+// d.m = e; // modules
+// d.c = a; // module cache  
+// globalThis.__wp__ = d;  // 全局导出
+
+// 之后在 Node.js 中:
+// const wp = globalThis.__wp__;
+// const signModule = wp(模块ID);  // 调用指定模块
+// console.log(signModule.sign('test'));
+\`;
+
+// === 6. 关键 opcode 语义表（某Q JSVMP）===
+const OPCODE_MAP = {
+    56: 'd[n[++g]] = Array(n[++g])  // 创建指定长度数组',
+    27: 'd[n[++g]] = n[++g]          // 寄存器赋值常量',
+    46: '// case 2: 创建函数(闭包)',
+    48: 'd[n[++g]][n[++g]] = d[n[++g]]  // 数组元素赋值',
+    0:  '// case 0: d[n[++g]] = new d[n[++g]](d[n[++g]])',
+    1:  'return d[n[++g]]              // 函数返回',
+    9:  'd[n[++g]] = ""  // 初始化字符串并拼接字符',
+    10: 'd[n[++g]] = d[n[++g]] | n[++g]  // 按位或',
+    11: '// 按位与 + 属性访问',
+    12: 'd[n[++g]] = {}  // 创建对象',
+};
+
+module.exports = { runVM, analyzeVMPLogs, QQ_ENV, WEBPACK_SELF_DUMP, OPCODE_MAP };
+`,
+
+      'pojie:m4s': `// 🎬 Chrome插件视频下载 (m4s格式)
+// 目标站: {param || 'https://www.bilibili.com'}
+// 15_chrome_extension_video_downloader.js
+// Chrome 插件开发 — B站 m4s 视频/音频下载方案
+// 来源: https://www.52pojie.cn/thread-2026417-1-1.html
+//
+// 原理:
+// 1. 从页面 <script> 标签提取 window.__playinfo__ 拿到 m4s URL
+// 2. Content Script 用 fetch 带正确 headers 下载 m4s 文件
+// 3. 绕过 CORS: 需要在 manifest.json 声明 host_permissions
+// 4. 视频音频分开下载，用 ffmpeg 合并
+
+// === manifest.json ===
+const MANIFEST = {
+    "manifest_version": 3,
+    "name": "Video M4S Downloader",
+    "version": "1.0.0",
+    "permissions": ["contextMenus", "activeTab", "scripting"],
+    "host_permissions": ["https://www.bilibili.com/*"],
+    "background": { "service_worker": "background.js" },
+    "content_scripts": [{
+        "matches": ["https://www.bilibili.com/*"],
+        "js": ["content.js"]
+    }]
+};
+
+// === background.js — 右键菜单 ===
+const BACKGROUND_JS = \`
+const MENU_ID = 'video-downloader';
+let menuCreated = false;
+
+function isAllowedUrl(url) {
+    return url && url.includes('bilibili.com');
+}
+
+async function updateMenu(tabId) {
+    try {
+        const tab = await chrome.tabs.get(tabId);
+        const allowed = isAllowedUrl(tab.url);
+        if (allowed && !menuCreated) {
+            menuCreated = true;
+            chrome.contextMenus.create({
+                id: MENU_ID,
+                title: '下载视频 (M4S)',
+                documentUrlPatterns: ['https://www.bilibili.com/*']
+            });
+        } else if (!allowed && menuCreated) {
+            await chrome.contextMenus.remove(MENU_ID);
+            menuCreated = false;
+        }
+    } catch(e) {}
+}
+
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+    if (info.url || info.status === 'complete') updateMenu(tabId);
+});
+chrome.tabs.onActivated.addListener(info => updateMenu(info.tabId));
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === MENU_ID) {
+        chrome.tabs.sendMessage(tab.id, { type: 'startDownload' });
+    }
+});
+\`;
+
+// === content.js — 核心下载逻辑 ===
+const CONTENT_JS = \`
+// 从 script 标签提取播放信息
+function getPlayInfo() {
+    if (window.__playinfo__) return window.__playinfo__;
+    for (const script of document.getElementsByTagName('script')) {
+        const t = script.textContent || '';
+        if (!t.includes('window.__playinfo__')) continue;
+        const start = t.indexOf('{');
+        const end = t.lastIndexOf('}') + 1;
+        try { return JSON.parse(t.slice(start, end)); } catch(e) {}
+    }
+    return null;
+}
+
+// 提取视频/音频 URL
+function extractUrls(playInfo) {
+    const dash = playInfo?.data?.dash;
+    if (!dash) return { videoUrls: [], audioUrls: [] };
+    
+    const videoUrls = (dash.video || []).map(v => ({
+        url: v.baseUrl || v.base_url,
+        quality: v.id,
+        type: 'video'
+    }));
+    const audioUrls = (dash.audio || []).map(a => ({
+        url: a.baseUrl || a.base_url, 
+        quality: a.id,
+        type: 'audio'
+    }));
+    return { videoUrls, audioUrls };
+}
+
+// 下载 m4s 文件（带必要的 headers）
+async function fetchM4s(url, rangeStart = 0) {
+    const resp = await fetch(url, {
+        headers: {
+            'accept': '*/*',
+            'accept-language': 'zh-CN,zh;q=0.9',
+            'range': \\\`bytes=\\\${rangeStart}-\\\`,
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'cross-site'
+        },
+        referrerPolicy: 'no-referrer-when-downgrade',
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit'
+    });
+    return resp.blob();
+}
+
+// Blob 转 base64（用于传输给 background）
+function blobToBase64(blob) {
+    return new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onload = e => {
+            const b64 = e.target.result;
+            res(b64.substring(b64.indexOf('base64,') + 7));
+        };
+        reader.onerror = rej;
+    });
+}
+
+// 触发浏览器下载
+function triggerDownload(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+}
+
+// 主流程
+async function downloadVideos() {
+    const playInfo = getPlayInfo();
+    if (!playInfo) { alert('未找到播放信息'); return; }
+    
+    const { videoUrls, audioUrls } = extractUrls(playInfo);
+    console.log('视频:', videoUrls.length, '音频:', audioUrls.length);
+    
+    // 下载最高画质视频
+    if (videoUrls.length > 0) {
+        const best = videoUrls[0];
+        console.log('下载视频:', best.url);
+        const blob = await fetchM4s(best.url);
+        const objUrl = URL.createObjectURL(blob);
+        triggerDownload(objUrl, \\\`video_\\\${best.quality}.m4s\\\`);
+    }
+    
+    // 下载最高音质音频
+    if (audioUrls.length > 0) {
+        const best = audioUrls[0];
+        console.log('下载音频:', best.url);
+        const blob = await fetchM4s(best.url);
+        const objUrl = URL.createObjectURL(blob);
+        triggerDownload(objUrl, \\\`audio_\\\${best.quality}.m4s\\\`);
+    }
+    
+    console.log('下载完成！用 ffmpeg 合并: ffmpeg -i video.m4s -i audio.m4s -c copy output.mp4');
+}
+
+chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'startDownload') downloadVideos();
+});
+\`;
+
+// === 合并 m4s 文件命令 ===
+const FFMPEG_MERGE = \`
+# 合并视频和音频
+ffmpeg -i video.m4s -i audio.m4s -c copy output.mp4
+
+# 如果报错，先转换
+ffmpeg -i video.m4s -c copy video.mp4
+ffmpeg -i audio.m4s -c copy audio.mp3
+ffmpeg -i video.mp4 -i audio.mp3 -c copy output.mp4
+\`;
+
+// === 捕获网络请求的 URL（declarativeNetRequest 方案）===
+const URL_CATCHER_MANIFEST = {
+    "manifest_version": 3,
+    "name": "URL Catcher",
+    "version": "1.0",
+    "permissions": ["declarativeNetRequest", "declarativeNetRequestFeedback", "activeTab"],
+    "background": { "service_worker": "background.js" }
+};
+
+const URL_CATCHER_BG = \`
+const RULE_ID = 1;
+chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [RULE_ID],
+    addRules: [{
+        id: RULE_ID,
+        priority: 1,
+        action: { type: 'allow' },
+        condition: { 
+            urlFilter: '*', 
+            resourceTypes: ['media', 'xmlhttprequest', 'script']
+        }
+    }]
+});
+
+// 监听并打印所有匹配的 URL
+chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(({ request }) => {
+    if (request.url.includes('.m4s') || request.url.includes('dash')) {
+        console.log('[M4S URL]', request.url);
+    }
+});
+\`;
+
+module.exports = { MANIFEST, BACKGROUND_JS, CONTENT_JS, FFMPEG_MERGE, URL_CATCHER_BG };
+`,
+
+      'pojie:soload': `# 📱 Android动态库加载追踪
+# 目标APP: {param || 'com.target.app'}
+# 用法: frida -U -f {param || 'com.target.app'} -l so_loader_trace.js
+"""
+16_android_so_loader_hook.py
+Android SO 加载过程追踪 Frida Hook
+来源: https://www.52pojie.cn/thread-2010329-1-1.html
+
+SO 加载完整链路:
+System.load() → Runtime.load0() → nativeLoad() → JVM_NativeLoad()
+→ JavaVMExt::LoadNativeLibrary() → android::OpenNativeLibrary()
+→ android_dlopen_ext() → dlopen_ext() → do_dlopen() → find_library()
+→ soinfo::call_constructors() → JNI_OnLoad()
+
+关键 Hook 点:
+1. android_dlopen_ext: 监控所有 SO 加载
+2. soinfo::call_constructors: SO 初始化前
+3. JNI_OnLoad: SO 已加载完毕
+
+应用场景:
+- 在 JNI_OnLoad 执行前 patch 掉反调试
+- 监控加固壳释放 dex/so 的时机
+- 拦截动态加载的 so 文件
+"""
+
+# === Frida 脚本：追踪完整 SO 加载链路 ===
+SO_LOADER_TRACE = """
+// 方案1: Hook Java 层 System.load()
+Java.perform(() => {
+    const System = Java.use('java.lang.System');
+    const Runtime = Java.use('java.lang.Runtime');
+    
+    // Hook System.load
+    System.load.implementation = function(filename) {
+        console.log('[System.load]', filename);
+        this.load(filename);
+    };
+    
+    // Hook System.loadLibrary  
+    System.loadLibrary.implementation = function(libname) {
+        console.log('[System.loadLibrary]', libname);
+        this.loadLibrary(libname);
+    };
+});
+
+// 方案2: Hook Native 层 android_dlopen_ext（更底层，包括壳加载的 so）
+var _android_dlopen_ext = Module.findExportByName(null, 'android_dlopen_ext');
+if (_android_dlopen_ext) {
+    Interceptor.attach(_android_dlopen_ext, {
+        onEnter: function(args) {
+            var path = args[0].readCString();
+            if (path) {
+                console.log('[dlopen_ext]', path);
+                this.path = path;
+            }
+        },
+        onLeave: function(ret) {
+            if (this.path) {
+                console.log('[dlopen_ext ret]', this.path, '→ handle:', ret);
+            }
+        }
+    });
+}
+
+// 方案3: Hook __loader_android_dlopen_ext（linker 内部）
+// 适合 SDK >= 26 的情况
+function hookLinkerDlopen() {
+    var linker = Process.findModuleByName('linker64') || Process.findModuleByName('linker');
+    if (!linker) return;
+    
+    linker.enumerateExports().forEach(exp => {
+        if (exp.name.includes('dlopen')) {
+            console.log('[linker export]', exp.name, exp.address);
+            Interceptor.attach(exp.address, {
+                onEnter: function(args) {
+                    try {
+                        var path = args[0].readCString();
+                        if (path && path.endsWith('.so')) {
+                            console.log('[linker dlopen]', path);
+                        }
+                    } catch(e) {}
+                }
+            });
+        }
+    });
+}
+hookLinkerDlopen();
+"""
+
+# === Frida 脚本：在 JNI_OnLoad 前 patch 反调试 ===
+PATCH_BEFORE_INIT = """
+// 在 libmsaoaidsec.so 加载时，init_proc 执行前替换关键函数
+var linker = Process.findModuleByName('linker64');
+var call_ctors_off = 0x20b78;  // 需要根据实际版本调整
+
+var listener = Interceptor.attach(linker.base.add(call_ctors_off), {
+    onEnter: function(args) {
+        var mod = Process.findModuleByName('libmsaoaidsec.so');
+        if (!mod) return;
+        
+        console.log('[*] libmsaoaidsec.so call_constructors 被调用');
+        
+        // patch 反调试函数（偏移需根据实际版本）
+        var antiFridaOffset = 0x1BEC4;
+        Memory.protect(mod.base.add(antiFridaOffset), 4, 'rwx');
+        Interceptor.replace(mod.base.add(antiFridaOffset), new NativeCallback(function() {
+            console.log('[*] anti-frida 函数已被 nop');
+        }, 'void', []));
+        
+        listener.detach();  // 只 hook 一次
+    }
+});
+
+// 也 hook android_dlopen_ext 来触发上面的逻辑
+Interceptor.attach(Module.findExportByName(null, 'android_dlopen_ext'), {
+    onEnter: function(args) {
+        var path = args[0].readCString() || '';
+        if (path.includes('libmsaoaidsec.so')) {
+            console.log('[*] 检测到 libmsaoaidsec.so 加载:', path);
+        }
+    }
+});
+"""
+
+# === ELF 文件 .init_array 分析 ===
+ELF_ANALYSIS = """
+# 查看 so 的 .init_array（初始化函数列表）
+# 这些函数在 JNI_OnLoad 之前执行，是最早的 hook 点
+
+import lief
+
+def analyze_init_array(so_path):
+    binary = lief.parse(so_path)
+    
+    # .init_array 节
+    init_array = binary.get_section('.init_array')
+    if init_array:
+        print(f".init_array 大小: {init_array.size} bytes")
+        # 每8字节一个函数指针（64位）
+        ptrs = [int.from_bytes(bytes(init_array.content[i:i+8]), 'little') 
+                for i in range(0, init_array.size, 8)]
+        for i, ptr in enumerate(ptrs):
+            print(f"  [{i}] 0x{ptr:016x}")
+    
+    # DT_INIT_ARRAY
+    dynamic = binary.dynamic_section
+    for entry in dynamic:
+        if entry.tag == lief.ELF.DYNAMIC_TAGS.INIT_ARRAY:
+            print(f"DT_INIT_ARRAY = 0x{entry.value:x}")
+        if entry.tag == lief.ELF.DYNAMIC_TAGS.INIT_ARRAYSZ:
+            print(f"DT_INIT_ARRAYSZ = {entry.value}")
+
+analyze_init_array('/path/to/target.so')
+"""
+
+if __name__ == '__main__':
+    with open('so_loader_trace.js', 'w', encoding='utf-8') as f:
+        f.write(SO_LOADER_TRACE)
+    with open('patch_before_init.js', 'w', encoding='utf-8') as f:
+        f.write(PATCH_BEFORE_INIT)
+    print("[+] so_loader_trace.js 已生成")
+    print("[+] patch_before_init.js 已生成")
+    print()
+    print("使用: frida -U -f <package> -l so_loader_trace.js --no-pause")
+`,
+
     };
 
     const key = `${type}:${sub}`;
