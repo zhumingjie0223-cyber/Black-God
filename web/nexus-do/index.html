@@ -2070,7 +2070,15 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 <script>
 /* 首屏可见性守卫：最早执行，独立于任何后续逻辑 */
 (function(){
-  function show(){ var a=document.getElementById('app'); if(a){ a.classList.add('shown'); } }
+  function show(){
+    var a=document.getElementById('app');
+    if(!a) return;
+    a.classList.add('shown');
+    // 直接写内联样式：不依赖 transition/animation 时钟，任何环境都立即可见
+    a.style.setProperty('opacity','1','important');
+    a.style.setProperty('transform','none','important');
+    a.style.setProperty('animation','none','important');
+  }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',show,{once:true}); }
   else { show(); }
   setTimeout(show,300);   // 兜底：无论如何 300ms 后可见
