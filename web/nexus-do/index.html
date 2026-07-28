@@ -453,8 +453,11 @@ button,input,textarea{font-family:inherit;color:inherit}
 .shu-tag{display:inline-flex;gap:6px;flex-wrap:wrap;padding:0 4px}
 .shu-tag i{font-style:normal;font-size:10px;padding:2px 7px;border-radius:6px;
   background:var(--surface);border:1px solid var(--line);color:var(--cy-1);font-weight:600}
-.typing{display:inline-flex;gap:4px;padding:14px 16px;background:var(--surface-2);
-  border:1px solid var(--line);border-radius:19px;border-bottom-left-radius:6px}
+.typing{display:inline-flex;gap:5px;padding:14px 16px;
+  background:var(--surface-2);-webkit-backdrop-filter:blur(12px) saturate(160%);
+  backdrop-filter:blur(12px) saturate(160%);
+  border:1px solid var(--line);border-radius:19px;border-bottom-left-radius:6px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.28),0 12px 32px -8px rgba(0,0,0,.45)}
 .typing i{width:7px;height:7px;border-radius:50%;background:var(--live);animation:blink 1.3s infinite}
 .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
 .typing.lbl{align-items:center;font-size:13px;color:var(--text-2)}
@@ -3988,6 +3991,263 @@ function bootOwner(){
 #tosBtns button{flex:1;padding:12px;border-radius:12px;border:0;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
 #tosOk{background:var(--cy-grad);color:#06170E}
 #tosNo{background:var(--surface-2,rgba(170,225,190,.07));color:var(--text-2,#A6C7B2);border:1px solid var(--line)}
+
+/* ============================================================
+   Black God — Emerald Upgrade Pack (append before </style>)
+   ============================================================ */
+
+/* ---------- 1. 消息淡入升级（blur + scale + translate） ---------- */
+
+@keyframes emeraldRise {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translate3d(0, 14px, 0) scale(.94);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes emeraldRiseMe {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translate3d(18px, 14px, 0) scale(.94);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes emeraldRiseHer {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translate3d(-18px, 14px, 0) scale(.94);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.msg {
+  animation: emeraldRise .45s cubic-bezier(.22, 1, .36, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+.msg.me {
+  animation-name: emeraldRiseMe;
+  transform-origin: 100% 100%;
+}
+
+.msg.her {
+  animation-name: emeraldRiseHer;
+  transform-origin: 0 100%;
+}
+
+
+/* ---------- 2. 三点加载指示器 ---------- */
+/*
+  配套 HTML（放进 .msg.her 的 .bubble 内即可）：
+
+  <div class="msg her">
+    <div class="bubble">
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+*/
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  padding: 1px 2px;
+}
+
+.typing-dots span,
+.typing i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cy-1);
+  opacity: .28;
+  transform: translateY(0) scale(.85);
+  animation: typingBlink 1.4s var(--ease, ease-in-out) infinite;
+}
+
+.typing-dots span:nth-child(1),.typing i:nth-child(1){ animation-delay: 0s; }
+.typing-dots span:nth-child(2),.typing i:nth-child(2){ animation-delay: .18s; }
+.typing-dots span:nth-child(3),.typing i:nth-child(3){ animation-delay: .36s; }
+
+@keyframes typingBlink {
+  0%, 60%, 100% {
+    opacity: .28;
+    transform: translateY(0) scale(.85);
+    background: var(--cy-1);
+    box-shadow: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1);
+    background: var(--cy-hi);
+    box-shadow: 0 0 8px var(--cy-glow);
+  }
+}
+
+
+/* ---------- 3. 输入框聚焦发光 ---------- */
+
+#inp {
+  transition:
+    border-color .2s cubic-bezier(.16, 1, .3, 1),
+    box-shadow   .2s cubic-bezier(.16, 1, .3, 1),
+    background   .2s cubic-bezier(.16, 1, .3, 1);
+}
+
+#inp:focus,
+#inp:focus-visible {
+  outline: none;
+  border-color: var(--cy-1);
+  background: var(--surface-2);
+  box-shadow:
+    0 0 0 3px var(--cy-glow),
+    0 0 18px 2px var(--cy-glow),
+    inset 0 1px 0 rgba(255, 255, 255, .05);
+  caret-color: var(--cy-hi);
+}
+
+#inp::placeholder {
+  color: var(--text-3);
+  transition: color .2s cubic-bezier(.16, 1, .3, 1);
+}
+
+#inp:focus::placeholder { color: var(--text-2); }
+
+
+/* ---------- 4. 气泡质感强化 ---------- */
+
+.msg.her .bubble {
+  position: relative;
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+  border: 1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    inset 0 0 0 1px rgba(255, 255, 255, .02),
+    0 1px 2px rgba(0, 0, 0, .28),
+    0 12px 32px -8px rgba(0, 0, 0, .45);
+}
+
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .msg.her .bubble { background: var(--surface-2); }
+}
+
+.msg.me .bubble {
+  position: relative;
+  background: var(--cy-grad);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .28),
+    inset 0 -1px 0 rgba(0, 0, 0, .10),
+    0 2px 6px -1px rgba(0, 0, 0, .30),
+    0 14px 34px -12px var(--cy-glow);
+}
+
+
+/* ---------- 5. 发光脉冲 .glow-pulse ---------- */
+
+.glow-pulse {
+  position: relative;
+  border-radius: var(--radius-pill);
+  animation: emeraldPulse 2s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+
+.glow-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 1px solid var(--live);
+  opacity: 0;
+  animation: emeraldPulseRing 2s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+
+@keyframes emeraldPulse {
+  0%   { box-shadow: 0 0 0 0 var(--live-glow), 0 0 10px 0 var(--cy-glow); }
+  70%  { box-shadow: 0 0 0 14px rgba(79, 224, 150, 0), 0 0 22px 4px var(--cy-glow); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 224, 150, 0), 0 0 10px 0 var(--cy-glow); }
+}
+
+@keyframes emeraldPulseRing {
+  0%   { opacity: .55; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(1.28); }
+  100% { opacity: 0;   transform: scale(1.28); }
+}
+
+
+/* 发光脉冲挂到实际状态：发送中 / 中枢在线 */
+.send--sending{
+  animation: emeraldPulse 2s cubic-bezier(.4,0,.2,1) infinite;
+  border-radius: var(--radius-pill);
+}
+.dot.live, .status-dot.live{
+  animation: emeraldPulse 2.4s cubic-bezier(.4,0,.2,1) infinite;
+}
+
+/* ---------- Reduced Motion 降级 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .msg,
+  .msg.me,
+  .msg.her {
+    animation: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+
+  .typing-dots span,
+  .typing i {
+    animation: none !important;
+    opacity: .6;
+    transform: none;
+    background: var(--cy-1);
+  }
+  .typing-dots span:nth-child(2) { opacity: .45; }
+  .typing-dots span:nth-child(3) { opacity: .3; }
+
+  #inp,
+  #inp::placeholder {
+    transition: none !important;
+  }
+
+  .send--sending,
+  .dot.live,
+  .status-dot.live { animation: none !important; }
+
+  .glow-pulse {
+    animation: none !important;
+    box-shadow: 0 0 0 2px var(--cy-glow), 0 0 12px 2px var(--cy-glow);
+  }
+
+  .glow-pulse::after {
+    animation: none !important;
+    opacity: .5;
+    transform: none;
+  }
+}
+
 </style>
 <div id="tosMask"><div id="tosBox">
   <h3>服务条款 · 使用须知</h3>
