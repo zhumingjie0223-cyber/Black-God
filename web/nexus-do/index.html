@@ -1771,7 +1771,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
         <div class="page-inner">
           <div class="set-row" onclick="toggleTheme()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
           <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关</span></div><div class="switch" id="pushSw"><i></i></div></div>
-          <div class="set-row" onclick="openModelSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑 · 模型</b><span id="modelLabel">Auto · 智能路由</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑舰队</b><span id="modelLabel">神枢自动调度</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
@@ -1797,26 +1797,6 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 
 <!-- ===== Sheets ===== -->
 <div class="mask" id="mask" onclick="closeSheet()"></div>
-
-<div class="sheet" id="sheetModel">
-  <div class="grab"></div>
-  <div class="sheet-title">大脑 · 模型</div>
-  <div class="sheet-sub">选一家 AI 服务商 · 点「登录」一键接入，或手动配。</div>
-  <div id="modelOpts"></div>
-  <div style="height:1px;background:var(--line-2);margin:16px 0 12px"></div>
-  <div style="font-size:13px;color:var(--text-3);margin-bottom:10px">＋ 接入 AI 服务商</div>
-  <div id="providerList"></div>
-</div>
-
-<div class="sheet" id="sheetOAuth">
-  <div class="grab"></div>
-  <div class="sheet-title" id="oauthTitle">登录</div>
-  <div class="sheet-sub" id="oauthSub">点下面按钮跳转官方登录，授权后把地址栏 code=… 那串粘回来。</div>
-  <a id="oauthGoBtn" href="#" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:12px">🔗 跳转登录</a>
-  <div class="field"><label>把授权码粘这里</label><input id="oauthCode" placeholder="登录后地址栏 code= 后面那串"/></div>
-  <button class="btn" onclick="oauthFinish()">完成接入</button>
-  <div id="oauthStatus" style="font-size:12px;color:var(--text-3);margin-top:10px;min-height:16px"></div>
-</div>
 
 <div class="sheet" id="sheetLexicon">
   <div class="grab"></div>
@@ -1844,13 +1824,46 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <div class="sheet-title">大脑舰队 · 神枢调度</div>
   <div class="sheet-sub">最多 9 条 · 神枢自动调度</div>
   <div id="brainList"></div>
-  <button class="btn ghost" id="brainAddBtn" onclick="brainAdd()" style="margin-top:4px">＋ 加一条</button>
+  <button class="btn ghost" id="brainAddBtn" onclick="openProviderPicker()" style="margin-top:4px">＋ 加一条</button>
+  <button class="btn ghost" onclick="brainAdd()" style="margin-top:4px;font-size:12px;opacity:.65">或手动填空白条</button>
   <div id="brainStatus" style="font-size:12px;color:var(--text-3);margin:10px 0;min-height:16px"></div>
   <div id="brainHealth" style="margin:2px 0 12px"></div>
   <div style="display:flex;gap:10px">
     <button class="btn" onclick="saveBrains()">保存并生效</button>
     <button class="btn ghost" onclick="testFleet()">测试舰队</button>
   </div>
+</div>
+
+<!-- 第1层：厂商列表 -->
+<div class="sheet" id="sheetProvider">
+  <div class="grab"></div>
+  <div class="sheet-title">选一家算力</div>
+  <div class="sheet-sub">选好后自动进「大脑舰队」补 Key，不用你自己开账号跑流程</div>
+  <div id="providerList"></div>
+</div>
+
+<!-- 第2层：认证方式二选一（仅 anthropic / openrouter 有此层） -->
+<div class="sheet" id="sheetAuthMethod">
+  <div class="grab"></div>
+  <div class="sheet-title">认证方式</div>
+  <div class="sheet-sub" id="authMethodSub"></div>
+  <div class="opt-row" id="authRowKey" onclick="pickAuthMethod(_authPid,'key')">
+    <div class="oi">🔑</div><div class="ot"><b>API Key</b><span id="authKeySub"></span></div><div class="set-arrow">›</div>
+  </div>
+  <div class="opt-row" id="authRowOAuth" onclick="pickAuthMethod(_authPid,'oauth')">
+    <div class="oi">👤</div><div class="ot"><b>OAuth</b><span id="authOauthSub"></span></div><div class="set-arrow">›</div>
+  </div>
+</div>
+
+<!-- 第3层-OAuth：跳转登录+回填 code -->
+<div class="sheet" id="sheetOAuth">
+  <div class="grab"></div>
+  <div class="sheet-title" id="oauthTitle">登录</div>
+  <div class="sheet-sub">点下面按钮跳转官方登录，授权后把地址栏 code=… 那串粘回来</div>
+  <a id="oauthGoBtn" href="#" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:12px">🔗 跳转登录</a>
+  <div class="field"><label>把授权码粘这里</label><input id="oauthCode" placeholder="登录后地址栏 code= 后面那串"/></div>
+  <button class="btn" onclick="oauthFinish()">完成接入</button>
+  <div id="oauthStatus" style="font-size:12px;color:var(--text-3);margin-top:10px;min-height:16px"></div>
 </div>
 
 <div class="sheet" id="sheetExec">
@@ -2859,7 +2872,7 @@ function go(i) {
 /* ============ Sheet（抽屉 + 拖拽关闭）============ */
 let openS = null;
 function openSheet(id){ const s=$('#'+id); if(!s)return; $('#mask').classList.add('show'); s.classList.add('show'); openS=s; initSheetDrag(s);
-  if(id==='sheetModel'){ renderModelOpts(); renderProviders(); } if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); }
+  if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); }
 function closeSheet(){ if(openS){ openS.classList.remove('show'); openS=null; } $('#mask').classList.remove('show'); }
 function initSheetDrag(s){
   if (s._drag) return; s._drag = true;
@@ -3353,116 +3366,6 @@ async function renderLexicon(q){
 function fmtTs(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}); }catch(e){ return ''; } }
 
 /* ============ 模型 / API / 人格 ============ */
-const MODELS = [
-  {id:'auto',      name:'Auto · 智能路由',           ic:'✨', sub:'按任务选当前最强可用算力'},
-  {id:'opus-5',    name:'Claude Opus 5 · 顶级',      ic:'💎', sub:'接入 aquan.love · claude-opus-5', model:'claude-opus-5'},
-  {id:'opus-4-8',  name:'Claude Opus 4.8 · 强力',    ic:'⚡', sub:'接入 aquan.love · claude-opus-4-8', model:'claude-opus-4-8'},
-  {id:'fable-5',   name:'Fable 5 · 旗舰',            ic:'🔥', sub:'接入 aquan.love · claude-fable-5', model:'claude-fable-5'},
-  {id:'strong',    name:'强算力网关',                 ic:'🔌', sub:'外接自定义网关（在接口里配）'},
-];
-function renderModelOpts(){
-  const sel = store.get('model')||'auto';
-  $('#modelOpts').innerHTML = MODELS.map(m=>`<div class="opt-row ${m.id===sel?'sel':''}" onclick="pickModel('${m.id}')">
-    <div class="oi">${m.ic}</div><div class="ot"><b>${m.name}</b><span>${m.sub}</span></div><div class="opt-check">✓</div></div>`).join('');
-}
-function pickModel(id){
-  store.set('model',id);
-  const m=MODELS.find(x=>x.id===id);
-  $('#modelLabel').textContent=m?m.name:id;
-  // aquan.love 模型：toast 提示模型名
-  if(m && m.model && m.model.startsWith('claude-')){
-    toast('模型：'+m.model+' · 需在接口设置里配 aquan.love');
-  }
-  // CF AI 内置模型：自动填 /cf-ai
-  if(m && m.cfModel){
-    store.set('api_base', '/cf-ai');
-    store.set('api_model', m.cfModel);
-    $('#apiBase') && ($('#apiBase').value = '/cf-ai');
-    $('#apiModel') && ($('#apiModel').value = m.cfModel);
-    $('#apiKey') && ($('#apiKey').value = 'CF_INTERNAL');
-    $('#apiLabel') && ($('#apiLabel').textContent = m.name);
-  }
-  renderModelOpts();
-  toast('已选：'+(m?m.name:id));
-}
-
-/* ===== 厂商接入（Minis 式：每家独立入口）===== */
-const PROVIDERS = [
-  {id:'aquan',     name:'aquan.love · 中转',    ic:'🔥', oauth:false, sub:'Fable5 / Opus5 中转站', gw:'https://aquan.love/v1', model:'claude-fable-5', provider:'openai', keyUrl:'https://aquan.love'},
-  {id:'anthropic', name:'Anthropic (Claude)', ic:'🟣', oauth:true, canKey:true, sub:'填 key 接入（推荐）· 或一键登录', gw:'https://api.anthropic.com', model:'claude-sonnet-5', provider:'anthropic', keyUrl:'https://console.anthropic.com/settings/keys'},
-  {id:'openrouter',name:'OpenRouter',         ic:'🔗', oauth:true,  sub:'一键登录 · 一号通全厂'},
-  {id:'openai',    name:'OpenAI (ChatGPT)',   ic:'🟢', oauth:false, sub:'填 key 接入', gw:'https://api.openai.com/v1', model:'gpt-4o', provider:'openai', keyUrl:'https://platform.openai.com/api-keys'},
-  {id:'google',    name:'Google Gemini',      ic:'🔵', oauth:false, sub:'填 key 接入', gw:'https://generativelanguage.googleapis.com', model:'gemini-2.0-flash', provider:'gemini', keyUrl:'https://aistudio.google.com/apikey'},
-  {id:'xai',       name:'xAI (Grok)',         ic:'⚫', oauth:false, sub:'填 key 接入', gw:'https://api.x.ai/v1', model:'grok-2-latest', provider:'openai', keyUrl:'https://console.x.ai'},
-  {id:'moonshot',  name:'Moonshot (Kimi)',    ic:'🌙', oauth:false, sub:'填 key 接入', gw:'https://api.moonshot.cn/v1', model:'kimi-k2-0711-preview', provider:'openai', keyUrl:'https://platform.moonshot.cn/console/api-keys'},
-  {id:'deepseek',  name:'DeepSeek',           ic:'🐋', oauth:false, sub:'填 key 接入', gw:'https://api.deepseek.com/v1', model:'deepseek-chat', provider:'openai', keyUrl:'https://platform.deepseek.com/api_keys'},
-  {id:'qwen',      name:'阿里通义千问',        ic:'🟠', oauth:false, sub:'填 key 接入', gw:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-max', provider:'openai', keyUrl:'https://bailian.console.aliyun.com/?apiKey=1'},
-  {id:'zhipu',     name:'智谱 GLM',            ic:'🔷', oauth:false, sub:'填 key 接入', gw:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-plus', provider:'openai', keyUrl:'https://open.bigmodel.cn/usercenter/apikeys'},
-];
-function renderProviders(){
-  const el=$('#providerList'); if(!el) return;
-  el.innerHTML=PROVIDERS.map(p=>`<div class="opt-row" onclick="pickProvider('${p.id}')" style="cursor:pointer">
-    <div class="oi">${p.ic}</div><div class="ot"><b>${p.name}</b><span>${p.sub}</span></div>
-    <div class="set-arrow" style="color:${p.oauth?'var(--brand,#4ea1ff)':'var(--text-3)'}">${p.oauth?'登录 ›':'配置 ›'}</div></div>`).join('');
-}
-let _oauthProvider='';
-function pickProvider(id){
-  const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
-  // 支持填 key 的（含 Anthropic）优先走「粘 key」路：一步到位，绕开会被 App 劫持的跳转登录。
-  // 只有纯 OAuth（如 OpenRouter，没 API key 只能授权）才走跳转。
-  if(p.canKey || !p.oauth){
-    _pendingProv=p;
-    $('#apiBase').value=p.gw||''; $('#apiModel').value=p.model||''; $('#apiKey').value='';
-    if(p.keyUrl) window.open(p.keyUrl,'_blank','noopener');
-    openSheet('sheetApi');
-    toast('已打开 '+p.name+' 的 key 页 · 复制 key 粘到下面');
-  } else {
-    startOAuth(id);
-  }
-}
-let _pendingProv=null;
-async function startOAuth(provider){
-  const p=PROVIDERS.find(x=>x.id===provider);
-  $('#oauthTitle').textContent=(p?p.name:provider)+' · 登录';
-  $('#oauthStatus').textContent='正在生成登录链接…';
-  $('#oauthCode').value='';
-  openSheet('sheetOAuth');
-  const r=await Nexus.oauthStart(provider);
-  if(r&&r.__401){ $('#oauthStatus').textContent='需以主人身份解锁后再登录'; return; }
-  if(r&&r.ok&&r.authUrl){
-    _oauthProvider=provider;
-    $('#oauthGoBtn').href=r.authUrl;
-    $('#oauthStatus').textContent='点上面按钮跳转登录，授权后把 code 粘回来';
-  } else { $('#oauthStatus').textContent=(r&&r.error)||'生成登录链接失败'; }
-}
-async function oauthFinish(){
-  const code=$('#oauthCode').value.trim();
-  if(!code){ $('#oauthStatus').textContent='先把授权码粘进来'; return; }
-  $('#oauthStatus').textContent='正在换取密钥并接入…';
-  const r=await Nexus.oauthCallback(code);
-  if(r&&r.__401){ $('#oauthStatus').textContent='需以主人身份解锁'; return; }
-  if(r&&r.ok){
-    toast((r.label||'厂商')+' 已登录接入！');
-    // 有真实模型列表 → 展示让你选具体型号
-    if(Array.isArray(r.models)&&r.models.length){
-      $('#oauthStatus').innerHTML='✅ 已接入 · 选一个模型：<div id="oauthModels" style="margin-top:8px"></div>';
-      const box=$('#oauthModels');
-      box.innerHTML=r.models.map(m=>`<div class="opt-row" onclick="pickOAuthModel('${m.replace(/'/g,"")}','${r.label||''}')" style="cursor:pointer;padding:8px 10px">
-        <div class="ot"><b style="font-size:13px">${m}</b></div><div class="set-arrow">›</div></div>`).join('');
-    } else {
-      $('#oauthStatus').textContent='✅ '+(r.note||'已接入');
-      setTimeout(()=>{ closeSheet(); }, 1200);
-    }
-  } else { $('#oauthStatus').textContent='❌ '+((r&&r.error)||'接入失败'); }
-}
-async function pickOAuthModel(model,label){
-  // 把选中的具体模型写回该厂商的 brain（改 model 字段）
-  const c=await Nexus.getConfig();
-  const brains=(c&&c.brains)||[];
-  const b=brains.find(x=>x.label===label)||brains[0];
-  if(b){ b.model=model; const r=await Nexus.setConfig({brains}); if(r&&r.ok){ toast('已选模型：'+model); $('#modelLabel').textContent=label+' · '+model; } }
-  closeSheet();
-}
 async function fillApi(){
   $('#nexusBase').value=store.get('nexus_base')||'';
   $('#apiStatus').textContent='读取当前配置…';
@@ -3533,6 +3436,77 @@ function _bpaste(i,raw){
   if(url||tok) _bstat('已自动拆分'+(url?' · 地址✓':'')+(tok?' · key✓':''),'var(--ok)');
 }
 function _bstat(m,c){ const el=$('#brainStatus'); if(el){ el.textContent=m; el.style.color=c||'var(--text-3)'; } }
+/* ===== 厂商接入三层流程：选厂商 → 认证方式(如支持) → Key表单/OAuth ===== */
+const PROVIDERS = [
+  {id:'aquan',     name:'aquan.love · 中转',   ic:'🔥', oauth:false, sub:'Fable5 / Opus5 中转站', gw:'https://aquan.love/v1', model:'claude-fable-5', keyUrl:'https://aquan.love'},
+  {id:'anthropic', name:'Anthropic (Claude)',  ic:'🟣', oauth:true,  sub:'填 Key 或一键登录', gw:'https://api.anthropic.com', model:'claude-sonnet-5', keyUrl:'https://console.anthropic.com/settings/keys'},
+  {id:'openrouter',name:'OpenRouter',          ic:'🔗', oauth:true,  sub:'一号通全厂 · 一键登录', gw:'https://openrouter.ai/api/v1', model:'anthropic/claude-sonnet-5', keyUrl:'https://openrouter.ai/keys'},
+  {id:'openai',    name:'OpenAI (ChatGPT)',    ic:'🟢', oauth:false, sub:'填 Key 接入', gw:'https://api.openai.com/v1', model:'gpt-4o', keyUrl:'https://platform.openai.com/api-keys'},
+  {id:'google',    name:'Google Gemini',       ic:'🔵', oauth:false, sub:'填 Key 接入', gw:'https://generativelanguage.googleapis.com', model:'gemini-2.0-flash', keyUrl:'https://aistudio.google.com/apikey'},
+  {id:'xai',       name:'xAI (Grok)',          ic:'⚫', oauth:false, sub:'填 Key 接入', gw:'https://api.x.ai/v1', model:'grok-2-latest', keyUrl:'https://console.x.ai'},
+  {id:'moonshot',  name:'Moonshot (Kimi)',     ic:'🌙', oauth:false, sub:'填 Key 接入', gw:'https://api.moonshot.cn/v1', model:'kimi-k2-0711-preview', keyUrl:'https://platform.moonshot.cn/console/api-keys'},
+  {id:'deepseek',  name:'DeepSeek',            ic:'🐋', oauth:false, sub:'填 Key 接入', gw:'https://api.deepseek.com/v1', model:'deepseek-chat', keyUrl:'https://platform.deepseek.com/api_keys'},
+  {id:'qwen',      name:'阿里通义千问',          ic:'🟠', oauth:false, sub:'填 Key 接入', gw:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-max', keyUrl:'https://bailian.console.aliyun.com/?apiKey=1'},
+  {id:'zhipu',     name:'智谱 GLM',             ic:'🔷', oauth:false, sub:'填 Key 接入', gw:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-plus', keyUrl:'https://open.bigmodel.cn/usercenter/apikeys'},
+];
+function openProviderPicker(){ renderProviders(); openSheet('sheetProvider'); }
+function renderProviders(){
+  const el=$('#providerList'); if(!el) return;
+  el.innerHTML = PROVIDERS.map(p=>`<div class="opt-row" onclick="pickProvider('${p.id}')">
+    <div class="oi">${p.ic}</div><div class="ot"><b>${esc(p.name)}</b><span>${esc(p.sub)}</span></div><div class="set-arrow">›</div></div>`).join('');
+}
+let _authPid=null;
+function pickProvider(id){
+  const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
+  if(p.oauth){
+    // 有后端真支持的 OAuth（目前仅 anthropic / openrouter）→ 弹认证方式二选一
+    _authPid=id;
+    $('#authMethodSub').textContent = '接入 '+p.name;
+    $('#authKeySub').textContent = '使用你的 '+p.name+' API 密钥';
+    $('#authOauthSub').textContent = '使用你的 '+p.name+' 账户登录';
+    openSheet('sheetAuthMethod');
+  } else {
+    pickAuthMethod(id,'key');
+  }
+}
+function pickAuthMethod(id, method){
+  const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
+  if(method==='oauth'){
+    startOAuth(id);
+    return;
+  }
+  // key 路径：塞进舰队一条，预填地址/模型，等你补 Key
+  _brains.push({url:p.gw||'', key:'', model:p.model||'', label:p.name, on:true});
+  renderBrains();
+  closeSheet();
+  setTimeout(()=>{ openSheet('sheetBrains'); toast('已加 '+p.name+' · 补上 Key 保存生效'); if(p.keyUrl) toast('去 '+p.keyUrl+' 拿 Key'); },180);
+}
+async function startOAuth(provider){
+  const p=PROVIDERS.find(x=>x.id===provider); if(!p) return;
+  $('#oauthTitle').textContent = '登录 · '+p.name;
+  openSheet('sheetOAuth');
+  const r = await Nexus.oauthStart(provider);
+  if(r && r.__401){ toast('需以主人身份解锁才能配置'); closeSheet(); return; }
+  if(r && r.authUrl){ $('#oauthGoBtn').href = r.authUrl; _oauthPid = provider; }
+  else { toast('该厂商 OAuth 暂不可用，改填 Key 吧'); closeSheet(); }
+}
+let _oauthPid=null;
+async function oauthFinish(){
+  const code=($('#oauthCode').value||'').trim();
+  const st=$('#oauthStatus');
+  if(!code){ st.textContent='把授权码粘进来'; return; }
+  st.textContent='接入中…';
+  const r = await Nexus.oauthCallback(code);
+  if(r && r.ok){
+    st.textContent='';
+    closeSheet();
+    await fillBrains();   // 后端已直接写入 config.brains，重新拉取刷新舰队列表
+    setTimeout(()=>{ openSheet('sheetBrains'); toast('接入成功 · 已生效'); },180);
+  } else {
+    st.textContent = (r&&r.error) || '接入失败，检查授权码是否正确';
+  }
+}
+
 function brainAdd(){ if(_brains.length>=9){ _bstat('最多 9 条','var(--danger,#e5484d)'); return; } _brains.push({url:'',key:'',model:'',label:'',on:true}); renderBrains(); }
 function brainMove(i,d){ const j=i+d; if(j<0||j>=_brains.length) return; const t=_brains[i]; _brains[i]=_brains[j]; _brains[j]=t; renderBrains(); _bstat('顺序=神枢优先调度次序,保存后生效'); }
 function brainDel(i){ _brains.splice(i,1); renderBrains(); }
@@ -3818,7 +3792,6 @@ function syncMyApiLabels(){
 }
 // 设置里点「大脑·模型 / 算力接口」:公共用户走自己的 API 编辑器(不是主人的 /config 面板)。
 function openBrainSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetBrains'); }
-function openModelSettings(){ if(Nexus.mode==='public') openApiEditor(); else openSheet('sheetModel'); }
 // 公共模式：左上角「⚙︎ 我的 API」随时改自己的网关
 function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
@@ -3935,7 +3908,7 @@ function typeInto(bubble, text, done){
   // —— 模式无关的 UI 初始化 ——
   try{ applyTheme(store.get('theme') || 'dark'); }catch(e){}  // 深林夜为默认（黑绿意识体），可在设置切浅色
   try{ setGreeting(); }catch(e){}
-  try{ if(store.get('model')){ const m=MODELS.find(x=>x.id===store.get('model')); if(m)$('#modelLabel').textContent=m.name; } }catch(e){}
+  try{ $('#modelLabel').textContent='神枢自动调度'; }catch(e){}
   try{ if(store.get('api_base')) $('#apiLabel').textContent='外接网关'; }catch(e){}
   try{ setPushUI(!!store.get('push_on')); }catch(e){}
   try{ $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } }); }catch(e){}
