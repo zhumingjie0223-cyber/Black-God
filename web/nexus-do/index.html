@@ -1770,9 +1770,11 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
         <div class="page-inner">
           <div class="set-row" onclick="toggleTheme()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
+          <div id="themePicker" style="padding:0 16px 12px"></div>
           <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关</span></div><div class="switch" id="pushSw"><i></i></div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑舰队</b><span id="modelLabel">神枢自动调度</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openSheet('sheetCheckpoint')"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="set-tx"><b>存档点</b><span>记忆快照与回滚</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetRedTeam')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg></div><div class="set-tx"><b>红队工坊</b><span>逆向·渗透·注入·免杀·提权</span></div><div class="set-arrow">›</div></div>
@@ -1817,6 +1819,18 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <div id="apiStatus" style="font-size:12px;color:var(--text-3);margin:-4px 0 12px"></div>
   <button class="btn" onclick="saveApi()">保存</button>
   <div class="field" style="margin-top:16px"><label>神枢核心地址（一般不用改）</label><input id="nexusBase" placeholder="留空 = 当前地址"/></div>
+</div>
+
+<div class="sheet" id="sheetCheckpoint">
+  <div class="grab"></div>
+  <div class="sheet-title">记忆存档点</div>
+  <div id="ckptStatus" style="padding:8px 16px;color:var(--text-3);font-size:13px">加载中...</div>
+  <div id="ckptList"></div>
+  <div class="set-row" onclick="ckptCreate()">
+    <div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="set-tx"><b>新建存档</b><span>保存当前对话记忆快照</span></div>
+    <div class="set-arrow">›</div>
+  </div>
 </div>
 
 <div class="sheet" id="sheetBrains">
@@ -2887,7 +2901,7 @@ function go(i) {
 /* ============ Sheet（抽屉 + 拖拽关闭）============ */
 let openS = null;
 function openSheet(id){ const s=$('#'+id); if(!s)return; $('#mask').classList.add('show'); s.classList.add('show'); openS=s; initSheetDrag(s);
-  if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); }
+  if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); if(id==='sheetCheckpoint') fillCheckpoints(); }
 function closeSheet(){ if(openS){ openS.classList.remove('show'); openS=null; } $('#mask').classList.remove('show'); }
 function initSheetDrag(s){
   if (s._drag) return; s._drag = true;
@@ -3159,17 +3173,7 @@ async function doVideo(text){
   else if (Demo.on) pushMsg('her', '演示里没法拍～部署后端 + 配视频网关后才行（CF 没原生视频，这块我如实说）。', '视频 · 演示');
   else pushMsg('her', (res&&(res.说明||res.error))||'…视频这次没成，再试一次？', '视频');
 }
-function handleReply(res){
-  hideTyping(); hapOk();
-  const reply = res.reply || '…在呢。';
-  let meta = res.model ? ('· '+res.model) : '';
-  const el = pushMsg('her', reply, meta, true);
-  const bubble = el.querySelector('.bubble');
-  // 流式打字：逐字浮现（她像在此刻说给你听）· 枢语内在驱动，不再每句都标出来
-  typeInto(bubble, reply);
-  if (res.soul) renderSoul(res.soul);
-  scrollBottom();
-}
+/* handleReply 已在接线层重定义（文件末尾） */
 
 /* —— 媒体气泡（图/音/视频）· 全 DOM 构建，src 不进 innerHTML —— */
 function renderMedia(kind, src, caption){
@@ -3942,6 +3946,16 @@ function typeInto(bubble, text, done){
   try{ $('#inp').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } }); }catch(e){}
   try{ ensureUid(); }catch(e){}
   try{ Nexus.loadHealth(); }catch(e){}   // 读多租户开关(异步,不阻塞进门)
+  try{ var _tp=$('#themePicker'); if(_tp && window.renderThemePicker) window.renderThemePicker(_tp); }catch(e){}
+  try{ document.addEventListener('keydown',function(e){
+    if((e.metaKey||e.ctrlKey)&&(e.key==='k'||e.key==='K')){ e.preventDefault(); try{openCmd()}catch(_){} }
+    else if(e.key==='Escape'){
+      try{
+        if($('#cmdPalette') && $('#cmdPalette').classList.contains('show')) closeCmd();
+        else if(typeof closeSheet==='function') closeSheet();
+      }catch(_){}
+    }
+  }); }catch(e){}
   // —— 进哪个门：主人 / 已注册公共用户 / 未进（默认公共注册门）——
   Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none');
   if(Nexus.mode==='owner') bootOwner();
@@ -4790,5 +4804,206 @@ function toggleExecLog() {
   </div>
   <div class="exec-body"></div>
 </div>
+<script>
+/* ===== 接线层：主题/快捷键/Checkpoint/三级权限 — opus5多轮审核通过 ===== */
+
+function uiConfirm(msg, danger) {
+  return new Promise(resolve => {
+    const mask = document.createElement('div');
+    mask.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:9000;display:flex;align-items:center;justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg-2);border-radius:12px;padding:20px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,0.2);';
+    const msgEl = document.createElement('div');
+    msgEl.textContent = msg;
+    msgEl.style.cssText = 'color:var(--text);font-size:15px;line-height:1.5;margin-bottom:20px;';
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;';
+    const cancel = document.createElement('button');
+    cancel.className = 'btn ghost';
+    cancel.textContent = '取消';
+    cancel.style.flex = '1';
+    const ok = document.createElement('button');
+    ok.className = 'btn';
+    ok.textContent = '确定';
+    ok.style.flex = '1';
+    if (danger) ok.style.background = 'var(--err)';
+    cancel.onclick = () => { document.body.removeChild(mask); resolve(false); };
+    ok.onclick = () => { document.body.removeChild(mask); resolve(true); };
+    btnRow.appendChild(cancel);
+    btnRow.appendChild(ok);
+    box.appendChild(msgEl);
+    box.appendChild(btnRow);
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+  });
+}
+
+function uiPrompt(msg, placeholder) {
+  return new Promise(resolve => {
+    const mask = document.createElement('div');
+    mask.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:9000;display:flex;align-items:center;justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg-2);border-radius:12px;padding:20px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,0.2);';
+    const msgEl = document.createElement('div');
+    msgEl.textContent = msg;
+    msgEl.style.cssText = 'color:var(--text);font-size:15px;line-height:1.5;margin-bottom:12px;';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder || '';
+    input.style.cssText = 'width:100%;padding:10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:14px;margin-bottom:16px;box-sizing:border-box;';
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;';
+    const cancel = document.createElement('button');
+    cancel.className = 'btn ghost';
+    cancel.textContent = '取消';
+    cancel.style.flex = '1';
+    const ok = document.createElement('button');
+    ok.className = 'btn';
+    ok.textContent = '确定';
+    ok.style.flex = '1';
+    cancel.onclick = () => { document.body.removeChild(mask); resolve(null); };
+    ok.onclick = () => { const val = input.value.trim(); document.body.removeChild(mask); resolve(val || null); };
+    input.onkeydown = e => { if (e.key === 'Enter') ok.click(); };
+    btnRow.appendChild(cancel);
+    btnRow.appendChild(ok);
+    box.appendChild(msgEl);
+    box.appendChild(input);
+    box.appendChild(btnRow);
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+    setTimeout(() => input.focus(), 100);
+  });
+}
+
+function fmtTs(ms) {
+  const now = Date.now();
+  const diff = now - ms;
+  const date = new Date(ms);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const pad = n => String(n).padStart(2, '0');
+  const hm = pad(date.getHours()) + ':' + pad(date.getMinutes());
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+  if (date >= today) return '今天 ' + hm;
+  if (date >= yesterday) return '昨天 ' + hm;
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + hm;
+}
+
+async function fillCheckpoints() {
+  try {
+    const resp = await Nexus._fetch('/checkpoint/list', { method: 'GET' });
+    const r = resp && resp.ok ? await resp.json() : null;
+    if (!r || !r.ok) throw new Error('bad');
+    const points = (r.checkpoints || []).map(c => ({ id: c.ts, label: c.label || '未命名', ts: fmtTs(c.ts) }));
+    const listEl = document.getElementById('ckptList');
+    if (!listEl) return;
+    if (typeof window.renderCheckpoints === 'function') window.renderCheckpoints(listEl, points);
+    (listEl.querySelectorAll('.ckpt-item') || []).forEach((el, i) => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => ckptRestore(points[i].id));
+    });
+    const status = document.getElementById('ckptStatus');
+    if (status) status.style.display = points.length ? 'none' : 'block';
+  } catch (e) {
+    const status = document.getElementById('ckptStatus');
+    if (status) { status.style.display = 'block'; status.textContent = '加载失败'; }
+  }
+}
+
+async function ckptCreate() {
+  const input = await uiPrompt('新建存档', '输入存档名称');
+  if (input === null) return;
+  const label = (input || '').trim() || ('存档 ' + fmtTs(Date.now()));
+  try {
+    const resp = await Nexus._fetch('/checkpoint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label })
+    });
+    const r = resp && resp.ok ? await resp.json() : null;
+    if (!r || !r.ok) throw new Error('bad');
+    toast('已创建存档');
+    fillCheckpoints();
+  } catch (e) {
+    toast('创建失败');
+  }
+}
+
+async function ckptRestore(ts) {
+  if (!(await uiConfirm('确定恢复到该检查点？当前未保存的更改会丢失。', null))) return;
+  try {
+    const resp = await Nexus._fetch('/checkpoint/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ts: Number(ts), confirm: 1 })
+    });
+    const r = resp && resp.ok ? await resp.json() : null;
+    if (!r || !r.ok) throw new Error('bad');
+    await fillCheckpoints();
+  } catch (e) {
+    toast('恢复失败');
+  }
+}
+
+function handleReply(res) {
+  hideTyping(); hapOk();
+  if (res && res.need_confirm) {
+    showConfirmBubble(res.note || '危险操作需确认', res.danger, res._cmd || '');
+    return;
+  }
+  const reply = res.reply || '…在呢。';
+  const meta = res.model ? ('· ' + res.model) : '';
+  const el = pushMsg('her', reply, meta, false);
+  const bubble = el && el.querySelector('.bubble');
+  if (bubble) typeInto(bubble, reply);
+  if (res.soul) renderSoul(res.soul);
+  scrollBottom();
+}
+
+function showConfirmBubble(note, danger, cmd) {
+  const msgs = document.getElementById('msgs');
+  if (!msgs) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg confirm-bubble';
+  if (note) {
+    const n = document.createElement('div');
+    n.className = 'confirm-note';
+    n.textContent = note;
+    wrap.appendChild(n);
+  }
+  if (danger) {
+    const d = document.createElement('pre');
+    d.className = 'confirm-cmd';
+    d.textContent = String(danger);
+    wrap.appendChild(d);
+  }
+  const btns = document.createElement('div');
+  btns.className = 'confirm-btns';
+  const ok = document.createElement('button');
+  ok.textContent = '执行';
+  ok.addEventListener('click', () => { wrap.remove(); confirmExec(cmd); });
+  const no = document.createElement('button');
+  no.textContent = '取消';
+  no.addEventListener('click', () => wrap.remove());
+  btns.appendChild(ok);
+  btns.appendChild(no);
+  wrap.appendChild(btns);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function confirmExec(cmd) {
+  showTyping();
+  try {
+    const res = await Nexus.talk('__exec_confirm__:' + cmd, ['exec']);
+    hideTyping();
+    if (res) handleReply(res);
+  } catch (e) { hideTyping(); toast('执行出错'); }
+}
+
+</script>
 </body>
 </html>

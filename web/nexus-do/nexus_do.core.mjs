@@ -724,6 +724,15 @@ export class ShenshuCore {
   async handleTalk(text, request, capsIn) {
     const now = Date.now();
     const caps = Array.isArray(capsIn) ? capsIn : [];
+    // 三级权限确认：__exec_confirm__:cmd 前缀，带 confirm=true 重跑执行脑，不走 AI
+    // 安全：/talk 在私密 API 集合里，未持 OWNER_TOKEN 的请求在路由层已被 401 拦截
+    if (typeof text === 'string' && text.startsWith('__exec_confirm__:')) {
+      const cmd = text.slice('__exec_confirm__:'.length).trim();
+      if (!cmd) return { reply: '命令为空', model: 'exec' };
+      const r = await this.execRemote(cmd, { confirm: true });
+      const stdout = r.stdout ? r.stdout.trim() : '';
+      return { reply: r.ok ? ('✅ 已执行\n```\n' + stdout + '\n```') : ('❌ 执行失败：' + (r.note || r.error || '')), model: 'exec', exec: r };
+    }
 
     // —— 1) 读快照，构建上下文（只读，不落盘）——
     const snap = await this.getSoul();
