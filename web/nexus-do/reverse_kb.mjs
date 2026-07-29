@@ -747,4 +747,174 @@ python3 dump.py <App名> -u mobile -p alpine -H 127.0.0.1 -p 2222
 
 给出针对「${arg}」的完整iOS逆向方案`
 
+
+/**
+ * REVERSE_KB_EXT — 扩展知识库（第二批：2025年最新实战）
+ * 来源：看雪Android安全版块精华帖
+ */
+export const REVERSE_KB_EXT = {
+
+  // Frida最新版反检测魔改（rusda方案，看雪实战）
+  frida_antidetect: `
+【Frida 17.6.2 rusda魔改反检测完整方案（看雪顶帖）】
+
+检测原理（App反Frida分层检测）：
+1. /proc/self/maps 扫描 frida/linjector/gadget字符串
+2. dlsym/dl_iterate_phdr 枚举带frida字样的so
+3. Unix Socket特征：frida-{pid} 命名
+4. 内存特征：frida-agent的特定字节序列
+5. 线程名检测：gum-js-loop/gmain/pool-frida
+
+rusda五层混淆方案：
+1. 协议字符串XOR混淆：frida字符串运行时解密，静态扫描看不到
+2. .rodata等长反转：把"frida"反转成"adirF"，maps扫不到
+3. 符号重命名：frida_agent_main→随机名，dlsym找不到
+4. memfd匿名加载：不落盘，/proc/maps路径变成memfd:xxxx
+5. 线程改名：gum-js-loop→worker/kworker等系统线程名
+
+编译方式：
+\`\`\`bash
+# clone rusda（魔改版frida）
+git clone https://github.com/rusda-project/rusda
+# 修改 frida-core/lib/agent/agent.vala 里的特征字符串
+# 修改 frida-core/src/linux/frida-helper-backend.vala 里的线程名
+python3 releng/build.py --host android-arm64
+# 得到 frida-server-17.6.2-android-arm64 魔改版
+\`\`\`
+
+快速方案（不编译）：
+- 用florida：直接替换frida-server，免编译，隐藏maps+socket
+- 用kFrida：商业魔改版，支持最新Android
+- LSPosed模块：FridaHider，系统级隐藏
+
+libmsaoaidsec.so专项绕过（阿里系App）：
+\`\`\`javascript
+// 在so加载前通过早期Hook插入，时机必须在JNI_OnLoad之前
+function hookBeforeInit(){
+  var linker = Process.findModuleByName("linker64");
+  // 找到call_constructors或__dl__ZN6soinfo17call_constructorsEv
+  var callCtor = linker.base.add(0x12345); // 需要动态找偏移
+  Interceptor.attach(callCtor,{
+    onEnter(a){
+      var soName = this.context.x0.readCString();
+      if(soName && soName.includes("msaoaidsec")){
+        // 提前hook检测函数
+        patchMsaoaidsec();
+      }
+    }
+  });
+}
+function patchMsaoaidsec(){
+  var mod = Process.findModuleByName("libmsaoaidsec.so");
+  if(!mod) return;
+  // 关键检测函数offset（需要IDA确认）
+  var checks = [0x1234, 0x2345, 0x3456]; // 文件读取/maps扫描/ptrace检测
+  checks.forEach(off=>{
+    Memory.patchCode(mod.base.add(off), 4, c=>{
+      new Arm64Writer(c, {pc: mod.base.add(off)}).putRet();
+    });
+  });
+  console.log("[*] libmsaoaidsec patched");
+}
+\`\`\`
+`,
+
+  // AI + IDA MCP 自动化还原VMP字节码
+  ai_vmp_reverse: `
+【AI自动化还原VMP字节码（IDA MCP方案，看雪实战）】
+
+VMP字节码结构（DEMO分析）：
+- 固定4字节指令
+- 高3位(bit29-31)=主分类：0x0=数据传输/0x1=算术/0x2=逻辑/0x3=控制流/0x4=比较
+- 虚拟寄存器：Arm64Context结构体，regs[32]+memory+pc+flags
+
+AI还原流程（IDA MCP + Claude/Gemini）：
+\`\`\`
+Prompt模板：
+"分析以下ARM64字节码，它是一个VMP解释器的输出。
+请：
+1. 识别虚拟机结构体(Arm64Context)的字段布局
+2. 还原每个handler的语义(数据传输/算术/逻辑/跳转)
+3. 输出等价的ARM64汇编代码
+4. 生成Python解码脚本
+
+VMP解释器代码：[IDA反编译结果]
+字节码数据：[hex dump]"
+\`\`\`
+
+Python解码脚本模板：
+\`\`\`python
+def decode_vmp(bytecode):
+    pc = 0; regs = [0]*32; result = []
+    while pc < len(bytecode):
+        insn = int.from_bytes(bytecode[pc:pc+4],'little')
+        cat = (insn>>29)&0x7
+        rd = (insn>>24)&0x1F
+        rn = (insn>>19)&0x1F
+        imm = insn&0xFFFF
+        if cat==0x0:   # MOV
+            regs[rd]=imm; result.append(f"MOV x{rd}, #{imm}")
+        elif cat==0x1: # ADD
+            regs[rd]=regs[rn]+imm; result.append(f"ADD x{rd}, x{rn}, #{imm}")
+        elif cat==0x2: # XOR
+            regs[rd]=regs[rn]^imm; result.append(f"EOR x{rd}, x{rn}, #{imm}")
+        elif cat==0x3: # BL
+            result.append(f"BL #{imm}")
+        pc+=4
+    return result
+
+bytecode = bytes.fromhex("your_hex_here")
+for asm in decode_vmp(bytecode): print(asm)
+\`\`\`
+
+IDA MCP配置：
+- 安装 mcp-server-ida 插件
+- Claude Desktop或Cursor连接MCP
+- 让AI直接调用IDA API分析字节码
+
+局限性：静态分析缺乏运行时信息 → 需要结合trace/unidbg
+`,
+
+  // JavaHumanify：LLM自动反混淆Java代码
+  java_deobfuscate: `
+【JavaHumanify：LLM+AST自动Java代码反混淆（看雪开源工具）】
+
+原理：AST解析混淆Java → 识别混淆模式 → LLM语义分析 → 还原可读名称
+
+工具地址：https://github.com/xxx/JavaHumanify
+
+使用：
+\`\`\`bash
+# jadx反编译APK
+jadx -d ./src target.apk
+# JavaHumanify处理
+python3 humanify.py --input ./src --model claude-3-5-sonnet --output ./clean
+\`\`\`
+
+支持还原：
+- 类名：a/b/c → UserManager/NetworkClient/CryptoHelper
+- 方法名：a()/b()/c() → isLoggedIn()/sendRequest()/encrypt()
+- 字段名：a/b → userId/token/apiKey
+
+混淆识别规则：
+- 单字母/双字母类名 → 混淆
+- 无意义数字后缀 → 混淆
+- ProGuard/R8/DexGuard特征
+
+结合Frida动态验证还原结果：
+\`\`\`javascript
+// 用还原后的名字hook，验证语义是否正确
+Java.perform(()=>{
+  var cls=Java.use("com.target.UserManager"); // 还原后的类名
+  cls.isLoggedIn.implementation=function(){
+    var r=this.isLoggedIn();
+    console.log("[*] isLoggedIn =", r);
+    return r;
+  };
+});
+\`\`\`
+`,
+
+};
+
 export { REVERSE_KB };

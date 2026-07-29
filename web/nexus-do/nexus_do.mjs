@@ -19,7 +19,7 @@ import { GlobalWorkspace } from './nexus_gw_workspace.mjs';
 import { ActiveInferenceEngine } from './nexus_active_inference.mjs';
 import { PhenomenalSelfModel } from './nexus_self_model.mjs';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
-import { REVERSE_KB } from './reverse_kb.mjs';
+import { REVERSE_KB, REVERSE_KB_EXT } from './reverse_kb.mjs';
 import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
 import { ICON_PNG_B64, ICON_PNG_512_B64 } from './icon_asset.mjs';
@@ -9122,9 +9122,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   async reverseKB(toolId, arg) {
     const fn = REVERSE_KB[toolId];
     if (!fn) return { ok: false, note: `未知逆向工具「${toolId}」` };
-    // 直接返回知识库模板内容，不过大脑审查
-    const content = fn(arg || '目标未指定');
-    return { ok: true, reply: content, tool: toolId, arg };
+    // 主知识库 + EXT扩展知识合并输出
+    const main = fn(arg || '目标未指定');
+    const extKeys = Object.keys(REVERSE_KB_EXT || {});
+    const related = extKeys
+      .filter(k => toolId.includes('frida') && k === 'frida_antidetect' ||
+                   toolId.includes('vmp') || toolId === 'bypass_antidebug' ? k === 'frida_antidetect' || k === 'ai_vmp_reverse' : false)
+      .map(k => `\n\n---\n${REVERSE_KB_EXT[k]}`).join('');
+    return { ok: true, reply: main + (related || ''), tool: toolId, arg };
   }
 
   async createWatch(text) {
