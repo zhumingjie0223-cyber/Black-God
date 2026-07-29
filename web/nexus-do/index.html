@@ -469,6 +469,7 @@ button,input,textarea{font-family:inherit;color:inherit}
 .nx2-cap.feat .go svg{width:18px;height:18px;fill:none;stroke:#08120F;stroke-width:2.4}
 /* 折叠区（旧动态：能力墙/执行日志/坐标）*/
 .nx2-old{margin-top:22px}
+.set-sec{margin:22px 2px 12px}.set-sec:first-of-type{margin-top:6px}
 @media (prefers-reduced-motion:reduce){.nx2-neb::after,.nx2-orb,.nx2-orb .aura,.nx2-orb::after,.nx2-cap::after{animation:none}}
 .page-head{padding:14px 18px 6px}
 .page-eyebrow{font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--chrome-2);font-weight:600}
@@ -1913,17 +1914,21 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
       <section class="page" id="settings">
         <div class="page-head"><div class="page-eyebrow">Settings · 配置</div><div class="page-h1">设置</div></div>
         <div class="page-inner">
+          <div class="nx2-sec set-sec"><h2>常用</h2><div class="ln"></div></div>
           <div class="set-row" onclick="toggleTheme()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><div class="set-tx"><b>外观</b><span id="themeLabel">暗黑模式</span></div><div class="switch" id="themeSw"><i></i></div></div>
           <div id="themePicker" style="padding:0 16px 12px"></div>
           <div class="set-row" onclick="togglePush()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="set-tx"><b>推送通知</b><span id="pushLabel">关</span></div><div class="switch" id="pushSw"><i></i></div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3zM12 6v12"/></svg></div><div class="set-tx"><b>大脑舰队</b><span id="modelLabel">神枢自动调度</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openBrainSettings()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M9 7V4h6v3M8 7h8v4a4 4 0 0 1-8 0zM12 15v5"/></svg></div><div class="set-tx"><b>算力接口</b><span id="apiLabel">同源直连（默认）</span></div><div class="set-arrow">›</div></div>
+          <div class="nx2-sec set-sec"><h2>工具</h2><div class="ln"></div></div>
           <div class="set-row" onclick="openSheet('sheetCheckpoint')"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="set-tx"><b>存档点</b><span>记忆快照与回滚</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openStrReplace()"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></div><div class="set-tx"><b>代码编辑器</b><span>SEARCH/REPLACE 可视化</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openGitOps()"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path></svg></div><div class="set-tx"><b>Git 操作</b><span>状态/提交/推送/日志</span></div><div class="set-arrow">›</div></div>
+          <div class="nx2-sec set-sec"><h2>进阶 · 谨慎</h2><div class="ln"></div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetRedTeam')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg></div><div class="set-tx"><b>红队工坊</b><span>逆向·渗透·注入·免杀·提权</span></div><div class="set-arrow">›</div></div>
+          <div class="nx2-sec set-sec"><h2>个人</h2><div class="ln"></div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
