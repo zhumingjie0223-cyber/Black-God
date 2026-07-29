@@ -3996,7 +3996,7 @@ function typeInto(bubble, text, done){
   Nexus.mode = store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none');
   if(Nexus.mode==='owner') bootOwner();
   else if(Nexus.mode==='public') initPublicMode();
-  else { const _owner=(location.hash==='#owner'||/[?&]owner=1/.test(location.search)); setGateMode(_owner?'owner':'public'); if(!_owner) prefillReg(); showLock(); }
+  else { setGateMode('owner'); showLock(); }
   // 回到前台 / 网络恢复 → 瞬间重连（仅主人；公共用户无 WS，不触发私密接口）
   document.addEventListener('visibilitychange', ()=>{ if(Nexus.mode==='owner' && document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
   window.addEventListener('online', ()=>{ if(Nexus.mode==='owner'){ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); } });
