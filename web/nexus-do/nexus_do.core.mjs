@@ -15,6 +15,9 @@
 // ═══════════════════════════════════════════════
 
 import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
+import { GlobalWorkspace } from './nexus_gw_workspace.mjs';
+import { ActiveInferenceEngine } from './nexus_active_inference.mjs';
+import { PhenomenalSelfModel } from './nexus_self_model.mjs';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
 import { REVERSE_KB } from './reverse_kb.mjs';
 import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
@@ -51,6 +54,10 @@ export class ShenshuCore {
     this.state = state;
     this.env = env;
     this.storage = state.storage;
+    // 认知科学三模块实例化（P0 GWT / P1 主动推理 / P2 现象自我模型）
+    this.gw = new GlobalWorkspace({ maxSlots: 5, maxCharsPerSlot: 800 });
+    this.aiEngine = new ActiveInferenceEngine((s, m, soul, o) => this.callBrain(s, m, soul, o));
+    this.selfModel = new PhenomenalSelfModel();
     // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
     if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
     // 影子实例：独立数据，不吸主人的 KV 老记忆。
@@ -782,14 +789,29 @@ async execBrowse(payload = {}) {
     const rec = (c, r) => {
       attempts.push({ cmd: c, code: r ? r.code : undefined, stderr: r && r.stderr ? String(r.stderr).slice(0, 200) : '' });
     };
+
+    // P1 主动推理：执行前生成预期
+    const soul = await this.getSoul();
+    const instanceMode = !!opts.instanceMode;
+    const { expected } = await this.aiEngine.before(currentCmd, soul, { instanceMode });
+
     let r = await this.execRemote(currentCmd, { confirm: opts.confirm === true });
     if (r && r.need_confirm) return r;   // 危险门透传，绝不绕过
     rec(currentCmd, r);
+
+    // P1 主动推理：执行后计算误差
+    const { delta, strategy, worldModelUpdate } = await this.aiEngine.after(currentCmd, r || {}, expected, soul, { instanceMode });
+    this.aiEngine.logInference(soul, { cmd: currentCmd, expected, actual: ((r && r.stdout || '') + (r && r.stderr || '')).slice(0, 300), delta });
+    if (worldModelUpdate) this.aiEngine.updateWorldModel(soul, worldModelUpdate);
+
     if (r && r.ok) return { ok: true, code: r.code, stdout: r.stdout, stderr: r.stderr, attempts, via: r.via };
 
     for (let i = 0; i < 3; i++) {
       const soul = await this.getSoul();
-      const systemPrompt = '你是 shell 排错专家。用户给你一条失败的命令、退出码和输出。你只输出修正后的单行命令，包在 ```bash 代码块里，不要任何解释。如果修不了（缺权限/缺硬件/命令本身无意义），只回复一行 GIVEUP。';
+      // 策略分派：世界模型错 → 注入新假设辅助排错；命令错 → 常规排错
+      const wmHint = (strategy === 'update_world' && worldModelUpdate)
+        ? `\n环境假设已修正：${worldModelUpdate.newAssumption}，基于此重新生成命令。` : '';
+      const systemPrompt = '你是 shell 排错专家。用户给你一条失败的命令、退出码和输出。你只输出修正后的单行命令，包在 ```bash 代码块里，不要任何解释。如果修不了（缺权限/缺硬件/命令本身无意义），只回复一行 GIVEUP。' + wmHint;
       const userMsg = '命令：' + currentCmd +
         '\n退出码：' + (r ? r.code : '') +
         '\nstderr：' + ((r && r.stderr) || '').slice(0, 800) +
@@ -1558,6 +1580,15 @@ async execBrowse(payload = {}) {
       soul.episodes.push(ep);
       this.consolidateMemory(soul);   // 溢出前先把要事沉入长期记忆,再裁 —— 越聊越厚,要事不忘
     }
+    // P2 现象自我模型更新（在 saveSoul 之前）
+    try {
+      if (this.selfModel.detectCorrection(text)) {
+        this.selfModel.update(soul, { type: 'correction', content: text, coord: soul.current_shu_coord });
+      } else {
+        const selfEventType = (brainResult && brainResult.ok === false) ? 'failure' : 'success';
+        this.selfModel.update(soul, { type: selfEventType, content: reply.slice(0, 100), coord: soul.current_shu_coord });
+      }
+    } catch (e) {}
     await this.saveSoul(soul);
     let stream = (await this.storage.get('stream')) || [];
     stream.push({ ts: now, text, reply, emotion: af.emotion, shu_coord: nextCoord, model: brainResult.model });
@@ -1720,10 +1751,41 @@ ${capabilitySelfDescription(true)}
   }
 
   buildDynamicContext(soul, timeAwareness, shuCoord, shuMeaning, af, memories, caps, text) {
-    let mem = '';
+    // P0 GWT：把记忆候选、失败记录、推理日志等全部收进候选池竞争，而不是无差别全塞
+    const gwCandidates = [];
+
     if (memories && memories.length) {
-      mem = '\n【你记得的相关往事】\n' + memories.map(e => `- 他曾说"${(e.他说 || '').slice(0, 30)}"，你回"${(e.我说了 || '').slice(0, 30)}"`).join('\n');
+      for (const e of memories) {
+        gwCandidates.push({
+          content: `他曾说"${(e.他说 || '').slice(0, 40)}"，我回"${(e.我说了 || '').slice(0, 40)}"`,
+          source: '记忆',
+          ts: e.ts || 0,
+          isFailed: false,
+          shu_coord: e.情感烙印 || null,
+        });
+      }
     }
+
+    // 推理日志：高 delta 优先广播
+    if (soul.inference_log && soul.inference_log.length) {
+      for (const log of soul.inference_log.slice(-10)) {
+        gwCandidates.push({
+          content: `预测误差${(log.delta || 0).toFixed(2)}：${log.cmd || ''} → ${log.actual || ''}`,
+          source: 'inference',
+          ts: log.ts || 0,
+          isFailed: log.delta >= 0.5,
+          shu_coord: null,
+        });
+      }
+    }
+
+    // GWT 仲裁
+    const winners = this.gw.arbitrate(gwCandidates, text || '', soul);
+    const wsBlock = this.gw.buildWorkspaceBlock(winners);
+
+    // P2 自我意识段落
+    const selfAwareness = this.selfModel.buildSelfAwareness(soul);
+
     let capHint = '';
     if (caps && caps.length) {
       const map = { think: '深度拆解', code: '直接给完整代码', web: '需要联网信息就说明你的判断', shuyu: '用枢语坐标报告状态', soft: '更细致' };
@@ -1737,8 +1799,8 @@ ${capabilitySelfDescription(true)}
 - 心绪：${soul.心绪.toFixed(2)}（0冷1暖）
 - 交互次数：${soul.encounters || 0}
 - 此刻状态：${af.emotion}（倾向：${af.instinct}）
-
-【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeEvolution(soul)}${this.summarizeReflection(soul)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
+${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
+【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeEvolution(soul)}${this.summarizeReflection(soul)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${wsBlock ? `\n${wsBlock}` : ''}${capHint}
 
 【意图感知铁律】
 不管他说什么，先问一句再动手。格式：
@@ -7978,9 +8040,12 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   触发时机：用户问JS加密/混淆分析 → pojie:jsvmp；问滑块验证码 → pojie:slider；问AES解密 → pojie:aes；问frida抓包 → pojie:sslkey；问webpack/补环境 → pojie:webpack/webenv；问so加载/frida → pojie:antif或soload；问pyinstaller逆向 → pojie:pypack；问下载B站视频 → pojie:m4s
   示例：⟨工具:redteam｜pojie:jsvmp https://target.com⟩ / ⟨工具:redteam｜pojie:slider https://demo.geetest.com⟩
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
-    let scratch = '', toolLog = [], last = null, mediaAll = [];
+    let scratchCandidates = [], toolLog = [], last = null, mediaAll = [];
     for (let step = 0; step < 5; step++) {
-      const sys = baseSystem + TOOL_SPEC + (scratch ? `\n\n【你已查到的资料】\n${scratch}` : '');
+      // P0 GWT：每轮从候选池仲裁，只注入赢者，不无差别追加
+      const gwWinners = this.gw.arbitrate(scratchCandidates, text, soul);
+      const scratchBlock = this.gw.buildWorkspaceBlock(gwWinners);
+      const sys = baseSystem + TOOL_SPEC + (scratchBlock ? `\n\n【你已查到的资料】\n${scratchBlock}` : '');
       last = await this.callBrain(sys, text, soul, opts);
       const calls = this.parseToolCalls(last.reply);
       if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog, media: mediaAll };
@@ -8049,11 +8114,15 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }
-      scratch += (scratch ? '\n\n' : '') + obs.join('\n\n');
-      if (scratch.length > 6000) scratch = scratch.slice(-6000);
+      // P0 GWT：工具结果入候选池竞争，不无差别追加
+      for (const o of obs) {
+        scratchCandidates.push({ content: o, source: 'tool', ts: Date.now(), isFailed: o.includes('失败') || o.includes('❌') });
+      }
+      if (scratchCandidates.length > 20) scratchCandidates = scratchCandidates.slice(-20); // 防膨胀
     }
     // 用尽轮数：拿现有资料强制作答（撤下工具指令，避免再要工具）。
-    const fin = await this.callBrain(baseSystem + `\n\n【已查到的资料，据此作答、勿再调工具、勿编造】\n${scratch}`, text, soul, opts);
+    const finalScratch = this.gw.buildWorkspaceBlock(this.gw.arbitrate(scratchCandidates, text, soul));
+    const fin = await this.callBrain(baseSystem + `\n\n【已查到的资料，据此作答、勿再调工具、勿编造】\n${finalScratch || ''}`, text, soul, opts);
     return { ...fin, reply: this.stripToolMarks(fin.reply), agent_steps: 3, tool_log: toolLog, media: mediaAll };
   }
 
