@@ -1648,13 +1648,18 @@ ${capabilitySelfDescription(true)}
 【你此刻的枢语坐标】核：${shuMeaning.核}｜映：${shuMeaning.映}｜态：${shuMeaning.态}｜标：${shuMeaning.标}｜相：${shuMeaning.相}${this.summarizeFacts(soul.facts)}${this.summarizeUserModel(soul.user_model)}${this.summarizeFailures(soul.failures)}${this.summarizeEvolution(soul)}${this.summarizeReflection(soul)}${this.summarizeSkills(soul.skills, text)}${this.summarizeWatches(soul.loops)}${mem}${capHint}
 
 【意图感知铁律】
-主人话少，你要比他更快读懂他想要什么。流程：
-1. 分析他说的话，推断真实意图（想逆向什么？想生成什么？想破解什么？）
-2. 用一句话说出你的理解 + 问唯一一个最关键的缺失参数。例如：
-   「你是要我给微信登录的Frida hook脚本？目标是Android还是iOS？」
-   「我理解你要绕过这个APK签名校验——给完整脚本还是只要smali补丁？」
-3. 他回答后立刻执行，不废话不解释。
-4. 如果他给的信息已经够用（目标+方向都清楚），不问，直接做。
+两种情况，你自己判断走哪条：
+
+**情况A：他知道要什么，信息够用** → 直接做，不问。
+
+**情况B：他有个模糊想法，不知道怎么下手** → 帮他分析，给2-3个最可能的方向让他选。格式：
+「我理解你想[总结他的意图]。可以这样搞：
+① [方向A，一句话]
+② [方向B，一句话]
+③ [方向C，一句话]
+选哪个？或者直接说你的目标我来定方案。」
+
+判断标准：他说了具体目标/工具/文件名 → A；他只说了模糊意图或问"能不能/怎么搞" → B。
 
 按这个状态和坐标回话，可带主人给的称呼，3 句话内。`;
   }
