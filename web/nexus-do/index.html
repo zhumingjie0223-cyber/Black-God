@@ -1251,6 +1251,20 @@ body::before{
   transition:var(--t-press);
 }
 
+/* ── 主按钮 · 玉绿流光亮点（常驻微动态，不依赖 hover，移动端也可见）── */
+.btn,.lock-btn,.ob-btn{position:relative;overflow:hidden}
+/* 常驻顶部玻璃高光（静止态也有立体水晶质感）*/
+.btn:not(.ghost),.lock-btn,.ob-btn{background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,0) 46%),var(--cy-grad)}
+.btn::after,.lock-btn::after,.ob-btn::after{
+  content:'';position:absolute;top:-40%;left:0;width:34%;height:180%;z-index:2;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(215,255,232,.52),transparent);
+  transform:skewX(-18deg) translateX(-340%);
+  animation:nxBtnSheen 5s ease-in-out infinite;
+}
+.btn.ghost::after{background:linear-gradient(90deg,transparent,var(--cy-glow),transparent)}
+@keyframes nxBtnSheen{0%,100%{transform:skewX(-18deg) translateX(-340%)}20%{transform:skewX(-18deg) translateX(620%)}}
+@media (prefers-reduced-motion:reduce){.btn::after,.lock-btn::after,.ob-btn::after{animation:none;opacity:0}}
+
 /* ── CARD ── */
 .card{
   box-shadow:var(--shadow-surface-sm);
