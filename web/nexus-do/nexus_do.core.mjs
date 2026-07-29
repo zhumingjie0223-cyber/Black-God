@@ -502,6 +502,41 @@ export class ShenshuCore {
   }
 
   // 容器执行脑统一请求：封装 getByName + fetch，调用方不感知容器细节
+  // SSE 流式：实时把容器 stdout/stderr 推给调用方
+  async _containerStream(path, bodyObj, onChunk) {
+    if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器未绑定' };
+    try {
+      const c = this.env.EXEC_CONTAINER.getByName('exec-main');
+      const resp = await c.fetch('http://container' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj)
+      });
+      if (!resp.body) return { ok: false, note: '无流' };
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const msg = JSON.parse(line.slice(6));
+              onChunk && onChunk(msg);
+            } catch {}
+          }
+        }
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, note: e?.message };
+    }
+  }
+
   async _containerFetch(path, bodyObj) {
     if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器执行脑未绑定（wrangler containers 未部署）' };
     try {
