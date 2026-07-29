@@ -38,15 +38,6 @@ jobs:
       - name: Build (index.html + core → nexus_do.mjs)
         run: npm run build
 
-      - name: Build & push container image
-        run: |
-          cd web/nexus-do
-          npx wrangler@4 containers push --config config/wrangler.jsonc 2>/dev/null || \
-          npx wrangler@4 deploy --config config/wrangler.jsonc
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-
       - name: Self-test (纯逻辑)
         run: node selftest.mjs
 
@@ -54,14 +45,14 @@ jobs:
         if: ${{ env.CF_TOKEN != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: aef9ce7978ba50dad5e9347010881164
+          CLOUDFLARE_ACCOUNT_ID: 142c76e0039e279886c89257b6fddbc7
         run: npx wrangler deploy
 
       - name: Inject TAVILY_KEY secret
         if: ${{ env.CF_TOKEN != '' && env.TAVILY_KEY != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: aef9ce7978ba50dad5e9347010881164
+          CLOUDFLARE_ACCOUNT_ID: 142c76e0039e279886c89257b6fddbc7
           TAVILY_KEY: ${{ secrets.TAVILY_KEY }}
         run: echo "$TAVILY_KEY" | npx wrangler secret put TAVILY_KEY
 
