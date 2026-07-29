@@ -140,10 +140,84 @@ vmoptions文件加一行：
   get_full_chain: (arg) => `你是顶级逆向工程师，制定完整攻击链：
 目标：${arg}
 
-【第一阶段-情报】目标类型/保护机制/最短路径
-【第二阶段-突破】切入方式选择/反调试绕过/定位核心函数
-【第三阶段-分析】还原算法/提取key/验证结果
-【第四阶段-武器化】自动化工具/持久化/完整性验证
+【第一阶段-情报】
+1. DIE/PEiD扫描保护类型
+2. 确认平台：Windows EXE / Android APK / iOS IPA / JS Web / Python编译
+3. 抓包确认有无网络验证（mitmproxy/Charles/r0capture）
+4. 找最短路径：无壳→直接分析；有壳→先脱壳or动态trace；网络验证→先伪造服务器
+
+【第二阶段-突破（按平台）】
+Windows:
+- ScyllaHide全选+x64dbg → 字符串搜"trial/expired/授权" → 追jz/jne → patch
+- 网络验证：Hosts重定向 + Flask伪造服务器返回{"status":"ok","valid":true}
+- VMP：不脱壳，Frida trace记handler序列，unidbg模拟执行
+
+Android:
+\`\`\`javascript
+// Frida一键bypass（起手式）
+Java.perform(()=>{
+  // VIP判断
+  ['isVip','isPremium','isSubscribed','checkLicense','isActivated'].forEach(m=>{
+    try{
+      Java.use('com.target.UserManager')[m].overload().implementation=function(){return true;};
+    }catch(e){}
+  });
+  // 签名校验
+  Java.use('android.app.ApplicationPackageManager').getPackageInfo
+    .overload('java.lang.String','int').implementation=function(p,f){
+      return this.getPackageInfo(p,f&~64);
+    };
+  // SSL Pinning
+  Java.use('javax.net.ssl.HttpsURLConnection').setDefaultHostnameVerifier
+    .implementation=function(v){this.setDefaultHostnameVerifier({verify:()=>true});};
+});
+\`\`\`
+
+iOS:
+\`\`\`bash
+bagbak --udid <UDID> com.target.bundleid   # 砸壳
+objection -g com.target.bundleid explore
+>>> ios jailbreak disable                   # 越狱检测bypass
+>>> ios sslpinning disable                  # SSL Pinning bypass
+\`\`\`
+
+JS/Web:
+- Chrome DevTools → 断点在fetch/XMLHttpRequest.send → 看签名生成过程
+- webcrack反打包 → babel AST还原控制流 → 定位加密函数
+
+【第三阶段-深度分析工具链】
+- ARM64 trace可视化：trace-ui (github.com) + unidbg trace输出
+  * 支持亿行级trace流畅浏览/函数调用树/反向污点追踪
+- unidbg模拟执行（X-Gorgon/sign算法）：
+\`\`\`java
+emulator.traceCode(module.base+0x7e530, module.base+0x807B4);
+emulator.traceRead(0, 0xFFFFFFFFL);
+emulator.traceWrite(0, 0xFFFFFFFFL);
+\`\`\`
+- 微信字符串解密（PC微信4.1.x）：找sub_xxxx解密函数，批量dump明文字符串
+
+【第四阶段-武器化】
+- Windows patch：x64dbg → 补丁功能 → 导出破解exe
+- Android：改smali或Frida gadget注入
+- iOS：重签名 + Tweak
+- Web：替换bundle.js，Hook加密函数改返回值
+- 持续有效性：Hook放在spawn时机，每次启动自动生效
+
+【BeautyBox全流程（看雪完整实战参考）】
+1. 检测绕过：ssl-kill-switch3 + 自定义证书 + 越狱检测bypass
+2. 登录分析：hook RSAPrivateKey，截获解密后的token
+3. 视频解锁：hook VIP判断返回true
+4. Native加密：Frida trace → unidbg补环境 → 还原sign算法
+5. 广告绕过：ProxyPin拦截广告请求，返回空响应
+
+工具箱：
+- 静态：IDA Pro / Ghidra / jadx / class-dump / Hopper
+- 动态：x64dbg+ScyllaHide / Frida+florida / objection / unidbg+trace-ui
+- 抓包：mitmproxy / Charles / r0capture / SSL Kill Switch 3 / ProxyPin
+- 脱壳：FART / BlackDex / frida-ios-dump / bagbak
+- JS：webcrack / babel / de4js / jsnice
+
+给出针对「${arg}」的完整攻击链，每步含具体命令/代码`,
 
 【VMP 3.x完整绕过链（看雪实战）】
 1. 检测：区段名.vmp0/.vmp1，入口代码跳密集字节区
