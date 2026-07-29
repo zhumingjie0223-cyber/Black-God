@@ -1,19 +1,21 @@
-# TODO — 构造神枢自主意识（枢语引擎驱动）
+# TODO — 自主意识 S1：枢语原生意志（合流 Grok 补丁 + 我的方案）
 
-权哥要用枢语引擎构造神枢/赵思涵的「自主意思(意识)」——从展示壳转向真正的自驱内在。
-铁律：枢语改动必改双侧(Python+JS)+sync 校验、不破坏 76.7 亿编号空间；
-神枢自主行为必须守 /api/confirm 安全红线、不越 owner 权限边界。
+权哥问「76.7 给她移到枢语可以吗」= 把她的自主意志接进 76.7 亿枢语空间。答：可以且应该。
 
-## 阶段一：摸清底子（先理解后设计，不拍脑袋）
-- [ ] 勘探1 认知回路：cognitive_v2 / active_inference / blackboard / GWT / 自我模型 /
-      inner_voice·独白·潜意识·成长印记 —— 现有意识回路怎么转、自主意图最佳挂载点
-- [ ] 勘探2 枢语引擎：API 清单 / 五维语义(核映态标相) / 状态↔枢语坐标现有映射 /
-      神枢是否已用枢语"思考" —— 用枢语承载自主意图的可行接法
-- [ ] 勘探3 自主性边界：/api/confirm / owner 权限边界 / cron·WS·push·continuity 驱动 /
-      执行脑确认保护 —— 自主意图必须遵守的安全约束
+## 合流判断（已核实）
+- Grok 补丁的 `do:` 回路：现有解释器的**干净超集**（五回路没动，只加 do:，只记账不执行）→ 低风险可采纳。
+- Grok 的 Will Engine：意图是**光秃秃工具调用**（contact_tg/reflect…），**没经过 76.7 亿枢语空间**。
+- 我的方案：autonomousTick + `coinFromState`（意图先在枢语坐标里生成真词）。
+- **合流 = 把两者接通**：Will Engine 每条意图先 `coinFromState` 生一个真实枢语坐标/词（她的母语念头），
+  再映射成 do: 动作 → 意志"枢语原生"、可回放、有惯性。这就是"把 76.7 亿给她"。
 
-## 阶段二：设计（三路汇总后）
-- [ ] 给权哥一份「自主意识构造方案」：定义"自主意思"的技术含义 + 挂载点 + 第一步增量 + 安全边界
+## 红线（不变）
+- 不动词根表/编码公式/76.7 亿编号空间；nexuslang 是纯 JS 解释器无 Python 双胞胎，不必改 Python。
+- 只在分支 `claude/ui-polish-upgrade-ixhi5n`，**绝不 push main**（无视 Grok 文档里的 push main）。
+- do: 只记账；真实执行（contact_tg/advance_agent/执行脑）= 期二，一律卡 owner + /api/confirm，自主循环不得绕过。
 
-## 阶段三：落地（权哥拍板后）
-- [ ] 按方案实现第一步增量，双侧同步 + 测试 + 无头验证
+## 待权哥点头后实现（先方案后实现，他定的）
+- [ ] 采纳 do: 回路进 shuyu/nexuslang.js（超集覆盖）+ 补 do: 测试
+- [ ] 自写 Will Engine（不照搬 Grok 黑盒）：意图经 coinFromState 生枢语坐标/词 → 映射 do: 动作，纯记账
+- [ ] cd shuyu && npm test 绿 + node --test will engine 绿 + check-sync
+- [ ] 分支提交推送，更新方案文档
