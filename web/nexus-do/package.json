@@ -9,7 +9,7 @@
     "postinstall": "node fix-containers-esm.mjs",
     "deploy": "node build.mjs && wrangler deploy",
     "dev": "node build.mjs && wrangler dev",
-    "test": "node build.mjs && node --check nexus_do.mjs && node selftest.mjs && node gateway.test.mjs && node continuity.test.mjs && node capsec-selftest.mjs"
+    "test": "node build.mjs && node --check nexus_do.mjs && node selftest.mjs && node gateway.test.mjs && node continuity.test.mjs && node capsec-selftest.mjs && node nexus_cognitive_v2.test.mjs"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.3.7"

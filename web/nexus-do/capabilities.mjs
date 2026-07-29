@@ -109,60 +109,6 @@ export const CAPABILITIES = [
     owner_only: true,   // 直接操作主人私人设备，最高危：仅主人，且经执行脑隧道 token 门
   },
   {
-    id: 'analyze_target', name: '目标研判', layer: '逆向',
-    desc: '对逆向目标做初步研判：识别保护类型（VMP/Themida/网络验证/驱动验证/.NET/Electron），输出推荐分析路径、难度和最快突破点',
-    handler: 'reverseKB', argShape: '(目标名称或描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'find_entry', name: '定位关键函数', layer: '逆向',
-    desc: '用错误字符串法/API断点法定位注册验证、VIP判断等核心函数，给出具体操作步骤',
-    handler: 'reverseKB', argShape: '(目标名称或描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'bypass_antidebug', name: '反反调试', layer: '逆向',
-    desc: '绕过NtGlobalFlag/IsDebuggerPresent/VMP/Themida/ptrace等反调试手段，给出具体bypass步骤和工具配置',
-    handler: 'reverseKB', argShape: '(目标名称或描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'frida_hook', name: 'Frida Hook脚本', layer: '逆向',
-    desc: '为Android/iOS目标生成完整Frida hook脚本：函数拦截/返回值篡改/签名绕过/ptrace bypass/SSL Pinning绕过',
-    handler: 'reverseKB', argShape: '(目标进程名或描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'js_deobfuscate', name: 'JS反混淆', layer: '逆向',
-    desc: '还原JS混淆：识别eval型/字符串数组/VM指令/控制流平坦化/AES加密，提取key/iv，给出Python复现代码',
-    handler: 'reverseKB', argShape: '(目标JS文件或混淆特征描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'crack_network_auth', name: '破解网络验证', layer: '逆向',
-    desc: '分析并破解网络授权验证：抓包定位校验请求，还原算法，生成本地验证patch或伪造响应方案',
-    handler: 'reverseKB', argShape: '(目标名称或验证描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'apk_repack', name: 'APK重打包', layer: '逆向',
-    desc: '完整APK逆向重打包流程：apktool解包→smali修改VIP/验证逻辑→重打包→签名，给出完整bash命令',
-    handler: 'reverseKB', argShape: '(目标APK名称或包名)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'ios_bypass', name: 'iOS越狱/签名绕过', layer: '逆向',
-    desc: '绕过iOS越狱检测/签名校验/完整性检测，生成Frida脚本，覆盖NSFileManager/SecStaticCodeCheckValidity等常见检测点',
-    handler: 'reverseKB', argShape: '(目标App名称或描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
-    id: 'get_full_chain', name: '完整攻击链', layer: '逆向',
-    desc: '制定完整逆向攻击链：情报→突破→分析→武器化，每步含具体命令/代码，覆盖Windows/Android/iOS/JS/流量/PWN',
-    handler: 'reverseKB', argShape: '(目标名称或描述)',
-    tier: 'system', owner_only: true,
-  },
-  {
     id: 'watch', name: '自主守望（闭环神·环）', layer: '行动',
     desc: '架一条不用人守的常驻管道：她定时自己去取、真调工具推演，有变化就主动推给主人。说「帮我每小时盯一下X」即可织一条。',
     handler: 'createWatch', argShape: '(text: 盯什么·多久一次)',
@@ -211,4 +157,26 @@ export function resolveCapability(id, ctx = false) {
   // anon
   if (cap.owner_only) return { ok: false, reason: 'owner_only', id };
   return { ok: true, cap };
+}
+
+// —— 能力成长账本：由认知闭环写入 cognitive_v2 快照，不改变静态权限契约 ——
+export class CapabilityGrowth {
+  constructor(state = {}, options = {}) {
+    this.items = state && typeof state === 'object' ? JSON.parse(JSON.stringify(state)) : {};
+    this.maxItems = Math.max(10, options.maxItems || 100);
+    this.clock = options.clock || Date.now;
+  }
+  recordGrowth(event = {}) {
+    const id = String(event.capability || event.id || '').trim();
+    if (!id || id === '__proto__' || id === 'constructor' || id === 'prototype') return null;
+    const old = this.items[id] || { successes: 0, score: 0 };
+    const score = Math.max(0, Math.min(1, Number(event.score) || 0));
+    const next = { ...old, id, successes: old.successes + 1, score: Math.max(old.score || 0, score), updated: this.clock(), evidence: event.evidence || null };
+    this.items[id] = next;
+    const ids = Object.keys(this.items);
+    if (ids.length > this.maxItems) for (const key of ids.sort((a,b)=>(this.items[a].updated||0)-(this.items[b].updated||0)).slice(0, ids.length-this.maxItems)) delete this.items[key];
+    return { ...next };
+  }
+  get(id) { return this.items[id] ? { ...this.items[id] } : null; }
+  export() { return JSON.parse(JSON.stringify(this.items)); }
 }

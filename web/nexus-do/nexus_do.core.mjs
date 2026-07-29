@@ -18,7 +18,12 @@ import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.
 import { GlobalWorkspace } from './nexus_gw_workspace.mjs';
 import { ActiveInferenceEngine } from './nexus_active_inference.mjs';
 import { PhenomenalSelfModel } from './nexus_self_model.mjs';
-import { describeCapabilities, capabilitySelfDescription, resolveCapability } from './capabilities.mjs';
+import { EventBus } from './nexus_event_bus.mjs';
+import { WorldGraph } from './nexus_world_graph.mjs';
+import { ShuyuBridge } from './nexus_shuyu_bridge.mjs';
+import { SelfImprove } from './nexus_self_improve.mjs';
+import { ExperienceMemory } from './memory/experience_memory.mjs';
+import { describeCapabilities, capabilitySelfDescription, resolveCapability, CapabilityGrowth } from './capabilities.mjs';
 import { REVERSE_KB, REVERSE_KB_EXT } from './reverse_kb.mjs';
 import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
 import { generateVapidKeys, sendWebPush } from './webpush.mjs';
@@ -58,11 +63,29 @@ export class ShenshuCore {
     this.gw = new GlobalWorkspace({ maxSlots: 5, maxCharsPerSlot: 800 });
     this.aiEngine = new ActiveInferenceEngine((s, m, soul, o) => this.callBrain(s, m, soul, o));
     this.selfModel = new PhenomenalSelfModel();
+    // v2 长期认知闭环：快照在 blockConcurrencyWhile 中恢复，运行期统一节流落盘
+    this.eventBus = new EventBus();
+    this.worldGraph = new WorldGraph();
+    this.memoryExperience = new ExperienceMemory();
+    this.capabilityGrowth = new CapabilityGrowth();
+    this.shuyu = new ShuyuBridge();
+    this.selfImprove = new SelfImprove({ eventBus: this.eventBus, memory: this.memoryExperience, capabilities: this.capabilityGrowth });
+    this._cognitiveDirty = false; this._cognitiveFlushTimer = null;
+    this.eventBus.on('improvement.applied', () => this.markCognitiveDirty());
     // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
     if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
     // 影子实例：独立数据，不吸主人的 KV 老记忆。
     this.isShadow = false;
     this.state.blockConcurrencyWhile(async () => {
+      try {
+        const snap = await this.storage.get('cognitive_v2');
+        if (snap && typeof snap === 'object') {
+          this.worldGraph = new WorldGraph(snap.world);
+          this.memoryExperience = new ExperienceMemory(snap.experience);
+          this.capabilityGrowth = new CapabilityGrowth(snap.capabilities);
+          this.selfImprove = new SelfImprove({ eventBus: this.eventBus, memory: this.memoryExperience, capabilities: this.capabilityGrowth });
+        }
+      } catch (e) { console.error('[cognitive_v2] restore:', e?.message); }
       try {
         const flag = await this.storage.get('_is_shadow');
         if (flag) this.isShadow = true;
@@ -76,6 +99,42 @@ export class ShenshuCore {
         if (!migrated && !this.isShadow) await this.migrateFromKV();
       } catch (e) { console.error('[init] migrateFromKV failed:', e?.message); }
     });
+  }
+
+  // ═══════════════════════ 路由 ═══════════════════════
+  ensureCognitiveV2() {
+    this.eventBus ||= new EventBus();
+    this.worldGraph ||= new WorldGraph();
+    this.memoryExperience ||= new ExperienceMemory();
+    this.capabilityGrowth ||= new CapabilityGrowth();
+    this.shuyu ||= new ShuyuBridge();
+    this.selfImprove ||= new SelfImprove({ eventBus: this.eventBus, memory: this.memoryExperience, capabilities: this.capabilityGrowth });
+  }
+  cognitiveSnapshot() { this.ensureCognitiveV2(); return { version: 2, world: this.worldGraph.export(), experience: this.memoryExperience.export(), capabilities: this.capabilityGrowth.export(), updated: Date.now() }; }
+  markCognitiveDirty() {
+    this._cognitiveDirty = true;
+    if (this._cognitiveFlushTimer || !this.storage?.put) return;
+    this._cognitiveFlushTimer = setTimeout(() => { this.flushCognitiveV2().catch(() => {}); }, 1000);
+  }
+  async flushCognitiveV2(force = false) {
+    if (!force && !this._cognitiveDirty) return false;
+    if (this._cognitiveFlushTimer) { clearTimeout(this._cognitiveFlushTimer); this._cognitiveFlushTimer = null; }
+    if (!this.storage?.put) return false;
+    await this.storage.put('cognitive_v2', this.cognitiveSnapshot()); this._cognitiveDirty = false; return true;
+  }
+  recordCognitiveOutcome({ text = '', reply = '', ok = true, model = '', coord = null } = {}) {
+    this.ensureCognitiveV2(); const ts = Date.now();
+    const inputId = `input:${this.shuyu.hash(text).map(x => x.toFixed(6)).join(':')}`;
+    const actionId = `action:${this.shuyu.hash(reply).map(x => x.toFixed(6)).join(':')}`;
+    this.worldGraph.addEntity({ id: inputId, type: 'input', text: String(text).slice(0, 240), confidence: 0.8 });
+    this.worldGraph.addEntity({ id: actionId, type: 'action', text: String(reply).slice(0, 240), model, confidence: ok ? 0.8 : 0.3 });
+    this.worldGraph.connect(inputId, actionId, ok ? 'produced' : 'failed', ok ? 0.8 : 0.9, { ts });
+    const priorFailure = ok ? this.memoryExperience.search('interaction_failure', x => x.input === String(text).slice(0, 240)).at(-1) : null;
+    const exp = this.memoryExperience.remember({ concept: ok ? 'interaction_success' : 'interaction_failure', input: String(text).slice(0, 240), output: String(reply).slice(0, 240), model, coord, confidence: ok ? 0.7 : 0.9 });
+    if (!ok) this.selfImprove.improve(new Error(String(reply).slice(0, 160) || 'interaction_failed'), { result: { ok: false, score: 0 }, capability: model || 'talk', context: { input: String(text).slice(0, 160) } }).catch(() => {});
+    else if (priorFailure) this.selfImprove.improve(new Error(priorFailure.output || 'prior_failure'), { result: { ok: true, score: 0.9, evidence: exp?.id }, capability: model || 'talk', context: { input: String(text).slice(0, 160) } }).catch(() => {});
+    this.eventBus.emit('cognitive.outcome', { inputId, actionId, experienceId: exp?.id, ok }).catch(() => {});
+    this.markCognitiveDirty(); return { inputId, actionId, experienceId: exp?.id };
   }
 
   // ═══════════════════════ 路由 ═══════════════════════
@@ -1593,6 +1652,7 @@ async execBrowse(payload = {}) {
         this.selfModel.update(soul, { type: selfEventType, content: reply.slice(0, 100), coord: soul.current_shu_coord });
       }
     } catch (e) {}
+    try { this.recordCognitiveOutcome({ text, reply, ok: brainResult?.ok !== false, model: brainResult?.model || '', coord: nextCoord }); } catch (e) {}
     await this.saveSoul(soul);
     let stream = (await this.storage.get('stream')) || [];
     stream.push({ ts: now, text, reply, emotion: af.emotion, shu_coord: nextCoord, model: brainResult.model });
@@ -8121,6 +8181,13 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       // P0 GWT：工具结果入候选池竞争，不无差别追加
       for (const o of obs) {
         scratchCandidates.push({ content: o, source: 'tool', ts: Date.now(), isFailed: o.includes('失败') || o.includes('❌') });
+        try {
+          const failed = o.includes('失败') || o.includes('❌');
+          this.ensureCognitiveV2();
+          this.memoryExperience.remember({ concept: failed ? 'action_failure' : 'action_success', input: text.slice(0, 200), output: o.slice(0, 400), confidence: failed ? 0.9 : 0.7 });
+          this.eventBus.emit('action.completed', { failed, observation: o }).catch(() => {});
+          this.markCognitiveDirty();
+        } catch (_) {}
       }
       if (scratchCandidates.length > 20) scratchCandidates = scratchCandidates.slice(-20); // 防膨胀
     }
