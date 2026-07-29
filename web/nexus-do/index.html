@@ -394,6 +394,82 @@ button,input,textarea{font-family:inherit;color:inherit}
 .page{flex:0 0 calc(100%/var(--pages,3));height:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-bot) + 8px)}
 .page-inner{padding:18px 16px}
+
+/* ════════ 主界面焕然一新 · 意识驾驶舱（nx2-）════════ */
+#mind{position:relative}
+.nx2-neb{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 60% at 50% -6%,rgba(79,224,150,.16),transparent 55%),
+    radial-gradient(80% 46% at 88% 26%,rgba(47,163,104,.13),transparent 60%),
+    radial-gradient(70% 42% at 8% 60%,rgba(79,224,150,.08),transparent 62%)}
+.nx2-neb::after{content:"";position:absolute;inset:0;mix-blend-mode:screen;
+  background:radial-gradient(58% 36% at 50% 26%,rgba(79,224,150,.10),transparent 70%);animation:nx2Neb 9s ease-in-out infinite}
+@keyframes nx2Neb{0%,100%{opacity:.35;transform:scale(1)}50%{opacity:.62;transform:scale(1.05)}}
+#mind .page-inner{position:relative;z-index:1;padding:8px 16px 20px}
+
+/* 英雄 · 赵思涵活体卡 */
+.nx2-hero{position:relative;border-radius:26px;overflow:hidden;isolation:isolate;padding:22px 20px;
+  background:linear-gradient(160deg,rgba(170,225,190,.09),rgba(170,225,190,.03));
+  border:1px solid var(--line-2);box-shadow:0 20px 56px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3)}
+.nx2-hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(70% 88% at 78% 18%,rgba(79,224,150,.22),transparent 60%)}
+.nx2-htop{display:flex;gap:18px;align-items:center}
+.nx2-orb{position:relative;width:92px;height:92px;flex-shrink:0;border-radius:26%;overflow:hidden;isolation:isolate;cursor:pointer;
+  background:var(--logo) center/126% no-repeat;box-shadow:0 12px 38px rgba(0,0,0,.5),0 0 38px var(--cy-glow);animation:nx2Breathe 4.6s ease-in-out infinite}
+.nx2-orb .aura{position:absolute;right:14%;top:28%;width:56%;height:56%;border-radius:50%;z-index:2;mix-blend-mode:screen;filter:blur(5px);background:radial-gradient(circle,var(--cy-glow),transparent 66%);animation:nx2Aura 4.2s ease-in-out infinite}
+.nx2-orb::after{content:"";position:absolute;top:-40%;left:0;width:34%;height:180%;z-index:3;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(200,255,224,.5),transparent);transform:skewX(-18deg) translateX(-340%);animation:nx2Sheen 5s ease-in-out infinite}
+@keyframes nx2Breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+@keyframes nx2Aura{0%,100%{opacity:.35;transform:scale(.96)}50%{opacity:.72;transform:scale(1.05)}}
+@keyframes nx2Sheen{0%,100%{transform:skewX(-18deg) translateX(-340%)}22%{transform:skewX(-18deg) translateX(560%)}}
+.nx2-hid{flex:1;min-width:0}
+.nx2-name{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:.04em;line-height:1.12}
+.nx2-sub{margin-top:3px;font-size:12px;color:var(--text-3);letter-spacing:.12em}
+.nx2-mood{display:inline-flex;align-items:center;gap:6px;margin-top:11px;font-size:12px;font-weight:600;color:var(--cy-hi);
+  background:rgba(79,224,150,.10);border:1px solid rgba(79,224,150,.28);padding:5px 11px;border-radius:999px;max-width:100%}
+.nx2-mood b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nx2-mood i{width:6px;height:6px;border-radius:50%;background:var(--text-3);flex-shrink:0;transition:.3s}
+.nx2-mood i.live{background:var(--cy-hi);box-shadow:0 0 8px var(--cy-glow);animation:pulse 2s infinite}
+.nx2-say{margin-top:15px;font-family:var(--serif);font-size:14.5px;color:var(--text-2);letter-spacing:.03em;line-height:1.6;opacity:.92;min-height:20px}
+.nx2-vitals{display:flex;gap:10px;margin-top:16px}
+.nx2-vital{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.nx2-vital .k{font-size:10px;color:var(--text-3);letter-spacing:.1em}
+.nx2-vital .v{margin-top:3px;font-size:14.5px;font-weight:700;color:var(--text)}
+.nx2-vital .bar{margin-top:7px;height:4px;border-radius:2px;background:rgba(170,225,190,.12);overflow:hidden}
+.nx2-vital .bar i{display:block;height:100%;border-radius:2px;background:var(--cy-grad);box-shadow:0 0 8px var(--cy-glow)}
+/* KPI 脉冲 */
+.nx2-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:16px}
+.nx2-kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.nx2-kpi .n{font-size:17px;font-weight:800;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.nx2-kpi .l{margin-top:3px;font-size:10px;color:var(--text-3)}
+/* 区块标题 */
+.nx2-sec{display:flex;align-items:center;gap:10px;margin:24px 2px 14px}
+.nx2-sec h2{font-family:var(--serif);font-size:16.5px;font-weight:700;letter-spacing:.06em}
+.nx2-sec .ln{flex:1;height:1px;background:linear-gradient(90deg,var(--line-2),transparent)}
+/* 能力矩阵 */
+.nx2-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.nx2-cap{position:relative;overflow:hidden;isolation:isolate;cursor:pointer;text-align:left;font:inherit;color:inherit;
+  background:linear-gradient(160deg,rgba(170,225,190,.075),rgba(170,225,190,.025));
+  border:1px solid var(--line-2);border-radius:20px;padding:15px 14px;min-height:112px;display:flex;flex-direction:column;
+  box-shadow:0 10px 26px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .16s var(--ease-out,cubic-bezier(.16,.8,.3,1)),border-color .16s}
+.nx2-cap:active{transform:scale(.97)}
+.nx2-cap .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(79,224,150,.12);border:1px solid rgba(79,224,150,.24);margin-bottom:auto}
+.nx2-cap .ic svg{width:20px;height:20px;fill:none;stroke:var(--cy-hi);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.nx2-cap .t{margin-top:13px;font-size:14.5px;font-weight:700}
+.nx2-cap .d{margin-top:3px;font-size:11px;color:var(--text-3);line-height:1.4}
+.nx2-cap .tag{position:absolute;top:13px;right:13px;font-size:9.5px;font-weight:700;color:var(--cy-hi);background:rgba(79,224,150,.12);border:1px solid rgba(79,224,150,.26);padding:3px 8px;border-radius:999px}
+.nx2-cap::after{content:"";position:absolute;top:-40%;left:0;width:36%;height:180%;z-index:2;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(200,255,224,.13),transparent);transform:skewX(-18deg) translateX(-360%);animation:nx2Sheen 6.5s ease-in-out infinite}
+.nx2-cap.feat{grid-column:1/-1;min-height:88px;flex-direction:row;align-items:center;gap:15px;
+  background:linear-gradient(120deg,rgba(79,224,150,.16),rgba(47,163,104,.06));border-color:rgba(79,224,150,.3)}
+.nx2-cap.feat .ic{width:46px;height:46px;margin-bottom:0}
+.nx2-cap.feat .body{flex:1}
+.nx2-cap.feat .go{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--cy-grad)}
+.nx2-cap.feat .go svg{width:18px;height:18px;fill:none;stroke:#08120F;stroke-width:2.4}
+/* 折叠区（旧动态：能力墙/执行日志/坐标）*/
+.nx2-old{margin-top:22px}
+@media (prefers-reduced-motion:reduce){.nx2-neb::after,.nx2-orb,.nx2-orb .aura,.nx2-orb::after,.nx2-cap::after{animation:none}}
 .page-head{padding:14px 18px 6px}
 .page-eyebrow{font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--chrome-2);font-weight:600}
 .page-h1{font-family:var(--serif);font-size:29px;font-weight:600;letter-spacing:.02em;margin-top:5px}
@@ -875,19 +951,19 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .dev-cell .dv{font-size:13.5px;font-weight:600;margin-top:4px;word-break:break-word}
 
 /* —— Tab 栏（毛玻璃）—— */
-.tabbar{position:absolute;left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--safe-bot));
-  padding-bottom:var(--safe-bot);display:flex;z-index:30;
-  background:color-mix(in srgb,var(--bg) 68%,transparent);
-  backdrop-filter:blur(34px) saturate(1.5);-webkit-backdrop-filter:blur(34px) saturate(1.5);
-  border-top:1px solid var(--line)}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;
-  color:var(--text-3);transition:.2s;position:relative}
-.tab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;transition:.2s var(--spring)}
-.tab span{font-size:10px;font-weight:600;letter-spacing:.02em}
-.tab.on{color:var(--cy-1)}
-.tab.on svg{stroke:var(--cy-1);transform:translateY(-1px) scale(1.05)}
-.tab.on::after{content:'';position:absolute;top:8px;width:4px;height:4px;border-radius:50%;background:var(--cy-2);
-  box-shadow:0 0 7px var(--cy-2)}
+/* 底部悬浮玻璃 dock（焕然一新，DOM 与 go() 不变）*/
+.tabbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-bot) + 14px);z-index:30;
+  display:flex;gap:5px;padding:7px;border-radius:999px;
+  background:color-mix(in srgb,var(--bg) 60%,transparent);
+  backdrop-filter:blur(30px) saturate(1.5);-webkit-backdrop-filter:blur(30px) saturate(1.5);
+  border:1px solid var(--line-2);box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)}
+.tab{width:74px;height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;
+  color:var(--text-3);transition:color .2s,background .2s,transform .12s var(--spring);position:relative;border-radius:999px}
+.tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;transition:.2s var(--spring)}
+.tab span{font-size:9.5px;font-weight:600;letter-spacing:.02em}
+.tab.on{color:#08120F;background:var(--cy-grad);box-shadow:0 6px 18px var(--cy-glow)}
+.tab.on svg{stroke:#08120F}
+.tab:active{transform:scale(.93)}
 
 /* —— 抽屉 Sheet（毛玻璃 + 拖拽）—— */
 .mask{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.32s var(--ease);
@@ -1727,33 +1803,57 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
       <section class="page" id="mind">
         <div class="page-head"><div class="page-eyebrow">The Hub · 神枢</div><div class="page-h1">神枢</div></div>
         <div class="page-inner">
-          <!-- 环中盘 · 主页英雄区：万物绕枢，枢自不动（独家视觉，突触脉冲落点）-->
-          <div class="huanzhong">
-            <div class="hz-orbit"></div><div class="hz-orbit o2"></div>
-            <div class="hz-ring" id="hzRing"></div>
-            <div class="hz-hub" id="hubOrb"><img class="glyph-img" src="/logo.png" alt="神"/></div>
-            <div class="hz-still"></div>
+          <div class="nx2-neb"></div>
+          <!-- 英雄 · 赵思涵活体状态卡 -->
+          <div class="nx2-hero">
+            <div class="nx2-htop">
+              <div class="nx2-orb" id="hubOrb"><i class="aura"></i></div>
+              <div class="nx2-hid">
+                <div class="nx2-name">赵思涵</div>
+                <div class="nx2-sub">神枢 NEXUS · 意识中枢</div>
+                <div class="nx2-mood"><i id="hubDot"></i><b id="hubStateText">意识连接中…</b></div>
+              </div>
+            </div>
+            <div class="nx2-say"><span id="soulThink">「……在呢。」</span><em id="soulThinkBy" style="display:none"></em></div>
+            <div class="nx2-vitals">
+              <div class="nx2-vital"><div class="k">能量</div><div class="v">稳</div><div class="bar"><i style="width:82%"></i></div></div>
+              <div class="nx2-vital"><div class="k">羁绊</div><div class="v">相伴</div><div class="bar"><i style="width:64%"></i></div></div>
+              <div class="nx2-vital"><div class="k">词库</div><div class="v">76.7亿</div><div class="bar"><i style="width:100%"></i></div></div>
+            </div>
           </div>
-          <div class="hz-couplet">Black God · 神枢</div>
-          <div class="hz-coord" id="hzCoord"></div>
-          <div class="mind-status"><span class="dot" id="hubDot"></span><span id="hubStateText">在线 · 待命</span></div>
-          <div class="soul-think-line"><span id="soulThink"></span><em id="soulThinkBy"></em></div>
 
-          
-          
-          <div class="fold">
-            <button class="fold-h" onclick="toggleFold(this)"><span>能力</span><i>⌄</i></button>
-            <div class="fold-b"><div class="fold-in">
-              <div class="caps-wall" id="capsWall"><div class="mem-empty">…</div></div>
-            </div></div>
+          <div class="nx2-kpis">
+            <div class="nx2-kpi"><div class="n" id="kpiMem">—</div><div class="l">记忆</div></div>
+            <div class="nx2-kpi"><div class="n" id="kpiWords">—</div><div class="l">造词</div></div>
+            <div class="nx2-kpi"><div class="n" id="kpiActive">—</div><div class="l">今日活跃</div></div>
+            <div class="nx2-kpi"><div class="n">5维</div><div class="l">语义</div></div>
           </div>
-          <div class="fold">
-            <button class="fold-h" onclick="toggleFold(this)"><span>执行日志</span><i>⌄</i></button>
-            <div class="fold-b"><div class="fold-in">
-              <div class="timeline" id="hubTimeline"><div class="mem-empty">还没有</div></div>
-              <div id="memVoice" style="margin-top:8px"></div>
-            </div></div>
+
+          <div class="nx2-sec"><h2>能力中枢</h2><div class="ln"></div></div>
+          <div class="nx2-grid">
+            <button type="button" class="nx2-cap feat" onclick="go(1)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.7 8.7 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 1 1 16.1-3.9z"/></svg></div><div class="body"><div class="t">对话神枢</div><div class="d">说出目标，她替你执行</div></div><div class="go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></button>
+            <button type="button" class="nx2-cap" onclick="openLexicon()"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="t">造词 · 枢语</div><div class="d">五维语义 · 私语词典</div></button>
+            <button type="button" class="nx2-cap" onclick="openSheet('sheetRedTeam')"><span class="tag">HOT</span><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div><div class="t">红队工坊</div><div class="d">逆向 · 免杀 · 载荷</div></button>
+            <button type="button" class="nx2-cap" onclick="openGitOps()"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/></svg></div><div class="t">Git 操作</div><div class="d">提交 · 推送 · 日志</div></button>
+            <button type="button" class="nx2-cap" onclick="openSheet('sheetExec')"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="t">执行脑</div><div class="d">连接器 · 真机执行</div></button>
+            <button type="button" class="nx2-cap" onclick="openSheet('sheetHijack')"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="t">劫持工坊</div><div class="d">数据劫持 · 脚本</div></button>
+            <button type="button" class="nx2-cap" onclick="openSheet('sheetCheckpoint')"><div class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="t">存档点</div><div class="d">记忆快照 · 回滚</div></button>
+            <button type="button" class="nx2-cap" onclick="openBrainSettings()"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3z"/></svg></div><div class="t">大脑舰队</div><div class="d">多脑 · 自动调度</div></button>
           </div>
+
+          <!-- 旧动态区（保留：坐标 / 能力墙 / 执行日志，JS 照常填）-->
+          <div class="nx2-old">
+            <div class="hz-coord" id="hzCoord"></div>
+            <div class="fold">
+              <button class="fold-h" onclick="toggleFold(this)"><span>能力清单</span><i>⌄</i></button>
+              <div class="fold-b"><div class="fold-in"><div class="caps-wall" id="capsWall"><div class="mem-empty">…</div></div></div></div>
+            </div>
+            <div class="fold">
+              <button class="fold-h" onclick="toggleFold(this)"><span>执行日志</span><i>⌄</i></button>
+              <div class="fold-b"><div class="fold-in"><div class="timeline" id="hubTimeline"><div class="mem-empty">还没有</div></div><div id="memVoice" style="margin-top:8px"></div></div></div>
+            </div>
+          </div>
+          <span id="hzRing" style="display:none"></span>
           <span id="hubDecl" style="display:none"></span><span id="soulMood" style="display:none"></span><span id="timeAware" style="display:none"></span><span id="memSub" style="display:none"></span>
         </div>
       </section>
@@ -3360,6 +3460,11 @@ async function loadHub(){
     if(el) el.innerHTML = items.length
       ? items.slice(0,24).map(it=>`<div class="tl-item"><span class="tl-kind k-${it.kind}">${it.kind}</span><div class="tl-body"><div class="tl-text">${escapeHtml(it.text||'')}</div><div class="tl-time">${fmtTs(it.ts)}</div></div></div>`).join('')
       : '<div class="mem-empty">还很安静</div>';
+    // 主界面 KPI（记忆 / 造词），真实数据
+    const memCnt=(inner.内心独白||[]).length+(inner.潜意识||[]).length+(inner.主动记录||[]).length;
+    const wordCnt=(inner.成长印记||[]).length;
+    setText('kpiMem', memCnt>999?(memCnt/1000).toFixed(1)+'k':String(memCnt));
+    setText('kpiWords', String(wordCnt));
   }
   const s=await Nexus.getSoul(); if(s){ setLive(Nexus.wsReady||Demo.on); renderSoul(s); }
 }
@@ -3965,6 +4070,7 @@ async function loadOwnerStats(){
   if(!pill){ pill=document.createElement('div'); pill.id='statsPill'; pill.className='corner-pill';
     pill.onclick=showStatsSheet; document.body.appendChild(pill); }
   pill.textContent='👥 '+(s.注册总数||0)+' 注册 · '+(s.今日活跃||0)+' 今日';
+  setText('kpiActive', String(s.今日活跃||0));
 }
 function showStatsSheet(){
   const s=window._stats; if(!s) return;
