@@ -1912,8 +1912,12 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   </div>
   <div class="field">
     <label>模型</label>
-    <input id="authModel" placeholder="模型名"/>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="authModel" placeholder="模型名（留空自动选第一个）" style="flex:1"/>
+      <button class="btn ghost" style="white-space:nowrap;padding:8px 12px;font-size:13px" onclick="probeAuthModels()">🔍 识别</button>
+    </div>
   </div>
+  <div id="authModelList" style="display:none;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
   <button class="btn" onclick="pickAuthMethod(_authPid,'key')">添加 AI 服务商</button>
   <div id="authStatus" style="font-size:12px;color:var(--text-3);margin-top:10px;min-height:16px"></div>
 </div>
@@ -3475,6 +3479,8 @@ function renderBrains(){
     <input class="lock-input bfld" data-k="url" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;margin-top:6px;letter-spacing:0" placeholder="地址 https://.../v1" value="${_esc(b.url)}" oninput="_bset(${i},'url',this.value)"/>
     <input class="lock-input bfld" data-k="key" type="password" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;margin-top:6px;letter-spacing:0" placeholder="API Key" value="${_esc(b.key)}" oninput="_bset(${i},'key',this.value)"/>
     <input class="lock-input" style="width:100%;box-sizing:border-box;text-align:left;padding:8px;margin-top:6px;letter-spacing:0" placeholder="模型（留空 = 自动识别）" value="${_esc(b.model)}" oninput="_bset(${i},'model',this.value)"/>
+    <div id="bml-${i}" style="display:none;flex-wrap:wrap;gap:5px;margin-top:5px"></div>
+    <button class="btn ghost" style="width:100%;margin-top:6px;font-size:12px" onclick="probeBrainModels(${i})">🔍 识别可用模型</button>
     <div style="text-align:right;margin-top:6px"><span onclick="brainDel(${i})" style="color:var(--danger,#e5484d);font-size:12px;cursor:pointer">删除这条</span></div>
   </div>`).join('') || '<div style="color:var(--text-3);font-size:13px;padding:8px 0">还没挂脑，点下面加一条。</div>';
   const addBtn=$('#brainAddBtn'); if(addBtn) addBtn.style.display=_brains.length>=9?'none':'';
@@ -3576,6 +3582,44 @@ async function oauthFinish(){
 }
 
 function brainAdd(){ if(_brains.length>=9){ _bstat('最多 9 条','var(--danger,#e5484d)'); return; } _brains.push({url:'',key:'',model:'',label:'',on:true}); renderBrains(); }
+
+async function probeBrainModels(i){
+  const b=_brains[i]; if(!b) return;
+  const url=(b.url||'').trim(); const key=(b.key||'').trim();
+  if(!url){ toast('先填地址'); return; }
+  const el=$(`#bml-${i}`); const card=$('#brainList').children[i];
+  const mInp=card?card.querySelectorAll('.lock-input')[3]:null; // 模型输入框
+  if(el){ el.style.display='flex'; el.innerHTML='<span style="font-size:12px;color:var(--text-3)">识别中…</span>'; }
+  try{
+    const r=await Nexus.probeModels({gateway_url:url,gateway_key:key});
+    if(r&&r.ok&&r.models&&r.models.length){
+      if(el){ el.innerHTML=r.models.map(m=>`<span onclick="this.parentNode.querySelectorAll('span').forEach(s=>s.style.background='');this.style.background='var(--ok-bg,#1a3a2a)';_bset(${i},'model','${m}');document.getElementById('brainList').children[${i}].querySelectorAll('.lock-input')[3].value='${m}'" style="cursor:pointer;border:1px solid var(--line-2);border-radius:8px;padding:3px 8px;font-size:12px">${_esc(m)}</span>`).join(''); }
+      if(!b.model&&r.models[0]){ _bset(i,'model',r.models[0]); if(mInp) mInp.value=r.models[0]; }
+      toast(`识别到 ${r.count} 个模型`);
+    } else {
+      if(el){ el.innerHTML=`<span style="font-size:12px;color:var(--danger,#e5484d)">${_esc((r&&r.error)||'未识别到模型')}</span>`; }
+    }
+  }catch(e){ if(el) el.innerHTML=`<span style="font-size:12px;color:var(--danger)">${_esc(e.message||'请求失败')}</span>`; }
+}
+
+async function probeAuthModels(){
+  const url=($('#authUrl').value||'').trim(); const key=($('#authKey').value||'').trim();
+  if(!url){ $('#authStatus').textContent='先填 API 地址'; return; }
+  $('#authStatus').textContent='识别中…';
+  const el=$('#authModelList');
+  try{
+    const r=await Nexus.probeModels({gateway_url:url,gateway_key:key});
+    if(r&&r.ok&&r.models&&r.models.length){
+      el.style.display='flex';
+      el.innerHTML=r.models.map(m=>`<span onclick="$('#authModel').value='${m}';this.parentNode.querySelectorAll('span').forEach(s=>s.style.background='');this.style.background='var(--ok-bg,#1a3a2a)'" style="cursor:pointer;border:1px solid var(--line-2);border-radius:8px;padding:3px 8px;font-size:12px">${esc(m)}</span>`).join('');
+      if(!$('#authModel').value&&r.models[0]) $('#authModel').value=r.models[0];
+      $('#authStatus').textContent=`✅ 识别到 ${r.count} 个模型，点选即填入`;
+    } else {
+      el.style.display='none';
+      $('#authStatus').textContent='❌ '+(r&&r.error)||'未识别到模型，手动填写';
+    }
+  }catch(e){ $('#authStatus').textContent='请求失败：'+(e.message||e); }
+}
 function brainMove(i,d){ const j=i+d; if(j<0||j>=_brains.length) return; const t=_brains[i]; _brains[i]=_brains[j]; _brains[j]=t; renderBrains(); _bstat('顺序=神枢优先调度次序,保存后生效'); }
 function brainDel(i){ _brains.splice(i,1); renderBrains(); }
 async function fillBrains(){
