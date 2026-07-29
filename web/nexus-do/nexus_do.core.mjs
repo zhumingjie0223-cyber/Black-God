@@ -790,6 +790,10 @@ async execBrowse(payload = {}) {
       attempts.push({ cmd: c, code: r ? r.code : undefined, stderr: r && r.stderr ? String(r.stderr).slice(0, 200) : '' });
     };
 
+    // ⚡ 危险门提前——在任何 IO/Soul 操作前先做危险判断
+    const preCheck = await this.execRemote(currentCmd, { confirm: opts.confirm === true, dryRun: true });
+    if (preCheck && preCheck.need_confirm) return preCheck;
+
     // P1 主动推理：执行前生成预期
     const soul = await this.getSoul();
     const instanceMode = !!opts.instanceMode;
@@ -9675,7 +9679,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   async setConfig(b) {
     const c = (await this.storage.get('config')) || {};
     // 换网关/换模型：清掉自动识别缓存，下次重新识别
-    if ((b.gateway_url !== undefined && b.gateway_url !== c.gateway_url) || b.gateway_model !== undefined) delete c._auto_model;
+    if ((b.gateway_url !== undefined && b.gateway_url !== c.gateway_url) || b.gateway_model !== undefined) { delete c._auto_model; c._auto_models = {}; }
     if (b.gateway_url !== undefined) c.gateway_url = String(b.gateway_url || '').trim();
     if (b.gateway_model !== undefined) c.gateway_model = String(b.gateway_model || '').trim();
     // 密钥：空串=清空；掩码开头(•)=不动；其它=更新
@@ -9859,7 +9863,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       const cfg = (await this.storage.get('config')) || {};
       if (cfg.gateway_url !== u.api_url || cfg.gateway_key !== u.api_key || (u.api_model || '') !== (cfg.gateway_model || '')) {
         cfg.gateway_url = u.api_url; cfg.gateway_key = u.api_key; cfg.gateway_model = u.api_model || '';
-        delete cfg._auto_model;   // 换网关/模型:清自动识别缓存,下次重识别
+        delete cfg._auto_model; cfg._auto_models = {};   // 换网关/模型:清自动识别缓存,下次重识别
         await this.storage.put('config', cfg);
       }
     }
