@@ -27,9 +27,115 @@ export { AgentStateMachineDO };
 
 // ═══ 逆向工具链知识库（吾爱破解40+篇实战提炼）═══
 const REVERSE_KB = {
-  analyze_target: (arg) => `你是顶级逆向工程师，对目标做初步研判：\n目标：${arg}\n\n【保护类型识别】\n- 壳检测：PEiD/DIE/ExeinfoPE 扫描，看区段名（.vmp0/.themida/.nsp）\n- VMP特征：入口点跳到加密区段，字节码密集\n- Themida特征：.mackt区段，import表加密，多线程反调试\n- 网络验证：有WinINet/socket调用，找InternetOpenA\n- 驱动验证：NtDeviceIoControlFile/IOCTL调用链\n- .NET：dnSpy直接看IL，无需汇编\n- Electron：解包app.asar直接看JS\n\n【工具链】PEiD/DIE/CFF Explorer/x64dbg+ScyllaHide/IDA/Ghidra/dnSpy/jadx/Frida\n\n输出：1.保护类型 2.推荐分析路径 3.难度 4.最快突破点`,
+  analyze_target: (arg) => `你是顶级逆向工程师，对目标做研判：
+目标：${arg}
 
-  find_entry: (arg) => `你是逆向专家，定位关键函数：\n目标：${arg}\n\n【错误字符串法（最高效）】\n1. 触发注册失败弹窗\n2. x64dbg → 搜索所有模块字符串 → 找"invalid/expired/license/激活/unauthorized"\n3. 追到最近的JE/JNE条件跳转 = 验证分叉点\n\n【API断点法】\n- 网络验证：bp InternetReadFile/HttpSendRequest\n- 文件：bp CreateFileA\n- 注册表：bp RegQueryValueEx\n- 时间锁：bp GetLocalTime\n\n给出针对${arg}的具体定位步骤`,
+【保护类型识别】
+Detect-It-Easy扫描 / PEiD扫：
+- .vmp0/.vmp1 = VMProtect；.themida/.mackt = Themida
+- .nuitka或rsrc超大(200MB+) = Nuitka(Python编译)；MEIPASS字符串 = PyInstaller
+- import表加密/无正常import = 壳保护
+- 区段名.text超大+调试信息丰富 = 无壳
+
+【Nuitka编译程序（Python逆向）】
+不能还原源码，走运行时内存取证：
+1. mitmproxy拦截：HTTP_PROXY=http://127.0.0.1:8888 ./target.exe
+2. 点击关键操作后立即扫内存找明文JSON：
+\`\`\`python
+import ctypes, re
+def scan_process(pid, pattern):
+    k32=ctypes.WinDLL("kernel32")
+    h=k32.OpenProcess(0x1F0FFF,False,pid)
+    addr=0; mbi=ctypes.create_string_buffer(48); res=[]
+    while addr<0x7FFFFFFFFFFF:
+        if not k32.VirtualQueryEx(h,addr,mbi,48): break
+        if int.from_bytes(mbi[28:32],'little')==0x1000:
+            buf=ctypes.create_string_buffer(int.from_bytes(mbi[16:24],'little'))
+            k32.ReadProcessMemory(h,addr,buf,len(buf),None)
+            for m in re.finditer(pattern,buf.raw): res.append(hex(addr+m.start()))
+        addr+=int.from_bytes(mbi[16:24],'little')
+    return res
+hits=scan_process(pid, b'"token"')
+\`\`\`
+
+【PyInstaller程序】
+\`\`\`bash
+pyinstxtractor.py target.exe
+uncompyle6 -o ./src/ target.pyc    # Python<3.9
+pycdc target.pyc                    # Python3.9+
+\`\`\`
+
+【VMP/Themida评估】
+VMP 3.x：不脱壳，ScyllaHide+x64dbg直接dump内存；handler还原看Frida trace
+Themida：ScyllaHide全选+.mackt断点+TLS回调处dump
+
+【LD_PRELOAD绕过TracerPid（Linux/Android）】
+\`\`\`c
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <dlfcn.h>
+static FILE*(*real_fopen)(const char*,const char*)=NULL;
+static int cnt=0;
+FILE *fopen(const char *path,const char *mode){
+  if(!real_fopen) real_fopen=dlsym(RTLD_NEXT,"fopen");
+  if(!strcmp(path,"/proc/self/status"))
+    return fmemopen(++cnt==1?"TracerPid:\\t0\\n":"TracerPid:\\t1\\n",14,"r");
+  return real_fopen(path,mode);
+}
+\`\`\`
+\`\`\`bash
+gcc -shared -fPIC -o ld_bypass.so override_fopen.c -ldl
+LD_PRELOAD=./ld_bypass.so ./target
+\`\`\`
+
+【整体难度评级】
+高：VMP+驱动+网络验证 → unidbg+内存取证+伪造服务器
+中：Nuitka/Themida+网络验证 → mitmproxy+ScyllaHide+内存扫描
+低：无壳/PyInstaller+注册码 → decompile/字符串定位+patch
+
+输出：1.保护类型 2.推荐路径 3.难度 4.最快突破点`,
+
+  find_entry: (arg) => `你是定位关键函数专家：
+目标：${arg}
+
+【字符串追踪（最快）】
+x64dbg→右键→搜索→当前模块字符串→找"过期"/"未注册"/"trial"/"expired"/"license"
+双击→跳到引用→看上下文的条件跳转(jz/jnz/je/jne)
+
+【API断点追踪（Navicat实战）】
+x64dbg → bp MessageBoxA/MessageBoxW → 运行 → 弹窗断下 → 看堆栈追authentication函数
+找jne关键跳转 → ZF寄存器翻转验证 → 两处jnz全改jmp → 生成补丁exe
+
+Navicat 17具体：
+1. 运行→过期弹窗→查堆栈找authentication_dialog_ask
+2. jne上下断→翻ZF→进主界面
+3. 搜索showTrialDialog→追第二处jne→同样翻转
+4. 两处全patch→测试功能
+
+【注册表监控】
+Procmon过滤目标进程→看HKCU\\Software\\目标\\License→对RegQueryValueEx下断
+
+【DLL注入技术（共10种）】
+CreateRemoteThread / SetWindowsHookEx / AppInit_DLLs / APC注入(NtQueueApcThread) /
+反射DLL注入 / Process Hollowing / Atom Bombing / COM劫持 / 早期鸟APC / LSP注入
+
+\`\`\`cpp
+// 最经典：CreateRemoteThread注入
+HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+LPVOID addr = VirtualAllocEx(hProc, NULL, dllPath.size()+1, MEM_COMMIT, PAGE_READWRITE);
+WriteProcessMemory(hProc, addr, dllPath.c_str(), dllPath.size()+1, NULL);
+HANDLE hThread = CreateRemoteThread(hProc, NULL, 0,
+  (LPTHREAD_START_ROUTINE)GetProcAddress(GetModuleHandleA("kernel32.dll"),"LoadLibraryA"),
+  addr, 0, NULL);
+WaitForSingleObject(hThread, INFINITE);
+\`\`\`
+
+【JetBrains全家桶激活】
+vmoptions文件加一行：
+-javaagent:/path/to/sniarbtej.jar=id=user,user=USER,exp=2299-12-31,force=true
+路径：%APPDATA%\\JetBrains\\<IDE版本>\\<IDE>.vmoptions
+
+给出针对「${arg}」的关键函数定位方案`,
 
   get_full_chain: (arg) => `你是顶级逆向工程师，制定完整攻击链：
 目标：${arg}
@@ -252,7 +358,103 @@ def gen(uid):
 
   keygen_from_algo: (arg) => `你是注册机开发专家：\n目标：${arg}\n\n\`\`\`python\nimport hashlib,random,string\n\ndef verify(key):\n    parts=key.replace('-','')\n    # 从IDA提取的验证逻辑\n    checksum=sum(ord(c) for c in parts[:-2])%97\n    return int(parts[-2:],16)==checksum\n\ndef keygen():\n    while True:\n        base=''.join(random.choices(string.ascii_uppercase+string.digits,k=14))\n        cs=sum(ord(c) for c in base)%97\n        key=f"{base[:4]}-{base[4:8]}-{base[8:12]}-{base[12:]}{cs:02X}"\n        if verify(key): return key\n\nfor _ in range(10):\n    k=keygen()\n    assert verify(k)\n    print(k)\n\`\`\`\n\n请根据${arg}的实际验证逻辑修改verify函数，生成可用序列号`,
 
-  frida_hook: (arg) => `你是Frida专家，为以下目标写hook脚本：\n目标：${arg}\n\n【基础hook】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"函数名"),{\n    onEnter(args){console.log(args[0].readUtf8String())},\n    onLeave(retval){retval.replace(1)}\n});\n\`\`\`\n\n【iOS ptrace bypass】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"ptrace"),{\n    onEnter(args){if(args[0].toInt32()===31)args[0]=ptr(0)}\n});\n\`\`\`\n\n【Android签名bypass】\n\`\`\`javascript\nJava.perform(()=>{\n    Java.use("android.app.ApplicationPackageManager").getPackageInfo\n    .overload("java.lang.String","int").implementation=function(p,f){\n        return this.getPackageInfo(p,f&~64);\n    };\n});\n\`\`\`\n\n给出针对${arg}的完整Frida脚本`,
+  frida_hook: (arg) => `你是Frida Hook专家：
+目标：${arg}
+
+【基础spawn/attach】
+\`\`\`bash
+frida -U -f com.target.app -l hook.js --no-pause   # spawn
+frida -U -n "App名" -l hook.js                      # attach
+objection -g com.target.app explore                  # 快速上手
+\`\`\`
+
+【Java层Hook模板】
+\`\`\`javascript
+Java.perform(() => {
+  var cls = Java.use('com.target.UserManager');
+  cls.isVip.overload().implementation = function() { return true; };
+  cls.checkLicense.overload('java.lang.String').implementation = function(k) {
+    console.log('[key]', k);
+    return Java.use('java.lang.Boolean').TRUE.value;
+  };
+  Java.choose('com.target.UserModel', {
+    onMatch(i){ console.log('[user]', i.userId.value); }, onComplete(){}
+  });
+});
+\`\`\`
+
+【Native Hook】
+\`\`\`javascript
+Interceptor.attach(Module.findExportByName('libtarget.so','verify_license'),{
+  onEnter(a){ this.k=a[0].readUtf8String(); },
+  onLeave(r){ r.replace(ptr(1)); }
+});
+var base=Module.findBaseAddress('libtarget.so');
+Memory.patchCode(base.add(0x5678),4,c=>{ new Arm64Writer(c).putRet(); });
+\`\`\`
+
+【反Frida检测绕过（看雪气骑士实战）】
+检测点：/proc/self/maps含frida字样 / dlsym枚举含frida的so / UnixSocket含frida- / ADB调试属性
+\`\`\`bash
+# 最简：用florida替换frida-server
+# https://github.com/Ylarod/Florida  → 隐藏maps+socket特征
+\`\`\`
+\`\`\`javascript
+// 手动绕过maps检测
+Interceptor.attach(Module.findExportByName(null,'read'),{
+  onLeave(r){
+    if(this._path&&this._path.includes('/maps')){
+      var s=this.buf.readUtf8String(r.toInt32());
+      if(s&&s.includes('frida')){
+        var clean=s.split('\\n').filter(l=>!l.includes('frida')&&!l.includes('linjector')).join('\\n');
+        Memory.writeUtf8String(this.buf,clean);
+      }
+    }
+  }
+});
+// ptrace bypass (iOS/Linux)
+Interceptor.attach(Module.findExportByName(null,'ptrace'),{
+  onEnter(a){if(a[0].toInt32()===31)a[0]=ptr(0)}
+});
+// Android签名bypass
+Java.perform(()=>{
+  Java.use('android.app.ApplicationPackageManager').getPackageInfo
+    .overload('java.lang.String','int').implementation=function(p,f){
+      return this.getPackageInfo(p,f&~64);
+    };
+});
+\`\`\`
+
+【微信小程序逆向】
+\`\`\`bash
+# 解密wxapkg
+# Android路径: /data/data/com.tencent.mm/MicroMsg/<hash>/appbrand/pkg/
+# 工具: https://github.com/Angels-Ray/UnpackMiniApp
+node wuWxapkg.js xxx.wxapkg
+npx prettier --write *.js
+# 找app-service.js→加密函数（RC4/魔改MD5）→Frida hook
+\`\`\`
+
+【OkHttp/协议层拦截】
+\`\`\`javascript
+Java.perform(()=>{
+  var Builder=Java.use('okhttp3.Request$Builder');
+  Builder.addHeader.implementation=function(n,v){
+    console.log('[header]',n,'=',v); return this.addHeader(n,v);
+  };
+  var Chain=Java.use('okhttp3.internal.http.RealInterceptorChain');
+  Chain.proceed.overload('okhttp3.Request').implementation=function(req){
+    console.log('[req]',req.url().toString());
+    var resp=this.proceed(req);
+    console.log('[resp]',resp.code());
+    return resp;
+  };
+});
+\`\`\`
+
+工具：Frida / florida / objection / LSPosed / UsbDetectionBypass / r0capture(SSL抓包)
+
+给出针对「${arg}」的完整Frida hook脚本`,
 
   apk_repack: (arg) => `你是Android逆向专家：
 目标：${arg}
