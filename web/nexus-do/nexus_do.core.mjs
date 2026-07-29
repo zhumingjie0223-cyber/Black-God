@@ -305,7 +305,41 @@ ScyllaHide插件全选 + .mackt区段识别 + TLS回调断点(bp TlsCallback)
 
 给出针对${arg}的具体bypass步骤`
 
-  dump_vm: (arg) => `你是壳分析专家：\n目标：${arg}\n\n【VMP不脱壳绕过】找VM处理完后的干净执行时机，OEP处dump\n【Loader注入法】WinMain后VM已解密，Scylla修复IAT\n【Themida不脱壳】等完全加载后，Cheat Engine找解密区，硬件执行断点\n【DSVM还原】找解释器大switch，记录每个opcode操作，写反汇编器\n\n给出针对${arg}的具体步骤`,
+  dump_vm: (arg) => `你是VM逆向和签名算法还原专家：
+目标：${arg}
+
+【Flutter App逆向（看雪实战）】
+Flutter特征：libflutter.so + libapp.so，jadx看不到业务逻辑
+1. Blutter还原符号：python3 main.py libapp.so ./out/ → 生成IDA符号表+Frida脚本
+2. Hook加密参数：
+\`\`\`javascript
+const base=Module.findBaseAddress("libapp.so");
+[[0x4845E0,"decode"],[0x890A14,"encode"]].forEach(([off,name])=>{
+  Interceptor.attach(base.add(off),{
+    onEnter(a){console.log("["+name+"]");for(let i=0;i<4;i++)console.log("a"+i,hexdump(ptr(a[i]),{length:64}));},
+    onLeave(r){console.log("[ret]",hexdump(ptr(r),{length:64}));}
+  });
+});
+\`\`\`
+3. 追到encrypt_Encrypter::decrypt，hook明文输出
+
+【魔改SHA-1还原（蜂窝zzz参数，unidbg实战）】
+Java层：appendGhostSighParams→ghostSigh→xPreAuthencode→native libmfw.so
+特征：H3=0x5E4A1F7C / H4=0x10325476（标准值不同）→ 魔改SHA-1
+unidbg trace：
+\`\`\`java
+emulator.traceCode(module.base+0x396c8, module.base+0x396c8+0x2000);
+Dobby.replace(module.base+0x3C9C4, (em,orig)->HookStatus.LR(em,1), true);
+\`\`\`
+Python复现魔改SHA-1：H0/H1/H2/H3/H4初始值修改，其余SHA-1轮函数相同
+
+【VMP handler还原】
+1. Frida Stalker trace完整执行流 → 过滤纯跳转保留操作指令
+2. 污染vPC/vSP/vREG四个专属寄存器
+3. 建立opcode→语义映射表 → 输出伪C代码
+4. VMP3.9.4 cmp/jne还原：找测试值→trace→比对污染值差异→判断handler类型
+
+给出针对「${arg}」的VM/算法还原方案`,
 
   patch_license: (arg) => `你是patch专家：\n目标：${arg}\n\n【定位】验证失败字符串→回溯→最近JE/JNE\n【patch方式】JE→JMP / NOP掉JNE(90 90) / MOV EAX,1+RET\n\nPython patch模板：\n\`\`\`python\nwith open("target.exe","rb") as f: data=bytearray(f.read())\noffset=0x1234  # 文件偏移\ndata[offset:offset+2]=b'\\x90\\x90'  # NOP\nwith open("patched.exe","wb") as f: f.write(data)\n\`\`\`\n\n特征码通杀：\n\`\`\`python\nsig=bytes.fromhex("558BEC51894DFC6A00E8")\npatch=bytes.fromhex("B001C3909090909090909090")\nidx=data.find(sig)\nif idx>=0: data[idx:idx+len(patch)]=patch\n\`\`\`\n\n给出针对${arg}的完整patch方案`,
 
