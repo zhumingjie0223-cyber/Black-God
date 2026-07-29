@@ -1402,15 +1402,16 @@ async execBrowse(payload = {}) {
     if (!instanceMode) {
       const REVERSE_INTENT = [
         { re: /frida|hook脚本|hook.*android|hook.*ios|拦截.*函数|注入.*脚本/i, tool: 'frida_hook' },
-        { re: /极验|geetest|滑块.*破解|验证码.*逆向|captcha.*bypass/i, tool: 'get_full_chain' },
-        { re: /apk.*逆向|重打包|smali|jadx|apktool|安卓.*破解/i, tool: 'apk_repack' },
-        { re: /ios.*绕过|越狱检测|签名.*bypass|ptrace.*bypass|ios.*破解/i, tool: 'ios_bypass' },
+        { re: /极验|geetest|滑块|验证码.*逆向|captcha.*bypass/i, tool: 'get_full_chain' },
+        { re: /apk.*逆向|重打包|smali|jadx|apktool|安卓.*破解|搞.*apk/i, tool: 'apk_repack' },
+        { re: /ios.*绕过|越狱检测|签名.*bypass|ptrace.*bypass|ios.*破解|搞.*ios/i, tool: 'ios_bypass' },
         { re: /js.*反混淆|js.*逆向|还原.*js|混淆.*还原|ast.*还原/i, tool: 'js_deobfuscate' },
-        { re: /网络验证.*破解|license.*绕过|授权.*破解|破解.*网络验证/i, tool: 'crack_network_auth' },
-        { re: /反调试|antidebug|scyllahide|themida.*绕过|vmp.*绕过/i, tool: 'bypass_antidebug' },
+        { re: /网络验证|license.*绕过|授权.*破解|破解.*网络/i, tool: 'crack_network_auth' },
+        { re: /反调试|antidebug|scyllahide|themida|vmp.*绕过/i, tool: 'bypass_antidebug' },
         { re: /定位.*函数|找.*验证函数|关键.*函数.*在哪|字符串.*定位/i, tool: 'find_entry' },
-        { re: /分析.*目标|研判.*目标|保护.*类型|什么壳|用了什么保护/i, tool: 'analyze_target' },
-        { re: /完整.*攻击链|逆向.*全流程|全链路.*逆向|攻击.*全链/i, tool: 'get_full_chain' },
+        { re: /分析.*目标|研判.*目标|什么壳|用了什么保护|保护.*类型/i, tool: 'analyze_target' },
+        { re: /完整.*攻击链|逆向.*全流程|攻击.*全链/i, tool: 'get_full_chain' },
+        { re: /搞.*(软件|app|程序|验证|登录|vip|会员|破解)|逆向.*(分析|搞)/i, tool: 'get_full_chain' },
       ];
       for (const { re, tool } of REVERSE_INTENT) {
         if (re.test(text)) {
