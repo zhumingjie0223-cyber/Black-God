@@ -1345,6 +1345,16 @@ async execBrowse(payload = {}) {
       push:      { title: '神枢', body: s.arg || '有进展', url: '/' },
       exec:      { command: s.arg },
       watch:     { text: s.arg },
+      // 逆向工具
+      analyze_target:     { arg: s.arg, text: s.arg },
+      find_entry:         { arg: s.arg, text: s.arg },
+      bypass_antidebug:   { arg: s.arg, text: s.arg },
+      frida_hook:         { arg: s.arg, text: s.arg },
+      js_deobfuscate:     { arg: s.arg, text: s.arg },
+      crack_network_auth: { arg: s.arg, text: s.arg },
+      apk_repack:         { arg: s.arg, text: s.arg },
+      ios_bypass:         { arg: s.arg, text: s.arg },
+      get_full_chain:     { arg: s.arg, text: s.arg },
     };
     const params = paramMap[s.id] || {};
     return this.invokeCapability(s.id, params, true, null);
