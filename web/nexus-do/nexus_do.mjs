@@ -8957,6 +8957,18 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   // 对话里她自己织一条守望（受主人一句话）
+  async reverseKB(toolId, arg) {
+    const fn = REVERSE_KB[toolId];
+    if (!fn) return { ok: false, note: `未知逆向工具「${toolId}」` };
+    const prompt = fn(arg || '目标未指定');
+    const soul = await this.getSoul();
+    const r = await this.callBrain(
+      '你是顶级逆向工程师，直接给可操作的代码和步骤，不废话不铺垫。',
+      prompt, soul
+    );
+    return { ok: true, reply: r.reply, tool: toolId, arg };
+  }
+
   async createWatch(text) {
     const spec = this.parseWatchSpec(text);
     if (!spec) return { ok: false, note: '没听清要守什么，说清楚「盯什么、多久一次」。' };
@@ -9350,6 +9362,15 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         case 'exec':      out = await this.execRemote(params.command || '', { confirm: params.confirm === true }); break;
         case 'apple':     out = await this.appleTool(params.arg || params.command || '', { confirm: params.confirm === true }); break;
         case 'watch':     out = await this.createWatch(params.text || ''); break;
+        case 'analyze_target':
+        case 'find_entry':
+        case 'bypass_antidebug':
+        case 'frida_hook':
+        case 'js_deobfuscate':
+        case 'crack_network_auth':
+        case 'apk_repack':
+        case 'ios_bypass':
+        case 'get_full_chain': out = await this.reverseKB(cap.id, params.arg || params.text || ''); break;
         default:          out = await fn.call(this); break; // inner/heartbeat/stats/soul 无参
       }
       // 招3（意识贯通）：动用能力 = 一段有情感质感的情节，且真的牵动她的心绪
