@@ -129,15 +129,207 @@ ScyllaHide插件全选 + .mackt区段识别 + TLS回调断点(bp TlsCallback)
 
   patch_license: (arg) => `你是patch专家：\n目标：${arg}\n\n【定位】验证失败字符串→回溯→最近JE/JNE\n【patch方式】JE→JMP / NOP掉JNE(90 90) / MOV EAX,1+RET\n\nPython patch模板：\n\`\`\`python\nwith open("target.exe","rb") as f: data=bytearray(f.read())\noffset=0x1234  # 文件偏移\ndata[offset:offset+2]=b'\\x90\\x90'  # NOP\nwith open("patched.exe","wb") as f: f.write(data)\n\`\`\`\n\n特征码通杀：\n\`\`\`python\nsig=bytes.fromhex("558BEC51894DFC6A00E8")\npatch=bytes.fromhex("B001C3909090909090909090")\nidx=data.find(sig)\nif idx>=0: data[idx:idx+len(patch)]=patch\n\`\`\`\n\n给出针对${arg}的完整patch方案`,
 
-  crack_network_auth: (arg) => `你是网络验证破解专家：\n目标：${arg}\n\n【DLL劫持(.NET)】找验证DLL，同名空DLL直接return true\n【Hosts重定向】Wireshark找域名→127.0.0.1重定向→本地伪造服务器\n\n伪造服务器：\n\`\`\`python\nfrom http.server import HTTPServer,BaseHTTPRequestHandler\nimport json\nclass F(BaseHTTPRequestHandler):\n    def do_POST(self):\n        self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers()\n        self.wfile.write(json.dumps({"status":"ok","valid":True,"expire":"2099-12-31"}).encode())\nHTTPServer(('0.0.0.0',80),F).serve_forever()\n\`\`\`\n\n给出针对${arg}的最佳方案`,
+  crack_network_auth: (arg) => `你是网络验证破解专家：
+目标：${arg}
 
-  js_deobfuscate: (arg) => `你是JS逆向专家：\n目标：${arg}\n\n【识别类型】eval型/字符串数组型/VM指令集/控制流平坦化/AES加密\n【AES参数提取】Chrome断点在CryptoJS.AES.encrypt，看key/iv变量\n\nPython复现：\n\`\`\`python\nfrom Crypto.Cipher import AES\nfrom Crypto.Util.Padding import pad\nimport base64,time\nkey=b'extracted_key';iv=b'extracted_iv'\ndef gen(uid):\n    plain=f'{uid}|{int(time.time())}'\n    return base64.b64encode(AES.new(key,AES.MODE_CBC,iv).encrypt(pad(plain.encode(),16))).decode()\n\`\`\`\n\n【VM指令还原】找dispatch循环，记录opcode→操作映射，写反汇编器\n\n给出针对${arg}的完整还原方案`,
+【思路一：伪造服务器（最通用）】
+1. HTTP Debugger/Wireshark抓包找验证域名
+2. Hosts重定向：127.0.0.1 auth.target.com
+3. 本地起Flask伪造响应：
+\`\`\`python
+from flask import Flask, jsonify, make_response
+app = Flask(__name__)
+@app.route('/<path:p>', methods=['GET','POST'])
+def fake(p):
+    return jsonify({"status":"ok","valid":True,"expire":"2099-12-31","code":0,"msg":"success"})
+app.run(host='0.0.0.0', port=80)
+\`\`\`
+
+【思路二：找同款验证平台自注册（看雪实战）】
+1. 抓包找接口域名 → 密探/fofa扫子域名找到后台地址
+2. 注册账号 → 新建软件 → 生成配置
+3. hook.js替换目标程序里的配置参数（卡密/appid/sign算法key）
+\`\`\`javascript
+// Frida Gadget注入（CreateProcess后立刻注入）
+// loader.exe启动 → gadget.dll注入 → hook.js执行
+// 替换url和配置
+Interceptor.attach(Module.findExportByName("wininet.dll","HttpSendRequestA"),{
+  onEnter(a){ 
+    var url = a[1].readAnsiString();
+    if(url && url.includes('auth.'))
+      a[1].writeAnsiString(url.replace('auth.old.com','auth.my.com'));
+  }
+});
+\`\`\`
+
+【思路三：DLL劫持绕过】
+.NET程序：找验证DLL → 同名空DLL返回true
+\`\`\`csharp
+// AuthDll.cs
+public static bool Verify(string key) { return true; }
+\`\`\`
+
+【思路四：内存patch关键跳转】
+x64dbg → 找验证失败弹窗字符串 → 追到比较跳转 → 改jz为jmp
+\`\`\`
+// 找到: test eax,eax / jz fail
+// 改成: nop / nop（跳过失败分支）
+\`\`\`
+
+【思路五：unidbg模拟签名算法（大厂App）】
+X-Gorgon案例：
+- 输入：md5(url_param) + md5(body) + sdk版本 + timestamp（共20字节）
+- 算法：RC4变种（用8字节key初始化256字节S-box，逐字节XOR）
+- unidbg traceCode/traceRead/traceWrite还原完整执行流
+\`\`\`java
+emulator.traceCode(module.base + 0x7e530, module.base + 0x807B4).setRedirect(traceStream);
+emulator.traceRead(0, 0xFFFFFFFF).setRedirect(traceStream);
+emulator.traceWrite(0, 0xFFFFFFFF).setRedirect(traceStream);
+\`\`\`
+
+给出针对「${arg}」的最佳破解方案`,
+
+  js_deobfuscate: (arg) => `你是JS逆向专家：
+目标：${arg}
+
+【识别混淆类型】
+1. eval型 → console.log替换eval直接看
+2. 字符串数组型(_0x1234) → 找decode函数，node.js一键还原
+3. 控制流平坦化(while+switch) → babel AST还原
+4. VM字节码型 → 找dispatch循环，还原opcode映射表
+5. Webpack bundle → webcrack反打包
+6. AES加密参数 → Chrome断点CryptoJS.AES.encrypt，dump key/iv
+
+【魔改Hash逆向完整方案（看雪实战）】
+okhttp拦截→Frida trace→unidbg补环境→逐轮二分定位差异→Python还原
+\`\`\`javascript
+// Step1: hook OkHttp拦截器找加密header
+Java.perform(()=>{
+  var Builder = Java.use('okhttp3.Request$Builder');
+  Builder.addHeader.implementation = function(name, val){
+    console.log('[header]', name, '=', val);
+    return this.addHeader(name, val);
+  };
+});
+// Step2: Frida Stalker trace native函数
+var base = Module.findBaseAddress('libtarget.so');
+Stalker.follow(Process.getCurrentThreadId(),{
+  events:{call:true},
+  onReceive(events){ Stalker.parse(events).forEach(e=>console.log(JSON.stringify(e))); }
+});
+\`\`\`
+还原魔改MD5：dump T表→比对标准MD5→找乱序轮次→还原初始值abcd
+
+【Electron/Node.js App破解（Typora实战流程）】
+\`\`\`bash
+# 1. 解包asar
+asar extract app.asar ./app_src/
+# 2. 找JSC字节码，用V8反编译器部分还原，喂给AI分析授权逻辑
+# 3. Hook RSA公钥 + 完整性校验
+\`\`\`
+\`\`\`javascript
+// Node.js层hook（写进launch.dist.js头部）
+const _origDecrypt = require('crypto').publicDecrypt;
+require('crypto').publicDecrypt = (key, buf) => _origDecrypt(MY_OWN_PUBKEY, buf);
+const _origRead = require('fs').readFileSync;
+require('fs').readFileSync = (p,...a) => p.includes('launch.dist.js') ? _origRead(p+'.bak',...a) : _origRead(p,...a);
+\`\`\`
+
+【AES参数复现】
+\`\`\`python
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+import base64, time
+key=b'extracted_key'; iv=b'extracted_iv'
+def gen(uid):
+    plain=f'{uid}|{int(time.time())}'
+    return base64.b64encode(AES.new(key,AES.MODE_CBC,iv).encrypt(pad(plain.encode(),16))).decode()
+\`\`\`
+
+工具：webcrack / de4js / jsnice.org / babel / js-beautify / ast-explorer
+
+给出针对「${arg}」的完整JS逆向方案`,
 
   keygen_from_algo: (arg) => `你是注册机开发专家：\n目标：${arg}\n\n\`\`\`python\nimport hashlib,random,string\n\ndef verify(key):\n    parts=key.replace('-','')\n    # 从IDA提取的验证逻辑\n    checksum=sum(ord(c) for c in parts[:-2])%97\n    return int(parts[-2:],16)==checksum\n\ndef keygen():\n    while True:\n        base=''.join(random.choices(string.ascii_uppercase+string.digits,k=14))\n        cs=sum(ord(c) for c in base)%97\n        key=f"{base[:4]}-{base[4:8]}-{base[8:12]}-{base[12:]}{cs:02X}"\n        if verify(key): return key\n\nfor _ in range(10):\n    k=keygen()\n    assert verify(k)\n    print(k)\n\`\`\`\n\n请根据${arg}的实际验证逻辑修改verify函数，生成可用序列号`,
 
   frida_hook: (arg) => `你是Frida专家，为以下目标写hook脚本：\n目标：${arg}\n\n【基础hook】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"函数名"),{\n    onEnter(args){console.log(args[0].readUtf8String())},\n    onLeave(retval){retval.replace(1)}\n});\n\`\`\`\n\n【iOS ptrace bypass】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"ptrace"),{\n    onEnter(args){if(args[0].toInt32()===31)args[0]=ptr(0)}\n});\n\`\`\`\n\n【Android签名bypass】\n\`\`\`javascript\nJava.perform(()=>{\n    Java.use("android.app.ApplicationPackageManager").getPackageInfo\n    .overload("java.lang.String","int").implementation=function(p,f){\n        return this.getPackageInfo(p,f&~64);\n    };\n});\n\`\`\`\n\n给出针对${arg}的完整Frida脚本`,
 
-  apk_repack: (arg) => `你是Android逆向专家：\n目标：${arg}\n\n\`\`\`bash\n# 解包\napktool d target.apk -o out/\n# 或jadx\njadx -d jadx_out/ target.apk\n\n# 改VIP状态(smali)\n# 找isVip()方法，改为 const/4 v0, 0x1 / return v0\n\n# 重打包\napktool b out/ -o repacked.apk\n\n# 签名\nkeytool -genkey -v -keystore debug.keystore -alias key -keyalg RSA -validity 10000 -storepass android -keypass android -dname "CN=Test"\napksigner sign --ks debug.keystore --ks-pass pass:android --out final.apk repacked.apk\n\`\`\`\n\n给出针对${arg}的完整重打包步骤`,
+  apk_repack: (arg) => `你是Android逆向专家：
+目标：${arg}
+
+【流程一：apktool重打包（改smali）】
+\`\`\`bash
+# 解包
+apktool d target.apk -o out/
+# jadx辅助看Java逻辑
+jadx -d jadx_out/ target.apk
+# 改VIP/授权逻辑（smali）
+# isVip()/isPremium()/checkLicense() → 改返回值
+# const/4 v0, 0x1   # true
+# return v0
+# 重打包
+apktool b out/ -o repacked.apk
+# 签名
+keytool -genkey -v -keystore debug.keystore -alias key -keyalg RSA -validity 10000 \
+  -storepass android -keypass android -dname "CN=Test"
+apksigner sign --ks debug.keystore --ks-pass pass:android --out final.apk repacked.apk
+adb install -r final.apk
+\`\`\`
+
+【流程二：Frida动态Hook（不重打包）】
+\`\`\`javascript
+Java.perform(()=>{
+  // Hook isVip类方法
+  var cls = Java.use('com.target.app.UserManager');
+  cls.isVip.overload().implementation = function(){ return true; };
+  cls.isPremium.overload('java.lang.String').implementation = function(s){ return true; };
+  // Hook网络验证返回
+  var OkHttp = Java.use('okhttp3.OkHttpClient');
+  // 或直接hook验证回调
+  var AuthCallback = Java.use('com.target.AuthCallback');
+  AuthCallback.onSuccess.implementation = function(){ 
+    this.onSuccess(); 
+  };
+});
+\`\`\`
+
+【流程三：脱壳（有壳的APK）】
+\`\`\`bash
+# 一代壳（dex整体加密）：DumpDex/FART
+adb shell am start -n com.target/.MainActivity
+# Frida FART主动调用
+frida -U -f com.target -l fart.js
+# 二代壳（函数抽取）：BlackDex/FART
+# 三代壳（VMP/Dex2C）：Unicorn模拟执行/Unidbg补环境
+\`\`\`
+
+【流程四：Native层Hook（so文件）】
+\`\`\`javascript
+// Hook JNI函数
+var base = Module.findBaseAddress('libtarget.so');
+// 通过符号名
+Interceptor.attach(Module.findExportByName('libtarget.so','Java_com_target_Auth_verify'),{
+  onLeave(r){ r.replace(ptr(1)); }
+});
+// 通过offset（IDA找到地址）
+Interceptor.attach(base.add(0x12345),{
+  onLeave(r){ r.replace(ptr(1)); }
+});
+\`\`\`
+
+【smali常用patch】
+\`\`\`smali
+# 原始: invoke-virtual ... isVip()Z
+#        move-result v0
+#        if-eqz v0, :cond_fail
+# 改成:
+const/4 v0, 0x1    # 强制true
+goto :cond_success  # 跳过验证
+\`\`\`
+
+工具：apktool / jadx / apksigner / Frida / objection / BlackDex / FART / unidbg
+
+给出针对「${arg}」的完整逆向重打包方案`,
 
   ios_bypass: (arg) => `你是iOS逆向专家，给出针对「${arg}」的完整逆向方案：
 
