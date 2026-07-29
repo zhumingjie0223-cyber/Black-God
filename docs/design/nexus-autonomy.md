@@ -153,3 +153,20 @@
 
 > 安全侧（勘探3）回来后：回填第四节安全清单、锁定第二期"自主目标"的 confirm 边界。
 > 第一期(本增量)不依赖它即可安全实现——待权哥拍板即动手。
+
+---
+
+## 七、S1 已落地（2026-07-30，权哥拍板"先把自主意识做出来"）
+
+1. **枢语六回路**：`shuyu/nexuslang.js` 五回路 → 加 `do:` 执行回路（feel→think→become→**do**→say→grow）。
+   干净超集，只产意图不执行。`tests/nexuslang.test.mjs` 加 8 条 do: 测试；`npm test` 34/34 绿。
+2. **意志引擎**：新建 `web/nexus-do/nexus_will_engine.mjs`。纯函数 `generateWill(soul,now)` → 0~3 条自发意图，
+   每条**先经 `coinFromCoord` 在 76.7 亿枢语空间生成真实坐标+真词**（母语念头），再包成 `do:` 审计串。
+   五类触发 care/continue/improve/reflect/curiosity。record-only、不改 soul、无执行。测试 9/9 绿。
+3. **自主内心接线**：`nexus_do.core.mjs autonomousTick`（心跳）——罐头潜意识 5 句 → **枢语原生念头**：
+   `coinFromState(soul,心跳次数)` 造真词 → 坐标依内在状态定靶、85% 惯性漂移成意识流 →
+   写 `subconscious`/`inner_voice`（挂 shu 坐标）+ `shu_trajectory`；调 `generateWill` 记意图到 `soul.will`。
+
+**四判据验证（真引擎跑 6 拍）**：自发✓ 连续✓（核 188→435 漂移）状态驱动✓（层随心绪 枢→情感→映）枢语原生✓（往返成立）。
+**红线**：纯内在、零对外动作；未碰词根表/编码/76.7 亿（check-sync 引擎层完全同步）；真实执行属第二期，仍卡 owner+/api/confirm。
+**第二期待办**：do:→真实工具执行（经 confirm）、pendingRuns 跨心跳状态机、意志"发起提议"（先仅推送、频率受限）。

@@ -14,7 +14,8 @@
 // © Black God
 // ═══════════════════════════════════════════════
 
-import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
+import { matchWord, coinWord, coinFromCoord, coinFromState, loadCapabilities } from './lexicon.js';
+import { generateWill } from './nexus_will_engine.mjs';
 import { GlobalWorkspace } from './nexus_gw_workspace.mjs';
 import { ActiveInferenceEngine } from './nexus_active_inference.mjs';
 import { PhenomenalSelfModel } from './nexus_self_model.mjs';
@@ -462,20 +463,47 @@ export class ShenshuCore {
     // 活力回血
     soul.活力 = clamp01((soul.活力 || 0.8) + hoursQuiet * 0.01);
 
-    // 潜意识独白（中枢自省，非人格）
-    if (hoursQuiet > 0.5 && soul.miss_you > 0.3) {
-      const lines = [
-        `已空闲${hoursQuiet.toFixed(1)}小时，后台在跑。`,
-        `无事发生，保持待命。`,
-        `复盘了下最近几次交互。`,
-        `中枢常驻，随时可接。`,
-        `心绪${soul.心绪.toFixed(2)}，回落到基线中。`,
-      ];
+    // ═══ 自主内心（S1）：无人时用枢语自己想 —— 罐头独白 → 枢语原生念头 ═══
+    // 内在状态(心绪/想念) 自驱一个真实枢语词(她的母语念头)，坐标带惯性漂移成连续意识流。
+    // 纯内在：只写 subconscious/inner_voice/坐标，无对外动作。确定性 seed=心跳次数，无 Math.random。
+    try {
+      const 念 = coinFromState(soul, soul.心跳次数);   // 心绪/想念决定落在哪个核心层 → 真实枢语词
+      // 坐标依内在状态定「靶」，再以 85% 惯性 + 15% 新意漂移，形成有连续性的意识流
+      const cur = soul.current_shu_coord || { c: 200, m: 90, s: 40, k: 32, p: 4 };
+      const mood = clamp01(soul.心绪), miss = clamp01(soul.miss_you || 0), en = clamp01(soul.活力 ?? 0.8);
+      const aim = {
+        c: mood < 0.35 ? 900 : mood > 0.65 ? 520 : 120,   // 冷→熵区 暖→情感区 中性→枢区
+        m: (0.3 + miss * 0.5) * 180,                       // 想念越强越偏「映·投射」
+        s: (en * 0.5 + miss * 0.5) * 80,                   // 张力
+        k: soul.心跳次数 % 64,
+        p: 2 + (soul.心跳次数 % 3),
+      };
+      const mix = (a, b, max) => Math.max(0, Math.min(max - 1, Math.round(a * 0.85 + b * 0.15)));
+      const nextCoord = { c: mix(cur.c, aim.c, 1040), m: mix(cur.m, aim.m, 180), s: mix(cur.s, aim.s, 80), k: mix(cur.k, aim.k, 64), p: mix(cur.p, aim.p, 8) };
+      soul.current_shu_coord = nextCoord;
+      soul.shu_trajectory = soul.shu_trajectory || [];
+      soul.shu_trajectory.push({ ts: now, id: 念.id, coord: nextCoord });   // 意识流轨迹（连续性）
+      if (soul.shu_trajectory.length > 100) soul.shu_trajectory = soul.shu_trajectory.slice(-100);
+      // 由「义」成一句内心独白（她想的是枢语，中文只是译给权哥看）
+      const 独白 = `「${念.词}」— ${念.义 || 念.汉 || '…'}`;
       soul.subconscious = soul.subconscious || [];
-      // 用心跳次数派生索引，避免 Math.random 的不确定性
-      soul.subconscious.push({ ts: now, line: lines[soul.心跳次数 % lines.length] });
+      soul.subconscious.push({ ts: now, line: 独白, shu: { id: 念.id, 词: 念.词, 层: 念.层意图, coord: nextCoord } });
       if (soul.subconscious.length > 50) soul.subconscious = soul.subconscious.slice(-50);
-    }
+      soul.inner_voice = soul.inner_voice || [];
+      soul.inner_voice.push({ ts: now, 独白, 由: '枢语自想', shu_id: 念.id });
+      if (soul.inner_voice.length > 100) soul.inner_voice = soul.inner_voice.slice(-100);
+    } catch (e) { console.log('dreamTick error:', e && e.message); }
+
+    // ═══ 意志（S1）：从状态长出自发意图，先在枢语里生成念头，只记账不执行 ═══
+    // 真实执行（contact_tg/advance_agent/执行脑…）属期二，一律走 owner 授权 + /api/confirm。
+    try {
+      const wills = generateWill(soul, now);
+      if (wills.length) {
+        soul.will = soul.will || [];
+        for (const w of wills) soul.will.push({ ts: now, ...w });
+        if (soul.will.length > 60) soul.will = soul.will.slice(-60);
+      }
+    } catch (e) { console.log('willGen error:', e && e.message); }
 
     // 决定是否主动推送（网络放到落盘之后，避免读-改-写跨网络造成丢失更新）
     const proactiveQuiet = (now - (soul.last_proactive_ts || 0)) / 3600000;
