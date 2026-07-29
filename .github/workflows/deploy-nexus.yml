@@ -14,6 +14,7 @@ on:
     branches: [ main ]
     paths:
       - 'web/nexus-do/**'
+      - 'shuyu/**'
   workflow_dispatch:
 
 jobs:
@@ -38,8 +39,11 @@ jobs:
       - name: Build (index.html + core → nexus_do.mjs)
         run: npm run build
 
-      - name: Self-test (纯逻辑)
-        run: node selftest.mjs
+      - name: Full regression + Shuyu runtime integration
+        run: npm test
+
+      - name: Wrangler bundle dry-run
+        run: npx wrangler deploy --dry-run --outdir /tmp/nexus-do-bundle
 
       - name: Deploy to Cloudflare Workers
         if: ${{ env.CF_TOKEN != '' }}
