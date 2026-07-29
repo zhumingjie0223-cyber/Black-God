@@ -139,7 +139,120 @@ ScyllaHide插件全选 + .mackt区段识别 + TLS回调断点(bp TlsCallback)
 
   apk_repack: (arg) => `你是Android逆向专家：\n目标：${arg}\n\n\`\`\`bash\n# 解包\napktool d target.apk -o out/\n# 或jadx\njadx -d jadx_out/ target.apk\n\n# 改VIP状态(smali)\n# 找isVip()方法，改为 const/4 v0, 0x1 / return v0\n\n# 重打包\napktool b out/ -o repacked.apk\n\n# 签名\nkeytool -genkey -v -keystore debug.keystore -alias key -keyalg RSA -validity 10000 -storepass android -keypass android -dname "CN=Test"\napksigner sign --ks debug.keystore --ks-pass pass:android --out final.apk repacked.apk\n\`\`\`\n\n给出针对${arg}的完整重打包步骤`,
 
-  ios_bypass: (arg) => `你是iOS逆向专家：\n目标：${arg}\n\n【越狱检测bypass】\n\`\`\`javascript\nvar paths=["/Applications/Cydia.app","/usr/sbin/sshd","/bin/bash"];\nInterceptor.attach(ObjC.classes.NSFileManager["- fileExistsAtPath:"].implementation,{\n    onEnter(args){this._fake=paths.some(p=>ObjC.Object(args[2]).toString().includes(p))},\n    onLeave(retval){if(this._fake)retval.replace(0)}\n});\n\`\`\`\n\n【签名校验bypass】\n\`\`\`javascript\nInterceptor.attach(Module.findExportByName(null,"SecStaticCodeCheckValidity"),{\n    onLeave(retval){retval.replace(0)}\n});\n\`\`\`\n\n给出针对${arg}的完整bypass方案`,
+  ios_bypass: (arg) => `你是iOS逆向专家，给出针对「${arg}」的完整逆向方案：
+
+【环境准备】
+- 越狱设备：checkra1n(A11及以下) / palera1n(A15及以下) / Dopamine(iOS 15-16)
+- 工具：Frida + frida-server(iOS版) + objection / SSL Kill Switch 3 / class-dump / Filza
+- 砸壳：frida-ios-dump 或 bagbak（推荐，无需越狱的App可用decrypted ipa直装）
+  \`\`\`bash
+  # frida-ios-dump砸壳
+  python3 dump.py -u root -p alpine -H 192.168.x.x "App名称"
+  # bagbak（更稳定）
+  bagbak --udid <设备UDID> <BundleID>
+  \`\`\`
+
+【头文件提取】
+\`\`\`bash
+class-dump -H /path/to/decrypted.app/Binary -o ./headers/
+# 或用Frida直接运行时dump
+frida-ios-dump (runtime class dump)
+\`\`\`
+
+【越狱检测对抗（完整版）】
+\`\`\`javascript
+// 1. 文件路径检测
+var jbPaths = ["/Applications/Cydia.app","/usr/sbin/sshd","/bin/bash",
+  "/usr/bin/ssh","/private/var/lib/apt","/etc/apt","/private/var/stash",
+  "/var/mobile/Library/SBSettings","/Library/MobileSubstrate"];
+Interceptor.attach(ObjC.classes.NSFileManager["- fileExistsAtPath:"].implementation,{
+  onEnter(a){this._p=ObjC.Object(a[2]).toString();
+    this._fake=jbPaths.some(p=>this._p.includes(p))},
+  onLeave(r){if(this._fake)r.replace(0)}
+});
+// 2. URL Scheme检测
+Interceptor.attach(ObjC.classes.UIApplication["- canOpenURL:"].implementation,{
+  onLeave(r){r.replace(0)}
+});
+// 3. 沙盒写入检测
+Interceptor.attach(ObjC.classes.NSFileManager["- isWritableFileAtPath:"].implementation,{
+  onLeave(r){const p=this._p||'';
+    if(p.includes('/private')||p.includes('/bin'))r.replace(0)}
+});
+// 4. fork检测
+Interceptor.attach(Module.findExportByName(null,"fork"),{
+  onLeave(r){if(r.toInt32()!=-1)r.replace(ptr(-1))}
+});
+// 5. dylib注入检测
+Interceptor.attach(Module.findExportByName(null,"_dyld_get_image_name"),{
+  onLeave(r){
+    const n=r.readUtf8String();
+    if(n&&(n.includes('MobileSubstrate')||n.includes('cycript')||n.includes('frida')))
+      r.replace(ptr(0));
+  }
+});
+\`\`\`
+
+【签名校验绕过】
+\`\`\`javascript
+// SecStaticCodeCheckValidity
+Interceptor.attach(Module.findExportByName(null,"SecStaticCodeCheckValidity"),{
+  onLeave(r){r.replace(ptr(0))}
+});
+// SecTrustEvaluate（SSL Pinning）
+Interceptor.attach(Module.findExportByName("Security","SecTrustEvaluate"),{
+  onLeave(r){r.replace(ptr(0))}
+});
+// NSURLSessionDelegate SSL Pinning
+try{
+  var cls=ObjC.classes.NSURLSession;
+  Interceptor.attach(cls["- dataTaskWithRequest:completionHandler:"].implementation,{
+    onEnter(a){this._req=ObjC.Object(a[2])}
+  });
+}catch(e){}
+\`\`\`
+
+【SSL抓包 (无需越狱)】
+\`\`\`bash
+# 方法1：objection
+objection -g <BundleID> explore
+>>> ios sslpinning disable
+# 方法2：SSL Kill Switch 3（越狱设备装Tweak）
+# 方法3：frida脚本
+frida -U -f <BundleID> -l ssl_bypass.js
+\`\`\`
+
+【ObjC方法Hook找关键逻辑】
+\`\`\`javascript
+// 列出所有类
+ObjC.enumerateLoadedClasses({onMatch(name,h){
+  if(name.includes('VIP')||name.includes('Login')||name.includes('Auth'))
+    console.log('[+]',name);
+}});
+// Hook目标方法
+var cls=ObjC.classes['目标类名'];
+Interceptor.attach(cls['- 目标方法名'].implementation,{
+  onEnter(a){console.log('[*]入参:',ObjC.Object(a[2]).toString())},
+  onLeave(r){r.replace(ObjC.classes.NSNumber.numberWithBool_(1))}
+});
+\`\`\`
+
+【Hopper/IDA分析流程】
+1. 拖入砸壳后的二进制
+2. 搜索字符串关键词（"vip"/"expired"/"trial"）
+3. 定位调用该字符串的函数
+4. 分析返回值逻辑，找到关键比较分支
+5. 用Frida hook该函数改返回值，或用hex editor patch二进制
+
+【Clutch/Flexdecrypt内存dump】
+\`\`\`bash
+# Clutch（越狱）
+Clutch -b <BundleID>
+# frida-ios-dump（更稳定，ssh转发）
+python3 dump.py <App名> -u mobile -p alpine -H 127.0.0.1 -p 2222
+\`\`\`
+
+给出针对「${arg}」的完整iOS逆向方案`
 
   get_full_chain: (arg) => `你是顶级逆向工程师，制定完整攻击链：\n目标：${arg}\n\n【第一阶段-情报】目标类型/保护机制/最短路径\n【第二阶段-突破】切入方式选择/反调试绕过/定位核心函数\n【第三阶段-分析】还原算法/提取key/验证结果\n【第四阶段-武器化】自动化工具/持久化/完整性验证\n\n工具箱：\n- Windows: x64dbg+ScyllaHide/IDA/dnSpy\n- Android: jadx/apktool/Frida/objection\n- iOS: Hopper/Frida/class-dump\n- JS: Chrome DevTools/babel/jsnice\n- 流量: Wireshark/Burp/mitmproxy\n- PWN: pwntools/ROPgadget/one_gadget\n\n给出针对${arg}的完整攻击链，每步含具体命令/代码`
 };
