@@ -446,13 +446,13 @@ button,input,textarea{font-family:inherit;color:inherit}
 /* 能力矩阵 —— 中性卡 + 发丝边 + 绿描边图标 */
 .nx2-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .nx2-cap{position:relative;cursor:pointer;text-align:left;font:inherit;color:inherit;
-  background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:15px 14px;min-height:104px;display:flex;flex-direction:column;
+  background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:16px 15px;min-height:92px;display:flex;flex-direction:column;
   transition:transform .16s cubic-bezier(.16,.8,.3,1),background .2s,border-color .2s}
 .nx2-cap:active{transform:scale(.975)}
 .nx2-cap:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.13)}
-.nx2-cap .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);margin-bottom:auto}
+.nx2-cap .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);margin-bottom:13px}
 .nx2-cap .ic svg{width:19px;height:19px;fill:none;stroke:#5FD394;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.nx2-cap .t{margin-top:14px;font-size:14.5px;font-weight:700;color:#EDF3EF}
+.nx2-cap .t{margin-top:0;font-size:14.5px;font-weight:700;color:#EDF3EF}
 .nx2-cap .d{margin-top:3px;font-size:11px;color:#5A6862;line-height:1.4}
 .nx2-cap .tag{position:absolute;top:13px;right:13px;font-size:9px;font-weight:800;letter-spacing:.05em;color:#0A1E14;background:#4FE096;padding:3px 7px;border-radius:6px}
 .nx2-cap.feat{grid-column:1/-1;min-height:78px;flex-direction:row;align-items:center;gap:14px;padding:16px;
@@ -649,12 +649,12 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   gap:7px;
   padding:12px 4px;
   cursor:pointer;
-  background:var(--surface-2);
-  border:1px solid transparent;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
   border-radius:15px;
-  color:var(--text-2);
+  color:#94A29B;
   font-size:12px;
-  font-weight:500;
+  font-weight:600;
   opacity:0;
   transform:translateY(8px);
   transition:transform var(--dur-normal) var(--spring),
@@ -672,17 +672,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   transform:scale(.94);
   transition-duration:var(--dur-instant);
 }
-.pp-tile.on{
-  background:var(--cy-glow);
-  border-color:var(--cy-3);
-  color:var(--cy-4);
-  box-shadow:var(--shadow-md);
-}
 .dock.plus-open .pp-tile{opacity:1;transform:none;transition:opacity .34s var(--ease) var(--d,0s),transform .34s cubic-bezier(.2,.9,.25,1) var(--d,0s),background .2s,border-color .2s}
-.pp-i{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--cy-2)}
+.pp-i{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);color:#5FD394}
 .pp-i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .pp-tile:active{transform:scale(.94)}
-.pp-tile.on{background:var(--cy-glow);border-color:var(--cy-3);color:var(--cy-4)}
+.pp-tile.on{background:rgba(255,255,255,.07);border-color:rgba(79,224,150,.25);color:#8FE3AE}
 .pp-tile.on .pp-i{background:var(--cy-grad);color:#0A2E1E;border-color:transparent}
 .dock.plus-open .pp-tile:nth-child(1){--d:.02s}.dock.plus-open .pp-tile:nth-child(2){--d:.05s}.dock.plus-open .pp-tile:nth-child(3){--d:.08s}.dock.plus-open .pp-tile:nth-child(4){--d:.11s}
 .dock.plus-open .pp-tile:nth-child(5){--d:.14s}.dock.plus-open .pp-tile:nth-child(6){--d:.17s}.dock.plus-open .pp-tile:nth-child(7){--d:.20s}.dock.plus-open .pp-tile:nth-child(8){--d:.23s}
@@ -861,8 +855,8 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hz-still{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:var(--cy-hi);box-shadow:0 0 9px 2px var(--cy-glow);z-index:6}
 .hz-couplet{text-align:center;font-family:var(--serif);font-size:11.5px;color:var(--text-3);letter-spacing:.18em;padding-left:.18em;margin:0 0 12px;opacity:.8}
 .hz-coord{display:flex;gap:5px;flex-wrap:nowrap;justify-content:center;margin-bottom:14px;overflow-x:auto;padding:0 4px}
-.hz-coord span{font-family:var(--serif);font-size:10.5px;color:var(--text);padding:4px 9px;border:1px solid var(--line-2);border-radius:var(--radius-pill);background:var(--surface);white-space:nowrap;flex-shrink:0}
-.hz-coord span em{font-style:normal;color:var(--cy-hi);margin-left:5px}
+.hz-coord span{font-family:var(--serif);font-size:11px;color:#B7C6BE;padding:5px 11px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(255,255,255,.03);white-space:nowrap;flex-shrink:0}
+.hz-coord span em{font-style:normal;color:#5FD394;margin-left:5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes counter{to{transform:rotate(-360deg)}}
 /* 动态：对话瞬间，枢脉动一下（filter 光晕，不动 transform 免与呼吸冲突）*/
@@ -1113,8 +1107,8 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   animation:gateBreath 6.5s ease-in-out infinite;
 }
 @keyframes gateBreath{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.92;transform:scale(1.08)}}
-:root[data-theme="dark"] .lockgate,:root[data-theme="dark"] .onboard{background:radial-gradient(120% 85% at 50% -10%,rgba(79,224,150,.15),transparent 60%),linear-gradient(180deg,#0D1510,#0A100C 45%,#080D0A)}
-:root[data-theme="dark"] .lockgate::before,:root[data-theme="dark"] .onboard::before{background:radial-gradient(60% 44% at 50% 30%,rgba(79,224,150,.20),transparent 72%)}
+:root[data-theme="dark"] .lockgate,:root[data-theme="dark"] .onboard{background:radial-gradient(120% 82% at 50% -10%,rgba(79,224,150,.09),transparent 62%),linear-gradient(180deg,#0C120E,#0A100C 45%,#070C09)}
+:root[data-theme="dark"] .lockgate::before,:root[data-theme="dark"] .onboard::before{background:radial-gradient(56% 42% at 50% 30%,rgba(79,224,150,.11),transparent 74%)}
 .lockgate.show{display:grid;animation:obIn .5s var(--ease)}
 .lock-inner{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center}
 /* —— 登录门 · 活体动态 logo（现有神字底图 + 玉绿生命光层）—— */
@@ -1842,6 +1836,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 
           <!-- 旧动态区（保留：坐标 / 能力墙 / 执行日志，JS 照常填）-->
           <div class="nx2-old">
+            <div class="nx2-sec"><h2>此刻 · 神枢内部</h2><div class="ln"></div></div>
             <div class="hz-coord" id="hzCoord"></div>
             <div class="fold">
               <button class="fold-h" onclick="toggleFold(this)"><span>能力清单</span><i>⌄</i></button>
