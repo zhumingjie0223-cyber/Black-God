@@ -3536,7 +3536,8 @@ function pickProvider(id){
     oauthBtn.style.display='none';
     $('#authDivider').style.display='none';
   }
-  openSheet('sheetAuthMethod');
+  closeSheet();
+  setTimeout(()=>openSheet('sheetAuthMethod'), 80);
 }
 function pickAuthMethod(id, method){
   const p=PROVIDERS.find(x=>x.id===id); if(!p) return;
@@ -3558,7 +3559,8 @@ function pickAuthMethod(id, method){
 async function startOAuth(provider){
   const p=PROVIDERS.find(x=>x.id===provider); if(!p) return;
   $('#oauthTitle').textContent = '登录 · '+p.name;
-  openSheet('sheetOAuth');
+  closeSheet();
+  setTimeout(()=>openSheet('sheetOAuth'), 80);
   const r = await Nexus.oauthStart(provider);
   if(r && r.__401){ toast('需以主人身份解锁才能配置'); closeSheet(); return; }
   if(r && r.authUrl){ $('#oauthGoBtn').href = r.authUrl; _oauthPid = provider; }
