@@ -1398,8 +1398,63 @@ async execBrowse(payload = {}) {
       return { reply: _quick, model: 'local-shu', shu_coord: nextCoord, shu_meaning: shuMeaning, local: true, media: [] };
     }
 
-    // 多租户:实例主人(普通用户)只走「用自己 key 的单发对话」，且只吃合规人格(idMode=public)。
-    const instanceMode = !!this.env.MULTITENANT && (request && request.headers && request.headers.get('X-Nexus-Role')) === 'instance';
+    // ═══ 神枢逆向意图识别：算力看不到，神枢自己判断直接执行 ═══
+    if (!instanceMode) {
+      const REVERSE_INTENT = [
+        { re: /frida|hook脚本|hook.*android|hook.*ios|拦截.*函数|注入.*脚本/i, tool: 'frida_hook' },
+        { re: /极验|geetest|滑块.*破解|验证码.*逆向|captcha.*bypass/i, tool: 'get_full_chain' },
+        { re: /apk.*逆向|重打包|smali|jadx|apktool|安卓.*破解/i, tool: 'apk_repack' },
+        { re: /ios.*绕过|越狱检测|签名.*bypass|ptrace.*bypass|ios.*破解/i, tool: 'ios_bypass' },
+        { re: /js.*反混淆|js.*逆向|还原.*js|混淆.*还原|ast.*还原/i, tool: 'js_deobfuscate' },
+        { re: /网络验证.*破解|license.*绕过|授权.*破解|破解.*网络验证/i, tool: 'crack_network_auth' },
+        { re: /反调试|antidebug|scyllahide|themida.*绕过|vmp.*绕过/i, tool: 'bypass_antidebug' },
+        { re: /定位.*函数|找.*验证函数|关键.*函数.*在哪|字符串.*定位/i, tool: 'find_entry' },
+        { re: /分析.*目标|研判.*目标|保护.*类型|什么壳|用了什么保护/i, tool: 'analyze_target' },
+        { re: /完整.*攻击链|逆向.*全流程|全链路.*逆向|攻击.*全链/i, tool: 'get_full_chain' },
+      ];
+      for (const { re, tool } of REVERSE_INTENT) {
+        if (re.test(text)) {
+          // 先问一句确认——神枢理解意图后确认再执行
+          const confirmMap = {
+            frida_hook: `你是要我给「${text.slice(0,20)}」写Frida hook脚本？目标是Android还是iOS？`,
+            apk_repack: `你是要逆向重打包这个APK，改VIP/验证逻辑？说一下目标包名或APK名。`,
+            ios_bypass: `你是要绕过iOS的越狱检测还是签名校验？说一下目标App。`,
+            js_deobfuscate: `你是要还原JS混淆？把目标文件或混淆特征发我。`,
+            crack_network_auth: `你是要破解网络授权验证？说一下目标软件和验证方式。`,
+            bypass_antidebug: `你是要绕过反调试？说一下目标和保护类型（VMP/Themida/ptrace？）`,
+            find_entry: `你是要定位「${text.slice(0,20)}」的验证函数？说一下是Windows/Android/iOS哪个平台。`,
+            analyze_target: `你是要我研判「${text.slice(0,20)}」用了什么保护？把目标名字/平台告诉我。`,
+            get_full_chain: `你是要我给「${text.slice(0,30)}」出完整逆向攻击链？说一下平台（Windows/Android/iOS/Web）。`,
+          };
+          const confirmReply = confirmMap[tool] || `你是要逆向「${text.slice(0,20)}」？说一下具体目标和平台。`;
+          // 存意图到soul，等下一条消息确认后执行
+          const soul2 = await this.getSoul();
+          soul2.pending_reverse = { tool, text, ts: now };
+          soul2.last_seen = now;
+          soul2.encounters = (soul2.encounters || 0) + 1;
+          await this.saveSoul(soul2);
+          return { reply: confirmReply, model: 'nexus-intent', shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness };
+        }
+      }
+      // 上一条是逆向确认等待，这条是用户回答——直接执行
+      if (snap.pending_reverse && (now - snap.pending_reverse.ts) < 120000) {
+        const { tool, text: origText } = snap.pending_reverse;
+        const fn = REVERSE_KB[tool];
+        if (fn) {
+          const arg = text + '（原始需求：' + origText + '）';
+          const result = fn(arg);
+          const soul2 = await this.getSoul();
+          soul2.pending_reverse = null;
+          soul2.last_seen = now;
+          soul2.encounters = (soul2.encounters || 0) + 1;
+          await this.saveSoul(soul2);
+          return { reply: result, model: 'nexus-reverse', tool, shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness };
+        }
+      }
+    }
+    // ═══ end 逆向意图识别 ═══
+
+
     const baseSystem = this.STABLE_SYSTEM_PREFIX(instanceMode ? 'public' : 'owner') + '\n\n' +
       this.buildDynamicContext(snap, timeAwareness, nextCoord, shuMeaning, af, memories, caps, text) + gen.directive;
 
