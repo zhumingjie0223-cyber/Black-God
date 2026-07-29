@@ -1042,11 +1042,26 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 :root[data-theme="dark"] .lockgate::before,:root[data-theme="dark"] .onboard::before{background:radial-gradient(60% 44% at 50% 30%,rgba(79,224,150,.20),transparent 72%)}
 .lockgate.show{display:grid;animation:obIn .5s var(--ease)}
 .lock-inner{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;text-align:center}
-.lock-orb{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;position:relative;margin-bottom:22px;
-  background:radial-gradient(circle at 38% 32%,#2a2f37,#0c0e11 72%);border:1px solid var(--line-2);
-  box-shadow:0 10px 50px rgba(0,0,0,.5),0 0 55px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.08);animation:orbBreath 4.6s ease-in-out infinite}
-.lock-orb::before{content:'';position:absolute;inset:-3px;border-radius:50%;z-index:-1;background:conic-gradient(from 0deg,transparent,var(--cy-2),transparent 55%);opacity:.5;filter:blur(7px);animation:orbSpin 7s linear infinite}
-.lock-orb{background:var(--logo) center/112% no-repeat;-webkit-mask:radial-gradient(circle,#000 66%,transparent 72%);mask:radial-gradient(circle,#000 66%,transparent 72%);border:none}
+/* —— 登录门 · 活体动态 logo（现有神字底图 + 玉绿生命光层）—— */
+.lock-orb{width:112px;height:112px;border-radius:26%;position:relative;overflow:hidden;margin-bottom:24px;cursor:pointer;
+  background:var(--logo) center/126% no-repeat;isolation:isolate;
+  box-shadow:0 14px 50px rgba(0,0,0,.55),0 0 52px var(--cy-glow);animation:nxOrbBreathe 4.6s ease-in-out infinite}
+.lock-orb::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:5;animation:nxOrbRing 4.6s ease-in-out infinite;box-shadow:inset 0 0 0 1.5px var(--cy-glow)}
+.lo-aura,.lo-sweep,.lo-spark{position:absolute;pointer-events:none}
+.lo-aura{right:15%;top:29%;width:54%;height:54%;border-radius:50%;z-index:2;mix-blend-mode:screen;filter:blur(5px);
+  background:radial-gradient(circle,var(--cy-glow),transparent 66%);animation:nxOrbAura 4.2s ease-in-out infinite}
+.lo-sweep{top:-30%;left:-60%;width:38%;height:160%;z-index:3;mix-blend-mode:screen;filter:blur(2px);transform:rotate(18deg);
+  background:linear-gradient(90deg,transparent,rgba(180,255,214,.5),transparent);animation:nxOrbSweep 5.6s ease-in-out infinite}
+.lo-spark{width:5px;height:5px;border-radius:50%;background:var(--cy-hi);box-shadow:0 0 8px 2px var(--cy-glow);z-index:4;mix-blend-mode:screen}
+.lo-spark.a{left:30%;top:60%;animation:nxOrbFloat 4.8s ease-in-out infinite}
+.lo-spark.b{left:66%;top:52%;animation:nxOrbFloat 6.2s ease-in-out .8s infinite}
+.lo-spark.c{left:50%;top:70%;animation:nxOrbFloat 5.5s ease-in-out 1.6s infinite}
+@keyframes nxOrbBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+@keyframes nxOrbRing{0%,100%{box-shadow:inset 0 0 0 1.5px rgba(143,227,174,.18)}50%{box-shadow:inset 0 0 0 1.5px rgba(143,227,174,.42)}}
+@keyframes nxOrbAura{0%,100%{opacity:.32;transform:scale(.96)}50%{opacity:.66;transform:scale(1.05)}}
+@keyframes nxOrbSweep{0%,100%{transform:translateX(0) rotate(18deg);opacity:0}10%{opacity:1}30%{transform:translateX(540%) rotate(18deg);opacity:0}}
+@keyframes nxOrbFloat{0%{transform:translateY(6px);opacity:0}30%{opacity:1}100%{transform:translateY(-22px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.lock-orb,.lock-orb::after,.lo-aura,.lo-sweep,.lo-spark{animation:none}.lo-sweep{opacity:0}}
 .lock-title{font-family:var(--serif);font-size:31px;font-weight:600;letter-spacing:.2em;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .lock-sub{font-size:14px;color:var(--text-2);margin-top:12px;line-height:1.7;margin-bottom:26px}
 .lock-input{
@@ -1622,7 +1637,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 <!-- ===== 门（公共注册 / 主人私密，二选一）===== -->
 <div id="lockgate" class="lockgate">
   <div class="lock-inner">
-    <div class="lock-orb" onclick="orbSecretTap()"></div>
+    <div class="lock-orb" onclick="orbSecretTap()"><i class="lo-aura"></i><i class="lo-sweep"></i><i class="lo-spark a"></i><i class="lo-spark b"></i><i class="lo-spark c"></i></div>
     <div class="lock-title">Black God</div>
 
     <!-- 公共注册：起名 + 接入你自己的大模型 API（密钥你自己的，费用各付各的） -->
