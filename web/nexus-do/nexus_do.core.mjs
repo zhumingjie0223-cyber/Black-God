@@ -10230,8 +10230,8 @@ const MANIFEST_JSON = JSON.stringify({
   display_override: ['standalone', 'minimal-ui'],
   orientation: 'portrait',
   dir: 'ltr',
-  background_color: '#F4FBF6',
-  theme_color: '#F4FBF6',
+  background_color: '#0A100C',
+  theme_color: '#0A100C',
   lang: 'zh-CN',
   categories: ['productivity', 'utilities', 'lifestyle'],
   icons: [
