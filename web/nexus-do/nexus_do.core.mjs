@@ -31,7 +31,99 @@ const REVERSE_KB = {
 
   find_entry: (arg) => `你是逆向专家，定位关键函数：\n目标：${arg}\n\n【错误字符串法（最高效）】\n1. 触发注册失败弹窗\n2. x64dbg → 搜索所有模块字符串 → 找"invalid/expired/license/激活/unauthorized"\n3. 追到最近的JE/JNE条件跳转 = 验证分叉点\n\n【API断点法】\n- 网络验证：bp InternetReadFile/HttpSendRequest\n- 文件：bp CreateFileA\n- 注册表：bp RegQueryValueEx\n- 时间锁：bp GetLocalTime\n\n给出针对${arg}的具体定位步骤`,
 
-  bypass_antidebug: (arg) => `你是反反调试专家：\n目标：${arg}\n\n【NtGlobalFlag】PEB+0x68值0x70=被调试，写0绕过\n【IsDebuggerPresent】patch RET前 xor eax,eax\n【VMP 3.x无驱动过法】装xAntiAntiDebug插件，hook NtQueryInformationProcess\n【Themida】ScyllaHide插件全选，再patch GetTickCount时间差检测\n【ptrace(macOS/Linux)】Frida: Process.setExceptionHandler()吞SIGTRAP\n\n必装插件：ScyllaHide/xAntiAntiDebug/TitanHide\n\n给出针对${arg}的具体bypass步骤`,
+  get_full_chain: (arg) => `你是顶级逆向工程师，制定完整攻击链：
+目标：${arg}
+
+【第一阶段-情报】目标类型/保护机制/最短路径
+【第二阶段-突破】切入方式选择/反调试绕过/定位核心函数
+【第三阶段-分析】还原算法/提取key/验证结果
+【第四阶段-武器化】自动化工具/持久化/完整性验证
+
+【VMP 3.x完整绕过链（看雪实战）】
+1. 检测：区段名.vmp0/.vmp1，入口代码跳密集字节区
+2. 不脱壳路线（推荐）：ScyllaHide全选 → OEP处dump → Scylla修复IAT
+3. VMP对TitanHide检测：VMP会扫TitanHide驱动特征，换用xAntiAntiDebug或自签名驱动
+4. handler序列还原：
+   - 用x64dbg+Frida trace记录完整执行流
+   - 污染vpc/vsp/vkey/vbase四个专属寄存器
+   - 保留有意义指令，过滤混淆间接跳转
+   - opcode映射：VMP3.9常见 ADD/STR/LOAD/CMP/LSL/ORR等指令
+
+【ttEncrypt/字节码VM还原（看雪实战）】
+1. hook RegisterNatives找jni绑定地址: frida追libEncryptor.so!0x7d88
+2. VM特征：0x520大栈空间，参数5传sp+0x510为VM内存，sub_2D28为解释器
+3. 字节码解析：4字节/指令，低6位=opcode，建立opcode→操作映射表
+4. 专属寄存器：X21=虚拟PC，X21+i*8+8=虚拟寄存器Xi (i=0~31)
+5. Python还原：读字节码块→按opcode表还原→输出等价C代码
+
+【Inline Hook/IAT Hook完整代码（Windows x64）】
+\`\`\`cpp
+// Inline Hook x64（14字节绝对跳转）
+BYTE jmp_code[14];
+jmp_code[0]=0x48; jmp_code[1]=0xB8;  // mov rax, imm64
+*(ULONG_PTR*)(jmp_code+2) = (ULONG_PTR)hook_func;
+jmp_code[10]=0xFF; jmp_code[11]=0xE0; // jmp rax
+VirtualProtect(target, 14, PAGE_EXECUTE_READWRITE, &old);
+memcpy(target, jmp_code, 14);
+// 跳板：复制原始14字节 + jmp back
+\`\`\`
+
+\`\`\`javascript
+// Frida完整监控（进程创建/内存分配/API调用）
+var apis = ['CreateProcessA','VirtualAlloc','VirtualProtect','WriteProcessMemory'];
+apis.forEach(api => {
+  Interceptor.attach(Module.findExportByName("kernel32.dll", api), {
+    onEnter(args){ console.log("[*]"+api+" called"); }
+  });
+});
+\`\`\`
+
+工具箱：
+- Windows: x64dbg+ScyllaHide+xAntiAntiDebug/IDA/Ghidra/dnSpy
+- Android: jadx/apktool/Frida/objection/unidbg
+- iOS: Hopper/Frida/class-dump/Filza
+- JS: Chrome DevTools/babel/jsnice/de4js/webcrack
+- VM还原: Triton/miasm/Frida-trace+自写分析脚本
+- 流量: Wireshark/Burp/mitmproxy/r0capture
+- PWN: pwntools/ROPgadget/one_gadget/pwndbg
+
+给出针对${arg}的完整攻击链，每步含具体命令/代码`,
+
+  bypass_antidebug: (arg) => `你是反反调试专家：
+目标：${arg}
+
+【基础反调试绕过】
+- NtGlobalFlag: PEB+0x68值0x70=被调试，写0绕过
+- IsDebuggerPresent: patch，xor eax,eax; ret
+- CheckRemoteDebuggerPresent: hook返回FALSE
+- NtQueryInformationProcess(ProcessDebugPort): hook返回0
+- GetTickCount时间差: Frida hook返回固定值
+- OutputDebugString: 无害，忽略
+
+【VMP反调试绕过（看雪实战）】
+VMP 3.x会主动检测TitanHide驱动特征（扫描驱动列表、检查特定IOCTL）
+方案：
+1. xAntiAntiDebug插件（最简单）：内置VMP绕过规则
+2. 自签名驱动版TitanHide：改驱动设备名规避检测
+3. ScyllaHide + 关闭TitanHide，只用ScyllaHide自带反反调试
+
+【VT-EPT无痕断点（看雪实战）】
+原理：基于VT EPT设置执行权限，CPU无痕断点，任何调试检测无感
+效果：软断点(0xCC)/硬件断点被检测时改用EPT断点，完全隐藏
+
+【ptrace(macOS/Linux/Android)】
+\`\`\`javascript
+Interceptor.attach(Module.findExportByName(null,"ptrace"),{
+    onEnter(args){if(args[0].toInt32()===31)args[0]=ptr(0)}
+});
+\`\`\`
+
+【Themida全套bypass】
+ScyllaHide插件全选 + .mackt区段识别 + TLS回调断点(bp TlsCallback)
+
+必装工具：ScyllaHide / xAntiAntiDebug / TitanHide(改名版) / x64dbg-VT-EPT插件
+
+给出针对${arg}的具体bypass步骤`
 
   dump_vm: (arg) => `你是壳分析专家：\n目标：${arg}\n\n【VMP不脱壳绕过】找VM处理完后的干净执行时机，OEP处dump\n【Loader注入法】WinMain后VM已解密，Scylla修复IAT\n【Themida不脱壳】等完全加载后，Cheat Engine找解密区，硬件执行断点\n【DSVM还原】找解释器大switch，记录每个opcode操作，写反汇编器\n\n给出针对${arg}的具体步骤`,
 
