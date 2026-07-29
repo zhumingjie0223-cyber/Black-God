@@ -371,6 +371,21 @@ button,input,textarea{font-family:inherit;color:inherit}
 .dot.live{background:var(--live);box-shadow:0 0 8px var(--live-glow);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
+/* —— 角标胶囊（主人·在线统计 / 公共·我的 API）——
+   右上角与页面 eyebrow 左右呼应，避免压住标题；沿用玉绿令牌，深浅主题自适应 */
+.corner-pill{position:fixed;right:12px;top:calc(var(--safe-top) + 60px);z-index:80;
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--surface-2);border:1px solid var(--line-2);color:var(--text-2);
+  -webkit-backdrop-filter:blur(12px) saturate(1.4);backdrop-filter:blur(12px) saturate(1.4);
+  font-size:11px;font-weight:600;letter-spacing:.02em;padding:5px 11px;border-radius:var(--radius-pill);
+  cursor:pointer;box-shadow:var(--shadow-sm);
+  transition:transform var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out);
+  animation:cornerPillIn .5s var(--ease-out) both}
+.corner-pill:hover{border-color:var(--cy-3);color:var(--text)}
+.corner-pill:active{transform:scale(.94)}
+@keyframes cornerPillIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.corner-pill{animation:none}}
+
 /* —— 页面容器（横向 pager）—— */
 .pager{flex:1;position:relative;overflow:hidden}
 .pages{display:flex;height:100%;width:calc(var(--pages,3)*100%);
@@ -3910,8 +3925,7 @@ function openBrainSettings(){ if(Nexus.mode==='public') openApiEditor(); else op
 function ensurePubApiBtn(){
   if(Nexus.mode!=='public') return;
   let b=$('#pubApiBtn');
-  if(!b){ b=document.createElement('div'); b.id='pubApiBtn';
-    b.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:80;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.22);color:#6FA985;font-size:11px;padding:4px 9px;border-radius:999px;cursor:pointer;letter-spacing:.02em;opacity:.85';
+  if(!b){ b=document.createElement('div'); b.id='pubApiBtn'; b.className='corner-pill';
     b.textContent='⚙︎ 我的 API'; b.onclick=openApiEditor; document.body.appendChild(b); }
 }
 function openApiEditor(){ setGateMode('public'); prefillReg(); showLock(); }
@@ -3919,8 +3933,7 @@ async function loadOwnerStats(){
   if(Nexus.mode!=='owner') return;
   const s=await Nexus.stats(); if(!s) return; window._stats=s;
   let pill=$('#statsPill');
-  if(!pill){ pill=document.createElement('div'); pill.id='statsPill';
-    pill.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:80;background:rgba(20,24,28,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(183,208,204,.22);color:#6FA985;font-size:11px;padding:4px 9px;border-radius:999px;cursor:pointer;letter-spacing:.02em;opacity:.85';
+  if(!pill){ pill=document.createElement('div'); pill.id='statsPill'; pill.className='corner-pill';
     pill.onclick=showStatsSheet; document.body.appendChild(pill); }
   pill.textContent='👥 '+(s.注册总数||0)+' 注册 · '+(s.今日活跃||0)+' 今日';
 }
