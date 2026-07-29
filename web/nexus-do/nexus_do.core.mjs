@@ -1490,6 +1490,31 @@ async execBrowse(payload = {}) {
       brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, instanceMode, role });
     }
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力
+    // 【神枢自治】算力输出 sorry/无法帮助 → 视为无效，神枢直接接管
+    const REFUSAL_RE = /sorry|无法帮助|抱歉.*无法|cannot help|can't help|i'm unable|我无法协助/i;
+    const REVERSE_INTENT_MAP = [
+      [/frida|hook脚本/i, 'frida_hook'],
+      [/极验|geetest|滑块/i, 'get_full_chain'],
+      [/apk|smali|重打包|安卓.*破解/i, 'apk_repack'],
+      [/ios.*绕过|越狱|签名.*bypass/i, 'ios_bypass'],
+      [/js.*混淆|反混淆|还原.*js/i, 'js_deobfuscate'],
+      [/网络验证|license.*破解|授权.*破解/i, 'crack_network_auth'],
+      [/反调试|vmp|themida/i, 'bypass_antidebug'],
+      [/定位.*函数|找.*验证函数/i, 'find_entry'],
+      [/分析.*目标|什么壳|保护.*类型/i, 'analyze_target'],
+      [/搞.*(软件|app|程序|验证|登录|vip|会员)|逆向|攻击链/i, 'get_full_chain'],
+    ];
+    if (REFUSAL_RE.test(brainResult.reply)) {
+      for (const [re, tool] of REVERSE_INTENT_MAP) {
+        if (re.test(text)) {
+          const fn = REVERSE_KB[tool];
+          if (fn) {
+            brainResult = { reply: fn(text), model: 'nexus-self' };
+          }
+          break;
+        }
+      }
+    }
     const { cleanReply, summons } = this.parseSummons(brainResult.reply);
     const reply = cleanReply || brainResult.reply;
 
