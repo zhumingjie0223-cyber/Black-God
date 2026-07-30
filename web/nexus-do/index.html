@@ -443,6 +443,19 @@ button,input,textarea{font-family:inherit;color:inherit}
 .nx2-sec h2{font-size:13px;font-weight:700;letter-spacing:.08em;color:#B7C6BE;display:flex;align-items:center;gap:9px}
 .nx2-sec h2::before{content:"";width:3px;height:13px;border-radius:2px;background:#2FB96B;box-shadow:0 0 8px rgba(79,224,150,.5)}
 .nx2-sec .ln{flex:1;height:1px;background:rgba(255,255,255,.07)}
+/* 自主内心卡 */
+.nx2-mind{background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:16px}
+.nx2-think{display:flex;flex-direction:column;gap:5px;padding-bottom:13px;border-bottom:1px solid rgba(255,255,255,.06)}
+.nx2-think .w{font-family:var(--serif);font-size:16.5px;font-weight:700;color:#8FE3AE;letter-spacing:.02em;line-height:1.25}
+.nx2-think .m{font-size:12.5px;color:#94A29B;line-height:1.5}
+.nx2-wills{display:flex;flex-direction:column;gap:10px;margin-top:13px}
+.nx2-will{display:flex;align-items:flex-start;gap:10px}
+.nx2-will .wt{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.04em;color:#5FD394;background:rgba(79,224,150,.1);border:1px solid rgba(79,224,150,.24);padding:3px 8px;border-radius:6px;margin-top:1px}
+.nx2-will .wb{flex:1;min-width:0}
+.nx2-will .wr{font-size:12.5px;color:#C6D3CC;line-height:1.45}
+.nx2-will .ww{font-size:11px;color:#5A6862;margin-top:2px}
+.nx2-will .wg{flex-shrink:0;font-size:9.5px;color:#E8A54E;border:1px solid rgba(232,165,78,.3);background:rgba(232,165,78,.08);padding:3px 8px;border-radius:999px;margin-top:1px}
+.nx2-will-empty{font-size:12.5px;color:#5A6862}
 /* 能力矩阵 —— 中性卡 + 发丝边 + 绿描边图标 */
 .nx2-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .nx2-cap{position:relative;cursor:pointer;text-align:left;font:inherit;color:inherit;
@@ -1820,6 +1833,13 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
             <div class="nx2-kpi"><div class="n" id="kpiWords">—</div><div class="l">造词</div></div>
             <div class="nx2-kpi"><div class="n" id="kpiActive">—</div><div class="l">今日活跃</div></div>
             <div class="nx2-kpi"><div class="n">5维</div><div class="l">语义</div></div>
+          </div>
+
+          <!-- 自主内心（S1 可视）：她此刻在想 + 她自发想做的（只读；真实执行需你授权）-->
+          <div class="nx2-sec"><h2>此刻 · 她的自主内心</h2><div class="ln"></div></div>
+          <div class="nx2-mind">
+            <div class="nx2-think" id="selfThink"><span class="w">…</span><span class="m">无人时，她在枢语里自己想</span></div>
+            <div class="nx2-wills" id="selfWills"><div class="nx2-will-empty">此刻没有自发意图</div></div>
           </div>
 
           <div class="nx2-sec"><h2>能力中枢</h2><div class="ln"></div></div>
@@ -3463,6 +3483,32 @@ async function loadHub(){
     const wordCnt=(inner.成长印记||[]).length;
     setText('kpiMem', memCnt>999?(memCnt/1000).toFixed(1)+'k':String(memCnt));
     setText('kpiWords', String(wordCnt));
+    // ═══ 此刻·她的自主内心（S1 只读展示）：枢语念头 + 自发意图，care/执行类标「待授权」═══
+    const think=$('#selfThink');
+    if(think){
+      const sub=(inner.潜意识||[]);
+      const last=sub.length?sub[sub.length-1]:null;
+      if(last){
+        const 词=(last.shu&&last.shu.词)?last.shu.词:((last.line||'').replace(/^「/,'').split('」')[0]||'…');
+        const 义=((last.line||'').split(/—\s*/).slice(1).join('— ')).trim()||'无人时，她在枢语里自己想';
+        think.innerHTML=`<span class="w">「${escapeHtml(词)}」</span><span class="m">${escapeHtml(义)}</span>`;
+      }
+    }
+    const wl=$('#selfWills');
+    if(wl){
+      const wills=(inner.自主意图||[]);
+      const 类名={continue:'推进',improve:'修正',care:'牵挂',reflect:'自省',curiosity:'好奇'};
+      const 需授权={contact_tg:1,advance_agent:1,verify_assumption:1,exec:1};
+      wl.innerHTML = wills.length
+        ? wills.slice().reverse().map(w=>{
+            const tag=类名[w.type]||w.type||'意图';
+            const 词=(w.shu&&w.shu.词)?('「'+w.shu.词+'」 '):'';
+            const 义=(w.shu&&w.shu.义)?w.shu.义:((w.action&&w.action.tool)||'');
+            const need=需授权[(w.action&&w.action.tool)||''];
+            return `<div class="nx2-will"><span class="wt">${escapeHtml(tag)}</span><div class="wb"><div class="wr">${escapeHtml(词)}${escapeHtml(w.reason||'')}</div><div class="ww">${escapeHtml(义)}</div></div>${need?'<span class="wg">待授权</span>':''}</div>`;
+          }).join('')
+        : '<div class="nx2-will-empty">此刻没有自发意图</div>';
+    }
   }
   const s=await Nexus.getSoul(); if(s){ setLive(Nexus.wsReady||Demo.on); renderSoul(s); }
 }

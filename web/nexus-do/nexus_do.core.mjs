@@ -1220,6 +1220,7 @@ async execBrowse(payload = {}) {
       事实: (soul.facts || []).slice(-20),
       认知: (() => { const m = soul.user_model || {}; const top = (o, n) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]); return { 常聊: top(m.topics, 3), 偏好: top(m.style, 1), 在意: top(m.entities, 3), 交互数: m.count || 0 }; })(),
       潜意识: (soul.subconscious || []).slice(-10),
+      自主意图: (soul.will || []).slice(-8),
       主动记录: (soul.proactive_log || []).slice(-10),
       成长印记: (soul.成长印记 || []).slice(-12),
       已习得技能: Object.values((soul.skills && soul.skills.技能) || {}).sort((a, b) => (b.last_ts || 0) - (a.last_ts || 0)).slice(0, 10).map(s => ({ 名: s.名, 方法: s.方法, 用过: s.count || 1, 来源: s.来源, 验证: !!s.验证 })),
