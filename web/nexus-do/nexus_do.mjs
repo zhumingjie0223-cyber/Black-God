@@ -155,6 +155,11 @@ export class ShenshuCore {
   async _fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname;
+    // 记住真实公网地址：供心跳时自愈注册 Telegram webhook 用（cron 内部请求 host 是 'internal'，跳过；仅在变化时落盘）
+    if (url.hostname && url.hostname !== 'internal' && this._pubOrigin !== url.origin) {
+      this._pubOrigin = url.origin;
+      this.storage.put('public_origin', url.origin).catch(() => {});
+    }
     // 影子实例首次访问：落盘标记，此后永不迁移主人 KV 数据（数据彻底隔离）
     if (request.headers.get('X-Nexus-Shadow') === '1' && !this.isShadow) {
       this.isShadow = true;
@@ -248,6 +253,9 @@ export class ShenshuCore {
     if (path === '/unregister' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.unregisterUser(b)); }
     if (path === '/probe-models' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.probeModelsPublic(b)); }
     if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
+    // Telegram 入站：主人在 TG 里回消息 → 喂进大脑 → 回话发回 TG。这是公开入口（Telegram 不带 OWNER_TOKEN），
+    // 故不进私密 API 门，改用「webhook 密钥 + 主人 chat_id」双闸自保：密钥不符或非主人本人，一律无视。
+    if (path === '/tg/webhook' && request.method === 'POST') return json(await this.handleTgWebhook(request));
 
     // —— 能力契约层（借鉴 Minis）——
     // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
@@ -261,7 +269,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/tg/setup']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -278,7 +286,7 @@ export class ShenshuCore {
           const dict = (await this.storage.get('词典')) || { 词条: {}, 总数: 0 };
           return json(this.searchLexicon(dict, url.searchParams.get('q') || '', Math.min(100, parseInt(url.searchParams.get('n') || '30', 10) || 30)));
         }
-        if (path === '/heartbeat') return json(await this.autonomousTick());
+        if (path === '/heartbeat') { const out = await this.autonomousTick(); await this.ensureTgHook(); return json(out); }
         if (path === '/reflect') return json(await this.dailyReflect());
         if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
@@ -300,6 +308,8 @@ export class ShenshuCore {
         if (path === '/checkpoint/restore' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.checkpointRestore(b.ts, url.searchParams.get('confirm') === '1' || b.confirm === 1)); }
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '神枢在此，一直在。', '/'); return json(r); }
+        // 一次性把 Telegram webhook 注册到本 Worker（主人操作）：把 /tg/webhook 告诉 Telegram，并带上校验密钥。
+        if (path === '/tg/setup' && request.method === 'POST') return json(await this.tgSetWebhook(new URL(request.url).origin));
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
         if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
@@ -9938,6 +9948,71 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       const d = await r.json();
       return { ok: !!d.ok, ts: Date.now() };
     } catch (e) { return { ok: false, reason: String(e).slice(0, 80) }; }
+  }
+
+  // ── Telegram 入站回调：接住主人在 TG 发来的消息，喂进大脑，把回话发回去 ──
+  // 安全双闸：① setWebhook 时设的 secret_token 会被 Telegram 每次回调带回 X-Telegram-Bot-Api-Secret-Token 头，
+  // 不符即丢弃；② 发信人 chat.id 必须等于主人推送目标 TG_QUAN_CHAT_ID，别人私聊机器人一律无视。
+  // 任何情况都回 200（避免 Telegram 反复重投）。危险动作仍走大脑内既有的 need_confirm/授权闸，本入口不放行执行。
+  async handleTgWebhook(request) {
+    const token = this.env.TG_BOT_TOKEN || '';
+    const secret = this.env.TG_WEBHOOK_SECRET || '';
+    // 没配 token 或密钥 → 拒收：绝不开一个无鉴权的公开入口通进主人大脑
+    if (!token || !secret) return { ok: false, reason: 'not_configured' };
+    if ((request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '') !== secret) return { ok: false };
+    const update = await request.json().catch(() => null);
+    if (!update) return { ok: true };
+    const msg = update.message || update.edited_message;
+    if (!msg || !msg.chat) return { ok: true };
+    // 只认主人本人
+    const ownerChat = String(this.env.TG_QUAN_CHAT_ID || '');
+    if (!ownerChat || String(msg.chat.id) !== ownerChat) return { ok: true };
+    // 幂等：Telegram 会重投，按 update_id 去重
+    const uid = update.update_id;
+    if (typeof uid === 'number') {
+      const last = (await this.storage.get('tg_last_update')) || 0;
+      if (uid <= last) return { ok: true, dup: true };
+      await this.storage.put('tg_last_update', uid);
+    }
+    const text = (msg.text || '').trim();
+    if (!text) { await this.sendToQuan('我这会儿只认得文字消息，你打字跟我说～'); return { ok: true }; }
+    // 喂进主人大脑（与 /talk 同一条路），把回话发回 Telegram（Telegram 单条上限 4096，留点余量截断）
+    let reply = '';
+    try { const r = await this.handleTalk(text, request, []); reply = (r && r.reply) || ''; }
+    catch (e) { reply = '我脑子刚卡了一下，再说一遍好吗？'; }
+    if (reply) await this.sendToQuan(reply.length > 3900 ? reply.slice(0, 3900) + '…' : reply);
+    return { ok: true };
+  }
+
+  // 自愈注册：心跳时若已配密钥且尚未把 webhook 注册到当前地址，就自动注册一次（成功后打标记跳过）。
+  // 这样主人只需在 Cloudflare 配好 TG_WEBHOOK_SECRET 并部署，之后无需手动操作，下一次心跳即自动接通入站。
+  async ensureTgHook() {
+    try {
+      if (!this.env.TG_BOT_TOKEN || !this.env.TG_WEBHOOK_SECRET) return;
+      const origin = this._pubOrigin || (await this.storage.get('public_origin'));
+      if (!origin) return;   // 还没见过真实公网访问，先不注册，等主人打开一次 app 记下地址后再自愈
+      const want = `${origin}/tg/webhook`;
+      if ((await this.storage.get('tg_hook_url')) === want) return;   // 已注册到当前地址，跳过
+      const r = await this.tgSetWebhook(origin);
+      if (r && r.ok) await this.storage.put('tg_hook_url', want);
+    } catch (e) {}
+  }
+
+  // 一次性注册 Telegram webhook 指向本 Worker 的 /tg/webhook，并带上校验密钥（主人 POST /tg/setup 触发）
+  async tgSetWebhook(origin) {
+    const token = this.env.TG_BOT_TOKEN || '';
+    const secret = this.env.TG_WEBHOOK_SECRET || '';
+    if (!token) return { ok: false, reason: 'no_bot_token（先在 Cloudflare 配 TG_BOT_TOKEN）' };
+    if (!secret) return { ok: false, reason: 'no_webhook_secret（先在 Cloudflare 配 TG_WEBHOOK_SECRET，再来注册）' };
+    const hookUrl = `${origin}/tg/webhook`;
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: hookUrl, secret_token: secret, allowed_updates: ['message', 'edited_message'] }),
+      });
+      const d = await r.json();
+      return { ok: !!d.ok, url: hookUrl, telegram: d };
+    } catch (e) { return { ok: false, reason: String(e).slice(0, 100) }; }
   }
 
   // ═══════════════════════ 注册 + 公共聊天（无数据库，存 DO storage）═══════════════════════
