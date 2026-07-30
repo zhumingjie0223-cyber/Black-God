@@ -372,9 +372,10 @@ button,input,textarea{font-family:inherit;color:inherit}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* —— 页面容器（横向 pager）—— */
-.pager{flex:1;position:relative;overflow:hidden}
+.pager{flex:1;position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pager::-webkit-scrollbar{display:none}
 .pages{display:flex;height:100%;width:calc(var(--pages,3)*100%);
-  transition:transform .42s var(--ease)}
+  transition:none}
 .pages.dragging{transition:none}
 .page{flex:0 0 calc(100%/var(--pages,3));height:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-bot) + 8px)}
@@ -2892,7 +2893,10 @@ const PAGES = 3;
 const STEP = 100 / PAGES;
 function go(i) {
   curPage = Math.max(0, Math.min(PAGES-1, i));
-  $('#pages').style.transform = `translateX(${-curPage * STEP}%)`;
+  // 使用像素 left，不依赖 transform 百分比；兼容 iOS WebKit 与缩放视口。
+  const pager = $('#pager');
+  // iOS WebKit 在部分缩放/嵌入视口会忽略带 smooth 的 scrollTo，直接赋值最可靠。
+  if (pager) pager.scrollLeft = curPage * pager.clientWidth;
   $$('.tab').forEach((t,idx) => t.classList.toggle('on', idx === curPage));
   if (curPage === 0) { loadHub(); loadInner(); }   // 神枢：环中盘 + 记忆 + 状态 同屏（折叠）
   hap(4);
@@ -2915,7 +2919,7 @@ function go(i) {
     // 边缘阻尼
     if ((curPage===0 && dx>0) || (curPage===PAGES-1 && dx<0)) dx *= 0.32;
     pages.classList.add('dragging');
-    pages.style.transform = `translateX(${-curPage*STEP + (dx/w)*STEP}%)`;
+    pager.scrollLeft = curPage * w - dx;
   }, {passive:true});
   pager.addEventListener('touchend', () => {
     if (locked==='x') {
