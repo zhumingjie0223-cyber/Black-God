@@ -897,7 +897,11 @@ class AgentHandler(BaseHTTPRequestHandler):
         # 静态文件
         web_root = ROOT.parent / "web"
         if path == "/" or path == "/index.html":
-            self._serve_file(web_root / "index.html", "text/html")
+            # 统一入口：nexus-do 完整版（与 aquan.lufei.uk 线上同源）
+            # 优先用 build 产物 index.built.html（含 frontier + ui-polish 注入）
+            built = web_root / "nexus-do" / "index.built.html"
+            src = web_root / "nexus-do" / "index.html"
+            self._serve_file(built if built.is_file() else src, "text/html")
         elif path == "/studio" or path == "/studio.html":
             self._serve_file(web_root / "nexus-do" / "studio.html", "text/html")
         elif path in ("/manifest.json", "/theme.css", "/sw.js", "/push-client.js") or \

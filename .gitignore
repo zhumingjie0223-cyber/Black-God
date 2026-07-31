@@ -72,3 +72,6 @@ web/nexus-do/node_modules/
 web/nexus-do/package-lock.json
 
 .learnings/
+
+# build 产物（本地 server 托管用）
+web/nexus-do/index.built.html
