@@ -212,6 +212,10 @@
 }
 html,body{
   height:100%;
+  height:100dvh;   /* iOS Safari 修复:100% 会把被地址栏/底部工具栏遮挡的区域也算进去,
+                      导致底部输入框(dock)与导航栏被顶出可视区、"找不到对话框"。
+                      dvh=动态视口高度,始终等于当前真实可视高度,底栏永远可见。
+                      老浏览器不识别 dvh 时自动回退上一行的 100%。 */
   background:var(--bg);
   color:var(--text);
   overscroll-behavior:none;
@@ -402,7 +406,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   box-shadow:0 8px 26px rgba(61,220,132,.35),inset 0 1px 0 rgba(255,255,255,.7);animation:orbBreath 4.6s ease-in-out infinite}
 .wc-mark span{font-family:var(--serif);font-size:27px;font-weight:800;line-height:1;color:#0F3D2E}
 .wc-greet{font-size:27px;font-weight:600;letter-spacing:.01em;color:var(--text)}
-.wc-sub{font-size:14px;color:var(--text-3);margin-top:9px;letter-spacing:.02em}
+.wc-sub{font-size:15px;color:var(--text-3);margin-top:9px;letter-spacing:.02em}
 .wc-suggest{display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px;margin-top:34px}
 .wc-item{
   display:flex;
@@ -416,7 +420,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   border:1px solid var(--line);
   border-radius:14px;
   color:var(--text);
-  font-size:14.5px;
+  font-size:15.5px;
   font-weight:500;
   letter-spacing:.01em;
   transition:transform var(--dur-fast) var(--ease-out),
@@ -449,7 +453,7 @@ button,input,textarea{font-family:inherit;color:inherit}
 .msg.me{align-self:flex-end;align-items:flex-end;animation-name:leafInMe}
 .msg.her{align-self:flex-start;align-items:flex-start}
 @media (prefers-reduced-motion:reduce){.msg{animation-duration:.2s}}
-.bubble{padding:11px 15px;border-radius:19px;font-size:15.5px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
+.bubble{padding:12px 15px;border-radius:19px;font-size:16.5px;line-height:1.6;word-break:break-word;white-space:pre-wrap}
 .msg.me .bubble{background:var(--cy-grad);color:#08120F;font-weight:520;border-bottom-right-radius:6px;
   box-shadow:0 4px 18px var(--cy-glow)}
 .msg.her .bubble{background:var(--surface-2);border:1px solid var(--line);border-bottom-left-radius:6px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 6px 20px rgba(0,0,0,.22)}
@@ -504,7 +508,8 @@ button,input,textarea{font-family:inherit;color:inherit}
 .dock.plus-open .plus-btn{transform:rotate(135deg);background:var(--cy-grad);color:#0A2E1E;border-color:transparent}
 .in-box{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:22px;transition:.25s var(--spring);padding:9px 15px}
 .in-box:focus-within{border-color:var(--cy-3);box-shadow:0 0 0 3px var(--cy-glow)}
-textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;font-size:15.5px;max-height:130px;line-height:1.45}
+textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;font-size:16.5px;max-height:130px;line-height:1.45}
+/* 注:输入框字号必须 >=16px——iOS Safari 对 <16px 的输入框在聚焦时会自动放大整页,造成跳动 */
 .send{
   width:42px;
   height:42px;
@@ -851,8 +856,8 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:var(--surface-2);border:1px solid var(--line)}
 .set-ic svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .set-tx{flex:1;min-width:0}
-.set-tx b{display:block;font-size:14.5px;font-weight:600}
-.set-tx span{display:block;font-size:12px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.set-tx b{display:block;font-size:15.5px;font-weight:600}
+.set-tx span{display:block;font-size:12.5px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .set-arrow{color:var(--text-3);font-size:18px;flex-shrink:0}
 .switch{width:46px;height:28px;border-radius:999px;background:var(--surface-3);position:relative;flex-shrink:0;transition:.25s var(--ease);cursor:pointer}
 .switch.on{background:var(--cy-3)}
