@@ -32,9 +32,13 @@ let failed = false;
   // 与 build.mjs 完全同规则重建"预期嵌入页面":index.html + nexus-frontier.css 注入 </body> 前。
   // 之前直接拿原始 index.html 比对,永远对不上,检查形同虚设——必须复刻构建时的变换。
   const frontierPath = path.join(ROOT, 'web/nexus-do/nexus-frontier.css');
-  const html = existsSync(frontierPath)
-    ? sourceHtml.replace('</body>', () => `<style id="nx-frontier-style">\n${readFileSync(frontierPath, 'utf8')}\n</style>\n</body>`)
-    : sourceHtml;
+  const polishPath = path.join(ROOT, 'web/nexus-do/ui-polish.css');
+  const frontier = existsSync(frontierPath) ? readFileSync(frontierPath, 'utf8') : '';
+  const polish = existsSync(polishPath) ? readFileSync(polishPath, 'utf8') : '';
+  const html = sourceHtml.replace(
+    '</body>',
+    () => `${frontier ? `<style id="nx-frontier-style">\n${frontier}\n</style>\n` : ''}${polish ? `<style id="nx-polish-style">\n${polish}\n</style>\n` : ''}</body>`,
+  );
   if (built.includes(JSON.stringify(html))) {
     console.log(`✓ [主界面] nexus_do.mjs 内嵌页面与 index.html 一致 (${html.length} 字节)`);
   } else {
