@@ -10380,22 +10380,6 @@ self.addEventListener('fetch', e => {
   })());
 });
 `;
-  if (url.pathname === '/' ) {
-    // 网络优先，失败回缓存壳
-    e.respondWith((async () => {
-      try { const r = await fetch(req); const c = await caches.open(CACHE); c.put('/', r.clone()); return r; }
-      catch (err) { const cached = await caches.match('/'); return cached || new Response('离线中…她还在。', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }); }
-    })());
-    return;
-  }
-  e.respondWith((async () => {
-    const cached = await caches.match(req);
-    if (cached) return cached;
-    try { const r = await fetch(req); if (r.ok) { const c = await caches.open(CACHE); c.put(req, r.clone()); } return r; }
-    catch (err) { return cached || Response.error(); }
-  })());
-});
-`;
 
 // ═══════════════════════ Worker 入口 ═══════════════════════
 export default {
