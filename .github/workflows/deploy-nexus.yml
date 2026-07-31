@@ -64,7 +64,7 @@ jobs:
         run: echo "$TAVILY_KEY" | npx wrangler secret put TAVILY_KEY
 
       - name: Inject TG secrets
-        if: ${{ env.CF_TOKEN != '' && secrets.TG_BOT_TOKEN != '' }}
+        if: ${{ env.CF_TOKEN != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 142c76e0039e279886c89257b6fddbc7
