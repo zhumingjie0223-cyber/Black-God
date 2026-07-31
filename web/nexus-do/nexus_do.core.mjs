@@ -8208,7 +8208,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
   async runAgentLoop(baseSystem, text, soul, opts = {}) {
     const _cfg = (await this.storage.get('config')) || {};
-    const hasExec = !!(_cfg.exec_url || this.env.NEXUS_EXEC_URL);
+    const hasExec = true; // 原生沙箱始终可用，不依赖外部连接器
     const TOOL_SPEC = `
 
 【你能自主调用的工具（作答前可多轮使用，最多 5 轮）】
@@ -8217,7 +8217,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 - 出图（叫内置模型画）：⟨工具:draw｜画面描述⟩（画好我自动附在你回复里，你别描述过程、别贴链接）
 - 出声（叫内置模型念）：⟨工具:speak｜要念的文字⟩（念好我自动附上，你别描述过程）
 - 下载/抓取文件正文：⟨工具:download｜https://完整网址⟩${hasExec ? `
-- 在主人服务器上真跑命令/代码：⟨工具:exec｜shell 命令⟩（真执行，谨慎用；只服务主人）
+- 在沙箱里直接跑命令/代码：⟨工具:exec｜shell命令或JS⟩（原生沙箱，无需连接器；curl/echo/ls/cat可用；JS前缀js:）
 - 操作主人的 iPhone（真调 iOS 硬件，经沙箱执行脑）：⟨工具:apple｜工具名 子命令 参数⟩
   可用工具名与用法（全部输出 JSON）：
   · alarm set --time 07:30 --label 起床｜alarm timer --duration 5m｜alarm list  —— 闹钟/计时器
@@ -8276,7 +8276,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         else if (c.tool === 'draw') { const r = await this.genImage(c.arg).catch(() => null); if (r && (r.image || r.imageUrl)) { const u = r.imageUrl || r.image; out = `[已出图｜${c.arg}]`; mediaAll.push({ kind: 'image', url: u }); } else out = '出图失败：' + ((r && r.error) || '未知'); }
         else if (c.tool === 'speak') { const r = await this.genVoice(c.arg).catch(() => null); if (r && (r.audio || r.audioUrl)) { const u = r.audioUrl || r.audio; out = `[已出声]`; mediaAll.push({ kind: 'audio', url: u }); } else out = '出声失败：' + ((r && r.error) || '未知'); }
         else if (c.tool === 'download') { const t = await this.fetchUrl(c.arg).catch(() => ''); out = t ? `[已下载并提取正文｜${c.arg}]\n${t}` : '下载失败：无法读取该地址'; }
-        else if (c.tool === 'exec') { const e = await this.execRemote(c.arg).catch(() => null); out = e ? (e.ok ? `[退出码 ${e.code}]\n${e.stdout || ''}${e.stderr ? '\n[stderr]\n' + e.stderr : ''}` : ('执行脑：' + (e.note || e.error || '失败'))) : '执行脑无响应'; }
+        else if (c.tool === 'exec') {
+          const arg = String(c.arg || '');
+          const isJs = arg.startsWith('js:');
+          const e = isJs
+            ? await this.nativeSandbox(arg.slice(3).trim(), 'js').catch(() => null)
+            : await this.execRemote(arg).catch(() => null);
+          out = e ? (e.ok ? `[沙箱·${e.via||'exec'}]\n${e.stdout||''}${e.result?'\n→ '+e.result:''}${e.stderr?'\n⚠ '+e.stderr:''}` : ('沙箱：' + (e.note || e.stderr || e.error || '失败'))) : '沙箱无响应';
+        }
         else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
         else if (c.tool === 'hijack') { const h = await this.handleHijack(c.arg).catch(() => null); out = h ? `[劫持脚本·${h.type}｜${h.desc}]\n\`\`\`javascript\n${h.script}\n\`\`\`` : '劫持工具无响应'; }
         else if (c.tool === 'redteam') { const r = await this.handleRedTeam(c.arg).catch(() => null); out = r ? (r.ok ? `[红队·${r.desc}]\n\`\`\`\n${r.script}\n\`\`\`` : ('红队工具：' + (r.note || '失败'))) : '红队工具无响应'; }

@@ -502,6 +502,44 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
   ok('自愈路由·近期连败脑降到最后', ranked[ranked.length - 1].url === 'https://bad/v1');
   ok('自愈路由·健康脑排前', ranked[0].url === 'https://good/v1');
   ok('自愈路由·久远失败(过5分钟)给复活机会,不降级', ranked.findIndex(b => b.url === 'https://old/v1') < ranked.findIndex(b => b.url === 'https://bad/v1'));
+
+// ── nativeSandbox 原生沙箱单测 ──
+{
+  const T = Object.create(ShenshuCore.prototype);
+  T.env = {};
+  T.storage = { get: async()=>null, put: async()=>null, list: async()=>({keys:[]}) };
+
+  // js · return 值
+  const r1 = await T.nativeSandbox("return 'hello'", 'js');
+  ok('沙箱·JS return值', r1.ok === true && r1.result === 'hello');
+
+  // js · ctx.log 写 stdout
+  const r2 = await T.nativeSandbox("ctx.log('world'); return 1", 'js');
+  ok('沙箱·JS ctx.log stdout', r2.ok === true && r2.stdout.includes('world'));
+
+  // js · 超时
+  const r3 = await T.nativeSandbox("await new Promise(r=>setTimeout(r,15000))", 'js');
+  ok('沙箱·JS 超时10s返回 ok=false', r3.ok === false && /超时/.test(r3.stderr));
+
+  // js · 语法错误
+  const r4 = await T.nativeSandbox("((( invalid syntax", 'js');
+  ok('沙箱·JS 语法错误 ok=false', r4.ok === false);
+
+  // shell · echo
+  const r5 = await T.nativeSandbox("echo hello world", 'shell');
+  ok('沙箱·Shell echo', r5.stdout.includes('hello world'));
+
+  // shell · 不支持命令 → stderr unsupported
+  const r6 = await T.nativeSandbox("notacommand foo", 'shell');
+  ok('沙箱·Shell 未知命令→stderr unsupported', r6.stderr.includes('unsupported'));
+
+  // shell · ls → 走 storage.list
+  const r7 = await T.nativeSandbox("ls", 'shell');
+  ok('沙箱·Shell ls 调 storage.list', r7.via === 'native-sandbox-shell');
+
+  // via 字段
+  ok('沙箱·JS via 字段', r1.via === 'native-sandbox-js');
+}
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
