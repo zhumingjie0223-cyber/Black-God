@@ -75,3 +75,7 @@ web/nexus-do/package-lock.json
 
 # build 产物（本地 server 托管用）
 web/nexus-do/index.built.html
+
+# build artifacts
+.buildstamp
+index.built.html
