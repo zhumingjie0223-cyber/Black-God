@@ -1661,6 +1661,18 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 .claim{border-bottom:1px dashed var(--cy-2);cursor:help}
 .claim sup{color:var(--cy-1);font-size:10px;margin-left:2px}
 .claim:hover{background:hsl(var(--hue) 80% 50%/.12)}
+/* ── 响应式断点 ── */
+@media(min-width:768px){
+  #pages{max-width:900px;margin:0 auto}
+  .bubble{max-width:600px}
+  .input-bar{max-width:860px;margin:0 auto}
+  .tab-bar{max-width:900px;margin:0 auto}
+}
+@media(min-width:1200px){
+  .bubble{max-width:720px}
+  .page.page-chat{display:flex;flex-direction:column;align-items:center}
+  #msgs{width:100%;max-width:860px}
+}
 </style>
 </head>
 <body>
@@ -1790,7 +1802,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
               <button class="wc-item" onclick="quick('用枢语报一下你此刻的运行状态')"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg><span>报告运行状态</span><i>›</i></button>
             </div>
           </div>
-          <div class="msgs" id="msgs" style="display:none"></div>
+          <div class="msgs" id="msgs" style="display:none" aria-live="polite" aria-atomic="false" role="log"></div>
         </div>
         <div class="dock">
           <!-- ＋ 功能面板：所有功能收纳于此，点＋平滑滑出（表面永远只 3 键）-->
@@ -1847,6 +1859,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
+<div class="set-row" onclick="loadConsciousness();openSheet('sheetConsciousness')"><div class="set-ic">◎</div><div class="set-tx"><b>意识体状态</b><span id="consLabel" style="font-size:11px;color:var(--txt-3);display:block">内心·枢语·经验</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" id="installRow" onclick="triggerInstall()" style="display:none"><div class="set-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13M8 12l4 4 4-4M5 20h14"/></svg></div><div class="set-tx"><b>安装到主屏幕</b><span>像 App 一样使用</span></div><div class="set-arrow">›</div></div>
         </div>
@@ -2115,6 +2128,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">记住此设备</button>
 </div>
 
+<div class="sheet" id="sheetConsciousness"><div class="sheet-handle"></div><div class="sheet-title">意识体状态</div><div class="sheet-sub">实时认知快照</div><div id="consBody" style="padding:0 4px;font-size:13px;line-height:2;color:var(--txt-2)">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetAbout">
   <div class="grab"></div>
   <div class="sheet-title">关于 Black God</div>
@@ -2630,10 +2644,16 @@ window.toggleCmdPanel = window.toggleCmdPanel || function() {
   }
 };
 
-// Esc全局关闭命令面板
+// 全局键盘快捷键
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') window.toggleCmdPanel?.();
-  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); window.toggleCmdPanel?.(); }
+  const mod = e.metaKey || e.ctrlKey;
+  if (e.key === 'Escape') { window.toggleCmdPanel?.(); closeSheet?.(); const si=$('#searchInput'); if(si){si.value='';si.dispatchEvent(new Event('input'));} }
+  if (mod && e.key === 'k') { e.preventDefault(); window.toggleCmdPanel?.(); }
+  if (mod && e.key === 'Enter') { e.preventDefault(); document.getElementById('sendBtn')?.click(); }
+  if (mod && e.key === '1') { e.preventDefault(); go(0); }
+  if (mod && e.key === '2') { e.preventDefault(); go(1); }
+  if (mod && e.key === '3') { e.preventDefault(); go(2); }
+  if (mod && e.key === '/') { e.preventDefault(); if(typeof toast==='function') toast('⌘K 命令面板 · ⌘Enter 发送 · ⌘1/2/3 切页 · Esc 关闭','info',3000); }
 });
 
 
@@ -3880,8 +3900,27 @@ function closeCmd(){ $('#cmdMask').classList.remove('show'); $('#cmdPalette').cl
 function renderSkills(q){ const list=SKILLS.filter(s=>!q||s.t.includes(q)||s.s.includes(q));
   $('#cmdList').innerHTML=list.map((s,i)=>`<div class="cmd-item" onclick="SKILLS[${SKILLS.indexOf(s)}].run()"><div class="cmd-ic">${s.ic}</div><div class="cmd-tx"><b>${s.t}</b><span>${s.s}</span></div></div>`).join(''); }
 function cmdInputHandler(e){ const v=e.target.value.trim();
-  if(e.key==='Enter'&&v){ closeCmd(); go(1); $('#inp').value=v; autogrow($('#inp')); send(); return; }
-  renderSkills(v); }
+  if(e.key==='Enter'&&v){
+    if(v.startsWith('/')){
+      // 消息搜索模式
+      const q=v.slice(1).trim().toLowerCase();
+      closeCmd();
+      if(q){ const bubbles=[...document.querySelectorAll('.bubble')]; const hit=bubbles.find(b=>b.textContent.toLowerCase().includes(q)); if(hit){hit.scrollIntoView({behavior:'smooth',block:'center'});hit.style.outline='2px solid var(--cy-2)';setTimeout(()=>hit.style.outline='',1500);} }
+      return;
+    }
+    closeCmd(); go(1); $('#inp').value=v; autogrow($('#inp')); send(); return;
+  }
+  if(v.startsWith('/')){
+    // 实时搜索高亮
+    const q=v.slice(1).trim().toLowerCase();
+    document.querySelectorAll('.bubble').forEach(b=>{
+      b.style.outline = (q && b.textContent.toLowerCase().includes(q)) ? '1px solid var(--cy-3)' : '';
+    });
+  } else {
+    document.querySelectorAll('.bubble').forEach(b=>b.style.outline='');
+    renderSkills(v);
+  }
+}
 function cmdToChat(m,cap){ closeCmd(); go(1); setModeByName(m); if(cap){ const chip=document.querySelector(`.pp-tile[data-cap="${cap}"]`); if(chip&&!chip.classList.contains('on')) toggleCap(chip); } $('#inp').focus(); }
 
 /* ============ 记忆图谱（可视化）============ */
@@ -5663,7 +5702,12 @@ function handleReply(res) {
     return;
   }
   const reply = res.reply || '…在呢。';
-  const meta = res.model ? ('· ' + res.model) : '';
+  let meta = res.model ? ('· ' + res.model) : '';
+  if (res.usage) {
+    const u = res.usage;
+    const cr = u.cache_read_input_tokens || 0;
+    meta += ` · 🔢${u.input_tokens||0}→${u.output_tokens||0}${cr?` 💾${cr}`:''}`;
+  }
   const el = pushMsg('her', reply, meta, false);
   const bubble = el && el.querySelector('.bubble');
   if (bubble) typeInto(bubble, reply);
@@ -5798,6 +5842,16 @@ window.addEventListener('unhandledrejection', e => {
   console.error('[BOUNDARY:promise]', reason);
   if (typeof toast === 'function') toast('异步错误：' + reason.slice(0,60), 'error', 3000);
 });
+async function loadConsciousness(){
+  try{
+    const r=await Nexus.req('/stats');
+    if(!r){$('#consBody').textContent='暂无数据';return;}
+    const c=r.shu_coord;
+    const coord=c?`核${c.c??'?'} 映${c.m??'?'} 态${c.s??'?'} 标${c.k??'?'} 相${c.p??'?'}`:'—';
+    const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
+    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div>`;
+  }catch(e){$('#consBody').textContent='读取失败';}
+}
 </script>
 </body>
 </html>

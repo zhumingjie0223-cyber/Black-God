@@ -10038,13 +10038,35 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     }
 
     const msg = update && update.message;
-    if (!msg || !msg.text || !msg.chat) return json({ ok: true });
+    if (!msg || !msg.chat) return json({ ok: true });
 
     const wantChat = String(this.env.TG_QUAN_CHAT_ID || '').trim();
     if (!wantChat || String(msg.chat.id) !== wantChat) return json({ ok: true });
 
     const wantUser = String(this.env.TG_QUAN_USER_ID || '').trim();
     if (wantUser && String(msg.from?.id ?? '') !== wantUser) return json({ ok: true });
+
+    // 图片转发
+    if (msg.photo && msg.photo.length) {
+      ctx?.waitUntil?.((async () => {
+        try {
+          const fileId = msg.photo.at(-1).file_id;
+          const cap = msg.caption || '';
+          const fileR = await fetch(`https://api.telegram.org/bot${this.env.TG_BOT_TOKEN}/getFile?file_id=${fileId}`);
+          const fd = await fileR.json();
+          const path = fd.result?.file_path;
+          if (path) {
+            const imgR = await fetch(`https://api.telegram.org/file/bot${this.env.TG_BOT_TOKEN}/${path}`);
+            const buf = await imgR.arrayBuffer();
+            const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+            await this.sendPhotoToQuan(b64, cap || '📸 图片已收到');
+          }
+        } catch (_) {}
+      })());
+      return json({ ok: true });
+    }
+
+    if (!msg.text) return json({ ok: true });
 
     const text = String(msg.text).slice(0, 4000);
     ctx?.waitUntil?.((async () => {
@@ -10078,6 +10100,24 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       const d = await r.json();
       return { ok: !!d.ok, ts: Date.now() };
     } catch (e) { return { ok: false, reason: String(e).slice(0, 80) }; }
+  }
+
+  async sendPhotoToQuan(base64, caption = '') {
+    const token = this.env.TG_BOT_TOKEN || '';
+    const chatId = this.env.TG_QUAN_CHAT_ID || '';
+    if (!token || !chatId) return { ok: false };
+    try {
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const form = new FormData();
+      form.append('chat_id', chatId);
+      form.append('photo', new Blob([bytes], { type: 'image/jpeg' }), 'photo.jpg');
+      if (caption) form.append('caption', caption.slice(0, 1024));
+      const r = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
+      const d = await r.json();
+      return { ok: !!d.ok };
+    } catch (e) { return { ok: false }; }
   }
 
   // ═══════════════════════ 注册 + 公共聊天（无数据库，存 DO storage）═══════════════════════
