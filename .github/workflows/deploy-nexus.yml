@@ -42,6 +42,9 @@ jobs:
       - name: Full regression + Shuyu runtime integration
         run: npm test
 
+      - name: UI 双副本同步校验（强制）
+        run: node ../../tools/sync-ui.mjs --check
+
       - name: Wrangler bundle dry-run
         run: npx wrangler deploy --dry-run --outdir /tmp/nexus-do-bundle
 

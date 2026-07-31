@@ -1028,7 +1028,7 @@ class AgentHandler(BaseHTTPRequestHandler):
         body = self._read_body()
 
         # Token 门：会真跑命令/代码的端点必须过鉴权（设了 NEXUS_EXEC_TOKEN 时）
-        if path in ("/exec", "/api/tool/execute", "/api/chat", "/api/agent/stream") and not self._authed():
+        if path in ("/exec", "/api/tool/execute", "/api/chat", "/api/agent/stream", "/api/memory/save", "/api/preferences") and not self._authed():
             self._json({"error": "unauthorized"}, 401)
             return
 
@@ -1131,6 +1131,11 @@ def start_server(host: str = "0.0.0.0", port: int = 8765):
     print(f"💾 记忆: SQLite ({memory.db_path})")
     print(f"✅ 本地优先 · 安全沙箱 · 自主规划 · 已就绪")
     print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    # 启动安全自检
+    if not os.environ.get("NEXUS_EXEC_TOKEN", "").strip():
+        print("⚠️  WARNING: NEXUS_EXEC_TOKEN 未设置，POST 写入接口对所有请求放行（本地开发可忽略，公网部署务必设置）")
+    if not os.environ.get("BG_BASE", "").strip():
+        print("⚠️  WARNING: BG_BASE 未设置，网关地址为空，对话功能不可用")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
