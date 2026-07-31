@@ -208,3 +208,19 @@
   --ramp-9:var(--accent-9); --ramp-10:var(--accent-10);
   --ramp-11:var(--accent-11); --ramp-12:var(--accent-12);
 }
+
+/* ── 14. B3 调色板热切换 ── */
+:root { --nx-h:156; --nx-c:1.0; --nx-swatch-size:28px; }
+.nx-theme-picker { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.theme-swatch {
+  width:var(--nx-swatch-size); height:var(--nx-swatch-size);
+  padding:0; border:0; border-radius:50%; cursor:pointer;
+  background:var(--sw-color);
+  box-shadow:0 0 0 0 transparent,0 0 0 0 transparent;
+  transition:box-shadow .18s ease,transform .18s ease;
+  -webkit-appearance:none; appearance:none;
+}
+.theme-swatch:hover { transform:scale(1.08); }
+.theme-swatch:focus-visible { outline:none; box-shadow:0 0 0 2px var(--bg-1),0 0 0 4px var(--sw-accent); }
+.theme-swatch.is-active { box-shadow:0 0 0 2.5px var(--bg-1),0 0 0 5px var(--sw-accent); transform:scale(1.1); }
+@media(prefers-reduced-motion:reduce){ .theme-swatch{transition:none;} .theme-swatch:hover,.theme-swatch.is-active{transform:none;} }

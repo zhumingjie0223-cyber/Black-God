@@ -2280,36 +2280,86 @@ window.initNodeTooltips = window.initNodeTooltips || function() {
 
 
 
-window.THEMES = window.THEMES || [
-  {name:'森林',hue:152},{name:'海洋',hue:210},{name:'暗红',hue:0},
-  {name:'紫',hue:270},{name:'橙',hue:30},{name:'青',hue:185},
-  {name:'粉',hue:330},{name:'黄',hue:60},{name:'灰',hue:200}
+/* ===== 神枢 B3：9套调色板热切换 ===== */
+window.THEMES = [
+  { name: '神枢', h: 156, c: 1.00, accent: 'oklch(0.720 0.178 156)' },
+  { name: '海洋', h: 220, c: 0.85, accent: 'oklch(0.720 0.151 220)' },
+  { name: '暗红', h:  25, c: 0.90, accent: 'oklch(0.720 0.160 25)'  },
+  { name: '紫',   h: 295, c: 0.80, accent: 'oklch(0.720 0.142 295)' },
+  { name: '橙',   h:  55, c: 0.90, accent: 'oklch(0.720 0.160 55)'  },
+  { name: '青',   h: 192, c: 0.85, accent: 'oklch(0.720 0.151 192)' },
+  { name: '粉',   h: 340, c: 0.80, accent: 'oklch(0.720 0.142 340)' },
+  { name: '黄金', h:  75, c: 0.85, accent: 'oklch(0.720 0.151 75)'  },
+  { name: '灰蓝', h: 240, c: 0.50, accent: 'oklch(0.720 0.089 240)' }
 ];
 
-window.applyTheme = window.applyTheme || function(hue) {
-  document.documentElement.style.setProperty('--hue', hue);
-  try { localStorage.setItem('theme-hue', hue); } catch(e) {}
+window.NX_PALETTE_KEY = 'nx-palette';
+
+window.paletteSwatchColor = function(t) {
+  return 'oklch(0.65 ' + (t.c * 0.178).toFixed(3) + ' ' + t.h + ')';
 };
 
-window.renderThemePicker = window.renderThemePicker || function(container) {
+window.resolveTheme = function(ref) {
+  var T = window.THEMES;
+  if (ref && typeof ref === 'object' && 'h' in ref) return ref;
+  if (typeof ref === 'number' && T[ref]) return T[ref];
+  for (var i = 0; i < T.length; i++) if (T[i].name === ref) return T[i];
+  return T[0];
+};
+
+window.applyPalette = function(ref) {
+  var t = window.resolveTheme(ref);
+  var root = document.documentElement;
+  root.style.setProperty('--nx-h', t.h);
+  root.style.setProperty('--nx-c', t.c);
+  root.style.setProperty('--accent-9', t.accent);
+  root.setAttribute('data-palette', t.name);
+  try { localStorage.setItem(window.NX_PALETTE_KEY, t.name); } catch(e) {}
+  try { window.dispatchEvent(new CustomEvent('nx-palette-change', { detail: t })); } catch(e) {}
+  return t;
+};
+
+window.applyTheme = function(hue) {
+  var T = window.THEMES, best = T[0], d = 1e9;
+  for (var i = 0; i < T.length; i++) {
+    var dd = Math.abs(T[i].h - hue); dd = Math.min(dd, 360 - dd);
+    if (dd < d) { d = dd; best = T[i]; }
+  }
+  return window.applyPalette(best);
+};
+
+window.currentPalette = function() {
+  var saved = null;
+  try { saved = localStorage.getItem(window.NX_PALETTE_KEY); } catch(e) {}
+  return window.resolveTheme(saved || window.THEMES[0].name);
+};
+
+window.renderThemePicker = function(container) {
   if (!container) return;
   container.innerHTML = '';
-  window.THEMES.forEach(t => {
-    const sw = document.createElement('div');
-    sw.className = 'theme-swatch';
-    sw.style.cssText = `display:inline-block;width:28px;height:28px;border-radius:50%;margin:4px;cursor:pointer;background:hsl(${t.hue},60%,50%);border:2px solid transparent`;
-    sw.title = t.name;
-    sw.onclick = () => {
-      window.applyTheme(t.hue);
-      container.querySelectorAll('.theme-swatch').forEach(s => s.style.borderColor = 'transparent');
-      sw.style.borderColor = '#fff';
-    };
+  container.classList.add('nx-theme-picker');
+  var active = window.currentPalette();
+  function sync(name) {
+    var all = container.querySelectorAll('.theme-swatch');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('is-active', all[i].dataset.name === name);
+      all[i].setAttribute('aria-checked', all[i].dataset.name === name ? 'true' : 'false');
+    }
+  }
+  window.THEMES.forEach(function(t) {
+    var sw = document.createElement('button');
+    sw.type = 'button'; sw.className = 'theme-swatch'; sw.dataset.name = t.name;
+    sw.title = t.name; sw.setAttribute('role', 'radio'); sw.setAttribute('aria-label', t.name);
+    sw.style.setProperty('--sw-color', window.paletteSwatchColor(t));
+    sw.style.setProperty('--sw-accent', t.accent);
+    sw.addEventListener('click', function() { window.applyPalette(t); sync(t.name); });
     container.appendChild(sw);
   });
-  let saved = NaN;
-  try { saved = parseInt(localStorage.getItem('theme-hue')); } catch(e) {}
-  if (!isNaN(saved)) window.applyTheme(saved);
+  container.setAttribute('role', 'radiogroup');
+  window.applyPalette(active); sync(active.name);
 };
+
+(function() { try { window.applyPalette(window.currentPalette()); } catch(e) {} })();
 
 window.initBento = window.initBento || function(container, caps) {
   if (!container) return;
