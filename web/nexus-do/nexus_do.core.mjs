@@ -67,7 +67,10 @@ export class ShenshuCore {
     const capability = outcome.capability || (outcome.ok === true ? 'interaction_success' : outcome.ok === false ? 'interaction_fail' : 'outcome');
     const ts = outcome.ts || Date.now();
     const experienceId = 'exp_' + ts.toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-    const shu = outcome.shu || { word: (outcome.text || '经验').trim().slice(0, 4) || '经验', coord: outcome.coord || null };
+    const coined = this.shuyu?.coin?.(outcome.coord || null);
+    const shu = outcome.shu || { word: coined?.词 || '经验', coord: outcome.coord || null, id: coined?.id || null, 义: coined?.义 || null };
+    this.selfImprove?.improve?.(null, { result: { score: outcome.ok ? 0.9 : 0.2 }, capability })?.catch?.(() => {});
+    try { this.worldGraph?.addEntity?.(shu.word, 'experience', { capability, ts }); } catch (_) {}
     const record = {
       experienceId,
       _experience: true,
@@ -185,7 +188,7 @@ export class ShenshuCore {
     this.shuyu ||= new ShuyuBridge();
     this.selfImprove ||= new SelfImprove({ eventBus: this.eventBus, memory: this.memoryExperience, capabilities: this.capabilityGrowth });
   }
-  cognitiveSnapshot() { this.ensureCognitiveV2(); return { version: 2, world: this.worldGraph.export(), experience: this.memoryExperience.export(), capabilities: this.capabilityGrowth.export(), updated: Date.now() }; }
+  cognitiveSnapshot() { this.ensureCognitiveV2(); return { version: 2, world: this.worldGraph.export(), experience: this.memoryExperience.export(), capabilities: this.capabilityGrowth.export(), inner_voice_count: this.memoryExperience?.search('inner')?.length ?? 0, updated: Date.now() }; }
   markCognitiveDirty() {
     this._cognitiveDirty = true;
     if (this._cognitiveFlushTimer || !this.storage?.put) return;
@@ -8754,6 +8757,13 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       soul.inner_voice.push({ ts: now, thought: voice.reply.slice(0, 200), context: `说了"${reply.slice(0, 30)}"` });
       if (soul.inner_voice.length > 50) soul.inner_voice = soul.inner_voice.slice(-50);
       await this.saveSoul(soul);
+      const mem = this._ensureMemoryExperience?.();
+      if (mem) {
+        try {
+          mem.remember('inner', { kind: 'inner', thought: voice.reply.slice(0, 200), text: text || '', reply: reply.slice(0, 80), coord: coord || null, ts: now });
+        } catch (_) {}
+      }
+      this.selfImprove?.improve?.(null, { result: { score: 0.9 }, capability: 'inner_voice' })?.catch?.(() => {});
     }
   }
 
