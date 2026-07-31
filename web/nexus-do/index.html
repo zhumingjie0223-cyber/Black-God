@@ -4406,11 +4406,8 @@ function bootOwner(){
 :root, :root[data-theme="dark"] { --text-3:#7a9e87; }
 :root[data-theme="light"] { --text-3:#4a6b57; }
 
-/* 4 — aurora 绿色化并增强可感知度 */
-#aurora span { opacity:.55; }
-#aurora span:nth-child(1) { background:radial-gradient(circle,rgba(59,199,126,.18),transparent 66%); }
-#aurora span:nth-child(2) { background:radial-gradient(circle,rgba(59,199,126,.13),transparent 66%); }
-#aurora span:nth-child(3) { background:radial-gradient(circle,rgba(59,199,126,.10),transparent 66%); }
+/* 4 — aurora 增强可感知度（颜色保持原色，只提透明度） */
+#aurora span { opacity:.52; }
 
 /* 5 — wc-item 建议卡左侧图标：翡翠绿着色 + 圆底背景 */
 .wc-item svg {
