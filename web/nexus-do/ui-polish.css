@@ -151,7 +151,38 @@
              0 0 14px color-mix(in srgb,var(--cy-1) 14%,transparent);
 }
 
-/* ── 12. OKLCH 12阶 ramp 补全 ── */
+/* ── 13. B2 BlockRenderer CSS ── */
+.diff-block {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.55;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 0; overflow-x: auto; margin: 8px 0;
+  white-space: pre; -webkit-overflow-scrolling: touch; tab-size: 2;
+}
+.diff-block span { display: block; padding: 0 12px; min-width: 100%; box-sizing: border-box; }
+.diff-add { background: color-mix(in srgb, var(--accent-9) 15%, transparent); color: var(--text-1); }
+.diff-del { background: color-mix(in srgb, #f87171 15%, transparent); color: var(--text-1); }
+.diff-hunk { color: var(--text-3); font-size: 11.5px; }
+.diff-ctx { color: var(--text-2); }
+
+.cot-label { display: block; font-size: 11px; color: var(--text-3); margin-bottom: 4px; letter-spacing: .01em; }
+
+.artifact-card {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px; margin: 6px 0;
+}
+.artifact-path { flex: 1; min-width: 0; font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.artifact-run { flex: 0 0 auto; appearance: none; -webkit-appearance: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 8px; background: var(--accent-9); color: #fff; transition: opacity .15s, transform .1s; }
+.artifact-run:hover { opacity: .88; }
+.artifact-run:active { transform: scale(.96); }
+
+.tool-call { background: var(--bg-3); border-radius: 8px; padding: 8px 10px; margin: 4px 0; }
+.tool-name { font-size: 12px; color: var(--text-3); margin-bottom: 4px; }
+.tool-args, .tool-result { font-size: 11.5px; color: var(--text-2); overflow-x: auto; margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.blk-text + .blk-text { margin-top: 4px; }
+.code-wrap { margin: 6px 0; }
 :root {
   --accent-2:#081A10; --accent-3:#0D2618;
   --accent-4:#113320; --accent-5:#164029;

@@ -2618,6 +2618,149 @@ function setNexusState(state){
   sync();
 })();
 
+/* ============================================================
+ * 神枢 · 块级渲染层 B2（parseBlocks + BlockRenderer + pushMsg）
+ * ============================================================ */
+
+/* ---------- parseBlocks ---------- */
+const BLK_RE = /```([A-Za-z0-9_+#.\-]*)[ \t]*\r?\n([\s\S]*?)```|<think>([\s\S]*?)<\/think>|<CoT>([\s\S]*?)<\/CoT>|<Artifact\s+path\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\/Artifact>/gi;
+
+function parseBlocks(text){
+  const out=[];
+  if(text==null) return out;
+  const s=String(text);
+  if(!s) return out;
+  const push=(t)=>{ if(t && t.trim()) out.push({type:'text', content:t.replace(/^\r?\n+|\r?\n+$/g,'')}); };
+  BLK_RE.lastIndex=0;
+  let last=0, m;
+  while((m=BLK_RE.exec(s))!==null){
+    if(m.index>last) push(s.slice(last,m.index));
+    if(m[2]!==undefined){
+      const lang=(m[1]||'').toLowerCase();
+      const body=m[2].replace(/\r?\n$/,'');
+      if(lang==='diff') out.push({type:'diff', lang:'diff', content:body});
+      else out.push({type:'code', lang:lang||'text', content:body});
+    }else if(m[3]!==undefined){ out.push({type:'cot', content:m[3].trim()}); }
+    else if(m[4]!==undefined){ out.push({type:'cot', content:m[4].trim()}); }
+    else if(m[6]!==undefined){ out.push({type:'artifact', path:(m[5]||'untitled').trim(), content:m[6].replace(/^\r?\n+|\r?\n+$/g,'')}); }
+    last=BLK_RE.lastIndex;
+  }
+  if(last<s.length) push(s.slice(last));
+  if(!out.length && s.trim()) out.push({type:'text', content:s});
+  return out;
+}
+
+/* ---------- BlockRenderer 注册表 ---------- */
+const BlockRenderer = (function(){
+  const map = Object.create(null);
+  function register(type, fn){ if(type && typeof fn==='function') map[type]=fn; return BlockRenderer; }
+  function get(type){ return map[type] || map['text']; }
+  function render(container, block){
+    if(!container || !block) return null;
+    const fn = get(block.type);
+    try { return fn(container, block); }
+    catch(e){ const pre=document.createElement('pre'); pre.className='blk-raw'; pre.textContent=(block.content||''); container.appendChild(pre); return pre; }
+  }
+  function renderAll(container, blocks){ (blocks||[]).forEach(b=>render(container,b)); return container; }
+  return { register, render, renderAll, has:(t)=>!!map[t] };
+})();
+
+/* --- text --- */
+BlockRenderer.register('text', function(container, block){
+  const el=document.createElement('div'); el.className='blk-text';
+  if(typeof appendLinkified==='function') appendLinkified(el, block.content);
+  else el.textContent=block.content;
+  container.appendChild(el); return el;
+});
+
+/* --- code --- */
+function _renderCodeBlock(container, block){
+  const lang = (block.lang || '').toLowerCase();
+  const wrap = document.createElement('div'); wrap.className = 'code-wrap';
+  const bar = document.createElement('div'); bar.className = 'code-bar';
+  const tag = document.createElement('span'); tag.className = 'code-lang'; tag.textContent = lang || 'text';
+  bar.appendChild(tag);
+  const acts = document.createElement('span'); acts.className = 'code-acts';
+  if(lang === 'html' || lang === 'htm'){
+    const run = document.createElement('button'); run.className = 'code-btn run-btn'; run.textContent = '▶ 运行';
+    run.onclick = (e)=>{ e.stopPropagation(); try{ openArtifact(block.content); }catch(err){} };
+    acts.appendChild(run);
+  }
+  const copy = document.createElement('button'); copy.className = 'code-btn copy-btn'; copy.textContent = '复制';
+  copy.onclick = (e)=>{
+    e.stopPropagation();
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(block.content); }
+      else{ const ta=document.createElement('textarea'); ta.value=block.content; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+      copy.textContent='已复制'; setTimeout(()=>{ copy.textContent='复制'; }, 1200);
+    }catch(err){}
+  };
+  acts.appendChild(copy); bar.appendChild(acts);
+  const pre = document.createElement('pre'); pre.className = 'code-pre';
+  const code = document.createElement('code'); if(lang) code.className = 'language-' + lang; code.textContent = block.content;
+  pre.appendChild(code); wrap.appendChild(bar); wrap.appendChild(pre); container.appendChild(wrap); return wrap;
+}
+BlockRenderer.register('code', function(container, block){ return _renderCodeBlock(container, block); });
+
+/* --- cot --- */
+BlockRenderer.register('cot', function(container, block){
+  const el = document.createElement('div'); el.className = 'cot-block';
+  container.appendChild(el);
+  try{ renderCoTBlock(el, block.content, true); }catch(err){ el.textContent = block.content; }
+  return el;
+});
+
+/* --- diff --- */
+BlockRenderer.register('diff', function(container, block){
+  try{ return renderDiff(container, block.content); }
+  catch(err){ const pre=document.createElement('pre'); pre.className='diff-block'; pre.textContent=block.content; container.appendChild(pre); return pre; }
+});
+
+/* --- artifact --- */
+BlockRenderer.register('artifact', function(container, block){
+  const card = document.createElement('div'); card.className = 'artifact-card';
+  const info = document.createElement('div'); info.className = 'artifact-info';
+  const icon = document.createElement('span'); icon.className = 'artifact-icon'; icon.textContent = '📄'; info.appendChild(icon);
+  const name = document.createElement('span'); name.className = 'artifact-path'; name.textContent = block.path || 'artifact'; info.appendChild(name);
+  card.appendChild(info);
+  const run = document.createElement('button'); run.className = 'artifact-run code-btn run-btn'; run.textContent = '▶ 运行';
+  run.onclick = (e)=>{ e.stopPropagation(); try{ openArtifact(block.content); }catch(err){} };
+  card.appendChild(run); container.appendChild(card); return card;
+});
+
+/* --- tool --- */
+BlockRenderer.register('tool', function(container, block){
+  const el = document.createElement('div'); el.className = 'tool-call';
+  const head = document.createElement('div'); head.className = 'tool-name'; head.textContent = '🔧 ' + (block.name || block.tool || 'tool'); el.appendChild(head);
+  let args = block.args; if(args == null) args = block.content;
+  if(args != null && args !== ''){
+    const body = document.createElement('pre'); body.className = 'tool-args';
+    let s; if(typeof args === 'string'){ try { s = JSON.stringify(JSON.parse(args), null, 2); }catch(e){ s = args; } }else{ try { s = JSON.stringify(args, null, 2); }catch(e){ s = String(args); } }
+    body.textContent = s; el.appendChild(body);
+  }
+  container.appendChild(el); return el;
+});
+
+/* --- renderDiff --- */
+function renderDiff(container, diffText){
+  const pre = document.createElement('pre'); pre.className = 'diff-block';
+  const text = (diffText == null ? '' : String(diffText)).replace(/\r\n?/g, '\n');
+  const lines = text.replace(/\n+$/, '').split('\n');
+  for(let i=0; i<lines.length; i++){
+    const line = lines[i]; let cls;
+    if(line.startsWith('@@')){ cls='diff-hunk'; }
+    else if(line.startsWith('\\')){ cls='diff-hunk'; }
+    else if(line.startsWith('+'+'+'+'+')||line.startsWith('-'+'-'+'-')||line.startsWith('diff ')||line.startsWith('index ')||line.startsWith('new file')||line.startsWith('deleted file')||line.startsWith('rename ')){ cls='diff-hunk'; }
+    else if(line.startsWith('+')){ cls='diff-add'; }
+    else if(line.startsWith('-')){ cls='diff-del'; }
+    else{ cls='diff-ctx'; }
+    const span = document.createElement('span'); span.className = cls;
+    span.textContent = line.length ? line : '\u200b';
+    pre.appendChild(span); pre.appendChild(document.createTextNode('\n'));
+  }
+  container.appendChild(pre); return pre;
+}
+
 /* ===== CoT 块渲染 ===== */
 function renderCoTBlock(el, delta, isDone){
   if(!el) return;
@@ -3189,9 +3332,23 @@ function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
   const b=document.createElement('div'); b.className='bubble';
-  if(role==='her' && text && /\[\d+\]/.test(text)){ renderGrounding(b, text); }
-  else if(role==='her' && text && (text.indexOf('```')>-1 || /https?:\/\//.test(text))){ renderRich(b, text); } 
-  else { b.textContent=text; }
+
+  if(role==='her' && text){
+    let blocks=null;
+    try { blocks = parseBlocks(text); } catch(e){ blocks = null; }
+    if(blocks && blocks.length && (blocks.length > 1 || blocks[0].type !== 'text')){
+      BlockRenderer.renderAll(b, blocks);
+    } else if(/\[\d+\]/.test(text)){
+      renderGrounding(b, text);
+    } else if(text.indexOf('```')>-1 || /https?:\/\//.test(text)){
+      renderRich(b, text);
+    } else {
+      b.textContent=text;
+    }
+  } else {
+    b.textContent=text;
+  }
+
   m.appendChild(b);
   const foot=document.createElement('div'); foot.className='msg-foot';
   if(meta){ const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=meta; foot.appendChild(mt); }
