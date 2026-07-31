@@ -28,8 +28,8 @@
 :root{
   /* 深林夜 · 默认（玄黑森林 · 翡翠活光）—— 神枢签名深色版 */
   --bg:#0A100C; --bg-1:#0D1510; --bg-2:#121C15; --bg-3:#18251C;
-  --surface:rgba(170,225,190,.045); --surface-2:rgba(170,225,190,.075); --surface-3:rgba(170,225,190,.11);
-  --line:rgba(170,225,190,.09); --line-2:rgba(170,225,190,.17);
+  --surface:rgba(170,225,190,.075); --surface-2:rgba(170,225,190,.12); --surface-3:rgba(170,225,190,.17);
+  --line:rgba(170,225,190,.15); --line-2:rgba(170,225,190,.26);
   --text:#EAF6EE; --text-2:#A6C7B2; --text-3:#66826F;
   /* 系统银 —— 结构强色（深色版翡翠绿）*/
   --cy-hi:#4FE096; --cy-1:#3BC77E; --cy-2:#41CC84; --cy-3:#3BC77E; --cy-4:#8FE3AE;
@@ -71,8 +71,8 @@
 :root[data-theme="dark"]{
   /* 深林夜 · 默认（玄黑森林 · 翡翠活光）*/
   --bg:#0A100C; --bg-1:#0D1510; --bg-2:#121C15; --bg-3:#18251C;
-  --surface:rgba(170,225,190,.045); --surface-2:rgba(170,225,190,.075); --surface-3:rgba(170,225,190,.11);
-  --line:rgba(170,225,190,.09); --line-2:rgba(170,225,190,.17);
+  --surface:rgba(170,225,190,.075); --surface-2:rgba(170,225,190,.12); --surface-3:rgba(170,225,190,.17);
+  --line:rgba(170,225,190,.15); --line-2:rgba(170,225,190,.26);
   --text:#EAF6EE; --text-2:#A6C7B2; --text-3:#66826F;
   --chrome-1:#7FDCA4; --chrome-2:#9EC3AB;
   --chrome-grad:linear-gradient(150deg,#B8F0CE,#7FDCA4 55%,#3E8F63);
@@ -405,7 +405,7 @@ button,input,textarea{font-family:inherit;color:inherit}
   background:radial-gradient(circle at 38% 32%,#EBFCF1,#9DE7BC 62%,#56AB2F);border:1px solid rgba(86,171,47,.35);
   box-shadow:0 8px 26px rgba(61,220,132,.35),inset 0 1px 0 rgba(255,255,255,.7);animation:orbBreath 4.6s ease-in-out infinite}
 .wc-mark span{font-family:var(--serif);font-size:27px;font-weight:800;line-height:1;color:#0F3D2E}
-.wc-greet{font-size:27px;font-weight:600;letter-spacing:.01em;color:var(--text)}
+.wc-greet{font-size:31px;font-weight:680;letter-spacing:.02em;color:var(--text)}
 .wc-sub{font-size:15px;color:var(--text-3);margin-top:9px;letter-spacing:.02em}
 .wc-suggest{display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px;margin-top:34px}
 .wc-item{
@@ -975,7 +975,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   transition:transform var(--dur-fast) var(--ease-out),
              box-shadow var(--dur-fast) var(--ease-out),
              background var(--dur-normal) var(--smooth);
-  box-shadow:var(--shadow-sm);
+  box-shadow:var(--shadow-md), 0 6px 22px -6px var(--cy-glow), inset 0 1px 0 rgba(255,255,255,.4);
   will-change:transform;
   position:relative;
   overflow:hidden;
@@ -1000,14 +1000,17 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 }
 .btn:hover{
   transform:translateY(-1px);
-  box-shadow:var(--shadow-md);
+  box-shadow:var(--shadow-lg), 0 10px 30px -6px var(--cy-glow), inset 0 1px 0 rgba(255,255,255,.45);
 }
 .btn:active{
-  transform:scale(.98) translateY(0);
-  box-shadow:var(--shadow-sm);
+  transform:scale(.97) translateY(0);
+  box-shadow:var(--shadow-sm), inset 0 2px 8px rgba(0,0,0,.28);
   transition-duration:var(--dur-instant);
 }
-.btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2)}
+/* 次级按钮:实底玻璃 + 顶部内高光,明确从背景浮起,不再和界面糊成一片 */
+.btn.ghost{background:var(--surface-3);color:var(--text);border:1px solid var(--line-2);
+  box-shadow:var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,.06)}
+.btn.ghost:active{transform:scale(.97);box-shadow:inset 0 2px 8px rgba(0,0,0,.3)}
 
 /* —— Toast —— */
 .toast{position:fixed;left:50%;top:calc(var(--safe-top) + 58px);transform:translate(-50%,-24px);z-index:620;
@@ -2179,6 +2182,43 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 </div>
 
 <script>
+/* 全局触觉反馈：所有可点元素按下即震动。
+   · 安卓/支持环境：走标准 navigator.vibrate。
+   · iOS Safari 不支持 vibrate——网页层唯一可能的真震动路径是 17.4+ 的
+     <input type="checkbox" switch>：在用户手势内切换它会触发系统 haptic。
+     苹果无官方承诺、版本相关,故为"尽力而为";要稳定震动须做原生壳 App。 */
+(function(){
+  var canVibrate = ('vibrate' in navigator);
+  var iosSwitch = null;   // 惰性单例
+  function ensureIosSwitch(){
+    if(iosSwitch !== null) return iosSwitch;
+    try{
+      var lab = document.createElement('label');
+      lab.setAttribute('aria-hidden','true');
+      lab.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1';
+      var inp = document.createElement('input');
+      inp.type = 'checkbox';
+      inp.setAttribute('switch','');   // Safari 17.4+ 专有属性
+      inp.tabIndex = -1; inp.setAttribute('aria-hidden','true');
+      lab.appendChild(inp);
+      (document.body || document.documentElement).appendChild(lab);
+      iosSwitch = inp;
+    }catch(e){ iosSwitch = false; }
+    return iosSwitch;
+  }
+  window.haptic = function(ms){
+    if(canVibrate){ try{ navigator.vibrate(ms || 7); return; }catch(e){} }
+    var inp = ensureIosSwitch();   // iOS 无 vibrate：切换隐藏 switch 触发系统 haptic
+    if(inp){ try{ inp.click(); if(inp.blur) inp.blur(); }catch(e){} }
+  };
+  var STRONG = '.btn,.send,.ob-btn,.lock-btn,.speak-btn,.vs-x';
+  var TAP = 'a,button,[onclick],[role="button"],.wc-item,.set-row,.tab,.pp-tile,.card,.tile,.chip,.cmd-item,.cap-item,.agent-island,.cmd-btn,.plus-btn,.fold-h,.opt-row,.switch,.hz-node';
+  document.addEventListener('pointerdown', function(e){
+    var t = e.target; if(!t || !t.closest) return;
+    if(t.closest(STRONG)) window.haptic(14);
+    else if(t.closest(TAP)) window.haptic(7);
+  }, { passive:true, capture:true });
+})();
 /* 首屏可见性守卫：最早执行，独立于任何后续逻辑 */
 (function(){
   function show(){
