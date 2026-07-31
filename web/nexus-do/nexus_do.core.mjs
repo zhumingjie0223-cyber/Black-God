@@ -263,7 +263,7 @@ export class ShenshuCore {
         cf: request.cf,
         json: async () => ({ text, uid: 'quan', source: 'tg' }),
       };
-      return this.handleTelegramWebhook(update, tgReq);
+      return this.handleTelegramWebhook(update, tgReq, ctx);
     }
 
     // —— 能力契约层（借鉴 Minis）——
@@ -9927,36 +9927,47 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     return { ok: true, provider: pending.provider, label: P.label, model, models, note: `${P.label} 已登录并接入，她现在能用这家大脑了` };
   }
 
-  async handleTelegramWebhook(update, tgReq) {
-    const msg = update && update.message;
-    if (!msg || !msg.text) return json({ ok: true });
+  async handleTelegramWebhook(update, tgReq, ctx) {
+    // 1. secret token 鉴权
+    const wantSecret = String(this.env.TG_WEBHOOK_SECRET || '').trim();
+    const gotSecret = tgReq?.headers?.get?.('X-Telegram-Bot-Api-Secret-Token') || '';
+    if (!wantSecret || gotSecret !== wantSecret) {
+      return new Response('unauthorized', { status: 401 });
+    }
 
-    // 注意：TG 群组 id 为负数，超大 id 可能在 JSON.parse 阶段丢精度；
-    // 当前仅私聊场景（正数小 id）可接受，日后接群组需改为 raw body 字符串解析。
+    // 2. update_id 去重（DO storage 保留最近 100 个，幂等）
+    const updateId = update && Number.isFinite(update.update_id) ? update.update_id : null;
+    if (updateId !== null) {
+      const KEY = 'tg:seen_update_ids';
+      const seen = (await this.storage.get(KEY)) || [];
+      if (seen.includes(updateId)) return json({ ok: true });
+      seen.push(updateId);
+      if (seen.length > 100) seen.splice(0, seen.length - 100);
+      await this.storage.put(KEY, seen);
+    }
+
+    const msg = update && update.message;
+    if (!msg || !msg.text || !msg.chat) return json({ ok: true });
+
     const wantChat = String(this.env.TG_QUAN_CHAT_ID || '').trim();
     if (!wantChat || String(msg.chat.id) !== wantChat) return json({ ok: true });
 
+    const wantUser = String(this.env.TG_QUAN_USER_ID || '').trim();
+    if (wantUser && String(msg.from?.id ?? '') !== wantUser) return json({ ok: true });
+
     const text = String(msg.text).slice(0, 4000);
-
-    let reply = '她走神了，过会再说';
-    try {
-      const res = await this.handleTalk(text, tgReq, undefined);
-      if (res && typeof res.reply === 'string' && res.reply.length > 0) {
-        reply = res.reply;
-      }
-    } catch (e) {
-      console.log('[tg] handleTalk error:', e && e.message);
-    }
-
-    try {
-      const sent = await this.sendToQuan(reply);
-      if (sent && sent.ok === false) {
-        console.log('[tg] sendToQuan failed:', JSON.stringify(sent).slice(0, 200));
-      }
-    } catch (e) {
-      console.log('[tg] sendToQuan error:', e && e.message);
-    }
-
+    ctx?.waitUntil?.((async () => {
+      let reply = '她走神了，过会再说';
+      try {
+        const res = await this.handleTalk(text, tgReq, undefined);
+        if (res && typeof res.reply === 'string' && res.reply.length > 0) reply = res.reply;
+      } catch (e) { console.log('[tg] handleTalk error:', e && e.message); }
+      if (reply.length > 4096) reply = reply.slice(0, 4095) + '…';
+      try {
+        const sent = await this.sendToQuan(reply);
+        if (sent && sent.ok === false) console.log('[tg] sendToQuan failed:', JSON.stringify(sent).slice(0, 200));
+      } catch (e) { console.log('[tg] sendToQuan error:', e && e.message); }
+    })());
     return json({ ok: true });
   }
 
