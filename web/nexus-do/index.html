@@ -2710,24 +2710,141 @@ function onStopClick(){
   (document.head||document.documentElement).appendChild(s);
 })();
 
-class StreamTypewriter{
-  constructor(el,opts={}){
-    this.el=typeof el==='string'?document.querySelector(el):el;
-    if(this.el==null)throw new Error('StreamTypewriter: target element not found');
-    this.queue=[];this.buffer='';this._timer=null;this._ended=false;
-    this.aborted=false;this.done=false;
-    this.interval=opts.minDelay||16;
-    this.charsPerTick=opts.charsPerTick||1;
-    this.onChar=opts.onChar;this.onComplete=opts.onComplete;
-    this.el.classList.add(opts.cursorClass||'st-cursor');
+class StreamTypewriter {
+  constructor(el, opts = {}) {
+    this.el = typeof el === 'string' ? document.querySelector(el) : el;
+    if (this.el == null) throw new Error('StreamTypewriter: target element not found');
+
+    this.queue = [];
+    this.buffer = '';
+    this.aborted = false;
+    this.done = false;
+
+    this._raf = null;
+    this._ended = false;
+    this._lastFrame = 0;
+
+    this.minDelay = opts.minDelay || 0;
+    this.charsPerTick = opts.charsPerTick || 0;
+    this.adaptive = !this.charsPerTick;
+
+    this.minChars = opts.minChars || 1;
+    this.maxChars = opts.maxChars || 8;
+    this.lowWater = opts.lowWater != null ? opts.lowWater : 5;
+    this.highWater = opts.highWater != null ? opts.highWater : 50;
+
+    this.onChar = opts.onChar;
+    this.onComplete = opts.onComplete;
+
+    this.cursorClass = opts.cursorClass || 'st-cursor';
+    this.el.classList.add(this.cursorClass);
   }
-  push(token){if(this.aborted||this.done)return;if(Array.isArray(token))this.queue.push(...token);else if(token!=null)this.queue.push(String(token));this._schedule();return this;}
-  _schedule(){if(this._timer!=null||this.aborted||this.done||this.queue.length===0)return;this._timer=setTimeout(()=>{this._timer=null;this._tick();},this.interval);}
-  _tick(){if(this.aborted)return;let emitted='';for(let i=0;i<this.charsPerTick&&this.queue.length>0;i++)emitted+=this.queue.shift();if(emitted){this.buffer+=emitted;this.el.textContent=this.buffer;if(typeof this.onChar==='function')this.onChar(emitted);}if(this.queue.length>0)this._schedule();else if(this._ended)this._finish();}
-  abort(){if(this.aborted)return;this.aborted=true;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}this.queue.length=0;return this;}
-  flush(){if(this.aborted||this.done)return this.buffer;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}if(this.queue.length>0){this.buffer+=this.queue.join('');this.queue.length=0;this.el.textContent=this.buffer;}if(this._ended)this._finish();return this.buffer;}
-  end(){if(this.aborted||this.done)return;this._ended=true;if(this.queue.length===0&&this._timer==null)this._finish();else this._schedule();return this;}
-  _finish(){if(this.done)return;this.done=true;if(this._timer!=null){clearTimeout(this._timer);this._timer=null;}this.el.classList.remove('st-cursor');if(typeof this.onComplete==='function')this.onComplete(this.buffer);}
+
+  push(token) {
+    if (this.aborted || this.done) return this;
+    if (Array.isArray(token)) {
+      for (const t of token) if (t != null) this.queue.push(String(t));
+    } else if (token != null) {
+      this.queue.push(String(token));
+    }
+    this._schedule();
+    return this;
+  }
+
+  end() {
+    if (this.aborted || this.done) return this;
+    this._ended = true;
+    if (this.queue.length === 0) this._finish();
+    else this._schedule();
+    return this;
+  }
+
+  abort() {
+    if (this.aborted) return this;
+    this.aborted = true;
+    this._cancel();
+    this.queue.length = 0;
+    this.el.classList.remove(this.cursorClass);
+    return this;
+  }
+
+  flush() {
+    if (this.aborted || this.done) return this.buffer;
+    this._cancel();
+    if (this.queue.length > 0) {
+      const rest = this.queue.join('');
+      this.queue.length = 0;
+      this.buffer += rest;
+      this._render();
+      if (typeof this.onChar === 'function') this.onChar(rest);
+    }
+    if (this._ended) this._finish();
+    return this.buffer;
+  }
+
+  _schedule() {
+    if (this._raf != null || this.aborted || this.done) return;
+    if (this.queue.length === 0) return;
+    this._raf = requestAnimationFrame(this._frame);
+  }
+
+  _frame = (ts) => {
+    this._raf = null;
+    if (this.aborted || this.done) return;
+    if (this.minDelay > 0 && this._lastFrame && ts - this._lastFrame < this.minDelay) {
+      this._schedule();
+      return;
+    }
+    this._lastFrame = ts;
+    this._tick();
+  };
+
+  _tick() {
+    if (this.aborted || this.done) return;
+    let budget = this._rate();
+    let emitted = '';
+    while (budget > 0 && this.queue.length > 0) {
+      const head = this.queue[0];
+      if (head.length <= budget) {
+        emitted += this.queue.shift();
+        budget -= head.length;
+      } else {
+        emitted += head.slice(0, budget);
+        this.queue[0] = head.slice(budget);
+        budget = 0;
+      }
+    }
+    if (emitted) {
+      this.buffer += emitted;
+      this._render();
+      if (typeof this.onChar === 'function') this.onChar(emitted);
+    }
+    if (this.queue.length > 0) this._schedule();
+    else if (this._ended) this._finish();
+  }
+
+  _rate() {
+    if (!this.adaptive) return this.charsPerTick;
+    const n = this.queue.length;
+    if (n >= this.highWater) return this.maxChars;
+    if (n <= this.lowWater) return this.minChars;
+    const t = (n - this.lowWater) / (this.highWater - this.lowWater);
+    return Math.max(this.minChars, Math.round(this.minChars + t * (this.maxChars - this.minChars)));
+  }
+
+  _render() { this.el.textContent = this.buffer; }
+
+  _cancel() {
+    if (this._raf != null) { cancelAnimationFrame(this._raf); this._raf = null; }
+  }
+
+  _finish() {
+    if (this.done) return;
+    this.done = true;
+    this._cancel();
+    this.el.classList.remove(this.cursorClass);
+    if (typeof this.onComplete === 'function') this.onComplete(this.buffer);
+  }
 }
 
 /* —— 安全全局已在 Upgrade Layer 前初始化 —— */

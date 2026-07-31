@@ -125,10 +125,55 @@
 .msgs { gap:12px !important; padding:16px 16px 8px !important; scroll-behavior:smooth; overscroll-behavior-y:contain; }
 .msg + .msg.her, .msg + .msg.me { margin-top:-4px; }
 
-/* ── 10. 输入框 focus 反馈 ── */
+/* ── 11. StreamTypewriter RAF 光标 ── */
+.st-cursor::after {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-left: 0.08em;
+  vertical-align: -0.16em;
+  background: currentColor;
+  border-radius: 1px;
+  animation: st-blink 1s step-end infinite;
+}
+@keyframes st-blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-cursor::after { animation: none; opacity: 1; }
+}
 .in-box { box-shadow:0 1px 3px rgba(0,0,0,.18), 0 0 0 1px color-mix(in srgb,var(--line) 80%,transparent) inset; }
 .in-box:focus-within {
   box-shadow:0 1px 3px rgba(0,0,0,.18),
              0 0 0 1.5px color-mix(in srgb,var(--cy-1) 45%,transparent) inset,
              0 0 14px color-mix(in srgb,var(--cy-1) 14%,transparent);
+}
+
+/* ── 12. OKLCH 12阶 ramp 补全 ── */
+:root {
+  --accent-2:#081A10; --accent-3:#0D2618;
+  --accent-4:#113320; --accent-5:#164029;
+  --accent-6:#1E5535; --accent-7:#276A43;
+  --accent-8:#308054; --accent-12:#C8EFD8;
+}
+@supports(color:oklch(0 0 0)){
+  :root {
+    --accent-2:oklch(0.177 0.035 155.1);
+    --accent-3:oklch(0.255 0.056 155.2);
+    --accent-4:oklch(0.333 0.076 155.4);
+    --accent-5:oklch(0.410 0.096 155.5);
+    --accent-6:oklch(0.488 0.117 155.6);
+    --accent-7:oklch(0.565 0.137 155.8);
+    --accent-8:oklch(0.642 0.158 155.9);
+    --accent-12:oklch(0.935 0.055 159);
+  }
+}
+:root {
+  --ramp-1:var(--bg-1); --ramp-2:var(--bg-2); --ramp-3:var(--bg-3);
+  --ramp-4:var(--bg-4); --ramp-5:var(--bg-5); --ramp-6:var(--bg-6);
+  --ramp-7:var(--bg-7); --ramp-8:var(--bg-8);
+  --ramp-9:var(--accent-9); --ramp-10:var(--accent-10);
+  --ramp-11:var(--accent-11); --ramp-12:var(--accent-12);
 }
