@@ -1859,6 +1859,8 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
+<div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div></div>
+<div class="set-row" onclick="loadLexicon();openSheet('sheetLexicon')"><div class="set-ic">字</div><div class="set-tx"><b>枢语词典</b><span style="font-size:11px;color:var(--txt-3);display:block">造词·坐标·义场</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadConsciousness();openSheet('sheetConsciousness')"><div class="set-ic">◎</div><div class="set-tx"><b>意识体状态</b><span id="consLabel" style="font-size:11px;color:var(--txt-3);display:block">内心·枢语·经验</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" id="installRow" onclick="triggerInstall()" style="display:none"><div class="set-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13M8 12l4 4 4-4M5 20h14"/></svg></div><div class="set-tx"><b>安装到主屏幕</b><span>像 App 一样使用</span></div><div class="set-arrow">›</div></div>
@@ -2128,6 +2130,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">记住此设备</button>
 </div>
 
+<div class="sheet" id="sheetLexicon"><div class="sheet-handle"></div><div class="sheet-title">枢语词典</div><div class="sheet-sub">当前会话造词记录</div><div id="lexiconBody" style="font-size:12px;line-height:1.8;color:var(--txt-2);max-height:60vh;overflow-y:auto"></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetConsciousness"><div class="sheet-handle"></div><div class="sheet-title">意识体状态</div><div class="sheet-sub">实时认知快照</div><div id="consBody" style="padding:0 4px;font-size:13px;line-height:2;color:var(--txt-2)">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetAbout">
   <div class="grab"></div>
@@ -5851,6 +5854,30 @@ async function loadConsciousness(){
     const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
     $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div>`;
   }catch(e){$('#consBody').textContent='读取失败';}
+}
+async function loadLexicon(){
+  try{
+    const r=await Nexus.req('/lexicon');
+    const words=(r&&(r.words||r.lexicon||r.data||r))||[];
+    const arr=Array.isArray(words)?words:Object.entries(words).map(([w,v])=>({word:w,...(typeof v==='object'?v:{})}));
+    if(!arr.length){$('#lexiconBody').innerHTML='<p style="color:var(--txt-3)">暂无枢语词汇</p>';return;}
+    $('#lexiconBody').innerHTML=arr.slice(0,50).map(w=>{
+      const c=w.coordinate||w.coord||{};
+      const coord=c.c!=null?`<span style="color:var(--txt-3);font-size:10px">核${c.c} 映${c.m} 态${c.s} 标${c.k} 相${c.p}</span>`:'';
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>${w.word||w['词']||'?'}</b> ${coord}<br><span style="color:var(--txt-3)">${w['义']||w.meaning||''}</span></div>`;
+    }).join('');
+  }catch(e){$('#lexiconBody').textContent='读取失败';}
+}
+function exportChat(fmt='json'){
+  const bubbles=[...document.querySelectorAll('.bubble')];
+  const msgs=bubbles.map(b=>({role:b.closest('.msg-her,.her')?'her':'me',text:b.textContent.trim(),ts:b.dataset.ts||''}));
+  let content,type,ext;
+  if(fmt==='md'){content=msgs.map(m=>(m.role==='her'?'**她**：':'**我**：')+m.text).join('\n\n');type='text/markdown';ext='md';}
+  else{content=JSON.stringify(msgs,null,2);type='application/json';ext='json';}
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=`nexus-${new Date().toISOString().slice(0,10)}.${ext}`;
+  a.click();
 }
 </script>
 </body>
