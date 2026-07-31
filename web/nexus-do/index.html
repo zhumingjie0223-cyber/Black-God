@@ -1372,6 +1372,8 @@ body::before{
 .blk-text strong{color:var(--txt-1);font-weight:600}
 .blk-text em{color:var(--txt-2);font-style:italic}
 .blk-text code{font-family:var(--mono);font-size:.85em;background:rgba(79,224,150,.1);padding:1px 5px;border-radius:4px;color:var(--cy-2)}
+.shu-badge{font-size:9px;color:var(--cy-3);border:1px solid var(--cy-3);border-radius:8px;padding:1px 6px;letter-spacing:.05em;opacity:.7;margin-left:4px;white-space:nowrap}
+.img-preview{max-width:80px;max-height:60px;border-radius:8px;object-fit:cover;cursor:pointer;margin:4px 4px 0 0;border:1px solid var(--line)}
 /* ── 气泡入场动效（Claude iOS逆向） ── */
 @keyframes bubble-in-right{
   from{transform:translate3d(16px,12px,0);opacity:0;}
@@ -3453,7 +3455,18 @@ async function onFilePicked(input){ const files=[...(input.files||[])]; input.va
   let added=0, note=[];
   for(const f of files.slice(0,3)){
     if(f.size>200000){ note.push(f.name+'（太大，略过正文）'); continue; }
-    if(/^(text\/|application\/(json|xml|javascript)|)/.test(f.type) || /\.(txt|md|json|js|ts|py|csv|log|html?|css|xml|yaml|yml)$/i.test(f.name)){
+    if(/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp)$/i.test(f.name)){
+      if(f.size > 4*1024*1024){ note.push(f.name+'（超过4MB，已跳过）'); }
+      else try{
+        const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); });
+        window._pendingImages = window._pendingImages || [];
+        window._pendingImages.push({ name:f.name, type:f.type||'image/*', data:dataUrl });
+        const img=document.createElement('img'); img.className='img-preview'; img.src=dataUrl; img.title='点击删除';
+        img.onclick=()=>{ const i=(window._pendingImages||[]).findIndex(p=>p.data===dataUrl); if(i>-1) window._pendingImages.splice(i,1); img.remove(); };
+        const box=$('#inp'); box.parentNode.insertBefore(img, box);
+        added++;
+      }catch(e){ note.push(f.name+'（图片读取失败）'); }
+    } else if(/^(text\/|application\/(json|xml|javascript)|)/.test(f.type) || /\.(txt|md|json|js|ts|py|csv|log|html?|css|xml|yaml|yml)$/i.test(f.name)){
       try{ const t=await f.text(); const box=$('#inp'); box.value=(box.value?box.value+'\n\n':'')+`【文件 ${f.name}】\n`+t.slice(0,4000); autogrow(box); syncSend(); added++; }catch(e){ note.push(f.name+'（读取失败）'); }
     } else note.push(f.name+'（'+(f.type||'二进制')+'，需后端解析）');
   }
@@ -3493,7 +3506,16 @@ function pushMsg(role, text, meta, speakable){
 
   m.appendChild(b);
   const foot=document.createElement('div'); foot.className='msg-foot';
-  if(meta){ const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=meta; foot.appendChild(mt); }
+  if(meta){
+    const shuM = (role==='her') ? String(meta).match(/「枢[^」]*」/) : null;
+    if(shuM){
+      const rest = String(meta).replace(shuM[0],'').trim();
+      if(rest){ const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=rest; foot.appendChild(mt); }
+      const badge=document.createElement('span'); badge.className='shu-badge'; badge.textContent=shuM[0]; foot.appendChild(badge);
+    } else {
+      const mt=document.createElement('span'); mt.className='msg-meta'; mt.textContent=meta; foot.appendChild(mt);
+    }
+  }
   if(speakable && role==='her'){ const sp=document.createElement('button'); sp.className='speak-btn'; sp.textContent='🔊'; sp.title='听她说';
     sp.onclick=()=>speak(sp, text); foot.appendChild(sp); }
   if(foot.childNodes.length) m.appendChild(foot);
@@ -3672,7 +3694,41 @@ async function doChat(text){
   const res = await Nexus.talk(text, [...caps]);
   hideTyping();
   if (res) handleReply(res);
-  else pushMsg('her', '…网络断了一下，我还在。再说一次？', '离线');
+  else {
+    (function(){
+      const rq = indexedDB.open('nexus-offline', 1);
+      rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('queue')) db.createObjectStore('queue', {autoIncrement:true}); };
+      rq.onsuccess = e => { const db=e.target.result; const tx=db.transaction('queue','readwrite'); tx.objectStore('queue').add({ text, ts: Date.now() }); tx.oncomplete = ()=>db.close(); };
+    })();
+    if(!window._offlineFlushBound){
+      window._offlineFlushBound = true;
+      window.addEventListener('online', ()=>{
+        const rq = indexedDB.open('nexus-offline', 1);
+        rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('queue')) db.createObjectStore('queue', {autoIncrement:true}); };
+        rq.onsuccess = e => {
+          const db = e.target.result;
+          const tx = db.transaction('queue', 'readwrite');
+          const st = tx.objectStore('queue');
+          const gAll = st.getAll();
+          const gKeys = st.getAllKeys();
+          tx.oncomplete = async () => {
+            const items = gAll.result || [];
+            const keys = gKeys.result || [];
+            if(keys.length){
+              const tx2 = db.transaction('queue', 'readwrite');
+              const st2 = tx2.objectStore('queue');
+              keys.forEach(k => st2.delete(k));
+              tx2.oncomplete = () => db.close();
+            } else db.close();
+            for(const item of items){
+              if(item && item.text){ try{ await doSend(item.text); }catch(_){} }
+            }
+          };
+        };
+      });
+    }
+    pushMsg('her', '已暂存，联网后自动补发。', '离线队列');
+  }
 }
 async function doImage(text){
   showTyping('神枢在生成图像');
