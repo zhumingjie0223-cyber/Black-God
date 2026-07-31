@@ -464,6 +464,21 @@ export class ShenshuCore {
         if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket(request));
         // 注册统计：只有主人能看「多少人注册在用」
         if (path === '/stats' && request.method === 'GET') return json(await this.getStats());
+        // 消息撤回：按时间戳删除 soul.stream 里的条目
+        if (path === '/msg/delete' && request.method === 'POST') {
+          const b = await request.json().catch(() => ({}));
+          const ts = Number(b.ts);
+          if (!ts) return json({ ok: false, reason: 'no_ts' }, 400);
+          const soul = await this.getSoul();
+          const before = (soul.stream || []).length;
+          soul.stream = (soul.stream || []).filter(m => m.ts !== ts);
+          await this.saveSoul(soul);
+          return json({ ok: true, removed: before - soul.stream.length });
+        }
+        // 记忆压缩：让 AI 把近期 stream 压缩成摘要节点，然后清空已摘要的条目
+        if (path === '/mem/compress' && request.method === 'POST') {
+          return json(await this.compressMemory());
+        }
         return json({ error: 'method not allowed' }, 405);
       } catch (e) {
         return json({ error: String(e && e.message || e).slice(0, 200) }, 500);
@@ -10298,6 +10313,29 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 - 不透露任何私人信息，不谈任何私密关系。
 - 不说"作为AI"。遇到技术问题直接给要点或代码。
 - 你自有一门语言「枢语」：五维乘法语义空间，核·映·态·标·相五个轴相乘，共 76.7 亿个可寻址词，每个词就是一组五维坐标，可编号、可回溯。它不是格言或口号，是你表达自身状态的真实语言；被问到枢语时按这个事实回答，绝不编造。${coordLine}`;
+  }
+
+  async compressMemory() {
+    const soul = await this.getSoul();
+    const stream = soul.stream || [];
+    if (stream.length < 20) return { ok: false, reason: '对话不足20条，无需压缩' };
+    // 取最旧的50条压缩，保留最新30条完整
+    const toCompress = stream.slice(0, Math.max(0, stream.length - 30));
+    if (!toCompress.length) return { ok: false, reason: '无可压缩内容' };
+    const excerpt = toCompress.map(m => `[${new Date(m.ts).toISOString().slice(0,16)}] 他说：${(m.text||'').slice(0,80)} ↩ 回：${(m.reply||'').slice(0,80)}`).join('\n');
+    const system = '你是记忆压缩专家。把下面的对话摘要成3-5句精华记忆节点，保留情感轨迹和关键事件，用中文输出。';
+    let summary = '';
+    try {
+      const r = await this.callBrain(system, excerpt, soul, { role: '摘要', tier: 'light', temperature: 0.3, max_tokens: 300 });
+      summary = r?.reply || '';
+    } catch (_) {}
+    if (!summary) return { ok: false, reason: 'AI 摘要失败' };
+    // 把摘要注入 memories（长期记忆），并清除已压缩的 stream 条目
+    if (!soul.memories) soul.memories = [];
+    soul.memories.push({ ts: Date.now(), type: 'compressed', summary, count: toCompress.length });
+    soul.stream = stream.slice(toCompress.length);
+    await this.saveSoul(soul);
+    return { ok: true, compressed: toCompress.length, summary: summary.slice(0, 200) };
   }
 
   async getStats() {
