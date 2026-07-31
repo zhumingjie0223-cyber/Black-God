@@ -57,6 +57,20 @@ const DAILY_REFLECT_CRON = '0 18 * * *'; // 每日自省 cron（UTC 18:00；与 
 export class ShenshuCore {
   // ==== 认知经验 V2：三方法 + memoryExperience 属性 ====
 
+  async checkRateLimit(ip) {
+    const key = 'rl:' + ip;
+    const now = Date.now();
+    let rec = await this.storage.get(key);
+    if (!rec || typeof rec !== 'object' || now - rec.window_start >= 60000) {
+      rec = { count: 0, window_start: now };
+    }
+    rec.count++;
+    const reset = Math.max(1, Math.ceil((rec.window_start + 60000 - now) / 1000));
+    if (rec.count > 120) return { blocked: true, reset };
+    await this.storage.put(key, rec);
+    return { blocked: false, reset };
+  }
+
   _ensureMemoryExperience() {
     if (!this.memoryExperience) this.memoryExperience = new ExperienceMemory();
     return this.memoryExperience;
@@ -152,9 +166,12 @@ export class ShenshuCore {
     this.eventBus.on('improvement.applied', () => this.markCognitiveDirty());
     // 上线安全底线：没配 OWNER_TOKEN = 私密接口（含 IP/定位）对公众开放
     if (!env.OWNER_TOKEN) console.warn('⚠️ [SECURITY] OWNER_TOKEN 未设置：所有私密接口对公众开放。请 npx wrangler secret put OWNER_TOKEN 后重新部署。');
+    this._startTs = Date.now();
     // 影子实例：独立数据，不吸主人的 KV 老记忆。
     this.isShadow = false;
     this.state.blockConcurrencyWhile(async () => {
+      // KV 冷启动预热：并行预取高频 key，减少首次 /talk 延迟
+      Promise.all([this.storage.get('soul'), this.storage.get('cognitive_v2')]).catch(()=>{});
       try {
         const snap = await this.storage.get('cognitive_v2');
         if (snap && typeof snap === 'object') {
@@ -210,6 +227,27 @@ export class ShenshuCore {
   async _fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const _reqToken = (request.headers.get('Authorization') || '').replace('Bearer ', '') || url.searchParams.get('token') || '';
+    const _isOwner = !!this.env?.OWNER_TOKEN && _reqToken === this.env.OWNER_TOKEN;
+    if (!_isOwner) {
+      const rl = await this.checkRateLimit(ip);
+      if (rl.blocked) return new Response(JSON.stringify({error:'too_many_requests',retry_after:rl.reset}),{status:429,headers:{'Content-Type':'application/json','Retry-After':String(rl.reset)}});
+    }
+    if (path === '/stats') {
+      const soul = (await this.storage.get('soul')) || {};
+      return new Response(JSON.stringify({
+        version: soul.version || 0,
+        uptime_s: Math.floor((Date.now() - (this._startTs || Date.now())) / 1000),
+        soul_version: soul.version || 0,
+        experience_count: this.memoryExperience?.records?.length || 0,
+        inner_voice_count: this.memoryExperience?.search('inner')?.length || 0,
+        world_entities: Object.keys(this.worldGraph?.entities || {}).length,
+        capabilities: this.capabilityGrowth?.all?.()?.length || 0,
+        shu_coord: soul.current_shu_coord || null,
+        cognitive_v2_dirty: !!this._cognitiveV2Dirty
+      }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
     // 影子实例首次访问：落盘标记，此后永不迁移主人 KV 数据（数据彻底隔离）
     if (request.headers.get('X-Nexus-Shadow') === '1' && !this.isShadow) {
       this.isShadow = true;
