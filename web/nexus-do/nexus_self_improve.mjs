@@ -1,53 +1,51 @@
+import * as Caps from './capabilities.mjs';
+const CapabilityGrowth = Caps.CapabilityGrowth ?? Caps.default;
+
 export class SelfImprove {
-  constructor({ eventBus, memory } = {}) {
-    this.eventBus = eventBus;
-    this.memory = memory;
-    this.history = [];
+  constructor(opts = {}) {
+    this.threshold = opts.threshold ?? 0.7;
+    this.capabilities = opts.capabilities || new CapabilityGrowth();
+    this.bus = opts.bus || opts.eventBus || null;
+    this.memory = opts.memory || null;
   }
 
-  reflect(failure) {
-    return {
-      ts: Date.now(),
-      kind: failure?.kind || 'unknown',
-      error: failure?.error ? String(failure.error).slice(0, 300) : null,
-      context: failure?.context ? String(failure.context).slice(0, 200) : null,
-    };
-  }
-
-  propose(reflection) {
-    const lessonMap = {
-      brain_error: '调用大脑失败时应降级为本地简答，而非沉默。',
-      empty_reply: '回复为空说明提示或上下文有缺陷，需检查注入的自我模型。',
-      unknown: '未知失败：记录上下文，同类情形下次先复述问题再回答。',
-    };
-    const lesson = lessonMap[reflection.kind] || lessonMap.unknown;
-    return {
-      reflection,
-      lesson,
-      declarationLine: `[教训 ${new Date(reflection.ts).toISOString().slice(0, 10)}] ${lesson}`,
-    };
-  }
-
-  improve(soul, proposal) {
-    try {
-      if (!soul || !proposal?.declarationLine) throw new Error('invalid improve input');
-      const decl = soul.self_declaration || '';
-      if (!decl.includes(proposal.declarationLine)) {
-        soul.self_declaration = (decl ? decl + '\n' : '') + proposal.declarationLine;
-      }
-      const applied = { ...proposal, applied_at: Date.now() };
-      this.history.push(applied);
-      this.eventBus?.emit?.('improvement.applied', applied);
-      this.memory?.remember?.({ type: 'improvement', content: proposal.lesson, meta: proposal.reflection });
-      return applied;
-    } catch (e) {
-      this.eventBus?.emit?.('improvement.failed', { error: e.message, proposal });
-      return null;
+  _emit(event, payload) {
+    if (!this.bus) return;
+    if (typeof this.bus.emit === 'function') {
+      this.bus.emit(event, payload);
+    } else if (typeof this.bus.dispatchEvent === 'function') {
+      try { this.bus.dispatchEvent(new CustomEvent(event, { detail: payload })); } catch (_) {}
     }
   }
 
-  digest() {
-    return this.history.slice(-10);
+  async improve(err, context = {}) {
+    const { result, capability } = context;
+    const score = Number(result?.score);
+
+    if (!Number.isFinite(score)) {
+      this._emit('improvement.skipped', { capability, reason: 'invalid-score' });
+      return { applied: false, reason: 'invalid-score' };
+    }
+
+    if (score >= this.threshold) {
+      const state = this.capabilities?.recordGrowth({ capability, score });
+      const record = {
+        applied: true,
+        capability,
+        score,
+        state,
+        error: err ? String(err?.message ?? err) : null,
+        at: Date.now(),
+      };
+      if (this.memory?.remember) {
+        try { this.memory.remember('improvement', { capability, score, error: record.error }); } catch (_) {}
+      }
+      this._emit('improvement.applied', record);
+      return record;
+    }
+
+    this._emit('improvement.rejected', { capability, score, threshold: this.threshold });
+    return { applied: false, reason: 'below-threshold', score, threshold: this.threshold };
   }
 }
 

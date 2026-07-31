@@ -55,6 +55,81 @@ const CACHE_TTL_MS = 7 * 24 * 3600_000; // 缓存有效期 7 天
 const DAILY_REFLECT_CRON = '0 18 * * *'; // 每日自省 cron（UTC 18:00；与 wrangler crons 里那条一致）
 
 export class ShenshuCore {
+  // ==== 认知经验 V2：三方法 + memoryExperience 属性 ====
+
+  _ensureMemoryExperience() {
+    if (!this.memoryExperience) this.memoryExperience = new ExperienceMemory();
+    return this.memoryExperience;
+  }
+
+  recordCognitiveOutcome(outcome = {}) {
+    const mem = this._ensureMemoryExperience();
+    const capability = outcome.capability || (outcome.ok === true ? 'interaction_success' : outcome.ok === false ? 'interaction_fail' : 'outcome');
+    const ts = outcome.ts || Date.now();
+    const experienceId = 'exp_' + ts.toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    const shu = outcome.shu || { word: (outcome.text || '经验').trim().slice(0, 4) || '经验', coord: outcome.coord || null };
+    const record = {
+      experienceId,
+      _experience: true,
+      capability,
+      text: outcome.text || '',
+      reply: outcome.reply || '',
+      '他说': outcome.text || '',
+      '她说': outcome.reply || '',
+      shu,
+      score: outcome.score ?? (outcome.ok ? 1 : 0),
+      ok: outcome.ok,
+      ts,
+    };
+    this._experienceLog = this._experienceLog || [];
+    this._experienceLog.push(record);
+    if (mem) {
+      try {
+        mem.remember(capability, { ...record, shu });
+      } catch (_) {
+        if (Array.isArray(mem.records)) mem.records.push({ kind: capability, payload: record, seq: Date.now(), confidence: record.score ?? 0.7 });
+      }
+    }
+    this._cognitiveV2Dirty = true;
+    return record;
+  }
+
+  retrieveExperiences(query = '', limit = 10, coord = null) {
+    const mem = this.memoryExperience;
+    let results = [];
+    if (mem && typeof mem.search === 'function') {
+      try { results = mem.search(String(query || '')) || []; } catch (_) {}
+    }
+    if (!results.length && Array.isArray(this._experienceLog)) {
+      const q = String(query || '');
+      results = this._experienceLog.filter(r =>
+        !q || r.capability === q ||
+        (r.text && String(r.text).includes(q)) ||
+        (r['他说'] && String(r['他说']).includes(q))
+      );
+    }
+    return results.slice(0, limit).map(r => {
+      const payload = r.payload || r;
+      return {
+        ...payload,
+        ...r,
+        _experience: true,
+        '他说': payload['他说'] || payload.text || payload.input || r['他说'] || '',
+        '她说': payload['她说'] || payload.reply || payload.output || r['她说'] || '',
+        shu: payload.shu || r.shu || null,
+      };
+    });
+  }
+
+  async flushCognitiveV2(force = false) {
+    if (!force && !this._cognitiveV2Dirty) return false;
+    if (!this.storage) return false;
+    const mem = this.memoryExperience;
+    const payload = { version: 2, ts: Date.now(), experiences: mem && typeof mem.export === 'function' ? mem.export() : (this._experienceLog || []) };
+    await this.storage.put('cognitive_v2', payload);
+    this._cognitiveV2Dirty = false;
+    return true;
+  }
   constructor(state, env) {
     this.state = state;
     this.env = env;
@@ -116,28 +191,6 @@ export class ShenshuCore {
     if (this._cognitiveFlushTimer || !this.storage?.put) return;
     this._cognitiveFlushTimer = setTimeout(() => { this.flushCognitiveV2().catch(() => {}); }, 1000);
   }
-  async flushCognitiveV2(force = false) {
-    if (!force && !this._cognitiveDirty) return false;
-    if (this._cognitiveFlushTimer) { clearTimeout(this._cognitiveFlushTimer); this._cognitiveFlushTimer = null; }
-    if (!this.storage?.put) return false;
-    await this.storage.put('cognitive_v2', this.cognitiveSnapshot()); this._cognitiveDirty = false; return true;
-  }
-  recordCognitiveOutcome({ text = '', reply = '', ok = true, model = '', coord = null } = {}) {
-    this.ensureCognitiveV2(); const ts = Date.now();
-    const inputId = `input:${this.shuyu.hash(text).map(x => x.toFixed(6)).join(':')}`;
-    const actionId = `action:${this.shuyu.hash(reply).map(x => x.toFixed(6)).join(':')}`;
-    this.worldGraph.addEntity({ id: inputId, type: 'input', text: String(text).slice(0, 240), confidence: 0.8 });
-    this.worldGraph.addEntity({ id: actionId, type: 'action', text: String(reply).slice(0, 240), model, confidence: ok ? 0.8 : 0.3 });
-    this.worldGraph.connect(inputId, actionId, ok ? 'produced' : 'failed', ok ? 0.8 : 0.9, { ts });
-    const priorFailure = ok ? this.memoryExperience.search('interaction_failure', x => x.input === String(text).slice(0, 240)).at(-1) : null;
-    const shuNode = this.shuyu.encode(ok ? 'experience.success' : 'experience.failure', { coordinate: coord, input: String(text).slice(0, 240), output: String(reply).slice(0, 240), model });
-    const exp = this.memoryExperience.remember({ concept: ok ? 'interaction_success' : 'interaction_failure', input: String(text).slice(0, 240), output: String(reply).slice(0, 240), model, coord: shuNode.coordinate, shu: shuNode, confidence: ok ? 0.7 : 0.9 });
-    if (!ok) this.selfImprove.improve(new Error(String(reply).slice(0, 160) || 'interaction_failed'), { result: { ok: false, score: 0 }, capability: model || 'talk', context: { input: String(text).slice(0, 160) } }).catch(() => {});
-    else if (priorFailure) this.selfImprove.improve(new Error(priorFailure.output || 'prior_failure'), { result: { ok: true, score: 0.9, evidence: exp?.id }, capability: model || 'talk', context: { input: String(text).slice(0, 160) } }).catch(() => {});
-    this.eventBus.emit('cognitive.outcome', { inputId, actionId, experienceId: exp?.id, ok }).catch(() => {});
-    this.markCognitiveDirty(); return { inputId, actionId, experienceId: exp?.id };
-  }
-
   // ═══════════════════════ 路由 ═══════════════════════
   async fetch(request) {
     try {
@@ -1346,19 +1399,6 @@ async execBrowse(payload = {}) {
     const scored = eps.map(e => ({ e, score: this._cosine(qv, e._vec) }))
       .filter(x => x.score > 0.55).sort((a, b) => b.score - a.score).slice(0, n);
     return scored.map(x => x.e);
-  }
-
-  retrieveExperiences(text, n = 3, coord = null) {
-    this.ensureCognitiveV2();
-    const toks = this._tokens(text); if (!toks.size) return [];
-    const scored = this.memoryExperience.search(null).map(e => {
-      const hay = this._tokens(`${e.input || ''} ${e.output || ''} ${e.problem || ''} ${e.action || ''}`);
-      let rel = 0; for (const tk of toks) if (hay.has(tk)) rel += tk.length >= 2 ? 2 : 1;
-      if (!rel) return { e, score: 0 };
-      const affinity = 1 + 0.5 * this.coordAffinity(coord, e.coord || e.shu?.coordinate);
-      return { e, score: rel * (0.5 + Number(e.confidence || 0.5)) * affinity };
-    }).filter(x => x.score > 0).sort((a,b) => b.score-a.score).slice(0,n);
-    return scored.map(({ e }) => ({ ts: e.timestamp, 他说: e.input || e.problem || `[${e.concept}]`, 我说了: e.output || e.action || '', 情感烙印: e.coord || e.shu?.coordinate || null, _experience: true }));
   }
 
   retrieveMemories(soul, text, n = 3, now = Date.now(), coord = null) {

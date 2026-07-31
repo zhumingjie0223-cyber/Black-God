@@ -77,11 +77,11 @@ export class ExperienceMemory {
 
   /**
    * 强化一条经验记录。
-   * @param {number|string} ref - seq 编号、record id 或 kind
-   * @param {number} [confidence] - 可选；传入时设置 confidence（钳制到 [0,1]），不传则保持不变
+   * @param {number|string} ref - seq 编号、record id（如 "em-7-1"）或 kind
+   * @param {number} [_confidence] - 已废弃，忽略；confidence 固定设为 1
    * @returns {object|null} record
    */
-  reinforce(ref, confidence) {
+  reinforce(ref, _confidence) {
     let record = null;
     if (Number.isFinite(ref)) {
       record = this.records.find((r) => r.seq === ref) ?? null;
@@ -94,14 +94,12 @@ export class ExperienceMemory {
         }
       }
     } else {
-      throw new TypeError('ExperienceMemory.reinforce: ref must be a seq number or non-empty kind string');
+      throw new TypeError('ExperienceMemory.reinforce: ref must be a seq number or non-empty id/kind string');
     }
     if (!record) return null;
     record.reinforcedCount = (record.reinforcedCount || 0) + 1;
     record.lastReinforcedAt = this._clock();
-    if (confidence !== undefined) {
-      record.confidence = Math.min(1, Math.max(0, confidence));
-    }
+    record.confidence = 1;
     this.eventBus?.emit('memory:reinforced', record);
     return record;
   }
@@ -159,7 +157,8 @@ export class ExperienceMemory {
         return deepMatch(r.payload);
       })
       .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
-      .slice(0, opts.count || 20);
+      .slice(0, opts.count || 20)
+      .map((r) => r.payload?.shu != null ? { ...r, shu: r.payload.shu } : r);
   }
 
   /**
@@ -195,11 +194,8 @@ export class ExperienceMemory {
     this.records =
       this.limit === Infinity ? valid.slice() : valid.slice(-this.limit);
 
-    // 同步序号计数器，避免恢复后 seq 冲突
-    this._seq = this.records.reduce(
-      (max, r) => (Number.isFinite(r.seq) && r.seq > max ? r.seq : max),
-      0
-    );
+    // 同步序号计数器为所有记录的最大 seq，避免恢复后新 remember 的 seq 冲突
+    this._seq = valid.length > 0 ? Math.max(...valid.map((r) => r.seq)) : 0;
 
     this.eventBus?.emit('memory:restored', { count: this.records.length });
 
