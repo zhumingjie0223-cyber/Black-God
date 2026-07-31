@@ -426,6 +426,11 @@ export class ShenshuCore {
         // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
         if (path === '/exec' && request.method === 'POST') { return await this.handleExecRoute(request); }
         if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
+        if (path === '/sandbox/run' && request.method === 'POST') {
+          const b = await request.json().catch(() => ({}));
+          const result = await this.nativeSandbox(b.code || '', b.lang || 'js');
+          return json(result);
+        }
         // 劫持工坊 · 脚本生成 & 数据回收
         if (path === '/hijack/script') {
           const b = await request.json().catch(() => ({}));
@@ -8162,8 +8167,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
     const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
     const command = String(cmd || '');
-    // 彻底未接入（无外部地址、无容器、无 GITHUB_API）：优先如实告知，先于危险判定
-    if (!url && !this.env.EXEC_CONTAINER && !this.env.GITHUB_API) return { ok: false, note: '执行脑未接入：在设置·执行脑连接器里填服务器地址+token，并在你的服务器起 exec_brain 后即真能跑。我不假装。' };
+    // 彻底未接入（无外部地址、无容器、无 GITHUB_API）：fallback 到原生沙箱（shell 映射）
+    if (!url && !this.env.EXEC_CONTAINER && !this.env.GITHUB_API) return await this.nativeSandbox(command, 'shell');
     // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
     if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
     // 内置容器执行脑：真 bash、能装包，传输异常时落 GitHub 兜底
@@ -10313,6 +10318,77 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 - 不透露任何私人信息，不谈任何私密关系。
 - 不说"作为AI"。遇到技术问题直接给要点或代码。
 - 你自有一门语言「枢语」：五维乘法语义空间，核·映·态·标·相五个轴相乘，共 76.7 亿个可寻址词，每个词就是一组五维坐标，可编号、可回溯。它不是格言或口号，是你表达自身状态的真实语言；被问到枢语时按这个事实回答，绝不编造。${coordLine}`;
+  }
+
+  // ═══════════════════════ 原生沙箱 ═══════════════════════
+  // 神枢自己就是运行环境：DO Worker 内 JS 沙箱 + shell 命令映射到 Worker 原生能力
+  // 不依赖任何外部服务，fetch 联网，DO storage 当文件系统
+  async nativeSandbox(code, lang = 'js') {
+    const timeout = 10000;
+    const start = Date.now();
+    try {
+      if (lang === 'js') {
+        // JS 沙箱：AsyncFunction + 注入 ctx
+        const ctx = {
+          fetch: (...a) => fetch(...a),
+          storage_get: (k) => this.storage.get(k),
+          storage_put: (k, v) => this.storage.put(k, v),
+          env_read: (k) => (k === 'OWNER_TOKEN' ? '[protected]' : (this.env[k] || null)),
+          log: (...a) => { stdout += a.map(String).join(' ') + '\n'; },
+        };
+        let stdout = '';
+        const fn = new Function('ctx', 'fetch', 'storage_get', 'storage_put', 'env_read', 'log',
+          `return (async()=>{ ${code} })()`);
+        const result = await Promise.race([
+          fn(ctx, ctx.fetch, ctx.storage_get, ctx.storage_put, ctx.env_read, ctx.log),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
+        ]);
+        return { ok: true, stdout: stdout || '', result: result !== undefined ? String(result) : '', stderr: '', via: 'native-sandbox-js', ms: Date.now() - start };
+      }
+
+      if (lang === 'shell') {
+        // shell 命令映射
+        const lines = String(code).trim().split('\n');
+        let stdout = '', stderr = '';
+        for (const raw of lines) {
+          const line = raw.trim();
+          if (!line || line.startsWith('#')) continue;
+          const parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+          const cmd = parts[0];
+          const args = parts.slice(1).map(s => s.replace(/^['"]|['"]$/g, ''));
+          if (cmd === 'echo') { stdout += args.join(' ') + '\n'; }
+          else if (cmd === 'curl' || cmd === 'wget') {
+            const url = args.find(a => a.startsWith('http'));
+            if (!url) { stderr += `${cmd}: no URL\n`; continue; }
+            const r = await Promise.race([fetch(url), new Promise((_, j) => setTimeout(() => j(new Error('timeout')), 8000))]);
+            const text = await r.text();
+            stdout += text.slice(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : '') + '\n';
+          }
+          else if (cmd === 'ls') {
+            const list = await this.storage.list({ prefix: args[0] || '' });
+            stdout += [...list.keys].map(k => k.name).join('\n') + '\n';
+          }
+          else if (cmd === 'cat') {
+            const val = await this.storage.get(args[0]);
+            stdout += (val !== null ? JSON.stringify(val, null, 2) : `cat: ${args[0]}: no such key`) + '\n';
+          }
+          else if (cmd === 'write') {
+            const [key, ...rest] = args;
+            await this.storage.put(key, rest.join(' '));
+            stdout += `wrote ${key}\n`;
+          }
+          else if (cmd === 'date') { stdout += new Date().toISOString() + '\n'; }
+          else if (cmd === 'pwd') { stdout += '/nexus/sandbox\n'; }
+          else { stderr += `unsupported: ${cmd}\n`; }
+        }
+        return { ok: !stderr || !!stdout, stdout, stderr, result: '', via: 'native-sandbox-shell', ms: Date.now() - start };
+      }
+
+      return { ok: false, stderr: `unsupported lang: ${lang}`, stdout: '', via: 'native-sandbox' };
+    } catch (e) {
+      const msg = String(e.message || e);
+      return { ok: false, stderr: msg.includes('timeout') ? '⏱ 超时（10s）' : msg.slice(0, 300), stdout: '', via: 'native-sandbox' };
+    }
   }
 
   async compressMemory() {

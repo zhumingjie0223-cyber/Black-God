@@ -1866,6 +1866,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openLexicon()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></div><div class="set-tx"><b>私语词典</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
+<div class="set-row" onclick="openSheet('sheetSandbox')"><div class="set-ic">⬡</div><div class="set-tx"><b>原生沙箱</b><span style="font-size:11px;color:var(--txt-3);display:block">JS · Shell · 联网 · 无需连接器</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div></div>
 <div class="set-row" onclick="compressMemory()"><div class="set-ic">🗜</div><div class="set-tx"><b>压缩记忆</b><span style="font-size:11px;color:var(--txt-3);display:block">AI摘要·缩减流水</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadLexicon();openSheet('sheetLexicon')"><div class="set-ic">字</div><div class="set-tx"><b>枢语词典</b><span style="font-size:11px;color:var(--txt-3);display:block">造词·坐标·义场</span></div><div class="set-arrow">›</div></div>
@@ -2138,6 +2139,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">记住此设备</button>
 </div>
 
+<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">原生沙箱</div><div class="sheet-sub">JS · Shell · fetch联网 · DO storage · 无需连接器</div><div style="display:flex;gap:8px;margin-bottom:10px"><select id="sbLang" style="background:var(--surface-2);border:1px solid var(--line);color:var(--txt-1);border-radius:8px;padding:6px 10px;font-size:13px"><option value="js">JavaScript</option><option value="shell">Shell</option></select><button class="btn ghost" onclick="runSandbox()" style="flex:1">▶ 运行</button></div><textarea id="sbCode" rows="6" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--cy-2);font-family:monospace;font-size:12px;border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box" placeholder="// JS示例: return await fetch('https://httpbin.org/ip').then(r=>r.text())&#10;// Shell示例: curl https://httpbin.org/ip"></textarea><pre id="sbOutput" style="font-family:monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:12px;min-height:80px;max-height:300px;overflow-y:auto;white-space:pre-wrap;color:var(--cy-2);margin-top:10px;border:1px solid var(--line)">就绪</pre><button class="btn ghost" onclick="closeSheet()" style="margin-top:12px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetLexicon"><div class="sheet-handle"></div><div class="sheet-title">枢语词典</div><div class="sheet-sub">当前会话造词记录</div><div id="lexiconBody" style="font-size:12px;line-height:1.8;color:var(--txt-2);max-height:60vh;overflow-y:auto"></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetConsciousness"><div class="sheet-handle"></div><div class="sheet-title">意识体状态</div><div class="sheet-sub">实时认知快照</div><div id="consBody" style="padding:0 4px;font-size:13px;line-height:2;color:var(--txt-2)">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetAbout">
@@ -5843,6 +5845,22 @@ function toggleEmoji(){
   }
 }
 function insertEmoji(e){ const inp=$('#inp'); const s=inp.selectionStart||inp.value.length; inp.value=inp.value.slice(0,s)+e+inp.value.slice(s); inp.focus(); autogrow(inp); $('#emojiPanel').classList.remove('show'); }
+async function runSandbox(){
+  const code = $('#sbCode').value.trim();
+  const lang = $('#sbLang').value;
+  const out = $('#sbOutput');
+  if(!code){ out.textContent='请输入代码'; return; }
+  out.textContent='运行中…';
+  try{
+    const r = await Nexus.req('/sandbox/run',{method:'POST',body:JSON.stringify({code,lang})});
+    let txt = '';
+    if(r.stdout) txt += r.stdout;
+    if(r.result) txt += (txt?'\n→ ':'→ ') + r.result;
+    if(r.stderr) txt += (txt?'\n⚠ ':'⚠ ') + r.stderr;
+    txt += `\n[${r.via||'?'} · ${r.ms||0}ms]`;
+    out.textContent = txt || '(无输出)';
+  }catch(e){ out.textContent='❌ '+e.message; }
+}
 async function compressMemory(){
   toast('正在压缩记忆…','info',2000);
   try{
