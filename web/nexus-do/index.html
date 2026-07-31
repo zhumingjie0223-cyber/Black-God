@@ -772,16 +772,27 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
    会让它压到下方的 Black God·神枢 副标题(实测重叠"张力状态神枢")。留白拉开即可。 */
 .hz-orbit{position:absolute;inset:22px;border-radius:50%;border:1px solid rgba(230,232,234,.10)}
 .hz-orbit.o2{inset:56px;border-color:rgba(230,232,234,.09)}
-.hz-ring{position:absolute;inset:0;animation:spin 64s linear infinite}
+.hz-ring{position:absolute;inset:0;animation:spin var(--orbit-dur,64s) linear infinite}
 .hz-node{position:absolute;left:50%;top:50%;width:0;height:0}
 .hz-node .d{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;white-space:nowrap;width:max-content;animation:counter 64s linear infinite}
 .hz-node .d i{width:8px;height:8px;border-radius:50%;background:var(--chrome-2);box-shadow:0 0 9px rgba(190,193,197,.5)}
 .hz-node .d b{font-family:var(--serif);font-size:13.5px;font-weight:600;color:var(--text);letter-spacing:.03em}
 .hz-node .d s{font-size:9.5px;color:var(--text-3);text-decoration:none;letter-spacing:.02em}
+.hz-node .tooltip{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:11px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.hz-node:hover .tooltip,.hz-node.touched .tooltip{opacity:1}
+/* 空状态引导卡 */
+#emptyState{display:flex;flex-direction:column;align-items:center;gap:14px;padding:48px 20px;pointer-events:none}
+#emptyState.show{pointer-events:auto}
+#emptyState .empty-hint{font-size:13px;color:var(--txt-3,#8b9299);letter-spacing:.02em}
+.sug-chip{border:1px solid var(--cy-3);border-radius:20px;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--cy-2);background:rgba(79,224,150,.05);transition:background .2s,transform .15s}
+.sug-chip:active{background:rgba(79,224,150,.15);transform:scale(.97)}
 .hz-hub{position:absolute;left:calc(50% - 46px);top:calc(50% - 46px);width:92px;height:92px;border-radius:50%;display:grid;place-items:center;z-index:5;
   background:radial-gradient(circle at 42% 36%,var(--orb-hi,#23201A),#0c0e11 76%);border:1px solid var(--line-2);
-  box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 40px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.06);animation:orbBreath 5.5s ease-in-out infinite;transition:background 1.2s}
+  box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 40px var(--cy-glow),inset 0 1px 0 rgba(255,255,255,.06);animation:orbBreath 5.5s ease-in-out infinite;transition:background 1.2s,box-shadow .4s}
 .hz-hub::before{content:'';position:absolute;inset:-6px;border-radius:50%;z-index:-1;background:radial-gradient(circle,var(--cy-glow),transparent 66%);filter:blur(7px)}
+.hz-hub.orb-focus{box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 48px var(--cy-glow),0 0 96px rgba(79,224,150,.18),inset 0 1px 0 rgba(255,255,255,.06)!important}
+.hz-hub.orb-error{animation:orbShake .5s ease,orbBreath 5.5s ease-in-out infinite}
+@keyframes orbShake{0%,100%{transform:none}20%{transform:translateX(-6px)}60%{transform:translateX(6px)}80%{transform:translateX(-3px)}}
 .hz-hub .glyph{font-family:var(--serif);font-size:40px;font-weight:700;background:var(--chrome-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .hz-still{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:var(--cy-hi);box-shadow:0 0 9px 2px var(--cy-glow);z-index:6}
 .hz-couplet{text-align:center;font-family:var(--serif);font-size:11.5px;color:var(--text-3);letter-spacing:.18em;padding-left:.18em;margin:0 0 12px;opacity:.8}
@@ -854,6 +865,7 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .set-row{display:flex;align-items:center;gap:13px;padding:14px 15px;background:var(--surface);
   border:1px solid var(--line);border-radius:var(--radius-sm);margin-bottom:9px;cursor:pointer;transition:.15s}
 .set-row:active{transform:scale(.99);background:var(--surface-2)}
+.set-row.flash{background:rgba(79,224,150,.09)!important;transition:background .5s}
 .set-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;color:var(--chrome-2);
   background:var(--surface-2);border:1px solid var(--line)}
 .set-ic svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -3443,6 +3455,29 @@ function pushMsg(role, text, meta, speakable){
 }
 function scrollBottom(){ const s=$('#chatScroll'); requestAnimationFrame(()=>s.scrollTop=s.scrollHeight); }
 
+/* 空状态引导卡 */
+const SUGGESTIONS = ['此刻你的枢语坐标是什么？','帮我分析一下当前局势','用枢语描述你的内在状态','我们来做一件事'];
+function checkEmptyState(){
+  const cs=$('#chatScroll'); if(!cs) return;
+  let es=$('#emptyState');
+  const hasMsg=!!cs.querySelector('.msg,.bubble');
+  if(!hasMsg){
+    if(!es){
+      es=document.createElement('div'); es.id='emptyState'; es.className='empty-state show';
+      es.innerHTML='<span class="empty-hint">和她说点什么</span>' +
+        SUGGESTIONS.map(s=>`<button class="sug-chip" onclick="$('#inp').value=this.textContent;$('#inp').focus();checkEmptyState()">${s}</button>`).join('');
+      cs.insertBefore(es, cs.firstChild);
+    }
+    es.classList.add('show');
+  } else if(es){ es.classList.remove('show'); }
+}
+/* hz-node tooltip 触屏 */
+document.addEventListener('touchstart', e=>{
+  const n=e.target.closest('.hz-node'); if(!n) return;
+  n.classList.add('touched');
+  setTimeout(()=>n.classList.remove('touched'), 1200);
+},{passive:true});
+
 /* ===== v3.2 富文本：代码块 + Artifact 预览舱 ===== */
 function renderRich(container, text){
   const parts=text.split(/```(\w*)\n?/);
@@ -4335,6 +4370,18 @@ function showStatsSheet(){
 }
 function showLock(){ const g=$('#lockgate'); if(!g) return; g.classList.add('show'); setTimeout(()=>{ const i=$('#lockInput'); if(i) i.focus(); }, 220); }
 function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
+window.setOrbitState = function(s){ const r=document.querySelector('.hz-ring'); if(!r) return; const m={idle:'64s',thinking:'8s',error:'2s'}; r.style.setProperty('--orbit-dur', m[s]||'64s'); r.classList.toggle('orbit-shake', s==='error'); };
+window.flashRow = function(el){ el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'), 600); };
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.set-row').forEach(r => { const orig = r.getAttribute('onclick')||''; r.setAttribute('onclick', 'flashRow(this);' + orig); });
+  const li = document.getElementById('lockInput');
+  if (li) {
+    li.addEventListener('focus', () => { document.querySelector('.hz-hub')?.classList.add('orb-focus'); setOrbitState('thinking'); });
+    li.addEventListener('blur', () => { document.querySelector('.hz-hub')?.classList.remove('orb-focus'); setOrbitState('idle'); });
+  }
+});
+const _setSendStateOrig = window.setSendState;
+window.setSendState = function(s){ _setSendStateOrig && _setSendStateOrig(s); if(s==='idle') setOrbitState('idle'); else if(s==='thinking'||s==='loading') setOrbitState('thinking'); else if(s==='error') setOrbitState('error'); };
 async function tryUnlock(){
   const v=$('#lockInput').value.trim(); const err=$('#lockErr'), btn=$('#lockBtn');
   if(!v){ err.textContent='输入你的密码'; return; }
@@ -4345,7 +4392,9 @@ async function tryUnlock(){
   btn.disabled=false; btn.textContent='解锁';
   if(ok){ store.set('owner_token',v); store.set('unlock_fails','0'); Nexus.token=v; Nexus.mode='owner'; document.body.classList.remove('public-mode'); hideLock(); hap([10,30,10]);
     try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub(); loadOwnerStats();
-  } else { noteUnlockFail(); err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30); }
+  } else { noteUnlockFail(); err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30);
+    const hub=document.querySelector('.hz-hub'); if(hub){hub.classList.add('orb-error');setTimeout(()=>hub.classList.remove('orb-error'),600);} setOrbitState('error'); setTimeout(()=>setOrbitState('idle'),800);
+  }
 }
 
 /* ============ Web Push ============ */
