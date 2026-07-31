@@ -767,7 +767,9 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
 .hub-p-right .hub-live{font-size:15px;font-weight:600;color:var(--cy-1)}
 .hub-p-right .hub-decl{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.6}
 /* 环中盘 —— 万物绕枢、枢自不动 */
-.huanzhong{position:relative;width:262px;height:262px;margin:4px auto 0}
+.huanzhong{position:relative;width:262px;height:262px;margin:4px auto 16px}
+/* 底部留 16px:环上"态/标"节点的说明文字会向下溢出容器约 5px,原先 margin-bottom:0
+   会让它压到下方的 Black God·神枢 副标题(实测重叠"张力状态神枢")。留白拉开即可。 */
 .hz-orbit{position:absolute;inset:22px;border-radius:50%;border:1px solid rgba(230,232,234,.10)}
 .hz-orbit.o2{inset:56px;border-color:rgba(230,232,234,.09)}
 .hz-ring{position:absolute;inset:0;animation:spin 64s linear infinite}
@@ -892,7 +894,11 @@ textarea#inp{width:100%;border:none;background:none;outline:none;resize:none;fon
   background:color-mix(in srgb,var(--bg-2) 82%,transparent);
   backdrop-filter:blur(40px) saturate(1.4);-webkit-backdrop-filter:blur(40px) saturate(1.4);
   border-top:1px solid var(--line-2);border-radius:26px 26px 0 0;
-  padding:10px 18px calc(24px + var(--safe-bot));max-height:86vh;overflow-y:auto;
+  padding:calc(10px + var(--safe-top)) 18px calc(24px + var(--safe-bot));overflow-y:auto;
+  /* 顶部避让:内容撑满时 sheet 不再上探进灵动岛/状态栏。原 max-height:86vh 从底往上到 14vh,
+     在灵动岛机型上会把标题顶进状态栏(糊成"大脑舰队人·神")。改为不侵入顶部安全区 + 顶部
+     padding 计入 safe-top 双保险;用 dvh 贴合 iOS 真实可视高度。 */
+  max-height:min(86vh, calc(100dvh - var(--safe-top) - 8px));
   transition:transform .42s var(--ease);box-shadow:0 -20px 60px rgba(0,0,0,.5)}
 .sheet.show{transform:translateY(0)}
 .sheet.dragging{transition:none}
