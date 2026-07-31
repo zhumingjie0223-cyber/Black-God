@@ -1869,7 +1869,9 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="openSheet('sheetSandbox')"><div class="set-ic">⬡</div><div class="set-tx"><b>原生沙箱</b><span style="font-size:11px;color:var(--txt-3);display:block">JS · Shell · 联网 · 无需连接器</span></div><div class="set-arrow">›</div></div>
+<div class="set-row" onclick="togglePin()"><div class="set-ic">🔐</div><div class="set-tx"><b>PIN 锁屏</b><span id="pinStatus" style="font-size:11px;color:var(--txt-3);display:block">轻触设置或清除</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div></div>
+<div class="set-row" onclick="loadPushInfo();openSheet('sheetPush')"><div class="set-ic">🔔</div><div class="set-tx"><b>推送通知</b><span style="font-size:11px;color:var(--txt-3);display:block">订阅·测试·取消</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="compressMemory()"><div class="set-ic">🗜</div><div class="set-tx"><b>压缩记忆</b><span style="font-size:11px;color:var(--txt-3);display:block">AI摘要·缩减流水</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadLexicon();openSheet('sheetLexicon')"><div class="set-ic">字</div><div class="set-tx"><b>枢语词典</b><span style="font-size:11px;color:var(--txt-3);display:block">造词·坐标·义场</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadCapRank();openSheet('sheetCapRank')"><div class="set-ic">🏆</div><div class="set-tx"><b>能力成长排行</b><span style="font-size:11px;color:var(--txt-3);display:block">技能·分数·成长轨迹</span></div><div class="set-arrow">›</div></div>
@@ -2142,6 +2144,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">记住此设备</button>
 </div>
 
+<div class="sheet" id="sheetPush"><div class="sheet-handle"></div><div class="sheet-title">🔔 推送通知</div><div class="sheet-sub">Web Push 订阅管理</div><div id="pushStatus" style="font-size:13px;color:var(--txt-2);margin-bottom:12px">检查中…</div><div style="display:flex;flex-direction:column;gap:8px"><button class="btn" onclick="subscribePush()">📲 订阅推送</button><button class="btn ghost" onclick="testPush()">📨 发送测试</button><button class="btn ghost" style="color:#e5534b" onclick="unsubscribePush()">🗑 取消订阅</button></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">原生沙箱</div><div class="sheet-sub">JS · Shell · fetch联网 · DO storage · 无需连接器</div><div style="display:flex;gap:8px;margin-bottom:10px"><select id="sbLang" style="background:var(--surface-2);border:1px solid var(--line);color:var(--txt-1);border-radius:8px;padding:6px 10px;font-size:13px"><option value="js">JavaScript</option><option value="shell">Shell</option></select><button class="btn ghost" onclick="runSandbox()" style="flex:1">▶ 运行</button></div><details style="margin-bottom:8px;font-size:11px"><summary style="cursor:pointer;color:var(--cy-2)">📖 可用命令 ▸</summary><pre style="margin:6px 0;font-size:10px;line-height:1.8;color:var(--txt-2)">Shell: echo curl wget jq ping head ls cat set del uuid base64 env sleep date pwd
 JS DSL: fetch json uuid timestamp base64_encode base64_decode storage_get storage_set</pre></details>
 <textarea id="sbCode" rows="6" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--cy-2);font-family:monospace;font-size:12px;border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box" placeholder="// JS示例: return await fetch('https://httpbin.org/ip').then(r=>r.text())&#10;// Shell示例: curl https://httpbin.org/ip"></textarea><pre id="sbOutput" style="font-family:monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:12px;min-height:80px;max-height:300px;overflow-y:auto;white-space:pre-wrap;color:var(--cy-2);margin-top:10px;border:1px solid var(--line)">就绪</pre><button class="btn ghost" onclick="closeSheet()" style="margin-top:12px;width:100%">关闭</button></div>
@@ -3888,6 +3891,27 @@ function openCmd(){ $('#cmdMask').classList.add('show'); $('#cmdPalette').classL
 function closeCmd(){ $('#cmdMask').classList.remove('show'); $('#cmdPalette').classList.remove('show'); $('#cmdInput').value=''; }
 function renderSkills(q){ const list=SKILLS.filter(s=>!q||s.t.includes(q)||s.s.includes(q));
   $('#cmdList').innerHTML=list.map((s,i)=>`<div class="cmd-item" onclick="SKILLS[${SKILLS.indexOf(s)}].run()"><div class="cmd-ic">${s.ic}</div><div class="cmd-tx"><b>${s.t}</b><span>${s.s}</span></div></div>`).join(''); }
+
+function highlightBubbles(bubbles, query) {
+  const q = (query || '').trim();
+  bubbles.forEach(bubble => {
+    if (bubble.dataset.origText === undefined) bubble.dataset.origText = bubble.textContent;
+    const orig = bubble.dataset.origText;
+    if (!q) { bubble.textContent = orig; bubble.style.opacity = ''; return; }
+    const hit = orig.toLowerCase().includes(q.toLowerCase());
+    if (hit) {
+      const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(esc, 'gi');
+      const escHtml = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      bubble.innerHTML = orig.replace(rx, m => '\x00'+m+'\x01').split(/(\x00|\x01)/).reduce((a,p) => {
+        if(p==='\x00') return a+'<mark style="background:rgba(80,220,150,.3);border-radius:2px">';
+        if(p==='\x01') return a+'</mark>';
+        return a+escHtml(p);
+      },'');
+      bubble.style.opacity = '';
+    } else { bubble.textContent = orig; bubble.style.opacity = '0.3'; }
+  });
+}
 function cmdInputHandler(e){ const v=e.target.value.trim();
   if(e.key==='Enter'&&v){
     if(v.startsWith('/')){
@@ -3902,9 +3926,7 @@ function cmdInputHandler(e){ const v=e.target.value.trim();
   if(v.startsWith('/')){
     // 实时搜索高亮
     const q=v.slice(1).trim().toLowerCase();
-    document.querySelectorAll('.bubble').forEach(b=>{
-      b.style.outline = (q && b.textContent.toLowerCase().includes(q)) ? '1px solid var(--cy-3)' : '';
-    });
+    highlightBubbles([...document.querySelectorAll('.bubble')], q);
   } else {
     document.querySelectorAll('.bubble').forEach(b=>b.style.outline='');
     renderSkills(v);
@@ -5848,7 +5870,11 @@ async function loadConsciousness(){
     const c=r.shu_coord;
     const coord=c?`核${c.c??'?'} 映${c.m??'?'} 态${c.s??'?'} 标${c.k??'?'} 相${c.p??'?'}`:'—';
     const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
-    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>📦 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>`;
+    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>📦 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>\` + (() => {
+    const mts=[...document.querySelectorAll('.meta-token')];
+    let ti=0,to2=0; mts.forEach(el=>{const m=el.textContent.match(/(\d+)→(\d+)/);if(m){ti+=+m[1];to2+=+m[2];}});
+    return mts.length ? `<div>💬 本轮累计：in <b>${ti}</b> / out <b>${to2}</b></div>` : '';
+  })() + `;
   }catch(e){$('#consBody').textContent='读取失败';}
 }
 async function loadLexicon(){
@@ -5877,6 +5903,16 @@ function toggleEmoji(){
   }
 }
 function insertEmoji(e){ const inp=$('#inp'); const s=inp.selectionStart||inp.value.length; inp.value=inp.value.slice(0,s)+e+inp.value.slice(s); inp.focus(); autogrow(inp); $('#emojiPanel').classList.remove('show'); }
+function togglePin(){
+  const cur=localStorage.getItem('nexus_pin');
+  if(cur){
+    if(confirm('清除 PIN 锁屏？')) { localStorage.removeItem('nexus_pin'); const s=$('#pinStatus'); if(s) s.textContent='未设置'; if(typeof toast==='function') toast('PIN已清除','ok',2000); }
+  } else {
+    const p=prompt('设置4位数字PIN（留空取消）：');
+    if(p && /^\d{4}$/.test(p)){ localStorage.setItem('nexus_pin',p); const s=$('#pinStatus'); if(s) s.textContent='已设置'; if(typeof toast==='function') toast('PIN已设置','ok',2000); }
+    else if(p!==null) if(typeof toast==='function') toast('必须是4位数字','err',2000);
+  }
+}
 async function runSandbox(){
   const code = $('#sbCode').value.trim();
   const lang = $('#sbLang').value;
@@ -5892,6 +5928,32 @@ async function runSandbox(){
     txt += `\n[${r.via||'?'} · ${r.ms||0}ms]`;
     out.textContent = txt || '(无输出)';
   }catch(e){ out.textContent='❌ '+e.message; }
+}
+async function loadPushInfo(){
+  const el=$('#pushStatus');
+  if(!el) return;
+  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+  const sw = navigator.serviceWorker?.controller ? '已注册' : '未注册';
+  el.innerHTML = `权限：<b>${perm}</b>　SW：<b>${sw}</b>`;
+}
+async function subscribePush(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const vapidKey = Nexus.vapidKey;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: vapidKey });
+    const r = await Nexus.api('/subscribe',{method:'POST',body:JSON.stringify({subscription:sub})});
+    if(typeof toast==='function') toast(r?.ok ? '✅ 推送订阅成功' : '❌ 订阅失败','ok',3000);
+  }catch(e){ if(typeof toast==='function') toast('❌ '+e.message,'err',3000); }
+}
+async function testPush(){
+  const r = await Nexus.api('/push-test',{method:'POST',body:'{}'});
+  if(typeof toast==='function') toast(r?.ok ? '📨 已发送测试推送' : '❌ 发送失败','ok',3000);
+}
+async function unsubscribePush(){
+  const reg = await navigator.serviceWorker?.ready;
+  const sub = await reg?.pushManager.getSubscription();
+  if(sub){ await sub.unsubscribe(); if(typeof toast==='function') toast('🗑 已取消订阅','ok',2000); }
+  else if(typeof toast==='function') toast('暂无订阅','info',2000);
 }
 async function compressMemory(){
   toast('正在压缩记忆…','info',2000);
@@ -5935,6 +5997,35 @@ function checkAtTrigger(inp){
   setTimeout(()=>document.addEventListener('touchstart',function _ha(ev){if(m&&m.contains(ev.target)){document.addEventListener('touchstart',_ha,{once:true,passive:true});return;}m&&m.remove();},{once:true,passive:true}),100);
 }
 window.insertAt=function(name){ const inp=$('#inp'); inp.value=inp.value.replace(/@$/,'@'+name+' '); inp.focus(); document.getElementById('atMenu')?.remove(); };
+</script>
+<div id="pinOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.95);flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="color:var(--cy-1);font-size:20px;margin-bottom:8px">🔐 输入PIN解锁</div>
+  <input id="pinInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" style="font-size:28px;letter-spacing:10px;text-align:center;background:var(--surface);border:1px solid var(--cy-2);border-radius:12px;padding:12px 20px;color:var(--txt-1);width:160px">
+  <div id="pinError" style="color:#e5534b;font-size:13px;min-height:20px"></div>
+</div>
+<script>
+(function(){
+  let fails=0,locked=false;
+  const PIN_KEY='nexus_pin';
+  function showPin(){ const o=document.getElementById('pinOverlay'); if(o){o.style.display='flex'; setTimeout(()=>document.getElementById('pinInput')?.focus(),100);} }
+  function hidePin(){ const o=document.getElementById('pinOverlay'); if(o) o.style.display='none'; fails=0; }
+  function checkPin(v){
+    const pin=localStorage.getItem(PIN_KEY);
+    if(!pin) return hidePin();
+    if(locked) return;
+    if(v===pin){ hidePin(); }
+    else{
+      fails++;
+      const e=document.getElementById('pinError');
+      if(fails>=3){ locked=true; if(e) e.textContent='锁定30秒…'; setTimeout(()=>{locked=false;fails=0;if(e)e.textContent='';},30000); }
+      else { if(e) e.textContent=`密码错误（${fails}/3）`; }
+      document.getElementById('pinInput').value='';
+    }
+  }
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&localStorage.getItem(PIN_KEY)) showPin(); });
+  document.addEventListener('input',e=>{ if(e.target.id==='pinInput'&&e.target.value.length===4) checkPin(e.target.value); },{capture:true});
+  if(localStorage.getItem(PIN_KEY)) showPin();
+})();
 </script>
 </body>
 </html>
