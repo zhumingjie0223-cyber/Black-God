@@ -236,6 +236,10 @@ export class ShenshuCore {
     }
     if (path === '/stats') {
       const soul = (await this.storage.get('soul')) || {};
+      const soulSz = JSON.stringify(soul).length;
+      const cogSnap = await this.storage.get('cognitive_v2').catch(() => null);
+      const cogSz = cogSnap ? JSON.stringify(cogSnap).length : 0;
+      const storageSzEst = ((soulSz + cogSz) / 1024).toFixed(1);
       return new Response(JSON.stringify({
         version: soul.version || 0,
         uptime_s: Math.floor((Date.now() - (this._startTs || Date.now())) / 1000),
@@ -245,7 +249,8 @@ export class ShenshuCore {
         world_entities: Object.keys(this.worldGraph?.entities || {}).length,
         capabilities: this.capabilityGrowth?.all?.()?.length || 0,
         shu_coord: soul.current_shu_coord || null,
-        cognitive_v2_dirty: !!this._cognitiveV2Dirty
+        cognitive_v2_dirty: !!this._cognitiveV2Dirty,
+        storage_size_est_kb: storageSzEst,
       }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
     // 影子实例首次访问：落盘标记，此后永不迁移主人 KV 数据（数据彻底隔离）

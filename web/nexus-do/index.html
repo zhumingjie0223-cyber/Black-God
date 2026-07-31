@@ -1374,6 +1374,8 @@ body::before{
 .blk-text code{font-family:var(--mono);font-size:.85em;background:rgba(79,224,150,.1);padding:1px 5px;border-radius:4px;color:var(--cy-2)}
 .shu-badge{font-size:9px;color:var(--cy-3);border:1px solid var(--cy-3);border-radius:8px;padding:1px 6px;letter-spacing:.05em;opacity:.7;margin-left:4px;white-space:nowrap}
 .img-preview{max-width:80px;max-height:60px;border-radius:8px;object-fit:cover;cursor:pointer;margin:4px 4px 0 0;border:1px solid var(--line)}
+.at-item{padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--txt-1)}
+.at-item:hover,.at-item:active{background:var(--surface-2)}
 /* ── 气泡入场动效（Claude iOS逆向） ── */
 @keyframes bubble-in-right{
   from{transform:translate3d(16px,12px,0);opacity:0;}
@@ -1821,7 +1823,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           </div>
           <div class="composer" id="composer">
             <button class="plus-btn" id="plusBtn" onclick="togglePlus()" aria-label="更多功能"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-            <div class="in-box"><textarea id="inp" rows="1" placeholder="对神枢说出你的目标…" oninput="autogrow(this);syncSend()"></textarea></div>
+            <div class="in-box"><textarea id="inp" rows="1" placeholder="对神枢说出你的目标…" oninput="autogrow(this);syncSend();checkAtTrigger(this)"></textarea></div>
             <button class="send" id="sendBtn" onclick="micOrSend()" aria-label="发送/语音"><svg class="ic-send" viewBox="0 0 24 24"><path d="M4 20l16-8L4 4v6l10 2-10 2z"/></svg><svg class="ic-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></button>
           </div>
           <input type="file" id="fileInput" style="display:none" multiple onchange="onFilePicked(this)"/>
@@ -5852,7 +5854,7 @@ async function loadConsciousness(){
     const c=r.shu_coord;
     const coord=c?`核${c.c??'?'} 映${c.m??'?'} 态${c.s??'?'} 标${c.k??'?'} 相${c.p??'?'}`:'—';
     const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
-    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div>`;
+    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>📦 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>`;
   }catch(e){$('#consBody').textContent='读取失败';}
 }
 async function loadLexicon(){
@@ -5879,6 +5881,29 @@ function exportChat(fmt='json'){
   a.download=`nexus-${new Date().toISOString().slice(0,10)}.${ext}`;
   a.click();
 }
+/* 系统暗/亮跟随 */
+(function(){
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function sync(e){
+    try{ const stored = localStorage.getItem('nexus_palette'); if(stored) return; }catch(_){}
+    document.documentElement.setAttribute('data-scheme', e.matches ? 'dark' : 'light');
+  }
+  mq.addEventListener('change', sync); sync(mq);
+})();
+/* @ 能力触发菜单 */
+function checkAtTrigger(inp){
+  const v=inp.value;
+  if(!v.endsWith('@')){ document.getElementById('atMenu')?.remove(); return; }
+  const caps=window._capList||[];
+  if(!caps.length){ document.getElementById('atMenu')?.remove(); return; }
+  let m=document.getElementById('atMenu');
+  if(!m){ m=document.createElement('div'); m.id='atMenu'; m.style.cssText='position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-height:220px;overflow-y:auto;min-width:160px'; document.body.appendChild(m); }
+  const r=inp.getBoundingClientRect();
+  m.style.left=r.left+'px'; m.style.bottom=(window.innerHeight-r.top+8)+'px';
+  m.innerHTML=caps.slice(0,8).map(c=>`<div class="at-item" onclick="insertAt('${(c.id||c.name||c).replace(/'/g,'')}')">${c.name||c}</div>`).join('');
+  setTimeout(()=>document.addEventListener('touchstart',()=>m.remove(),{once:true,passive:true}),100);
+}
+window.insertAt=function(name){ const inp=$('#inp'); inp.value=inp.value.replace(/@$/,'@'+name+' '); inp.focus(); document.getElementById('atMenu')?.remove(); };
 </script>
 </body>
 </html>
