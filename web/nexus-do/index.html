@@ -2913,6 +2913,11 @@ function setLive(on) {
   if (Demo.on && !on) { $('#liveDot').classList.remove('live'); $('#liveText').textContent = '演示'; return; }
   $('#liveDot').classList.toggle('live', on);
   $('#liveText').textContent = on ? '在线' : '连接中';
+  const island = $('#agentIsland');
+  if (island) {
+    island.classList.toggle('connected', !!on);
+    island.classList.toggle('offline', !on);
+  }
 }
 /* Agent 状态岛：意图可见化 */
 function setAgentStatus(state){
@@ -4387,8 +4392,91 @@ function bootOwner(){
 }
 
 /* ============================================================
-   UI POLISH PATCH — 2026-07-31
-   第1批：纯 CSS，不改 HTML/JS
+   UI POLISH PATCH 第2批 — 2026-07-31
+   1. wc-suggest 2+1 布局（前两条横排/第三条全宽）
+   2. wc-item hover 左边框翡翠绿提示
+   3. themePicker 激活态明显外圈
+   4. agentIsland liveText 三态文字颜色
+   5. wc-mark 品牌圆圈强化
+   ============================================================ */
+
+/* 1 — wc-suggest 2+1 布局 */
+.wc-suggest {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 28px;
+}
+.wc-suggest .wc-item:last-child {
+  grid-column: 1 / -1;
+}
+/* 横排卡片：竖排文字，隐藏箭头 */
+.wc-suggest .wc-item:not(:last-child) {
+  padding: 14px 12px 12px;
+  flex-direction: column !important;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 80px;
+}
+.wc-suggest .wc-item:not(:last-child) span {
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+.wc-suggest .wc-item:not(:last-child) i { display: none; }
+
+/* 2 — wc-item hover 左边框 */
+.wc-item {
+  border-left: 2.5px solid transparent;
+  transition: border-left-color .2s var(--smooth),
+              transform var(--dur-fast) var(--ease-out),
+              border-color var(--dur-normal) var(--smooth),
+              background var(--dur-normal) var(--smooth),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.wc-item:hover {
+  border-left-color: var(--cy-1);
+}
+
+/* 3 — themePicker 激活态明显外圈 */
+.theme-swatch {
+  transition: transform .15s var(--spring), box-shadow .15s;
+  border-radius: 50% !important;
+}
+.theme-swatch:hover {
+  transform: scale(1.12);
+}
+/* 用 JS 设 borderColor='#fff'，这里加 box-shadow 双重反馈 */
+.theme-swatch[style*="border-color: rgb(255"] ,
+.theme-swatch[style*="border-color: white"] ,
+.theme-swatch[style*="border-color:#fff"] {
+  box-shadow: 0 0 0 3px var(--cy-1), 0 0 0 5px var(--bg);
+  transform: scale(1.1);
+}
+
+/* 4 — agentIsland 状态文字颜色动态化 */
+#liveDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--chrome-2);
+  flex-shrink: 0;
+  transition: background .4s;
+}
+/* JS 里把 class 加到 agentIsland，这里接收 */
+#agentIsland.connected #liveDot { background: var(--cy-1); box-shadow: 0 0 5px var(--cy-2); }
+#agentIsland.offline   #liveDot { background: #f87171; }
+#agentIsland.busy      #liveDot { background: var(--cy-1); animation: pulse 1s infinite; }
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .4; }
+}
+
+/* 5 — wc-mark 品牌圆圈增强 */
+.wc-mark {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cy-1) 30%, transparent),
+              0 0 22px color-mix(in srgb, var(--cy-1) 12%, transparent);
+}
+
    ============================================================ */
 
 /* 1 & 2 — tabbar 激活态强化 + dock 分隔线 */
