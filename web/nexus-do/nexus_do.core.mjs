@@ -377,7 +377,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。

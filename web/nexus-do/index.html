@@ -5868,7 +5868,7 @@ async function runSandbox(){
   if(!code){ out.textContent='请输入代码'; return; }
   out.textContent='运行中…';
   try{
-    const r = await Nexus.req('/sandbox/run',{method:'POST',body:JSON.stringify({code,lang})});
+    const r = await Nexus.api('/sandbox/run',{method:'POST',body:JSON.stringify({code,lang})});
     let txt = '';
     if(r.stdout) txt += r.stdout;
     if(r.result) txt += (txt?'\n→ ':'→ ') + r.result;
