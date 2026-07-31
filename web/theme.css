@@ -1,0 +1,13 @@
+/* Black God · 主题变量 */
+:root {
+  --bg-base: #08090B;
+  --bg-surface: #111318;
+  --bg-card: #1a1d24;
+  --accent: #00ff88;
+  --accent-dim: #00cc6a;
+  --text-primary: #e8eaf0;
+  --text-secondary: #8b9099;
+  --border: #2a2d35;
+  --radius: 12px;
+  --shadow: 0 4px 24px rgba(0,0,0,.6);
+}

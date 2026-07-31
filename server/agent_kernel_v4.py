@@ -900,6 +900,18 @@ class AgentHandler(BaseHTTPRequestHandler):
             self._serve_file(web_root / "index.html", "text/html")
         elif path == "/studio" or path == "/studio.html":
             self._serve_file(web_root / "nexus-do" / "studio.html", "text/html")
+        elif path in ("/manifest.json", "/theme.css", "/sw.js", "/push-client.js") or \
+             path.startswith("/icon-") or path.endswith(".png") and not path.startswith("/api/"):
+            # 根路径静态资源（manifest/theme/图标等）直接从 web/ 提供
+            file_path = web_root / path.lstrip("/")
+            if file_path.is_file():
+                ct = "text/css" if path.endswith('.css') else \
+                     "application/json" if path.endswith('.json') else \
+                     "image/png" if path.endswith('.png') else \
+                     "text/javascript"
+                self._serve_file(file_path, ct)
+            else:
+                self._json({"error": "not found", "path": path}, 404)
         elif path.startswith("/web/") or path.startswith("/assets/"):
             file_path = web_root / path.lstrip("/")
             if file_path.is_file():
@@ -978,6 +990,33 @@ class AgentHandler(BaseHTTPRequestHandler):
                     prefs[key] = val
             self._json({"preferences": prefs})
         
+        elif path == "/api/categories":
+            # 从 SKILLS 提取分类（key 即分类 slug）
+            categories = [
+                {"id": k, "name": v.split("：")[0].split(":")[0].strip(), "description": v}
+                for k, v in SKILLS.items()
+            ]
+            self._json({"categories": categories, "total": len(categories)})
+
+        elif path == "/api/skills":
+            # 技能列表（详细版，含 id/name/description/category）
+            skills_list = [
+                {"id": k, "name": v.split("：")[0].split(":")[0].strip(),
+                 "description": v, "category": k, "status": "active"}
+                for k, v in SKILLS.items()
+            ]
+            self._json({"skills": skills_list, "total": len(skills_list)})
+
+        elif path == "/api/apps":
+            # 集成应用/工具入口列表
+            apps = [
+                {"id": "chat", "name": "对话", "url": "/", "icon": "/icon-192.png"},
+                {"id": "studio", "name": "工作台", "url": "/studio", "icon": "/icon-192.png"},
+                {"id": "tasks", "name": "任务", "url": "/api/tasks", "icon": None},
+                {"id": "memory", "name": "记忆", "url": "/api/memory", "icon": None},
+            ]
+            self._json({"apps": apps, "total": len(apps)})
+
         elif path == "/api/events":
             self._json({"events": [], "message": "事件流端点，请使用 SSE 连接"})
         
