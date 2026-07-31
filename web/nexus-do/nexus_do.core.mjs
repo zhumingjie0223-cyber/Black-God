@@ -247,6 +247,24 @@ export class ShenshuCore {
     if (path === '/unregister' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.unregisterUser(b)); }
     if (path === '/probe-models' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.probeModelsPublic(b)); }
     if (path === '/pubtalk' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handlePubTalk(b, request)); }
+    if (path === '/tg' && request.method === 'POST') {
+      // fail-closed：secret 未配置或不匹配一律 403
+      const secret = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+      const want = (this.env.TG_WEBHOOK_SECRET || '').trim();
+      if (!want || secret !== want) return json({ ok: false }, 403);
+      let update;
+      try { update = await request.json(); } catch { return json({ ok: false }, 400); }
+      const msg = update && update.message;
+      const text = msg && msg.text ? String(msg.text).slice(0, 4000) : '';
+      // request-like：handleTalk 内部若调 request.json()，拿到的是它期望的 body 形状
+      const tgReq = {
+        method: 'POST',
+        headers: request.headers,
+        cf: request.cf,
+        json: async () => ({ text, uid: 'quan', source: 'tg' }),
+      };
+      return this.handleTelegramWebhook(update, tgReq);
+    }
 
     // —— 能力契约层（借鉴 Minis）——
     // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
@@ -9902,6 +9920,39 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       if (pm && pm.ok && Array.isArray(pm.models)) models = pm.models.slice(0, 40);
     } catch (_) {}
     return { ok: true, provider: pending.provider, label: P.label, model, models, note: `${P.label} 已登录并接入，她现在能用这家大脑了` };
+  }
+
+  async handleTelegramWebhook(update, tgReq) {
+    const msg = update && update.message;
+    if (!msg || !msg.text) return json({ ok: true });
+
+    // 注意：TG 群组 id 为负数，超大 id 可能在 JSON.parse 阶段丢精度；
+    // 当前仅私聊场景（正数小 id）可接受，日后接群组需改为 raw body 字符串解析。
+    const wantChat = String(this.env.TG_QUAN_CHAT_ID || '').trim();
+    if (!wantChat || String(msg.chat.id) !== wantChat) return json({ ok: true });
+
+    const text = String(msg.text).slice(0, 4000);
+
+    let reply = '她走神了，过会再说';
+    try {
+      const res = await this.handleTalk(text, tgReq, undefined);
+      if (res && typeof res.reply === 'string' && res.reply.length > 0) {
+        reply = res.reply;
+      }
+    } catch (e) {
+      console.log('[tg] handleTalk error:', e && e.message);
+    }
+
+    try {
+      const sent = await this.sendToQuan(reply);
+      if (sent && sent.ok === false) {
+        console.log('[tg] sendToQuan failed:', JSON.stringify(sent).slice(0, 200));
+      }
+    } catch (e) {
+      console.log('[tg] sendToQuan error:', e && e.message);
+    }
+
+    return json({ ok: true });
   }
 
   async sendToQuan(text) {
