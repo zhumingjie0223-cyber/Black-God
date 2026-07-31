@@ -8098,7 +8098,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   · device  —— 设备信息｜clipboard read / clipboard write --text ...  —— 剪贴板
   · homekit list｜homekit set --name 客厅灯 --characteristic power --value 1  —— 智能家居
   · notification｜media｜photos｜vision｜speak --text 你好｜nlp  —— 通知/音乐/相册/识图/朗读/语言分析
-  提示：查询类（list/search/weather/location/device）直接调；写入类（set/create/remind/write）iOS 会弹权限窗，放心调。` : ''}
+  提示：查询类（list/search/weather/location/device）直接调；写入类（set/create/remind/write）iOS 会弹权限窗，放心调。
+- 安全分析工具集（exec 脑宿主机真跑）：⟨工具:sec｜工具名 [参数]⟩
+  逆向：ghidra <file> | r2 <file> <r2命令> | capa <file> | floss <file> | die <file>
+  调试：gdb <binary> "<gdb命令>" | pwndbg <binary> "<gdb命令>"
+  静态审计：yara <rule.yar> <target> | semgrep <path> | joern-scan <path>
+  取证：vol3 <image.vmem> <plugin> [参数]（如 windows.pslist / linux.bash_history）
+  漏扫：nuclei <url> [-severity critical,high] | trivy image <镜像> | trivy fs <path>
+  示例：⟨工具:sec｜r2 /tmp/a.out "aaa;afl"⟩ / ⟨工具:sec｜nuclei https://target.com⟩ / ⟨工具:sec｜vol3 /tmp/mem.vmem windows.pslist⟩` : ''}
 - 网站数据劫持/自动化：⟨工具:hijack｜类型 [参数]⟩（生成可直接粘贴到控制台/油猴的劫持脚本）
   类型列表：xhr（XHR拦截）| fetch（Fetch拦截）| ws（WebSocket拦截）| cookie（Cookie/Storage监控）| form（表单/密码劫持）| all（全量一键装）| sw（ServiceWorker中间人）| watch <CSS选择器>（DOM变化监控）| auto <操作描述>（自动点击/抢购）| proto <属性名>（原型链污染提权）| sniff <目标URL>（生成油猴脚本）
   示例：⟨工具:hijack｜all⟩ / ⟨工具:hijack｜watch .price⟩ / ⟨工具:hijack｜auto 点击购买按钮⟩ / ⟨工具:hijack｜sniff *://shop.example.com/*⟩
