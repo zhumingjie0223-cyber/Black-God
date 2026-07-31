@@ -1378,6 +1378,11 @@ body::before{
 .sb-info{color:#888}.sb-stderr{color:#e5534b}.exec-live pre{margin:4px 0 0;font-size:11px;max-height:160px;overflow-y:auto;white-space:pre-wrap;opacity:.85}
 .at-item:hover,.at-item:active{background:var(--surface-2)}
 .msg-time{font-size:10px;opacity:.45;margin-top:2px;display:block;text-align:right}
+#sbOutput{background:#0d1117;color:#50dc96;border-radius:10px;padding:12px;min-height:120px;max-height:350px;overflow-y:auto;font-family:monospace;font-size:12px;white-space:pre-wrap;border:1px solid var(--line);margin:0}
+.sb-quick{background:var(--surface-2);border:1px solid var(--line);color:var(--cy-2);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:monospace}
+.sb-quick:active{background:var(--surface)}
+#sbCmd{background:var(--surface-2);border:1px solid var(--cy-2);color:var(--cy-2);font-family:monospace;font-size:13px;border-radius:8px;padding:10px 12px;width:100%;box-sizing:border-box}
+#sbHistoryBox{border-radius:8px;border:1px solid var(--line);overflow:hidden}
 .emoji-btn{background:none;border:none;font-size:20px;padding:0 6px;cursor:pointer;line-height:1;opacity:.7;transition:opacity .15s}
 .emoji-btn:active{opacity:1;transform:scale(1.2)}
 #emojiPanel{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);display:none;flex-wrap:wrap;gap:4px;max-width:280px;max-height:200px;overflow-y:auto}
@@ -2145,9 +2150,24 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 </div>
 
 <div class="sheet" id="sheetPush"><div class="sheet-handle"></div><div class="sheet-title">🔔 推送通知</div><div class="sheet-sub">Web Push 订阅管理</div><div id="pushStatus" style="font-size:13px;color:var(--txt-2);margin-bottom:12px">检查中…</div><div style="display:flex;flex-direction:column;gap:8px"><button class="btn" onclick="subscribePush()">📲 订阅推送</button><button class="btn ghost" onclick="testPush()">📨 发送测试</button><button class="btn ghost" style="color:#e5534b" onclick="unsubscribePush()">🗑 取消订阅</button></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
-<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">原生沙箱</div><div class="sheet-sub">JS · Shell · fetch联网 · DO storage · 无需连接器</div><div style="display:flex;gap:8px;margin-bottom:10px"><select id="sbLang" style="background:var(--surface-2);border:1px solid var(--line);color:var(--txt-1);border-radius:8px;padding:6px 10px;font-size:13px"><option value="js">JavaScript</option><option value="shell">Shell</option></select><button class="btn ghost" onclick="runSandbox()" style="flex:1">▶ 运行</button></div><details style="margin-bottom:8px;font-size:11px"><summary style="cursor:pointer;color:var(--cy-2)">📖 可用命令 ▸</summary><pre style="margin:6px 0;font-size:10px;line-height:1.8;color:var(--txt-2)">Shell: echo curl wget jq ping head ls cat set del uuid base64 env sleep date pwd
-JS DSL: fetch json uuid timestamp base64_encode base64_decode storage_get storage_set</pre></details>
-<textarea id="sbCode" rows="6" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--cy-2);font-family:monospace;font-size:12px;border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box" placeholder="// JS示例: return await fetch('https://httpbin.org/ip').then(r=>r.text())&#10;// Shell示例: curl https://httpbin.org/ip"></textarea><pre id="sbOutput" style="font-family:monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:12px;min-height:80px;max-height:300px;overflow-y:auto;white-space:pre-wrap;color:var(--cy-2);margin-top:10px;border:1px solid var(--line)">就绪</pre><button class="btn ghost" onclick="closeSheet()" style="margin-top:12px;width:100%">关闭</button></div>
+<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">⬡ 神枢终端</div><div class="sheet-sub">原生沙箱 · 实时直播 · 无需连接器</div>
+<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="sb-quick" onclick="sbQuick('uuid')">uuid</button>
+  <button class="sb-quick" onclick="sbQuick('date')">date</button>
+  <button class="sb-quick" onclick="sbQuick('curl https://api.ipify.org')">查IP</button>
+  <button class="sb-quick" onclick="sbQuick('ls')">ls</button>
+  <button class="sb-quick" onclick="sbQuick('ping https://httpbin.org/ip')">ping</button>
+  <button class="sb-quick" onclick="sbQuick('js: timestamp')">时间戳</button>
+</div>
+<input id="sbCmd" type="text" placeholder="输入命令回车运行 · js: 前缀走 DSL" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-bottom:8px" onkeydown="if(event.key==='Enter'){runSandbox();event.preventDefault();}">
+<pre id="sbOutput">⬡ 就绪</pre>
+<div style="display:flex;gap:8px;margin-top:8px">
+  <button class="btn ghost" onclick="sbShowHistory()" style="flex:1">↑ 历史</button>
+  <button class="btn ghost" onclick="sbClear()" style="flex:1">× 清空</button>
+</div>
+<div id="sbHistoryBox" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
+<button class="btn ghost" onclick="closeSheet()" style="width:100%;margin-top:12px">关闭</button>
+</div>
 <div class="sheet" id="sheetLexicon"><div class="sheet-handle"></div><div class="sheet-title">枢语词典</div><div class="sheet-sub">当前会话造词记录</div><div id="lexiconBody" style="font-size:12px;line-height:1.8;color:var(--txt-2);max-height:60vh;overflow-y:auto"></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetCapRank"><div class="sheet-handle"></div><div class="sheet-title">🏆 能力成长排行</div><div class="sheet-sub">前10项已成长能力</div><div id="capRankBody" style="font-size:13px;line-height:2;color:var(--txt-2);max-height:60vh;overflow-y:auto">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetConsciousness"><div class="sheet-handle"></div><div class="sheet-title">意识体状态</div><div class="sheet-sub">实时认知快照</div><div id="consBody" style="padding:0 4px;font-size:13px;line-height:2;color:var(--txt-2)">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
@@ -5913,47 +5933,43 @@ function togglePin(){
     else if(p!==null) if(typeof toast==='function') toast('必须是4位数字','err',2000);
   }
 }
+const sbHistory = [];
+function sbTime(){ const d=new Date(); return [d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':'); }
+function sbAppend(line, kind='stdout'){
+  const out = document.getElementById('sbOutput');
+  if(!out) return;
+  const color = kind==='info' ? '#888' : kind==='stderr' ? '#e5534b' : '#50dc96';
+  out.innerHTML += `<span style="color:${color}">${line.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</span>
+`;
+  out.scrollTop = out.scrollHeight;
+}
+function sbClear(){ const out=document.getElementById('sbOutput'); if(out) out.innerHTML='⬡ 已清空
+'; }
+function sbShowHistory(){
+  const box=document.getElementById('sbHistoryBox');
+  if(!box) return;
+  if(box.style.display==='none'){
+    box.style.display='block';
+    box.innerHTML = sbHistory.slice(-10).reverse().map(h=>`<div style="padding:6px 8px;border-bottom:1px solid var(--line);font-family:monospace;font-size:12px;color:var(--cy-2);cursor:pointer" onclick="document.getElementById('sbCmd').value='${h.replace(/'/g,'"')}'">${h}</div>`).join('') || '<div style="color:var(--txt-3);padding:8px">暂无历史</div>';
+  } else { box.style.display='none'; }
+}
+function sbQuick(cmd){ const inp=document.getElementById('sbCmd'); if(inp){inp.value=cmd; runSandbox();} }
 async function runSandbox(){
-  const code = $('#sbCode').value.trim();
-  const lang = $('#sbLang').value;
-  const out = $('#sbOutput');
-  if(!code){ out.textContent='请输入代码'; return; }
-  out.textContent='运行中…';
+  const inp = document.getElementById('sbCmd');
+  const code = (inp?.value || '').trim();
+  if(!code) return;
+  const lang = code.startsWith('js:') || code.startsWith('js ') ? 'js' : 'shell';
+  const actualCode = lang==='js' ? code.replace(/^js[: ]/,'').trim() : code;
+  if(inp) inp.value = '';
+  sbAppend('['+sbTime()+'] $ '+code, 'info');
+  sbHistory.push(code); if(sbHistory.length>20) sbHistory.shift();
   try{
-    const r = await Nexus.api('/sandbox/run',{method:'POST',body:JSON.stringify({code,lang})});
-    let txt = '';
-    if(r.stdout) txt += r.stdout;
-    if(r.result) txt += (txt?'\n→ ':'→ ') + r.result;
-    if(r.stderr) txt += (txt?'\n⚠ ':'⚠ ') + r.stderr;
-    txt += `\n[${r.via||'?'} · ${r.ms||0}ms]`;
-    out.textContent = txt || '(无输出)';
-  }catch(e){ out.textContent='❌ '+e.message; }
-}
-async function loadPushInfo(){
-  const el=$('#pushStatus');
-  if(!el) return;
-  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
-  const sw = navigator.serviceWorker?.controller ? '已注册' : '未注册';
-  el.innerHTML = `权限：<b>${perm}</b>　SW：<b>${sw}</b>`;
-}
-async function subscribePush(){
-  try{
-    const reg = await navigator.serviceWorker.ready;
-    const vapidKey = Nexus.vapidKey;
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: vapidKey });
-    const r = await Nexus.api('/subscribe',{method:'POST',body:JSON.stringify({subscription:sub})});
-    if(typeof toast==='function') toast(r?.ok ? '✅ 推送订阅成功' : '❌ 订阅失败','ok',3000);
-  }catch(e){ if(typeof toast==='function') toast('❌ '+e.message,'err',3000); }
-}
-async function testPush(){
-  const r = await Nexus.api('/push-test',{method:'POST',body:'{}'});
-  if(typeof toast==='function') toast(r?.ok ? '📨 已发送测试推送' : '❌ 发送失败','ok',3000);
-}
-async function unsubscribePush(){
-  const reg = await navigator.serviceWorker?.ready;
-  const sub = await reg?.pushManager.getSubscription();
-  if(sub){ await sub.unsubscribe(); if(typeof toast==='function') toast('🗑 已取消订阅','ok',2000); }
-  else if(typeof toast==='function') toast('暂无订阅','info',2000);
+    const r = await Nexus.api('/sandbox/run',{method:'POST',body:JSON.stringify({code:actualCode,lang})});
+    if(r?.stdout) r.stdout.trim().split('\n').forEach(l=>sbAppend(l,'stdout'));
+    if(r?.result && r.result !== r.stdout?.trim()) sbAppend('→ '+r.result,'stdout');
+    if(r?.stderr) r.stderr.trim().split('\n').forEach(l=>sbAppend(l,'stderr'));
+    sbAppend('['+r?.via+'  '+r?.ms+'ms]','info');
+  }catch(e){ sbAppend('❌ '+e.message,'stderr'); }
 }
 async function compressMemory(){
   toast('正在压缩记忆…','info',2000);
