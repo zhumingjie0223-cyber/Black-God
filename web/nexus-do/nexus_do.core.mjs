@@ -10357,36 +10357,38 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         // shell 命令映射
         const lines = String(code).trim().split('\n');
         let stdout = '', stderr = '';
+        const live = (line, kind) => { try { this.broadcast({ type: 'sandbox_live', line, kind, ts: Date.now() }); } catch (_) {} };
         for (const raw of lines) {
           const line = raw.trim();
           if (!line || line.startsWith('#')) continue;
+          live('$ ' + line, 'info');
           const parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
           const cmd = parts[0];
           const args = parts.slice(1).map(s => s.replace(/^['"]|['"]$/g, ''));
-          if (cmd === 'echo') { stdout += args.join(' ') + '\n'; }
+          if (cmd === 'echo') { const _o = args.join(' ') + '\n'; stdout += _o; live(_o.trimEnd(), 'stdout'); }
           else if (cmd === 'curl' || cmd === 'wget') {
             const url = args.find(a => a.startsWith('http'));
             if (!url) { stderr += `${cmd}: no URL\n`; continue; }
             const r = await Promise.race([fetch(url), new Promise((_, j) => setTimeout(() => j(new Error('timeout')), 8000))]);
             const text = await r.text();
-            stdout += text.slice(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : '') + '\n';
+            const _ct = text.slice(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : '') + '\n'; stdout += _ct; live(_ct.slice(0,200).trimEnd(), 'stdout');
           }
           else if (cmd === 'ls') {
             const list = await this.storage.list({ prefix: args[0] || '' });
-            stdout += [...list.keys].map(k => k.name).join('\n') + '\n';
+            const _ls=[...list.keys].map(k=>k.name).join('\n')+'\n'; stdout+=_ls; live(_ls.trimEnd(),'stdout');
           }
           else if (cmd === 'cat') {
             const val = await this.storage.get(args[0]);
-            stdout += (val !== null ? JSON.stringify(val, null, 2) : `cat: ${args[0]}: no such key`) + '\n';
+            const _cv=(val!==null?JSON.stringify(val,null,2):`cat: ${args[0]}: no such key`)+'\n'; stdout+=_cv; live(_cv.slice(0,200).trimEnd(),'stdout');
           }
           else if (cmd === 'write') {
             const [key, ...rest] = args;
             await this.storage.put(key, rest.join(' '));
-            stdout += `wrote ${key}\n`;
+            stdout+=`wrote ${key}\n`; live(`wrote ${key}`,'stdout');
           }
           else if (cmd === 'date') { stdout += new Date().toISOString() + '\n'; }
           else if (cmd === 'pwd') { stdout += '/nexus/sandbox\n'; }
-          else { stderr += `unsupported: ${cmd}\n`; }
+          else { const _se=`unsupported: ${cmd}\n`; stderr+=_se; live(_se.trimEnd(),'stderr'); }
         }
         return { ok: !stderr || !!stdout, stdout, stderr, result: '', via: 'native-sandbox-shell', ms: Date.now() - start };
       }

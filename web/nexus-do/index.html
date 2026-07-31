@@ -1375,6 +1375,7 @@ body::before{
 .shu-badge{font-size:9px;color:var(--cy-3);border:1px solid var(--cy-3);border-radius:8px;padding:1px 6px;letter-spacing:.05em;opacity:.7;margin-left:4px;white-space:nowrap}
 .img-preview{max-width:80px;max-height:60px;border-radius:8px;object-fit:cover;cursor:pointer;margin:4px 4px 0 0;border:1px solid var(--line)}
 .at-item{padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--txt-1)}
+.sb-info{color:#888}.sb-stderr{color:#e5534b}.exec-live pre{margin:4px 0 0;font-size:11px;max-height:160px;overflow-y:auto;white-space:pre-wrap;opacity:.85}
 .at-item:hover,.at-item:active{background:var(--surface-2)}
 .emoji-btn{background:none;border:none;font-size:20px;padding:0 6px;cursor:pointer;line-height:1;opacity:.7;transition:opacity .15s}
 .emoji-btn:active{opacity:1;transform:scale(1.2)}
@@ -3269,6 +3270,21 @@ const Nexus = {
 function onWSMessage(m) {
   if (m.type === 'soul' || m.type === 'heartbeat') { if (m.soul || m.data) renderSoul(m.soul || m.data); setLive(true); }
   if (m.type === 'reply') handleReply(m.data);
+  if (m.type === 'sandbox_live') {
+    const sb = document.getElementById('sbOutput');
+    if (sb) {
+      const div = document.createElement('div');
+      div.className = 'sb-line sb-' + (m.kind || 'stdout');
+      div.textContent = m.line;
+      sb.appendChild(div); sb.scrollTop = sb.scrollHeight;
+    }
+    const bubble = document.querySelector('.bubble.streaming');
+    if (bubble) {
+      let box = bubble.querySelector('.exec-live');
+      if (!box) { box = document.createElement('div'); box.className = 'exec-live'; box.appendChild(document.createElement('pre')); bubble.appendChild(box); }
+      box.querySelector('pre').textContent += m.line + '\n';
+    }
+  }
   if (m.type === 'new_talk') {
     if (m.soul) renderSoul(m.soul);
     // 动态：内在状态真实时驱动界面 —— 环中盘坐标随对话漂移、枢脉动、造词浮现
