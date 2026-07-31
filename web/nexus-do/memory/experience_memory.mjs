@@ -123,11 +123,3 @@ export class ExperienceMemory {
     this.eventBus?.emit('memory:cleared', { count });
   }
 }
-
-五处修改说明：
-
-1. **constructor**：`limit` 非整数或负数抛 `RangeError`，`0` 归一化为 `Infinity`（`Infinity` 本身直接放行）。
-2. **restore 后 `_seq` 同步**：用指定的 `reduce` 表达式取最大 `seq`，防止恢复后新记录 seq 与旧记录冲突。
-3. **valid filter**：增加 `Number.isFinite(r.seq)` 校验，缺失或非法 seq 的条目直接丢弃。
-4. **事件顺序**：`memory:remembered` 在淘汰循环之前 emit，保证订阅方先看到写入再看到 `memory:evicted`。
-5. **`Number.isFinite`**：全部使用严格版本（不做隐式类型转换），无裸 `isFinite` 残留。
