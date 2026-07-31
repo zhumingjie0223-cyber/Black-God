@@ -1190,6 +1190,28 @@ body::before{
 }
 
 /* ══════════════════════════════════════════
+   宽屏适配：本 UI 为移动优先，无宽屏布局。桌面上输入框/底部导航/
+   内容会横跨整屏拉伸、图标甩到两角，显廉价。这里把可读内容收进一列
+   居中(--col)，磨砂条本身仍满宽(符合底栏习惯)。纯布局、只在宽屏生效，
+   移动端零影响；不碰任何颜色令牌。
+   ══════════════════════════════════════════ */
+@media (min-width:820px){
+  :root{ --col:760px; }
+  /* 顶栏内容收进中列，与下方对齐 */
+  .topbar{ padding-left:max(16px,calc((100% - var(--col))/2)); padding-right:max(16px,calc((100% - var(--col))/2)); }
+  /* 页头与页内容居中成列，折叠条/设置行不再全宽 */
+  .page-head,.page-inner{ max-width:var(--col); margin-left:auto; margin-right:auto; }
+  /* 对话消息列居中 */
+  .msgs{ max-width:var(--col); margin-left:auto; margin-right:auto; }
+  /* 输入区:磨砂 dock 满宽,内部 composer 收进中列居中 */
+  .composer{ max-width:var(--col); margin-left:auto; margin-right:auto; width:100%; }
+  .plus-panel{ max-width:var(--col); margin-left:auto; margin-right:auto; }
+  /* 底部导航:三键聚拢居中,不再甩到两角 */
+  .tabbar{ justify-content:center; gap:24px; }
+  .tab{ flex:0 0 108px; }
+}
+
+/* ══════════════════════════════════════════
    Lovable × Replit 逆向移植 · 组件升级
    ══════════════════════════════════════════ */
 
