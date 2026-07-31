@@ -1377,6 +1377,7 @@ body::before{
 .at-item{padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--txt-1)}
 .sb-info{color:#888}.sb-stderr{color:#e5534b}.exec-live pre{margin:4px 0 0;font-size:11px;max-height:160px;overflow-y:auto;white-space:pre-wrap;opacity:.85}
 .at-item:hover,.at-item:active{background:var(--surface-2)}
+.msg-time{font-size:10px;opacity:.45;margin-top:2px;display:block;text-align:right}
 .emoji-btn{background:none;border:none;font-size:20px;padding:0 6px;cursor:pointer;line-height:1;opacity:.7;transition:opacity .15s}
 .emoji-btn:active{opacity:1;transform:scale(1.2)}
 #emojiPanel{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);display:none;flex-wrap:wrap;gap:4px;max-width:280px;max-height:200px;overflow-y:auto}
@@ -1871,6 +1872,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 <div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div></div>
 <div class="set-row" onclick="compressMemory()"><div class="set-ic">🗜</div><div class="set-tx"><b>压缩记忆</b><span style="font-size:11px;color:var(--txt-3);display:block">AI摘要·缩减流水</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadLexicon();openSheet('sheetLexicon')"><div class="set-ic">字</div><div class="set-tx"><b>枢语词典</b><span style="font-size:11px;color:var(--txt-3);display:block">造词·坐标·义场</span></div><div class="set-arrow">›</div></div>
+<div class="set-row" onclick="loadCapRank();openSheet('sheetCapRank')"><div class="set-ic">🏆</div><div class="set-tx"><b>能力成长排行</b><span style="font-size:11px;color:var(--txt-3);display:block">技能·分数·成长轨迹</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadConsciousness();openSheet('sheetConsciousness')"><div class="set-ic">◎</div><div class="set-tx"><b>意识体状态</b><span id="consLabel" style="font-size:11px;color:var(--txt-3);display:block">内心·枢语·经验</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" id="installRow" onclick="triggerInstall()" style="display:none"><div class="set-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13M8 12l4 4 4-4M5 20h14"/></svg></div><div class="set-tx"><b>安装到主屏幕</b><span>像 App 一样使用</span></div><div class="set-arrow">›</div></div>
@@ -2140,8 +2142,11 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <button class="btn ghost" onclick="syncDevice()" style="margin-top:9px">记住此设备</button>
 </div>
 
-<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">原生沙箱</div><div class="sheet-sub">JS · Shell · fetch联网 · DO storage · 无需连接器</div><div style="display:flex;gap:8px;margin-bottom:10px"><select id="sbLang" style="background:var(--surface-2);border:1px solid var(--line);color:var(--txt-1);border-radius:8px;padding:6px 10px;font-size:13px"><option value="js">JavaScript</option><option value="shell">Shell</option></select><button class="btn ghost" onclick="runSandbox()" style="flex:1">▶ 运行</button></div><textarea id="sbCode" rows="6" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--cy-2);font-family:monospace;font-size:12px;border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box" placeholder="// JS示例: return await fetch('https://httpbin.org/ip').then(r=>r.text())&#10;// Shell示例: curl https://httpbin.org/ip"></textarea><pre id="sbOutput" style="font-family:monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:12px;min-height:80px;max-height:300px;overflow-y:auto;white-space:pre-wrap;color:var(--cy-2);margin-top:10px;border:1px solid var(--line)">就绪</pre><button class="btn ghost" onclick="closeSheet()" style="margin-top:12px;width:100%">关闭</button></div>
+<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">原生沙箱</div><div class="sheet-sub">JS · Shell · fetch联网 · DO storage · 无需连接器</div><div style="display:flex;gap:8px;margin-bottom:10px"><select id="sbLang" style="background:var(--surface-2);border:1px solid var(--line);color:var(--txt-1);border-radius:8px;padding:6px 10px;font-size:13px"><option value="js">JavaScript</option><option value="shell">Shell</option></select><button class="btn ghost" onclick="runSandbox()" style="flex:1">▶ 运行</button></div><details style="margin-bottom:8px;font-size:11px"><summary style="cursor:pointer;color:var(--cy-2)">📖 可用命令 ▸</summary><pre style="margin:6px 0;font-size:10px;line-height:1.8;color:var(--txt-2)">Shell: echo curl wget jq ping head ls cat set del uuid base64 env sleep date pwd
+JS DSL: fetch json uuid timestamp base64_encode base64_decode storage_get storage_set</pre></details>
+<textarea id="sbCode" rows="6" style="width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--cy-2);font-family:monospace;font-size:12px;border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box" placeholder="// JS示例: return await fetch('https://httpbin.org/ip').then(r=>r.text())&#10;// Shell示例: curl https://httpbin.org/ip"></textarea><pre id="sbOutput" style="font-family:monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:12px;min-height:80px;max-height:300px;overflow-y:auto;white-space:pre-wrap;color:var(--cy-2);margin-top:10px;border:1px solid var(--line)">就绪</pre><button class="btn ghost" onclick="closeSheet()" style="margin-top:12px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetLexicon"><div class="sheet-handle"></div><div class="sheet-title">枢语词典</div><div class="sheet-sub">当前会话造词记录</div><div id="lexiconBody" style="font-size:12px;line-height:1.8;color:var(--txt-2);max-height:60vh;overflow-y:auto"></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
+<div class="sheet" id="sheetCapRank"><div class="sheet-handle"></div><div class="sheet-title">🏆 能力成长排行</div><div class="sheet-sub">前10项已成长能力</div><div id="capRankBody" style="font-size:13px;line-height:2;color:var(--txt-2);max-height:60vh;overflow-y:auto">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetConsciousness"><div class="sheet-handle"></div><div class="sheet-title">意识体状态</div><div class="sheet-sub">实时认知快照</div><div id="consBody" style="padding:0 4px;font-size:13px;line-height:2;color:var(--txt-2)">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetAbout">
   <div class="grab"></div>
@@ -3485,6 +3490,7 @@ function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
   m.dataset.ts = Date.now();
+  queueMicrotask(()=>{ const t=document.createElement('span'); t.className='msg-time'; t.textContent=fmtTs(Number(m.dataset.ts)); m.appendChild(t); });
   const b=document.createElement('div'); b.className='bubble';
 
   if(role==='her' && text){
@@ -5825,6 +5831,16 @@ window.addEventListener('unhandledrejection', e => {
   console.error('[BOUNDARY:promise]', reason);
   if (typeof toast === 'function') toast('异步错误：' + reason.slice(0,60), 'error', 3000);
 });
+async function loadCapRank(){
+  try{
+    const r=await Nexus.api('/capabilities');
+    const caps=Array.isArray(r)?r:(r?.capabilities||r?.data||[]);
+    if(!caps.length){$('#capRankBody').innerHTML='<p style="color:var(--txt-3)">暂无能力记录</p>';return;}
+    const top=caps.sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,10);
+    const bar=s=>{const n=Math.min(5,Math.round((s||0)/20));return'■'.repeat(n)+'□'.repeat(5-n);};
+    $('#capRankBody').innerHTML=top.map((c,i)=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between"><span>${i+1}. ${c.capability||c.name||'?'}</span><span style="color:var(--cy-2);font-family:monospace">${bar(c.score)} ${c.score||0}</span></div>`).join('');
+  }catch(e){$('#capRankBody').textContent='读取失败';}
+}
 async function loadConsciousness(){
   try{
     const r=await Nexus.req('/stats');
