@@ -2182,12 +2182,35 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 </div>
 
 <script>
-/* 全局触觉反馈：所有可点元素按下即轻震动,给"按下去"一个实感。
-   诚实注:iOS Safari 不支持 navigator.vibrate,此处静默降级——iOS 上主要靠
-   CSS :active 的按压+光感反馈补偿(见下方 .tap-press);安卓/支持环境有真震动。 */
+/* 全局触觉反馈：所有可点元素按下即震动。
+   · 安卓/支持环境：走标准 navigator.vibrate。
+   · iOS Safari 不支持 vibrate——网页层唯一可能的真震动路径是 17.4+ 的
+     <input type="checkbox" switch>：在用户手势内切换它会触发系统 haptic。
+     苹果无官方承诺、版本相关,故为"尽力而为";要稳定震动须做原生壳 App。 */
 (function(){
   var canVibrate = ('vibrate' in navigator);
-  window.haptic = function(ms){ try{ if(canVibrate) navigator.vibrate(ms||7); }catch(e){} };
+  var iosSwitch = null;   // 惰性单例
+  function ensureIosSwitch(){
+    if(iosSwitch !== null) return iosSwitch;
+    try{
+      var lab = document.createElement('label');
+      lab.setAttribute('aria-hidden','true');
+      lab.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1';
+      var inp = document.createElement('input');
+      inp.type = 'checkbox';
+      inp.setAttribute('switch','');   // Safari 17.4+ 专有属性
+      inp.tabIndex = -1; inp.setAttribute('aria-hidden','true');
+      lab.appendChild(inp);
+      (document.body || document.documentElement).appendChild(lab);
+      iosSwitch = inp;
+    }catch(e){ iosSwitch = false; }
+    return iosSwitch;
+  }
+  window.haptic = function(ms){
+    if(canVibrate){ try{ navigator.vibrate(ms || 7); return; }catch(e){} }
+    var inp = ensureIosSwitch();   // iOS 无 vibrate：切换隐藏 switch 触发系统 haptic
+    if(inp){ try{ inp.click(); if(inp.blur) inp.blur(); }catch(e){} }
+  };
   var STRONG = '.btn,.send,.ob-btn,.lock-btn,.speak-btn,.vs-x';
   var TAP = 'a,button,[onclick],[role="button"],.wc-item,.set-row,.tab,.pp-tile,.card,.tile,.chip,.cmd-item,.cap-item,.agent-island,.cmd-btn,.plus-btn,.fold-h,.opt-row,.switch,.hz-node';
   document.addEventListener('pointerdown', function(e){
