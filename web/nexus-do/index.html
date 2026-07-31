@@ -4386,6 +4386,70 @@ function bootOwner(){
   }
 }
 
+/* ============================================================
+   UI POLISH PATCH — 2026-07-31
+   第1批：纯 CSS，不改 HTML/JS
+   ============================================================ */
+
+/* 1 & 2 — tabbar 激活态强化 + dock 分隔线 */
+.tab { color: color-mix(in srgb,var(--text-3) 90%,transparent); padding-top:2px; }
+.tab.on { color:var(--cy-1); }
+.tab.on svg { filter:drop-shadow(0 0 6px color-mix(in srgb,var(--cy-1) 50%,transparent)); }
+.tab.on::after {
+  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:28px; height:2.5px; border-radius:0 0 3px 3px;
+  background:var(--cy-1); box-shadow:0 0 8px var(--cy-2);
+}
+.dock { border-bottom:1px solid var(--line); }
+
+/* 3 — text-3 提亮修复 WCAG AA（#66826F → #7a9e87） */
+:root, :root[data-theme="dark"] { --text-3:#7a9e87; }
+:root[data-theme="light"] { --text-3:#4a6b57; }
+
+/* 4 — aurora 绿色化并增强可感知度 */
+#aurora span { opacity:.55; }
+#aurora span:nth-child(1) { background:radial-gradient(circle,rgba(59,199,126,.18),transparent 66%); }
+#aurora span:nth-child(2) { background:radial-gradient(circle,rgba(59,199,126,.13),transparent 66%); }
+#aurora span:nth-child(3) { background:radial-gradient(circle,rgba(59,199,126,.10),transparent 66%); }
+
+/* 5 — wc-item 建议卡左侧图标：翡翠绿着色 + 圆底背景 */
+.wc-item svg {
+  stroke:var(--cy-2); opacity:.85;
+  background:color-mix(in srgb,var(--cy-1) 10%,transparent);
+  border-radius:8px; padding:3px;
+  width:24px; height:24px; box-sizing:content-box;
+}
+.wc-item:hover svg { stroke:var(--cy-1); opacity:1; }
+
+/* 6 — set-ic 按语义色区分 */
+.set-row:nth-child(1) .set-ic{background:color-mix(in srgb,#a78bfa 14%,transparent);color:#a78bfa;border-color:color-mix(in srgb,#a78bfa 22%,transparent)}
+.set-row:nth-child(2) .set-ic{background:color-mix(in srgb,var(--cy-1) 14%,transparent);color:var(--cy-1);border-color:color-mix(in srgb,var(--cy-1) 22%,transparent)}
+.set-row:nth-child(3) .set-ic{background:color-mix(in srgb,#60a5fa 14%,transparent);color:#60a5fa;border-color:color-mix(in srgb,#60a5fa 22%,transparent)}
+.set-row:nth-child(4) .set-ic{background:color-mix(in srgb,#f472b6 14%,transparent);color:#f472b6;border-color:color-mix(in srgb,#f472b6 22%,transparent)}
+.set-row:nth-child(5) .set-ic{background:color-mix(in srgb,#fb923c 14%,transparent);color:#fb923c;border-color:color-mix(in srgb,#fb923c 22%,transparent)}
+.set-row:nth-child(6) .set-ic{background:color-mix(in srgb,#fbbf24 14%,transparent);color:#fbbf24;border-color:color-mix(in srgb,#fbbf24 22%,transparent)}
+.set-row:nth-child(7) .set-ic{background:color-mix(in srgb,#34d399 14%,transparent);color:#34d399;border-color:color-mix(in srgb,#34d399 22%,transparent)}
+.set-row:nth-child(8) .set-ic{background:color-mix(in srgb,#e879f9 14%,transparent);color:#e879f9;border-color:color-mix(in srgb,#e879f9 22%,transparent)}
+.set-row:nth-child(9) .set-ic{background:color-mix(in srgb,#38bdf8 14%,transparent);color:#38bdf8;border-color:color-mix(in srgb,#38bdf8 22%,transparent)}
+
+/* 7 — 主题色选择器加容器包裹 */
+#themePicker {
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:14px; margin:0 0 9px;
+  padding:12px 16px !important;
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+}
+
+/* 8 — agentIsland 三态增强 */
+.agent-island { transition:background .3s var(--ease),border-color .3s,color .3s; }
+.agent-island.connected { border-color:color-mix(in srgb,var(--cy-1) 40%,transparent); color:var(--cy-1); }
+.agent-island.offline { border-color:color-mix(in srgb,#f87171 30%,transparent); color:#f87171; }
+.agent-island.busy { box-shadow:0 0 14px color-mix(in srgb,var(--cy-1) 22%,transparent); }
+
+/* 9 — wc-greet/wc-sub 比例修正 */
+.wc-greet { font-size:24px; }
+.wc-sub { font-size:14px; color:var(--text-2); }
+
 </style>
 <div id="tosMask"><div id="tosBox">
   <h3>服务条款 · 使用须知</h3>
