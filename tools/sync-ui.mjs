@@ -23,12 +23,18 @@ let failed = false;
     console.error('✗ [主界面] 找不到构建产物 nexus_do.mjs — 先跑: cd web/nexus-do && node build.mjs');
     failed = true; return;
   }
-  const html = readFileSync(htmlPath, 'utf8');
+  const sourceHtml = readFileSync(htmlPath, 'utf8');
   const built = readFileSync(builtPath, 'utf8');
   if (built.includes('"__CHAT_HTML__"')) {
     console.error('✗ [主界面] 构建产物里还留着占位符,注入没生效 — 重跑: cd web/nexus-do && node build.mjs');
     failed = true; return;
   }
+  // 与 build.mjs 完全同规则重建"预期嵌入页面":index.html + nexus-frontier.css 注入 </body> 前。
+  // 之前直接拿原始 index.html 比对,永远对不上,检查形同虚设——必须复刻构建时的变换。
+  const frontierPath = path.join(ROOT, 'web/nexus-do/nexus-frontier.css');
+  const html = existsSync(frontierPath)
+    ? sourceHtml.replace('</body>', () => `<style id="nx-frontier-style">\n${readFileSync(frontierPath, 'utf8')}\n</style>\n</body>`)
+    : sourceHtml;
   if (built.includes(JSON.stringify(html))) {
     console.log(`✓ [主界面] nexus_do.mjs 内嵌页面与 index.html 一致 (${html.length} 字节)`);
   } else {

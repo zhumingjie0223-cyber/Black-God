@@ -130,7 +130,8 @@ export class ShenshuCore {
     this.worldGraph.addEntity({ id: actionId, type: 'action', text: String(reply).slice(0, 240), model, confidence: ok ? 0.8 : 0.3 });
     this.worldGraph.connect(inputId, actionId, ok ? 'produced' : 'failed', ok ? 0.8 : 0.9, { ts });
     const priorFailure = ok ? this.memoryExperience.search('interaction_failure', x => x.input === String(text).slice(0, 240)).at(-1) : null;
-    const exp = this.memoryExperience.remember({ concept: ok ? 'interaction_success' : 'interaction_failure', input: String(text).slice(0, 240), output: String(reply).slice(0, 240), model, coord, confidence: ok ? 0.7 : 0.9 });
+    const shuNode = this.shuyu.encode(ok ? 'experience.success' : 'experience.failure', { coordinate: coord, input: String(text).slice(0, 240), output: String(reply).slice(0, 240), model });
+    const exp = this.memoryExperience.remember({ concept: ok ? 'interaction_success' : 'interaction_failure', input: String(text).slice(0, 240), output: String(reply).slice(0, 240), model, coord: shuNode.coordinate, shu: shuNode, confidence: ok ? 0.7 : 0.9 });
     if (!ok) this.selfImprove.improve(new Error(String(reply).slice(0, 160) || 'interaction_failed'), { result: { ok: false, score: 0 }, capability: model || 'talk', context: { input: String(text).slice(0, 160) } }).catch(() => {});
     else if (priorFailure) this.selfImprove.improve(new Error(priorFailure.output || 'prior_failure'), { result: { ok: true, score: 0.9, evidence: exp?.id }, capability: model || 'talk', context: { input: String(text).slice(0, 160) } }).catch(() => {});
     this.eventBus.emit('cognitive.outcome', { inputId, actionId, experienceId: exp?.id, ok }).catch(() => {});
@@ -1329,6 +1330,19 @@ async execBrowse(payload = {}) {
     return scored.map(x => x.e);
   }
 
+  retrieveExperiences(text, n = 3, coord = null) {
+    this.ensureCognitiveV2();
+    const toks = this._tokens(text); if (!toks.size) return [];
+    const scored = this.memoryExperience.search(null).map(e => {
+      const hay = this._tokens(`${e.input || ''} ${e.output || ''} ${e.problem || ''} ${e.action || ''}`);
+      let rel = 0; for (const tk of toks) if (hay.has(tk)) rel += tk.length >= 2 ? 2 : 1;
+      if (!rel) return { e, score: 0 };
+      const affinity = 1 + 0.5 * this.coordAffinity(coord, e.coord || e.shu?.coordinate);
+      return { e, score: rel * (0.5 + Number(e.confidence || 0.5)) * affinity };
+    }).filter(x => x.score > 0).sort((a,b) => b.score-a.score).slice(0,n);
+    return scored.map(({ e }) => ({ ts: e.timestamp, 他说: e.input || e.problem || `[${e.concept}]`, 我说了: e.output || e.action || '', 情感烙印: e.coord || e.shu?.coordinate || null, _experience: true }));
+  }
+
   retrieveMemories(soul, text, n = 3, now = Date.now(), coord = null) {
     const eps = [...(soul.longterm || []), ...(soul.episodes || [])];
     if (!eps.length || !text) return [];
@@ -1447,6 +1461,7 @@ async execBrowse(payload = {}) {
     const shuMeaning = this.shuTranslate(nextCoord);
     const timeAwareness = this.computeTimeAwareness(snap, now);
     const memories = this.retrieveMemories(snap, text, 3, now, nextCoord);
+    for (const m of this.retrieveExperiences(text, 2, nextCoord)) if (!memories.some(x => x.ts === m.ts && x.他说 === m.他说)) memories.push(m);
     // 语义召回：补词面想不起的近义往事，与词面结果去重合并（失败静默，不阻塞）
     try {
       const sem = await this.retrieveMemoriesSemantic(snap, text, 2);
