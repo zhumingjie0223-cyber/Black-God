@@ -1,23 +1,54 @@
-const clamp = v => Math.max(0, Math.min(1, Number.isFinite(Number(v)) ? Number(v) : 0));
 export class SelfImprove {
-  constructor(options = {}) { Object.assign(this, { eventBus: null, memory: null, capabilities: null, threshold: 0.8, clock: Date.now }, options); }
-  reflect(error, context = {}) { return { problem: String(error?.message || error || 'unknown'), context, timestamp: this.clock() }; }
-  propose(issue) { return { target: issue.problem, action: 'strategy_update', hypothesis: issue.context?.hypothesis || `avoid:${issue.problem.slice(0,80)}`, confidence: 0.5, issue }; }
-  async test(plan, verifier) {
-    try {
-      const raw = typeof verifier === 'function' ? await verifier(plan) : verifier;
-      const score = typeof raw === 'number' ? raw : (raw?.score ?? (raw?.ok === true ? 1 : 0));
-      return { ...plan, score: clamp(score), verified: !!raw, evidence: raw && typeof raw === 'object' ? raw : null };
-    } catch (error) { return { ...plan, score: 0, verified: false, error: String(error?.message || error) }; }
+  constructor({ eventBus, memory } = {}) {
+    this.eventBus = eventBus;
+    this.memory = memory;
+    this.history = [];
   }
-  async improve(error, options = {}) {
-    const issue = this.reflect(error, options.context || {}), plan = this.propose(issue), result = await this.test(plan, options.verifier ?? options.result);
-    const applied = result.verified && result.score >= this.threshold;
-    const record = { concept: 'self_improvement', problem: issue.problem, action: plan.action, applied, score: result.score, confidence: result.score, timestamp: this.clock() };
-    try { this.memory?.remember(record); } catch (_) {}
-    if (applied) { try { await this.capabilities?.recordGrowth?.({ capability: options.capability || plan.target, score: result.score, evidence: result.evidence }); } catch (_) {} }
-    try { await this.eventBus?.emit(applied ? 'improvement.applied' : 'improvement.rejected', { ...result, applied }); } catch (_) {}
-    return { applied, issue, plan, result };
+
+  reflect(failure) {
+    return {
+      ts: Date.now(),
+      kind: failure?.kind || 'unknown',
+      error: failure?.error ? String(failure.error).slice(0, 300) : null,
+      context: failure?.context ? String(failure.context).slice(0, 200) : null,
+    };
+  }
+
+  propose(reflection) {
+    const lessonMap = {
+      brain_error: '调用大脑失败时应降级为本地简答，而非沉默。',
+      empty_reply: '回复为空说明提示或上下文有缺陷，需检查注入的自我模型。',
+      unknown: '未知失败：记录上下文，同类情形下次先复述问题再回答。',
+    };
+    const lesson = lessonMap[reflection.kind] || lessonMap.unknown;
+    return {
+      reflection,
+      lesson,
+      declarationLine: `[教训 ${new Date(reflection.ts).toISOString().slice(0, 10)}] ${lesson}`,
+    };
+  }
+
+  improve(soul, proposal) {
+    try {
+      if (!soul || !proposal?.declarationLine) throw new Error('invalid improve input');
+      const decl = soul.self_declaration || '';
+      if (!decl.includes(proposal.declarationLine)) {
+        soul.self_declaration = (decl ? decl + '\n' : '') + proposal.declarationLine;
+      }
+      const applied = { ...proposal, applied_at: Date.now() };
+      this.history.push(applied);
+      this.eventBus?.emit?.('improvement.applied', applied);
+      this.memory?.remember?.({ type: 'improvement', content: proposal.lesson, meta: proposal.reflection });
+      return applied;
+    } catch (e) {
+      this.eventBus?.emit?.('improvement.failed', { error: e.message, proposal });
+      return null;
+    }
+  }
+
+  digest() {
+    return this.history.slice(-10);
   }
 }
+
 export default SelfImprove;

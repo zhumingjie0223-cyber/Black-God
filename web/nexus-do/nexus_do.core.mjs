@@ -1683,6 +1683,11 @@ async execBrowse(payload = {}) {
       } else {
         const selfEventType = (brainResult && brainResult.ok === false) ? 'failure' : 'success';
         this.selfModel.update(soul, { type: selfEventType, content: reply.slice(0, 100), coord: soul.current_shu_coord });
+    // ShuyuBridge 着色当前回复
+    try {
+      const shuCoin = this.shuyu?.coin?.(soul.current_shu_coord);
+      if (shuCoin) soul.current_shuyu = { word: shuCoin.词 || null, meaning: shuCoin.义 || shuCoin.汉 || null, coord: soul.current_shu_coord };
+    } catch (_) {}
       }
     } catch (e) {}
     try { this.recordCognitiveOutcome({ text, reply, ok: brainResult?.ok !== false, model: brainResult?.model || '', coord: nextCoord }); } catch (e) {}
