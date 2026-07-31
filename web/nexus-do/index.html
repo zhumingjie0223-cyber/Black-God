@@ -2882,64 +2882,13 @@ BlockRenderer.register('tool', function(container, block){
 });
 
 /* --- renderDiff --- */
-function renderDiff(container, diffText){
-  const pre = document.createElement('pre'); pre.className = 'diff-block';
-  const text = (diffText == null ? '' : String(diffText)).replace(/\r\n?/g, '\n');
-  const lines = text.replace(/\n+$/, '').split('\n');
-  for(let i=0; i<lines.length; i++){
-    const line = lines[i]; let cls;
-    if(line.startsWith('@@')){ cls='diff-hunk'; }
-    else if(line.startsWith('\\')){ cls='diff-hunk'; }
-    else if(line.startsWith('+'+'+'+'+')||line.startsWith('-'+'-'+'-')||line.startsWith('diff ')||line.startsWith('index ')||line.startsWith('new file')||line.startsWith('deleted file')||line.startsWith('rename ')){ cls='diff-hunk'; }
-    else if(line.startsWith('+')){ cls='diff-add'; }
-    else if(line.startsWith('-')){ cls='diff-del'; }
-    else{ cls='diff-ctx'; }
-    const span = document.createElement('span'); span.className = cls;
-    span.textContent = line.length ? line : '\u200b';
-    pre.appendChild(span); pre.appendChild(document.createTextNode('\n'));
-  }
-  container.appendChild(pre); return pre;
-}
+/* renderDiff: 见后定义 */
 
 /* ===== CoT 块渲染 ===== */
-function renderCoTBlock(el, delta, isDone){
-  if(!el) return;
-  if(delta) el.textContent += delta;
-  if(isDone){
-    el.classList.remove('streaming');
-    el.classList.add('done');
-  }else{
-    el.classList.remove('done');
-    el.classList.add('streaming');
-    el.scrollTop = el.scrollHeight;
-  }
-  if(!el.dataset.bound){
-    el.dataset.bound = '1';
-    el.addEventListener('click',()=>{
-      el.classList.toggle('expanded');
-      if(el.classList.contains('expanded')) el.classList.remove('done');
-      haptic('send');
-    });
-  }
-}
+/* renderCoTBlock: 见后定义 */
 
 /* ===== 执行步骤流渲染 ===== */
-function renderStepFlow(container, steps){
-  if(!container) return;
-  container.className = 'step-flow';
-  container.innerHTML = (steps || []).map(s => {
-    const st = s.status || 'pending';
-    return `<div class="step-item ${st}">
-      <div class="step-dot"></div>
-      <div class="step-body">
-        <div class="step-title">${esc(s.title || '')}</div>
-        ${s.detail ? `<div class="step-detail">${esc(s.detail)}</div>` : ''}
-      </div></div>`;
-  }).join('');
-  const last = (steps || [])[steps.length - 1];
-  if(last && last.status === 'done') haptic('done');
-  if(last && last.status === 'error') haptic('error');
-}
+/* renderStepFlow: 见后定义 */
 function esc(s){
   return String(s).replace(/[&<>"]/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -4022,7 +3971,7 @@ async function renderLexicon(q){
       +'<div class="lex-meta">'+(e.情绪?'<span class="lex-emo">'+escapeHtml(e.情绪)+'</span>':'')+(when?'<span>'+when+'</span>':'')+(e.层?'<span>·'+escapeHtml(e.层)+'层</span>':'')+'</div></div>';
   }).join('');
 }
-function fmtTs(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}); }catch(e){ return ''; } }
+/* fmtTs: 见后定义（语义版）*/
 
 /* ============ 模型 / API / 人格 ============ */
 async function fillApi(){
@@ -5882,7 +5831,7 @@ async function loadLexicon(){
   }catch(e){$('#lexiconBody').textContent='读取失败';}
 }
 // ── emoji 选择器 ──
-const EMOJIS='😊😂🥹❤️🔥💯✅❌🎉🙏👍🤔💪🤣😍🥰😎😭😤👏🤝💬🧠⚡🌙🌊🎯🔑🚀💡🛠️🎨📦🔍📌💾🖥️👾🦾🔮'.split(/(?<=\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u).filter(Boolean);
+const EMOJIS='😊 😂 🥹 ❤️ 🔥 💯 ✅ ❌ 🎉 🙏 👍 🤔 💪 🤣 😍 🥰 😎 😭 😤 👏 🤝 💬 🧠 ⚡ 🌙 🌊 🎯 🔑 🚀 💡 🛠️ 🎨 📦 🔍 📌 💾 🖥️ 👾 🦾 🔮'.split(' ');
 (function(){const p=document.createElement('div');p.id='emojiPanel';document.body.appendChild(p);})();
 function toggleEmoji(){
   const p=$('#emojiPanel'); const btn=$('#emojiBtn');
@@ -5890,7 +5839,7 @@ function toggleEmoji(){
     if(!p.childNodes.length) p.innerHTML=EMOJIS.map(e=>`<span style="font-size:24px;cursor:pointer;padding:4px;border-radius:8px" onclick="insertEmoji('${e}')">${e}</span>`).join('');
     const r=btn.getBoundingClientRect();
     p.style.bottom=(window.innerHeight-r.top+8)+'px'; p.style.left=Math.max(8,r.right-280)+'px';
-    setTimeout(()=>document.addEventListener('touchstart',()=>p.classList.remove('show'),{once:true,passive:true}),100);
+    setTimeout(()=>document.addEventListener('touchstart',function _h(ev){if(p.contains(ev.target)){document.addEventListener('touchstart',_h,{once:true,passive:true});return;}p.classList.remove('show');},{once:true,passive:true}),100);
   }
 }
 function insertEmoji(e){ const inp=$('#inp'); const s=inp.selectionStart||inp.value.length; inp.value=inp.value.slice(0,s)+e+inp.value.slice(s); inp.focus(); autogrow(inp); $('#emojiPanel').classList.remove('show'); }
@@ -5933,7 +5882,7 @@ function checkAtTrigger(inp){
   const r=inp.getBoundingClientRect();
   m.style.left=r.left+'px'; m.style.bottom=(window.innerHeight-r.top+8)+'px';
   m.innerHTML=caps.slice(0,8).map(c=>`<div class="at-item" onclick="insertAt('${(c.id||c.name||c).replace(/'/g,'')}')">${c.name||c}</div>`).join('');
-  setTimeout(()=>document.addEventListener('touchstart',()=>m.remove(),{once:true,passive:true}),100);
+  setTimeout(()=>document.addEventListener('touchstart',function _ha(ev){if(m&&m.contains(ev.target)){document.addEventListener('touchstart',_ha,{once:true,passive:true});return;}m&&m.remove();},{once:true,passive:true}),100);
 }
 window.insertAt=function(name){ const inp=$('#inp'); inp.value=inp.value.replace(/@$/,'@'+name+' '); inp.focus(); document.getElementById('atMenu')?.remove(); };
 </script>
