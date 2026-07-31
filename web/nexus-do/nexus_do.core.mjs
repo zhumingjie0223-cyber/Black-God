@@ -380,7 +380,7 @@ export class ShenshuCore {
         return json({ error: 'system_only', 提示: '这是系统主人的能力,你的神枢用不了。' }, 403);
       }
       try {
-        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [])); }
+        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [], b.images || [])); }
         if (path === '/soul') return json(await this.getSoulPublic());
         if (path === '/soul/continuity') return json(await this.getContinuity(Math.min(50, parseInt(url.searchParams.get('n') || '12', 10) || 12)));
         if (path === '/inner') return json(await this.getInner());
@@ -1538,9 +1538,10 @@ async execBrowse(payload = {}) {
   // ═══════════════════════ 对话主流程 ═══════════════════════
   // 并发安全：网络调用（callBrain）只读快照、不写 soul；所有 soul 读-改-写集中在
   // callBrain 之后一段「仅 storage 操作」的连续临界段里（DO 输入门保证原子，无丢失更新）。
-  async handleTalk(text, request, capsIn) {
+  async handleTalk(text, request, capsIn, imagesIn) {
     const now = Date.now();
     const caps = Array.isArray(capsIn) ? capsIn : [];
+    const images = Array.isArray(imagesIn) ? imagesIn : [];
     // 三级权限确认：__exec_confirm__:cmd 前缀，带 confirm=true 重跑执行脑，不走 AI
     // 安全：/talk 在私密 API 集合里，未持 OWNER_TOKEN 的请求在路由层已被 401 拦截
     if (typeof text === 'string' && text.startsWith('__exec_confirm__:')) {
@@ -1672,7 +1673,9 @@ async execBrowse(payload = {}) {
           const found = await this.webSearch(text).catch(() => '');
           if (found) webBlock = '\n\n【联网查到的实时资料，据此作答、勿编造。结尾用「来源：」列出用到的链接（最多3条）】\n' + found;
         }
-        brainResult = await this.callBrain(baseSystem + webBlock, text, snap, { temperature: gen.temperature, tier, instanceMode, role });
+        brainResult = await this.callBrain(baseSystem + webBlock, images && images.length > 0
+          ? [ ...images.slice(0,5).map(img=>({ type:'image', source:{ type:'base64', media_type: img.media_type || img.type || 'image/jpeg', data: img.data } })), { type:'text', text } ]
+          : text, snap, { temperature: gen.temperature, tier, instanceMode, role });
       }
     }
     // A：解析她回话里的意念召唤标记，得到干净回复 + 待执行能力

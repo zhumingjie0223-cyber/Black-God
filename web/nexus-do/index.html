@@ -3213,7 +3213,7 @@ const Nexus = {
   },
   async getSoul() { try { const r = await this._fetch('/soul', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.getSoul(); } catch(e){ return Demo.getSoul(); } },
   async getInner() { try { const r = await this._fetch('/inner', { headers: this.hdr() }); return r && r.ok ? await r.json() : Demo.inner(); } catch(e){ return Demo.inner(); } },
-  async talk(text, caps) {
+  async talk(text, caps, images) {
     // 多租户开:注册用户走「自己的实例」/talk（带 X-Nexus-Uid 头即被路由+授予实例主人权），
     // 拿完整体验（自己的灵魂/记忆/私语,用自己的 key,费用各付各的）。
     if (this.mode === 'public' && this.mt) {
@@ -3226,7 +3226,7 @@ const Nexus = {
         return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
     }
     // 主人:私密 /talk
-    try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps }) });
+    try { const r = await this._fetch('/talk', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body: JSON.stringify({ text, caps, ...(images && images.length ? { images: images.map(img=>({ type:'base64', media_type:img.type||'image/jpeg', data:img.data.replace(/^data:[^;]+;base64,/,'') })) } : {}) }) });
       return r && r.ok ? await r.json() : Demo.reply(text); } catch(e){ return Demo.reply(text); }
   },
   async device(info) { try { await this._fetch('/device',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(info)}); } catch(e){} },
@@ -3691,7 +3691,10 @@ async function send(){
 }
 async function doChat(text){
   showTyping();
-  const res = await Nexus.talk(text, [...caps]);
+  const imgs = window._pendingImages ? [...window._pendingImages] : [];
+  window._pendingImages = [];
+  document.querySelectorAll('.img-preview').forEach(el => el.remove());
+  const res = await Nexus.talk(text, [...caps], imgs.length ? imgs : undefined);
   hideTyping();
   if (res) handleReply(res);
   else {
