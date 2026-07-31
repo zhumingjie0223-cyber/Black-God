@@ -2869,12 +2869,45 @@ function renderDiff(container, text){
   }).join('') + '</pre>';
 }
 
+/* ===== Safari 保活（AudioContext 静音）===== */
+class SafariKeepAlive {
+  constructor(){ this.ctx = null; this._t = null; }
+  start(){
+    if(this._t) return;
+    try{
+      this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
+      if(this.ctx.state === 'suspended') this.ctx.resume();
+      this._t = setInterval(() => {
+        try{
+          if(this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          gain.gain.value = 0;
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.05);
+        }catch(e){}
+      }, 20000);
+    }catch(e){}
+  }
+  stop(){
+    if(this._t){ clearInterval(this._t); this._t = null; }
+    try{ if(this.ctx) this.ctx.suspend(); }catch(e){}
+  }
+}
+window._skaLive = window._skaLive || new SafariKeepAlive();
+
 /* ===== 触觉反馈 ===== */
 function haptic(type){
   if(!navigator.vibrate) return;
-  const map = { send:[10], done:[10,50,10], error:[30,20,30] };
+  const map = { send:[10], done:[10,50,10], error:[30,20,30], light:[4] };
   try{ navigator.vibrate(map[type] || [10]); }catch(e){}
 }
+
+/* 按钮按下统一轻触反馈 */
+document.addEventListener('touchstart', (e) => {
+  if(e.target.closest('.send, .plus-btn, .speak-btn, .ob-btn, .pp-tile, .chip, .cap-item, .cmd-item, .tile')) haptic('light');
+}, { passive: true });
 
 
 /* ══ F2: 发送按钮三态状态机（ChatGPT Operator逆向）══ */
@@ -3174,7 +3207,7 @@ const Nexus = {
       ws.onclose = () => { this.wsReady = false; setLive(false); this.scheduleReconnect(); };
       ws.onerror = () => { try { ws.close(); } catch(e){} };
       // 保活 ping
-      this._ping = setInterval(() => { if (this.wsReady) try { ws.send(JSON.stringify({type:'ping'})); } catch(e){} }, 25000);
+      this._ping = setInterval(() => { if (this.wsReady) try { ws.send(JSON.stringify({type:'ping'})); } catch(e){} }, 15000);
     } catch(e) { this.scheduleReconnect(); }
   },
   scheduleReconnect() {
@@ -4414,10 +4447,51 @@ function typeInto(bubble, text, done){
   if(Nexus.mode==='owner') bootOwner();
   else if(Nexus.mode==='public') initPublicMode();
   else { setGateMode('owner'); showLock(); }
-  // 回到前台 / 网络恢复 → 瞬间重连（仅主人；公共用户无 WS，不触发私密接口）
-  document.addEventListener('visibilitychange', ()=>{ if(Nexus.mode==='owner' && document.visibilityState==='visible'){ if(!Nexus.wsReady) Nexus.connectWS(); refreshSoul(); } });
-  window.addEventListener('online', ()=>{ if(Nexus.mode==='owner'){ try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); } });
-  window.addEventListener('pageshow', ()=>{ if(Nexus.mode==='owner' && !Nexus.wsReady) Nexus.connectWS(); });
+  // ═══ KeepAliveManager：Safari 保活 + 后台策略 ═══
+  const KAM = {
+    init() {
+      // visibilitychange：前台 → 保活+重连；后台 → 降频省电
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          window._skaLive?.start();
+          if (Nexus.mode === 'owner') {
+            const last = +sessionStorage.getItem('_nexusLastSeen') || 0;
+            if (!Nexus.wsReady || Date.now() - last > 30000) {
+              try { Nexus.ws && Nexus.ws.close(); } catch(e) {}
+              Nexus.connectWS(); refreshSoul();
+            }
+          }
+        } else {
+          window._skaLive?.stop();
+          sessionStorage.setItem('_nexusLastSeen', Date.now());
+          // 后台降低 WS ping 频率
+          if (Nexus._ping) { clearInterval(Nexus._ping); Nexus._ping = null; }
+          if (Nexus.wsReady) Nexus._ping = setInterval(() => {
+            try { Nexus.ws.send(JSON.stringify({type:'ping'})); } catch(e) {}
+          }, 45000);
+        }
+      });
+      // 网络恢复
+      window.addEventListener('online', () => {
+        if (Nexus.mode === 'owner') {
+          try { Nexus.ws && Nexus.ws.close(); } catch(e) {}
+          Nexus.connectWS(); refreshSoul();
+        }
+      });
+      // BFCache / iOS 后台恢复
+      window.addEventListener('pageshow', (e) => {
+        if (Nexus.mode === 'owner' && !Nexus.wsReady) Nexus.connectWS();
+        if (e.persisted) { refreshSoul(); window._skaLive?.start(); }
+      });
+      window.addEventListener('pagehide', () => {
+        sessionStorage.setItem('_nexusLastSeen', Date.now());
+        window._skaLive?.stop();
+      });
+      // 初始立即启动保活（主人模式首次进入）
+      if (Nexus.mode === 'owner') window._skaLive?.start();
+    }
+  };
+  KAM.init();
   // PWA + 自愈：检测到新版自动刷新一次，杜绝旧缓存把人卡在旧版（如旧密码页）
   if('serviceWorker' in navigator){ try{
     const hadController = !!navigator.serviceWorker.controller;   // 本次加载是否已被旧 SW 接管
