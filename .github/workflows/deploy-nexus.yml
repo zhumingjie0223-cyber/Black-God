@@ -63,6 +63,19 @@ jobs:
           TAVILY_KEY: ${{ secrets.TAVILY_KEY }}
         run: echo "$TAVILY_KEY" | npx wrangler secret put TAVILY_KEY
 
+      - name: Inject TG secrets
+        if: ${{ env.CF_TOKEN != '' && secrets.TG_BOT_TOKEN != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 142c76e0039e279886c89257b6fddbc7
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_QUAN_CHAT_ID: ${{ secrets.TG_QUAN_CHAT_ID }}
+          TG_WEBHOOK_SECRET: ${{ secrets.TG_WEBHOOK_SECRET }}
+        run: |
+          echo "$TG_BOT_TOKEN" | npx wrangler secret put TG_BOT_TOKEN
+          echo "$TG_QUAN_CHAT_ID" | npx wrangler secret put TG_QUAN_CHAT_ID
+          echo "$TG_WEBHOOK_SECRET" | npx wrangler secret put TG_WEBHOOK_SECRET
+
       # 上线安全闸：部署后校验线上 /health 的 secure 标志。
       # 没设 OWNER_TOKEN → 私密接口(含 IP/定位)对公众开放 → 让部署失败，逼你设密钥。
       - name: Verify OWNER_TOKEN is set (security gate)
