@@ -10237,10 +10237,11 @@ const MANIFEST_JSON = JSON.stringify({
   display_override: ['standalone', 'minimal-ui'],
   orientation: 'portrait',
   dir: 'ltr',
-  background_color: '#F4FBF6',
-  theme_color: '#F4FBF6',
+  background_color: '#0A100C',
+  theme_color: '#0A100C',
   lang: 'zh-CN',
   categories: ['productivity', 'utilities', 'lifestyle'],
+  prefer_related_applications: false,
   icons: [
     { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -10250,6 +10251,9 @@ const MANIFEST_JSON = JSON.stringify({
   shortcuts: [
     { name: '对话', short_name: '对话', url: '/?tab=chat', description: '直接跟神枢说话' },
     { name: '记忆', short_name: '记忆', url: '/?tab=memory', description: '看她记住的往事' },
+  ],
+  screenshots: [
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', form_factor: 'narrow', label: '神枢主界面' },
   ],
 });
 
@@ -10276,16 +10280,67 @@ const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 <image href="data:image/png;base64,${ICON_PNG_B64}" width="512" height="512" clip-path="url(#r)" preserveAspectRatio="xMidYMid slice"/>
 </svg>`;
 
-// Service Worker —— 离线壳，保证掉线也能开
+// Service Worker —— 离线壳 + Background Sync + Push
 const SW_JS = `
-const CACHE = 'shensu-v8';
+const CACHE = 'shensu-v9';
+const OFFLINE_QUEUE_KEY = 'nexus_offline_queue';
+
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil((async () => {
   const keys = await caches.keys();
   await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
   await self.clients.claim();
 })()); });
-// Web Push：她想你了 → 推到桌面/锁屏（app 关了也收得到）
+
+// ── Background Sync：离线时缓存消息，联网后自动补发 ──
+self.addEventListener('sync', e => {
+  if (e.tag === 'nexus-talk-retry') {
+    e.waitUntil((async () => {
+      const db = await openDB();
+      const queue = await dbGet(db, OFFLINE_QUEUE_KEY) || [];
+      const remaining = [];
+      for (const item of queue) {
+        try {
+          const r = await fetch('/talk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: item.body });
+          if (!r.ok) remaining.push(item);
+        } catch { remaining.push(item); }
+      }
+      await dbSet(db, OFFLINE_QUEUE_KEY, remaining);
+      if (remaining.length < queue.length) {
+        const all = await clients.matchAll({ type: 'window' });
+        all.forEach(c => c.postMessage({ type: 'sync-done', sent: queue.length - remaining.length }));
+      }
+    })());
+  }
+});
+
+// 简易 IndexedDB helpers
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('nexus-sw', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = e => rej(e.target.error);
+  });
+}
+function dbGet(db, key) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readonly');
+    const req = tx.objectStore('kv').get(key);
+    req.onsuccess = () => res(req.result);
+    req.onerror = e => rej(e.target.error);
+  });
+}
+function dbSet(db, key, val) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(val, key);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
+// Web Push
 self.addEventListener('push', e => {
   let data = { title: '神枢', body: '神枢在此，随时待命。', url: '/' };
   try { if (e.data) data = Object.assign(data, e.data.json()); } catch (err) {}
@@ -10303,11 +10358,28 @@ self.addEventListener('notificationclick', e => {
     if (clients.openWindow) return clients.openWindow(url);
   })());
 });
+
+// Fetch 策略
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET') return;                       // 只缓存 GET
-  if (['/talk','/pubtalk','/soul','/inner','/heartbeat','/device','/health','/stats','/register'].includes(url.pathname)) return;  // 动态接口不缓存
+  if (req.method !== 'GET') return;
+  if (['/talk','/pubtalk','/soul','/inner','/heartbeat','/device','/health','/stats','/register'].includes(url.pathname)) return;
+  if (url.pathname === '/' ) {
+    e.respondWith((async () => {
+      try { const r = await fetch(req); const c = await caches.open(CACHE); c.put('/', r.clone()); return r; }
+      catch (err) { const cached = await caches.match('/'); return cached || new Response('离线中…她还在。', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }); }
+    })());
+    return;
+  }
+  e.respondWith((async () => {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    try { const r = await fetch(req); if (r.ok) { const c = await caches.open(CACHE); c.put(req, r.clone()); } return r; }
+    catch (err) { return cached || Response.error(); }
+  })());
+});
+`;
   if (url.pathname === '/' ) {
     // 网络优先，失败回缓存壳
     e.respondWith((async () => {

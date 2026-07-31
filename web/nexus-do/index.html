@@ -1823,6 +1823,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetAbout')"><div class="set-ic">◈</div><div class="set-tx"><b>关于</b></div><div class="set-arrow">›</div></div>
+          <div class="set-row" id="installRow" onclick="triggerInstall()" style="display:none"><div class="set-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13M8 12l4 4 4-4M5 20h14"/></svg></div><div class="set-tx"><b>安装到主屏幕</b><span>像 App 一样使用</span></div><div class="set-arrow">›</div></div>
         </div>
       </section>
 
@@ -4102,6 +4103,30 @@ function typeInto(bubble, text, done){
       refreshing = true; location.reload();
     });
     navigator.serviceWorker.register('/sw.js').then(reg=>{ try{ reg.update(); }catch(e){} }).catch(()=>{});
+
+    // ── PWA 安装提示 ──────────────────────────────────────────
+    let _deferredInstall = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      _deferredInstall = e;
+      // 显示 settings 里的安装入口
+      const row = document.getElementById('installRow');
+      if (row) row.style.display = '';
+    });
+    window.addEventListener('appinstalled', () => {
+      _deferredInstall = null;
+      const row = document.getElementById('installRow');
+      if (row) row.style.display = 'none';
+    });
+    // 独立模式（已安装）下也隐藏
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      const row = document.getElementById('installRow');
+      if (row) row.style.display = 'none';
+    }
+    window.triggerInstall = () => {
+      if (_deferredInstall) { _deferredInstall.prompt(); _deferredInstall.userChoice.then(()=>{ _deferredInstall=null; }); }
+      else { alert('在浏览器地址栏右侧点「安装」或分享菜单里选「添加到主屏幕」'); }
+    };
   }catch(e){} }
   // 动态光效纵深视差（去掉了粒子，保留极光流光 + 倾斜纵深）
   Parallax.init();
