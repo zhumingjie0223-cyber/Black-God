@@ -6,20 +6,33 @@ export class ExperienceMemory {
    * @param {number} [options.limit=Infinity] - 最大记录数；0 视为不限（Infinity）
    * @param {object} [options.eventBus] - 可选事件总线（需支持 emit）
    */
-  constructor({ limit = Infinity, eventBus = null } = {}) {
+  constructor(recordsOrOpts = [], opts = {}) {
+    let initialRecords = [];
+    let options = {};
+    if (Array.isArray(recordsOrOpts)) {
+      initialRecords = recordsOrOpts;
+      options = opts;
+    } else if (recordsOrOpts && typeof recordsOrOpts === 'object') {
+      options = recordsOrOpts;
+    }
+
+    let { limit = Infinity, eventBus = null, maxRecords, clock } = options;
+    if (maxRecords != null && limit === Infinity) limit = maxRecords;
+
     if (limit !== Infinity) {
       if (!Number.isInteger(limit) || limit < 0) {
-        throw new RangeError(
-          `ExperienceMemory: limit must be a non-negative integer or Infinity, got ${limit}`
-        );
+        throw new RangeError(`ExperienceMemory: limit must be a non-negative integer or Infinity, got ${limit}`);
       }
       if (limit === 0) limit = Infinity;
     }
 
     this.limit = limit;
     this.eventBus = eventBus;
+    this._clock = typeof clock === 'function' ? clock : () => Date.now();
     this.records = [];
     this._seq = 0;
+
+    if (initialRecords.length > 0) this.restore(initialRecords);
   }
 
   get size() {
@@ -33,15 +46,20 @@ export class ExperienceMemory {
    * @returns {object} record
    */
   remember(kind, payload = {}) {
+    if (kind == null) kind = 'experience';
     if (typeof kind !== 'string' || kind.length === 0) {
       throw new TypeError('ExperienceMemory.remember: kind must be a non-empty string');
     }
 
+    const seq = ++this._seq;
+    const at = this._clock();
     const record = {
-      seq: ++this._seq,
+      id: `em-${at}-${seq}`,
+      seq,
       kind,
       payload,
-      at: Date.now(),
+      at,
+      confidence: 0,
     };
 
     this.records.push(record);
@@ -54,6 +72,37 @@ export class ExperienceMemory {
       this.eventBus?.emit('memory:evicted', evicted);
     }
 
+    return record;
+  }
+
+  /**
+   * 强化一条经验记录。
+   * @param {number|string} ref - seq 编号、record id 或 kind
+   * @param {number} [confidence] - 可选；传入时设置 confidence（钳制到 [0,1]），不传则保持不变
+   * @returns {object|null} record
+   */
+  reinforce(ref, confidence) {
+    let record = null;
+    if (Number.isFinite(ref)) {
+      record = this.records.find((r) => r.seq === ref) ?? null;
+    } else if (typeof ref === 'string' && ref.length > 0) {
+      // 先按 id 精确匹配，再按 kind 匹配最近一条
+      record = this.records.find((r) => r.id === ref) ?? null;
+      if (!record) {
+        for (let i = this.records.length - 1; i >= 0; i--) {
+          if (this.records[i].kind === ref) { record = this.records[i]; break; }
+        }
+      }
+    } else {
+      throw new TypeError('ExperienceMemory.reinforce: ref must be a seq number or non-empty kind string');
+    }
+    if (!record) return null;
+    record.reinforcedCount = (record.reinforcedCount || 0) + 1;
+    record.lastReinforcedAt = this._clock();
+    if (confidence !== undefined) {
+      record.confidence = Math.min(1, Math.max(0, confidence));
+    }
+    this.eventBus?.emit('memory:reinforced', record);
     return record;
   }
 
@@ -79,11 +128,54 @@ export class ExperienceMemory {
   }
 
   /**
+   * 全文搜索：匹配 kind 及 payload 中所有嵌套字段，结果按 confidence 降序排列。
+   * @param {string} query
+   * @param {object} [opts]
+   * @param {number} [opts.count=20]
+   * @returns {object[]}
+   */
+  search(query, opts = {}) {
+    if (typeof query !== 'string' || query.length === 0) return [];
+    const q = query.toLowerCase();
+
+    const deepMatch = (value, seen = new Set()) => {
+      if (value == null) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(q);
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value).toLowerCase().includes(q);
+      }
+      if (typeof value === 'object') {
+        if (seen.has(value)) return false;
+        seen.add(value);
+        const values = Array.isArray(value) ? value : Object.values(value);
+        return values.some((v) => deepMatch(v, seen));
+      }
+      return false;
+    };
+
+    return this.records
+      .filter((r) => {
+        if (r.kind && r.kind.toLowerCase().includes(q)) return true;
+        return deepMatch(r.payload);
+      })
+      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      .slice(0, opts.count || 20);
+  }
+
+  /**
    * 序列化当前记录。
    * @returns {object[]}
    */
-  snapshot() {
+  export() {
     return this.records.map((r) => ({ ...r }));
+  }
+
+  /**
+   * export() 的别名。
+   * @returns {object[]}
+   */
+  snapshot() {
+    return this.export();
   }
 
   /**
