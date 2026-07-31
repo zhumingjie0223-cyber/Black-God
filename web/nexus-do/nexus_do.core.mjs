@@ -10333,24 +10333,34 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   async nativeSandbox(code, lang = 'js') {
     const timeout = 10000;
     const start = Date.now();
+    const bcast = (line, kind = 'stdout') => { try { this.broadcast({ type: 'sandbox_live', line, kind, ts: Date.now() }); } catch (_) {} };
     try {
       if (lang === 'js') {
-        // JS 沙箱：AsyncFunction + 注入 ctx
-        const ctx = {
-          fetch: (...a) => fetch(...a),
-          storage_get: (k) => this.storage.get(k),
-          storage_put: (k, v) => this.storage.put(k, v),
-          env_read: (k) => (k === 'OWNER_TOKEN' ? '[protected]' : (this.env[k] || null)),
-          log: (...a) => { stdout += a.map(String).join(' ') + '\n'; },
-        };
-        let stdout = '';
-        const fn = new Function('ctx', 'fetch', 'storage_get', 'storage_put', 'env_read', 'log',
-          `return (async()=>{ ${code} })()`);
-        const result = await Promise.race([
-          fn(ctx, ctx.fetch, ctx.storage_get, ctx.storage_put, ctx.env_read, ctx.log),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
-        ]);
-        return { ok: true, stdout: stdout || '', result: result !== undefined ? String(result) : '', stderr: '', via: 'native-sandbox-js', ms: Date.now() - start };
+        // JS DSL 模式（CF Worker 禁 new Function）
+        // 支持: fetch/json/uuid/base64/timestamp/storage_get/storage_set
+        let stdout = '', result = '';
+        const lines2 = code.trim().split('\n');
+        for (const raw2 of lines2) {
+          const t = raw2.trim(); if (!t || t.startsWith('//')) continue;
+          const [op, ...rest] = t.split(/\s+/);
+          const arg2 = rest.join(' ');
+          bcast('» ' + t, 'info');
+          try {
+            if (op === 'fetch' || op === 'json') {
+              const resp = await Promise.race([fetch(arg2), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
+              const txt = await resp.text();
+              const out2 = op === 'json' ? JSON.stringify(JSON.parse(txt), null, 2).slice(0, 1000) : txt.slice(0, 1000);
+              stdout += out2 + '\n'; result = out2; bcast(out2.split('\n')[0], 'stdout');
+            } else if (op === 'uuid') { result = crypto.randomUUID(); stdout += result + '\n'; bcast(result, 'stdout'); }
+            else if (op === 'timestamp') { result = String(Date.now()); stdout += result + '\n'; bcast(result, 'stdout'); }
+            else if (op === 'base64_encode') { result = btoa(unescape(encodeURIComponent(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
+            else if (op === 'base64_decode') { result = decodeURIComponent(escape(atob(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
+            else if (op === 'storage_get') { const v = await this.storage.get(arg2); result = JSON.stringify(v); stdout += result + '\n'; bcast(result, 'stdout'); }
+            else if (op === 'storage_set') { const [k2,...v2] = rest; await this.storage.put(k2, v2.join(' ')); result = 'ok'; stdout += 'ok\n'; bcast('ok', 'stdout'); }
+            else { stdout += 'unknown op: ' + op + '\n'; bcast('unknown op: ' + op, 'stderr'); }
+          } catch (e2) { const em = String(e2.message||e2).slice(0,200); stdout += em + '\n'; bcast(em, 'stderr'); }
+        }
+        return { ok: true, stdout, result, stderr: '', via: 'native-sandbox-js', ms: Date.now() - start };
       }
 
       if (lang === 'shell') {
@@ -10375,7 +10385,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           }
           else if (cmd === 'ls') {
             const list = await this.storage.list({ prefix: args[0] || '' });
-            const _ls=[...list.keys].map(k=>k.name).join('\n')+'\n'; stdout+=_ls; live(_ls.trimEnd(),'stdout');
+            const _ls=Array.from(list.keys).map(k=>k.name).join('\n')+'\n'; stdout+=_ls; live(_ls.trimEnd(),'stdout');
           }
           else if (cmd === 'cat') {
             const val = await this.storage.get(args[0]);
@@ -10388,6 +10398,46 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           }
           else if (cmd === 'date') { stdout += new Date().toISOString() + '\n'; }
           else if (cmd === 'pwd') { stdout += '/nexus/sandbox\n'; }
+          else if (cmd === 'wget') {
+            const url2 = args.find(a => a.startsWith('http'));
+            const oIdx = args.indexOf('-o'); const key2 = oIdx >= 0 ? args[oIdx+1] : 'wget_output';
+            if (!url2) { stderr += 'wget: no URL\n'; live('wget: no URL','stderr'); continue; }
+            const wr = await Promise.race([fetch(url2), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
+            const wt = await wr.text();
+            await this.storage.put(key2, wt);
+            const wl = `saved ${wt.length} bytes → ${key2}`; stdout+=wl+'\n'; live(wl,'stdout');
+          }
+          else if (cmd === 'jq') {
+            const [path2, url3] = args;
+            if (!url3 || !path2) { stderr+='jq: usage jq PATH URL\n'; live('jq: usage jq PATH URL','stderr'); continue; }
+            const jr = await Promise.race([fetch(url3), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
+            const jobj = await jr.json();
+            const keys3 = path2.replace(/^\./, '').split('.');
+            let val2 = jobj; for (const k3 of keys3) { val2 = val2?.[k3]; }
+            const jl = JSON.stringify(val2); stdout+=jl+'\n'; live(jl,'stdout');
+          }
+          else if (cmd === 'ping') {
+            const url4 = args[0]; if (!url4) { stderr+='ping: no URL\n'; continue; }
+            const t0 = Date.now();
+            await Promise.race([fetch(url4,{method:'HEAD'}), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),5000))]).catch(()=>{});
+            const pl = `pong ${Date.now()-t0}ms`; stdout+=pl+'\n'; live(pl,'stdout');
+          }
+          else if (cmd === 'set') { const [k4,...v4]=args; await this.storage.put(k4,v4.join(' ')); live(`set ${k4}`,'stdout'); stdout+=`set ${k4}\n`; }
+          else if (cmd === 'del') { await this.storage.delete(args[0]); live(`deleted ${args[0]}`,'stdout'); stdout+=`deleted ${args[0]}\n`; }
+          else if (cmd === 'uuid') { const uid=crypto.randomUUID(); stdout+=uid+'\n'; live(uid,'stdout'); }
+          else if (cmd === 'base64') {
+            const [mode2,...rest2]=args; const txt2=rest2.join(' ');
+            const b64r = mode2==='encode' ? btoa(unescape(encodeURIComponent(txt2))) : decodeURIComponent(escape(atob(txt2)));
+            stdout+=b64r+'\n'; live(b64r,'stdout');
+          }
+          else if (cmd === 'head') {
+            const url5=args[0]; if(!url5){stderr+='head: no URL\n';continue;}
+            const hr=await Promise.race([fetch(url5,{method:'HEAD'}),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),5000))]);
+            const hdrs=JSON.stringify(Object.fromEntries(hr.headers),null,2).slice(0,500);
+            stdout+=hdrs+'\n'; live(hdrs.split('\n')[0],'stdout');
+          }
+          else if (cmd === 'env') { const el='OWNER_TOKEN=*** (protected)\nWORKER=nexus-do\nNODE_ENV=production'; stdout+=el+'\n'; live(el,'stdout'); }
+          else if (cmd === 'sleep') { const ns=Math.min(Number(args[0])||1,5); await new Promise(r=>setTimeout(r,ns*1000)); live(`slept ${ns}s`,'stdout'); stdout+=`slept ${ns}s\n`; }
           else { const _se=`unsupported: ${cmd}\n`; stderr+=_se; live(_se.trimEnd(),'stderr'); }
         }
         return { ok: !stderr || !!stdout, stdout, stderr, result: '', via: 'native-sandbox-shell', ms: Date.now() - start };

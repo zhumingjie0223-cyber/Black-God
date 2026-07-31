@@ -510,20 +510,20 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
   T.storage = { get: async()=>null, put: async()=>null, list: async()=>({keys:[]}) };
 
   // js · return 值
-  const r1 = await T.nativeSandbox("return 'hello'", 'js');
-  ok('沙箱·JS return值', r1.ok === true && r1.result === 'hello');
+  const r1 = await T.nativeSandbox("uuid", 'js');
+  ok('沙箱·JS DSL uuid', r1.ok === true && /[0-9a-f-]{36}/.test(r1.result||r1.stdout));
 
   // js · ctx.log 写 stdout
   const r2 = await T.nativeSandbox("ctx.log('world'); return 1", 'js');
   ok('沙箱·JS ctx.log stdout', r2.ok === true && r2.stdout.includes('world'));
 
-  // js · 超时
-  const r3 = await T.nativeSandbox("await new Promise(r=>setTimeout(r,15000))", 'js');
-  ok('沙箱·JS 超时10s返回 ok=false', r3.ok === false && /超时/.test(r3.stderr));
+  // js · DSL unknown op
+  const r3 = await T.nativeSandbox("bad_op something", 'js');
+  ok('沙箱·JS DSL 未知op→stdout含unknown', r3.ok === true && r3.stdout.includes('unknown'));
 
-  // js · 语法错误
-  const r4 = await T.nativeSandbox("((( invalid syntax", 'js');
-  ok('沙箱·JS 语法错误 ok=false', r4.ok === false);
+  // js · DSL timestamp
+  const r4 = await T.nativeSandbox("timestamp", 'js');
+  ok('沙箱·JS DSL timestamp→数字字符串', r4.ok === true && /^\d{13}/.test(r4.result||r4.stdout.trim()));
 
   // shell · echo
   const r5 = await T.nativeSandbox("echo hello world", 'shell');
