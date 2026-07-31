@@ -5727,6 +5727,18 @@ window.commitGit = async function() {
   if (!msg) return;
   await gitOp('commit:' + msg);
 };
+
+/* ═══ 全局错误边界 ═══ */
+window.onerror = function(msg, src, line, col, err) {
+  console.error('[BOUNDARY]', msg, src+':'+line, err?.stack?.slice(0,300));
+  if (typeof toast === 'function') toast('出错了：' + String(msg).slice(0,60), 'error', 4000);
+  return false;
+};
+window.addEventListener('unhandledrejection', e => {
+  const reason = e.reason?.message || String(e.reason).slice(0,80);
+  console.error('[BOUNDARY:promise]', reason);
+  if (typeof toast === 'function') toast('异步错误：' + reason.slice(0,60), 'error', 3000);
+});
 </script>
 </body>
 </html>

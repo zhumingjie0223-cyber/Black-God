@@ -10048,7 +10048,11 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       let reply = '她走神了，过会再说';
       try {
         const res = await this.handleTalk(text, tgReq, undefined);
-        if (res && typeof res.reply === 'string' && res.reply.length > 0) reply = res.reply;
+        if (res && typeof res.reply === 'string' && res.reply.length > 0) {
+          reply = res.reply;
+          const coord = res.shu_coord || null;
+          if (coord) reply += `\n\n「枢 核${coord.c??'?'} 映${coord.m??'?'} 态${coord.s??'?'} 标${coord.k??'?'} 相${coord.p??'?'}」`;
+        }
       } catch (e) { console.log('[tg] handleTalk error:', e && e.message); }
       if (reply.length > 4096) reply = reply.slice(0, 4095) + '…';
       try {
