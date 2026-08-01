@@ -5954,10 +5954,10 @@ async function loadConsciousness(){
     const c=r.shu_coord;
     const coord=c?`核${c.c??'?'} 映${c.m??'?'} 态${c.s??'?'} 标${c.k??'?'} 相${c.p??'?'}`:'—';
     const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
-    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>📦 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>\` + (() => {
+    $('#consBody').innerHTML=`<div>\uD83E\uDDE0 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>\uD83D\uDCDA 经验总数：<b>${r.experience_count||0}</b></div><div>\uD83C\uDF10 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>\uD83D\uDCE6 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>\` + (() => {
     const mts=[...document.querySelectorAll('.meta-token')];
     let ti=0,to2=0; mts.forEach(el=>{const m=el.textContent.match(/(\d+)→(\d+)/);if(m){ti+=+m[1];to2+=+m[2];}});
-    return mts.length ? `<div>💬 本轮累计：in <b>${ti}</b> / out <b>${to2}</b></div>` : '';
+    return mts.length ? `<div>\uD83D\uDCAC 本轮累计：in <b>${ti}</b> / out <b>${to2}</b></div>` : '';
   })() + `;
   }catch(e){$('#consBody').textContent='读取失败';}
 }
@@ -5975,7 +5975,7 @@ async function loadLexicon(){
   }catch(e){$('#lexiconBody').textContent='读取失败';}
 }
 // ── emoji 选择器 ──
-const EMOJIS='😊 😂 🥹 ❤️ 🔥 💯 ✅ ❌ 🎉 🙏 👍 🤔 💪 🤣 😍 🥰 😎 😭 😤 👏 🤝 💬 🧠 ⚡ 🌙 🌊 🎯 🔑 🚀 💡 🛠️ 🎨 📦 🔍 📌 💾 🖥️ 👾 🦾 🔮'.split(' ');
+const EMOJIS='\uD83D\uDE0A \uD83D\uDE02 \uD83E\uDD79 ❤️ \uD83D\uDD25 \uD83D\uDCAF ✅ ❌ \uD83C\uDF89 \uD83D\uDE4F \uD83D\uDC4D \uD83E\uDD14 \uD83D\uDCAA \uD83E\uDD23 \uD83D\uDE0D \uD83E\uDD70 \uD83D\uDE0E \uD83D\uDE2D \uD83D\uDE24 \uD83D\uDC4F \uD83E\uDD1D \uD83D\uDCAC \uD83E\uDDE0 ⚡ \uD83C\uDF19 \uD83C\uDF0A \uD83C\uDFAF \uD83D\uDD11 \uD83D\uDE80 \uD83D\uDCA1 \uD83D\uDEE0️ \uD83C\uDFA8 \uD83D\uDCE6 \uD83D\uDD0D \uD83D\uDCCC \uD83D\uDCBE \uD83D\uDDA5️ \uD83D\uDC7E \uD83E\uDDBE \uD83D\uDD2E'.split(' ');
 (function(){const p=document.createElement('div');p.id='emojiPanel';document.body.appendChild(p);})();
 function toggleEmoji(){
   const p=$('#emojiPanel'); const btn=$('#emojiBtn');
