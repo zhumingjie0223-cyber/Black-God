@@ -377,7 +377,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -407,6 +407,7 @@ export class ShenshuCore {
         }
         // /migrate：仅 POST + 显式 ?force=1 才强制；默认幂等，防误触回滚记忆
         if (path === '/migrate' && request.method === 'POST') return json(this.isShadow ? { skipped: true } : await this.migrateFromKV(url.searchParams.get('force') === '1'));
+        if (path === '/evict' && request.method === 'POST') { await this.state.storage.deleteAll(); return json({ ok: true, msg: 'DO storage cleared, instance will reinitialize on next request' }); }
         // 数据主权：导出(读,安全) / 迁回(写,需 ?confirm=1 且先备份)——数据归你、可带走、可迁移
         if (path === '/export') return json(await this.exportData());
         if (path === '/import' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.importData(b, url.searchParams.get('confirm') === '1')); }
@@ -8591,14 +8592,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     }
 
     // 多脑网关：按注册表顺序故障转移(自由调度)。一条挂了自动换下一条，最多 9 条。
+    const _brainInstanceMode = !!opts.instanceMode;
     const tryGateway = async () => {
-      const instanceMode = !!opts.instanceMode;
       const cfg = (await this.storage.get('config')) || {};
       cfg._auto_models = cfg._auto_models || {}; cfg._provider = cfg._provider || {}; cfg._health = cfg._health || {};
       // 神枢主导:先按任务职责把对口脑排前(秒派);再按健康自检把近期连败的脑降到最后(自愈路由);
       // 最后按 MACE 累积权重把"历来答得好的脑"提到最前(越用越会挑)。
       const _bw = await this.getBrainWeights();
-      const brains = this.rankByWeight(this.rankByHealth(this.orderBrainsForTask(await this.resolveBrains(instanceMode), opts.role), cfg._health), _bw);
+      const brains = this.rankByWeight(this.rankByHealth(this.orderBrainsForTask(await this.resolveBrains(_brainInstanceMode), opts.role), cfg._health), _bw);
       if (!brains.length) return null;
       let cacheDirty = false;
       for (const brain of brains) {
