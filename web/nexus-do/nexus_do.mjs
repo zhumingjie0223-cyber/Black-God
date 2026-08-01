@@ -8664,7 +8664,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       return null;
     };
     // 大脑：新账号 CF Nemotron-120B（HTTP，马甲变量藏 Secret）
-    const tryCF = async () => {
+// [内部工具层] 仅供 genImage / genVoice / vision / nativeSandbox / webSearch 调用，
+// 不参与对话链，结果不得写入最终 reply 字段。
+    const _cfToolCall = async () => {
       if (instanceMode) return null;
       const acc = this.env.NX_A || null, key = this.env.NX_K || null;
       const brainModel = this.env.NX_BRAIN || '@cf/nvidia/nemotron-3-120b-a12b';
@@ -8697,7 +8699,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     };
 
     // 网关死了 → 大脑走 CF（Nemotron 主 / Llama 兜底）优先，网关留着以后 Claude 复活再用
-    const order = [tryCF, tryGateway];
+    const order = [tryGateway];  // aquan.love 网关是唯一对话大脑；CF AI 已降级为内部工具层
     let result = null;
     for (const fn of order) {
       const r = await fn();
@@ -8775,7 +8777,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         }
         
         const punishmentMsg = userMsg + punishmentPrompt;
-        const retry = await tryGateway(punishmentMsg) || await tryCF(punishmentMsg);
+        const retry = await tryGateway(punishmentMsg);
         
         if (!retry || !retry.reply) break;
         
