@@ -9608,20 +9608,13 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     const styled = opts.raw ? prompt
       : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
     // 出图：主账号 CF flux（AI binding，原生最快）→ 副账号 CF flux（HTTP，冗余兜底）
-    // Pollinations.ai 免费出图（无需 key，稳定可靠）
+    // Pollinations.ai 免费出图（直接返回URL，无需下载，客户端加载）
     try {
       const _pollUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(styled.slice(0, 500))}?width=512&height=512&nologo=true&model=flux`;
-      const _pr = await fetch(_pollUrl, { signal: AbortSignal.timeout(25000) });
-      if (_pr.ok) {
-        const _pb = await _pr.arrayBuffer();
-        const _b64p = btoa(String.fromCharCode(...new Uint8Array(_pb)));
-        if (_b64p) {
-          await this.logCreation('image', prompt);
-          const _pout = { image: 'data:image/jpeg;base64,' + _b64p, imageUrl: _pollUrl, prompt, styled, model: 'pollinations', via: 'pollinations' };
-          await this.cachePut('img', prompt, _pout);
-          return _pout;
-        }
-      }
+      await this.logCreation('image', prompt);
+      const _pout = { imageUrl: _pollUrl, prompt, styled, model: 'pollinations', via: 'pollinations' };
+      await this.cachePut('img', prompt, _pout);
+      return _pout;
     } catch (_pe) {}
     const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
     // ① 主账号：AI binding
@@ -9654,15 +9647,10 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     if (!text || !text.trim()) return { error: '没有话可说' };
     // 出语音：主账号 CF MeloTTS（binding）→ 副账号 CF MeloTTS（HTTP 冗余）
     // ① 主账号：AI binding
-    // Google TTS 免费出声
+    // Google TTS 直接返回 URL（无需下载）
     try {
       const _gttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text.slice(0,200))}&tl=zh-CN&client=tw-ob`;
-      const _gtr = await fetch(_gttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
-      if (_gtr.ok) {
-        const _gab = await _gtr.arrayBuffer();
-        const _gb64 = btoa(String.fromCharCode(...new Uint8Array(_gab)));
-        if (_gb64) return { audio: 'data:audio/mpeg;base64,' + _gb64, text, via: 'gtts' };
-      }
+      return { audioUrl: _gttsUrl, text, via: 'gtts' };
     } catch (_) {}
     if (this.env.AI) {
       try {
