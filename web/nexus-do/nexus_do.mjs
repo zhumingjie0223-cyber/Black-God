@@ -385,7 +385,7 @@ export class ShenshuCore {
         return json({ error: 'system_only', 提示: '这是系统主人的能力,你的神枢用不了。' }, 403);
       }
       try {
-        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [], b.images || [])); }
+        if (path === '/talk' && request.method === 'POST') { const b = await request.json(); return json(await this.handleTalk(b.text || '', request, b.caps || [], b.images || [], _mt && _role === 'instance')); }
         if (path === '/soul') return json(await this.getSoulPublic());
         if (path === '/soul/continuity') return json(await this.getContinuity(Math.min(50, parseInt(url.searchParams.get('n') || '12', 10) || 12)));
         if (path === '/inner') return json(await this.getInner());
@@ -1564,7 +1564,7 @@ async execBrowse(payload = {}) {
   // ═══════════════════════ 对话主流程 ═══════════════════════
   // 并发安全：网络调用（callBrain）只读快照、不写 soul；所有 soul 读-改-写集中在
   // callBrain 之后一段「仅 storage 操作」的连续临界段里（DO 输入门保证原子，无丢失更新）。
-  async handleTalk(text, request, capsIn, imagesIn) {
+  async handleTalk(text, request, capsIn, imagesIn, instanceMode = false) {
     const now = Date.now();
     const caps = Array.isArray(capsIn) ? capsIn : [];
     const images = Array.isArray(imagesIn) ? imagesIn : [];
