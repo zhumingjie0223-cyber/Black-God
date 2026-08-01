@@ -9608,6 +9608,28 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     const styled = opts.raw ? prompt
       : `${prompt}. cinematic, obsidian black and cement-cyan palette, soft volumetric light, premium texture, high detail, 8k`;
     // 出图：主账号 CF flux（AI binding，原生最快）→ 副账号 CF flux（HTTP，冗余兜底）
+    // 曼谷工厂优先（HTTP，不依赖 CF AI binding）
+    const _factoryUrl = this.env.FACTORY_URL;
+    if (_factoryUrl) {
+      try {
+        const _fr = await fetch(`${_factoryUrl}/image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: styled, steps: opts.steps || 4 }),
+          signal: AbortSignal.timeout(25000),
+        });
+        if (_fr.ok) {
+          const _fd = await _fr.json();
+          const _b64f = _fd.image || _fd.b64 || null;
+          if (_b64f) {
+            await this.logCreation('image', prompt);
+            const _out = { image: _b64f.startsWith('data:') ? _b64f : 'data:image/jpeg;base64,' + _b64f, prompt, styled, model: 'factory', via: 'factory' };
+            await this.cachePut('img', prompt, _out);
+            return _out;
+          }
+        }
+      } catch (_) {}
+    }
     const model = this.env.IMAGE_MODEL || '@cf/black-forest-labs/flux-1-schnell';
     // ① 主账号：AI binding
     if (this.env.AI) {
@@ -9639,6 +9661,23 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     if (!text || !text.trim()) return { error: '没有话可说' };
     // 出语音：主账号 CF MeloTTS（binding）→ 副账号 CF MeloTTS（HTTP 冗余）
     // ① 主账号：AI binding
+    // 曼谷工厂优先
+    const _vfactoryUrl = this.env.FACTORY_URL;
+    if (_vfactoryUrl) {
+      try {
+        const _vfr = await fetch(`${_vfactoryUrl}/voice`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text.slice(0, 800), lang: opts.lang || 'zh' }),
+          signal: AbortSignal.timeout(20000),
+        });
+        if (_vfr.ok) {
+          const _vfd = await _vfr.json();
+          const _vb64 = _vfd.audio || _vfd.b64 || null;
+          if (_vb64) return { audio: _vb64.startsWith('data:') ? _vb64 : 'data:audio/mpeg;base64,' + _vb64, text, via: 'factory' };
+        }
+      } catch (_) {}
+    }
     if (this.env.AI) {
       try {
         const r = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: text.slice(0, 800), lang: opts.lang || 'zh' });
