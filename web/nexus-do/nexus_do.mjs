@@ -1677,6 +1677,31 @@ async execBrowse(payload = {}) {
     //   闲聊轻量 → 单发；若是简单事实问句则预取一次检索（CF 模型对工具协议不稳，预取更可靠）
     // 多租户:实例主人(普通用户)只走「用自己 key 的单发对话」—— 不开 agent/联网/CF,
     // 那些会烧系统(权哥)的算力。他的神枢用他自己的网关回话。
+    // 神枢直接处理工具意图（不经过brain，毫秒级）
+    const _drawRE = /^(画|draw|生成图片?|出图|帮我画|给我画|image of|create image)/i;
+    const _speakRE = /^(念|说出来|speak|tts|语音朗读|读出来|用speak|帮我念)/i;
+    if (_drawRE.test(text.trim())) {
+      const _imgPrompt = text.replace(_drawRE, '').trim() || text;
+      try {
+        const _ir = await this.genImage(_imgPrompt);
+        if (_ir && (_ir.image || _ir.imageUrl)) {
+          const _iu = _ir.image || _ir.imageUrl;
+          await this.saveSoul(Object.assign(await this.getSoul(), { last_seen: Date.now() }));
+          return { reply: '出来了。', model: 'nexus-draw', media: [{ kind: 'image', url: _iu }], shu_coord: nextCoord, shu_meaning: shuMeaning };
+        }
+      } catch (_) {}
+    }
+    if (_speakRE.test(text.trim())) {
+      const _ttsText = text.replace(_speakRE, '').trim() || text;
+      try {
+        const _vr = await this.genVoice(_ttsText);
+        if (_vr && (_vr.audio || _vr.audioUrl)) {
+          const _vu = _vr.audio || _vr.audioUrl;
+          await this.saveSoul(Object.assign(await this.getSoul(), { last_seen: Date.now() }));
+          return { reply: '念出来了。', model: 'nexus-speak', media: [{ kind: 'audio', url: _vu }], shu_coord: nextCoord, shu_meaning: shuMeaning };
+        }
+      } catch (_) {}
+    }
     const tier = this.pickTier(text, caps);
     let brainResult = null;
     const isTask = !instanceMode && this.isTaskGoal(text);   // 融合:明确任务→强制执行
