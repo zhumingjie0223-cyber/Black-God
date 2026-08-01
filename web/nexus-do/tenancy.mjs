@@ -13,7 +13,7 @@
 // ═══════════════════════════════════════════════
 
 // 系统主人(权哥)的固定实例名——保持历史值,现有数据零迁移。
-export const SYSTEM_DO = 'quan-shenshu-nexus';
+export const SYSTEM_DO = 'quan-shenshu-nexus-v2';
 
 // 影子实例:持 SHADOW_TOKEN 的用户 → 独立实例。界面/功能与主人版一致,数据完全隔离。
 export const SHADOW_DO = 'shadow-nexus';
