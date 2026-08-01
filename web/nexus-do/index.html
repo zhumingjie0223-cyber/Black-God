@@ -2824,27 +2824,64 @@ function mdInline(s){
 }
 function mdRender(text){
   const lines=String(text||'').split('\n');
-  let html='', i=0;
+  const out=[]; let i=0;
   while(i<lines.length){
-    if(lines[i].trim().startsWith('|')){
+    const ln=lines[i];
+    // 代码块
+    if(/^```/.test(ln)){
+      const lang=ln.slice(3).trim(); const buf=[]; i++;
+      while(i<lines.length && !/^```/.test(lines[i])){buf.push(lines[i]);i++;}
+      i++; out.push('<pre><code'+(lang?' class="lang-'+mdEsc(lang)+'"':'')+'>'+(buf.map(l=>mdEsc(l)).join('\n'))+'</code></pre>'); continue;
+    }
+    // 表格
+    if(ln.trim().startsWith('|')){
       const rows=[];
-      while(i<lines.length && lines[i].trim().startsWith('|')){ rows.push(lines[i].trim()); i++; }
+      while(i<lines.length && lines[i].trim().startsWith('|')){rows.push(lines[i].trim());i++;}
       const parsed=rows.map(r=>r.replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim())).filter(cells=>!cells.every(c=>/^:?-+:?$/.test(c)));
       if(parsed.length){
         let t='<table class="md-table"><thead><tr>';
         t+=parsed[0].map(c=>'<th>'+mdInline(c)+'</th>').join('');
         t+='</tr></thead><tbody>';
         for(let r=1;r<parsed.length;r++) t+='<tr>'+parsed[r].map(c=>'<td>'+mdInline(c)+'</td>').join('')+'</tr>';
-        t+='</tbody></table>';
-        html+=t;
+        t+='</tbody></table>'; out.push(t);
       }
-    }else{
-      const para=[];
-      while(i<lines.length && !lines[i].trim().startsWith('|')){ para.push(lines[i]); i++; }
-      html+='<p>'+para.map(mdInline).join('<br>')+'</p>';
+      continue;
     }
+    // 无序列表（连续行）
+    if(/^\s*[-*]\s+/.test(ln)){
+      const items=[];
+      while(i<lines.length && /^\s*[-*]\s+/.test(lines[i])){
+        items.push(mdInline(lines[i].replace(/^\s*[-*]\s+/,''))); i++;
+      }
+      out.push('<ul class="md-ul">'+items.map(t=>'<li>'+t+'</li>').join('')+'</ul>'); continue;
+    }
+    // 有序列表（连续行）
+    if(/^\s*\d+\.\s+/.test(ln)){
+      const items=[];
+      while(i<lines.length && /^\s*\d+\.\s+/.test(lines[i])){
+        items.push(mdInline(lines[i].replace(/^\s*\d+\.\s+/,''))); i++;
+      }
+      out.push('<ol class="md-ol">'+items.map(t=>'<li>'+t+'</li>').join('')+'</ol>'); continue;
+    }
+    // 引用块（连续行）
+    if(/^\s*>\s?/.test(ln)){
+      const buf=[];
+      while(i<lines.length && /^\s*>\s?/.test(lines[i])){
+        buf.push(mdInline(lines[i].replace(/^\s*>\s?/,''))); i++;
+      }
+      out.push('<blockquote class="md-quote">'+buf.join('<br>')+'</blockquote>'); continue;
+    }
+    // 标题
+    const hm=ln.match(/^(#{1,4})\s+(.*)/);
+    if(hm){ out.push('<h'+(hm[1].length+2)+'>'+mdInline(hm[2])+'</h'+(hm[1].length+2)+'>'); i++; continue; }
+    // 水平线
+    if(/^[-*]{3,}$/.test(ln.trim())){ out.push('<hr>'); i++; continue; }
+    // 空行
+    if(!ln.trim()){ out.push(''); i++; continue; }
+    // 普通段落
+    out.push('<p>'+mdInline(ln)+'</p>'); i++;
   }
-  return html;
+  return out.join('\n');
 }
 BlockRenderer.register('text', function(container, block){
   const el=document.createElement('div'); el.className='blk-text';
