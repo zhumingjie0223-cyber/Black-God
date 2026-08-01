@@ -10385,6 +10385,29 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
             else if (op === 'base64_decode') { result = decodeURIComponent(escape(atob(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
             else if (op === 'storage_get') { const v = await this.storage.get(arg2); result = JSON.stringify(v); stdout += result + '\n'; bcast(result, 'stdout'); }
             else if (op === 'storage_set') { const [k2,...v2] = rest; await this.storage.put(k2, v2.join(' ')); result = 'ok'; stdout += 'ok\n'; bcast('ok', 'stdout'); }
+            else if (op === 'echo') {
+              result = arg2; stdout += result + '\n'; bcast(result, 'stdout');
+            }
+            else if (op === 'math' || op === 'expr' || (!/\s/.test(t) && /[\+\-\*\/\%\(\)]/.test(t)) || /^\d/.test(t)) {
+              const mathExpr = (op === 'math' || op === 'expr') ? arg2 : t;
+              const allowed = /^[\d\s\+\-\*\/\%\(\)\.eEbBxX_a-fA-F]+$/;
+              const withMath = mathExpr.replace(/Math\.\w+/g, '0').replace(/Math\.PI/g, '3.14159');
+              if (!allowed.test(withMath.replace(/\s/g, ''))) {
+                stdout += 'expr: 只支持数学表达式\n'; bcast('expr: 只支持数学表达式', 'stderr');
+              } else {
+                try {
+                  // CF Worker 支持 Function constructor（限于 workerd >= 2023）
+                  const mathFn = new Function(
+                    'Math', '"use strict"; return (' + mathExpr + ')'
+                  );
+                  const val = mathFn(Math);
+                  result = String(val); stdout += result + '\n'; bcast(result, 'stdout');
+                } catch(fe) {
+                  stdout += 'expr error: ' + String(fe.message).slice(0,100) + '\n';
+                  bcast('expr error: ' + String(fe.message).slice(0,100), 'stderr');
+                }
+              }
+            }
             else { stdout += 'unknown op: ' + op + '\n'; bcast('unknown op: ' + op, 'stderr'); }
           } catch (e2) { const em = String(e2.message||e2).slice(0,200); stdout += em + '\n'; bcast(em, 'stderr'); }
         }
