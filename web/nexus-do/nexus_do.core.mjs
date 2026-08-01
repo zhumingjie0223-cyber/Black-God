@@ -1678,6 +1678,7 @@ async execBrowse(payload = {}) {
     // 多租户:实例主人(普通用户)只走「用自己 key 的单发对话」—— 不开 agent/联网/CF,
     // 那些会烧系统(权哥)的算力。他的神枢用他自己的网关回话。
     const tier = this.pickTier(text, caps);
+    let brainResult = null;
     const isTask = !instanceMode && this.isTaskGoal(text);   // 融合:明确任务→强制执行
     const agentic = !instanceMode && (isTask || tier === 'heavy' || caps.includes('web') || caps.includes('think') || caps.includes('code'));
     const role = this.preferredRole(tier, caps);   // 神枢主导:按任务定首选职责,秒派对口脑
