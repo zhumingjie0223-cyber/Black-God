@@ -5954,11 +5954,8 @@ async function loadConsciousness(){
     const c=r.shu_coord;
     const coord=c?`核${c.c??'?'} 映${c.m??'?'} 态${c.s??'?'} 标${c.k??'?'} 相${c.p??'?'}`:'—';
     const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
-    $('#consBody').innerHTML=`<div>${String.fromCodePoint(0x1F9E0)} 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>${String.fromCodePoint(0x1F4DA)} 经验总数：<b>${r.experience_count||0}</b></div><div>${String.fromCodePoint(0x1F310)} 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>${String.fromCodePoint(0x1F4E6)} 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>\` + (() => {
-    const mts=[...document.querySelectorAll('.meta-token')];
-    let ti=0,to2=0; mts.forEach(el=>{const m=el.textContent.match(/(\d+)→(\d+)/);if(m){ti+=+m[1];to2+=+m[2];}});
-    return mts.length ? `<div>${String.fromCodePoint(0x1F4AC)} 本轮累计：in <b>${ti}</b> / out <b>${to2}</b></div>` : '';
-  })() + `;
+    const _tok=(()=>{const mts=[...document.querySelectorAll('.meta-token')];let ti=0,to2=0;mts.forEach(el=>{const m=el.textContent.match(/(\d+)→(\d+)/);if(m){ti+=+m[1];to2+=+m[2];}});return mts.length?'<div>'+String.fromCodePoint(0x1F4AC)+' 本轮累计：in <b>'+ti+'</b> / out <b>'+to2+'</b></div>':''})();
+    $('#consBody').innerHTML='<div>'+String.fromCodePoint(0x1F9E0)+' 内心独白：<b>'+r.inner_voice_count||0+'</b> 条</div><div>'+String.fromCodePoint(0x1F4DA)+' 经验总数：<b>'+(r.experience_count||0)+'</b></div><div>'+String.fromCodePoint(0x1F310)+' 世界节点：<b>'+(r.world_entities||0)+'</b></div><div>能力成长：<b>'+(r.capabilities||0)+'</b></div><div>枢语坐标：<b>'+coord+'</b></div><div>在线时长：<b>'+h+'h'+m+'m'+s+'s</b></div><div>'+String.fromCodePoint(0x1F4E6)+' 存储估算：<b>'+(r.storage_size_est_kb||'?')+' KB</b></div>'+_tok+';'
   }catch(e){$('#consBody').textContent='读取失败';}
 }
 async function loadLexicon(){
@@ -6007,8 +6004,7 @@ function sbAppend(line, kind='stdout'){
 `;
   out.scrollTop = out.scrollHeight;
 }
-function sbClear(){ const out=document.getElementById('sbOutput'); if(out) out.innerHTML='⬡ 已清空
-'; }
+function sbClear(){ const out=document.getElementById('sbOutput'); if(out) out.innerHTML='⬡ 已清空\n'; }
 function sbShowHistory(){
   const box=document.getElementById('sbHistoryBox');
   if(!box) return;
