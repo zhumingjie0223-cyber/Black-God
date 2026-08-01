@@ -431,9 +431,9 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
 // ── 职责分派(神枢主导·秒派对口脑·故障转移兜底)──
 {
   const S3 = Object.create(ShenshuCore.prototype);
-  ok('分派·code→代码', S3.preferredRole('light', ['code']) === '代码');
-  ok('分派·heavy→深思', S3.preferredRole('heavy', []) === '深思');
-  ok('分派·think→深思', S3.preferredRole('light', ['think']) === '深思');
+  ok('分派·code→重任务', S3.preferredRole('light', ['code']) === '重任务');
+  ok('分派·heavy→重任务', S3.preferredRole('heavy', []) === '重任务');
+  ok('分派·think→重任务', S3.preferredRole('light', ['think']) === '重任务');
   ok('分派·light→快答', S3.preferredRole('light', []) === '快答');
   ok('分派·默认→主力', S3.preferredRole('normal', []) === '主力');
   // 神枢自己判分工(用户不选)：从模型名推断
