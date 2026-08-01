@@ -8604,7 +8604,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       // 神枢主导:先按任务职责把对口脑排前(秒派);再按健康自检把近期连败的脑降到最后(自愈路由);
       // 最后按 MACE 累积权重把"历来答得好的脑"提到最前(越用越会挑)。
       const _bw = await this.getBrainWeights();
-      const brains = this.rankByWeight(this.rankByHealth(this.orderBrainsForTask(await this.resolveBrains(_brainInstanceMode), opts.role), cfg._health), _bw);
+      // role 排序最后做，确保任务职责优先级不被 MACE 权重覆盖
+      const brains = this.orderBrainsForTask(this.rankByWeight(this.rankByHealth(await this.resolveBrains(_brainInstanceMode), cfg._health), _bw), opts.role);
       if (!brains.length) return null;
       let cacheDirty = false;
       for (const brain of brains) {
