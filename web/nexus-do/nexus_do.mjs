@@ -8592,6 +8592,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
     // 多脑网关：按注册表顺序故障转移(自由调度)。一条挂了自动换下一条，最多 9 条。
     const tryGateway = async () => {
+      const instanceMode = !!opts.instanceMode;
       const cfg = (await this.storage.get('config')) || {};
       cfg._auto_models = cfg._auto_models || {}; cfg._provider = cfg._provider || {}; cfg._health = cfg._health || {};
       // 神枢主导:先按任务职责把对口脑排前(秒派);再按健康自检把近期连败的脑降到最后(自愈路由);
