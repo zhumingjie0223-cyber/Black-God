@@ -6054,30 +6054,6 @@ function exportChat(fmt='json'){
   a.download=`nexus-${new Date().toISOString().slice(0,10)}.${ext}`;
   a.click();
 }
-function importChat(){
-  const inp=document.createElement('input');
-  inp.type='file'; inp.accept='.json';
-  inp.onchange=()=>{
-    const f=inp.files[0]; if(!f)return;
-    const rd=new FileReader();
-    rd.onload=()=>{
-      try{
-        const data=JSON.parse(rd.result);
-        const msgs=Array.isArray(data)?data:(data.msgs||[]);
-        let n=0;
-        msgs.forEach(m=>{
-          if(m && m.text && (m.role==='her'||m.role==='me')){
-            pushMsg(m.role, m.text, {}, m.ts||'');
-            n++;
-          }
-        });
-        toast('已恢复 '+n+' 条消息');
-      }catch(e){ toast('文件格式错误'); }
-    };
-    rd.readAsText(f);
-  };
-  inp.click();
-}
 /* 系统暗/亮跟随 */
 (function(){
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -6130,6 +6106,32 @@ window.insertAt=function(name){ const inp=$('#inp'); inp.value=inp.value.replace
   document.addEventListener('input',e=>{ if(e.target.id==='pinInput'&&e.target.value.length===4) checkPin(e.target.value); },{capture:true});
   if(localStorage.getItem(PIN_KEY)) showPin();
 })();
+</script>
+<script>
+window.importChat = function importChat(){
+  var inp=document.createElement('input');
+  inp.type='file'; inp.accept='.json';
+  inp.onchange=function(){
+    var f=inp.files[0]; if(!f)return;
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{
+        var data=JSON.parse(rd.result);
+        var msgs=Array.isArray(data)?data:(data.msgs||[]);
+        var n=0;
+        msgs.forEach(function(m){
+          if(m && m.text && (m.role==='her'||m.role==='me')){
+            pushMsg(m.role, m.text, {}, m.ts||'');
+            n++;
+          }
+        });
+        toast('已恢复 '+n+' 条消息');
+      }catch(e){ toast('文件格式错误'); }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+};
 </script>
 </body>
 </html>
