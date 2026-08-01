@@ -8530,8 +8530,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   // 平滑更新 ω^(t+1)=(1-γ)ω^t + γ·ω_task，γ=0.15。存 storage 键 _brain_weights。
   async getBrainWeights() { return (await this.storage.get('_brain_weights')) || {}; }
   // 任务后更新某脑权重。ok=本轮是否成功；latencyMs=耗时（越快越好，软加分）。
-  async updateBrainWeight(url, ok, latencyMs) {
+  async updateBrainWeight(url, ok, latencyMs, model) {
     if (!url) return;
+    const key = model ? url + '#' + model : url;
     const W = await this.getBrainWeights();
     const cur = (typeof W[url] === 'number') ? W[url] : 0.5;   // 新脑从中位 0.5 起
     // ω_task：成功=1，失败=0；再按速度微调（<3s 满分，>15s 打折）
@@ -8640,7 +8641,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
               const text = this.parseBrainText(provider, d);
               if (text && text.trim() && !this.isRefusal(text)) {
                 if (cfg._provider[brain.url] !== provider) { cfg._provider[brain.url] = provider; cacheDirty = true; }   // 锁定这家的方言
-                const _hh = cfg._health[brain.url]; if (!_hh || _hh.fails) { cfg._health[brain.url] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
+                const _brainKey = (brain.url||'') + '#' + (brain.model||'');
+                const _hh = cfg._health[_brainKey]; if (!_hh || _hh.fails) { cfg._health[_brainKey] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
                 if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
                 try { await this.updateBrainWeight(brain.url, true, Date.now() - _t0); } catch (e) {}   // MACE:成功加分
                 return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
@@ -8659,8 +8661,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); diagBody = String(e && e.message || e); break; }
         }
         // 反思自检:这条(所有方言)都没成 → 记健康(连败计数+自诊断),下次自动降级绕开;成功会清零(自愈)
-        const _hf = cfg._health[brain.url] || {};
-        cfg._health[brain.url] = { fails: (_hf.fails || 0) + 1, ts: Date.now(), 诊断: this.diagnoseErr(diagStatus, diagBody) };
+        const _brainKey2 = (brain.url||'') + '#' + (brain.model||'');
+        const _hf = cfg._health[_brainKey2] || {};
+        cfg._health[_brainKey2] = { fails: (_hf.fails || 0) + 1, ts: Date.now(), 诊断: this.diagnoseErr(diagStatus, diagBody) };
         cacheDirty = true;
         try { await this.updateBrainWeight(brain.url, false); } catch (e) {}   // MACE:失败扣分
         // → 自动换下一条脑(自由调度 · 故障转移)
