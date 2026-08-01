@@ -8574,12 +8574,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     }
     return pri.concat(rest);
   }
-  // 按任务算首选职责(不乱:确定性映射)。
-  // code/think/heavy → '重任务'（兼容旧'代码'/'深思'）；light→'快答'；否则→'主力'。
+  // fable5 主力处理所有请求，不按 caps/tier 分流。opus5 由 proxy 层 refusal 后自动切。
   preferredRole(tier, caps) {
-    caps = caps || [];
-    if (caps.includes('code') || tier === 'heavy' || caps.includes('think')) return '重任务';
-    if (tier === 'light') return '快答';
     return '主力';
   }
 
