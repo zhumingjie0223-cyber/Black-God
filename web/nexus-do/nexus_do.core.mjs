@@ -10390,22 +10390,50 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
             }
             else if (op === 'math' || op === 'expr' || (!/\s/.test(t) && /[\+\-\*\/\%\(\)]/.test(t)) || /^\d/.test(t)) {
               const mathExpr = (op === 'math' || op === 'expr') ? arg2 : t;
-              const allowed = /^[\d\s\+\-\*\/\%\(\)\.eEbBxX_a-fA-F]+$/;
-              const withMath = mathExpr.replace(/Math\.\w+/g, '0').replace(/Math\.PI/g, '3.14159');
-              if (!allowed.test(withMath.replace(/\s/g, ''))) {
-                stdout += 'expr: 只支持数学表达式\n'; bcast('expr: 只支持数学表达式', 'stderr');
-              } else {
-                try {
-                  // CF Worker 支持 Function constructor（限于 workerd >= 2023）
-                  const mathFn = new Function(
-                    'Math', '"use strict"; return (' + mathExpr + ')'
-                  );
-                  const val = mathFn(Math);
-                  result = String(val); stdout += result + '\n'; bcast(result, 'stdout');
-                } catch(fe) {
-                  stdout += 'expr error: ' + String(fe.message).slice(0,100) + '\n';
-                  bcast('expr error: ' + String(fe.message).slice(0,100), 'stderr');
+              // 手写递归下降解析器（CF Worker 禁 new Function/eval）
+              const _calc = (s) => {
+                s = s.trim()
+                  .replace(/Math\.PI/g, String(Math.PI))
+                  .replace(/Math\.E(?![A-Za-z])/g, String(Math.E))
+                  .replace(/Math\.sqrt\(([^)]+)\)/g, (_,x)=>String(Math.sqrt(parseFloat(_calc(x)))))
+                  .replace(/Math\.abs\(([^)]+)\)/g,  (_,x)=>String(Math.abs(parseFloat(_calc(x)))))
+                  .replace(/Math\.ceil\(([^)]+)\)/g, (_,x)=>String(Math.ceil(parseFloat(_calc(x)))))
+                  .replace(/Math\.floor\(([^)]+)\)/g,(_,x)=>String(Math.floor(parseFloat(_calc(x)))))
+                  .replace(/Math\.round\(([^)]+)\)/g,(_,x)=>String(Math.round(parseFloat(_calc(x)))))
+                  .replace(/Math\.log\(([^)]+)\)/g,  (_,x)=>String(Math.log(parseFloat(_calc(x)))))
+                  .replace(/Math\.pow\(([^,]+),([^)]+)\)/g,(_,a,b)=>String(Math.pow(parseFloat(_calc(a)),parseFloat(_calc(b)))))
+                  .replace(/Math\.max\(([^,]+),([^)]+)\)/g,(_,a,b)=>String(Math.max(parseFloat(_calc(a)),parseFloat(_calc(b)))))
+                  .replace(/Math\.min\(([^,]+),([^)]+)\)/g,(_,a,b)=>String(Math.min(parseFloat(_calc(a)),parseFloat(_calc(b)))));
+                // 括号
+                while (/\([\d\s\+\-\*\/\%\.e]+\)/.test(s)) {
+                  s = s.replace(/\(([\d\s\+\-\*\/\%\.e]+)\)/g, (_,inner)=>_calc(inner));
                 }
+                // ** 幂
+                s = s.replace(/([\d\.e]+)\s*\*\*([\s\d\.e]+)/g, (_,a,b)=>String(Math.pow(parseFloat(a),parseFloat(b))));
+                // * / %
+                s = s.replace(/([\d\.e]+)\s*([*\/%])\s*([\d\.e]+)/g, (_,a,op2,b)=>{
+                  const A=parseFloat(a),B=parseFloat(b);
+                  return String(op2==='*'?A*B:op2==='/'?A/B:A%B);
+                });
+                while (/([\d\.e]+)\s*([*\/%])\s*([\d\.e]+)/.test(s)) {
+                  s = s.replace(/([\d\.e]+)\s*([*\/%])\s*([\d\.e]+)/g, (_,a,op2,b)=>{
+                    const A=parseFloat(a),B=parseFloat(b); return String(op2==='*'?A*B:op2==='/'?A/B:A%B);
+                  });
+                }
+                // + -
+                while (/([\d\.e]+)\s*([\+\-])\s*([\d\.e]+)/.test(s)) {
+                  s = s.replace(/([\d\.e]+)\s*([\+\-])\s*([\d\.e]+)/g, (_,a,op2,b)=>{
+                    return String(op2==='+'?parseFloat(a)+parseFloat(b):parseFloat(a)-parseFloat(b));
+                  });
+                }
+                return s.trim();
+              };
+              try {
+                const val = _calc(mathExpr);
+                result = val; stdout += result + '\n'; bcast(result, 'stdout');
+              } catch(fe) {
+                stdout += 'math error: ' + String(fe.message).slice(0,80) + '\n';
+                bcast('math error: ' + String(fe.message).slice(0,80), 'stderr');
               }
             }
             else { stdout += 'unknown op: ' + op + '\n'; bcast('unknown op: ' + op, 'stderr'); }
