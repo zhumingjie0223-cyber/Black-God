@@ -8566,14 +8566,18 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   orderBrainsForTask(brains, role) {
     if (!role || !Array.isArray(brains) || brains.length < 2) return brains;
     const pri = [], rest = [];
-    for (const b of brains) (this.inferBrainRole(b.model, b.label) === role ? pri : rest).push(b);
+    for (const b of brains) {
+      // 优先用 brain 自己配的 role 字段匹配；fallback 到 inferBrainRole 推断
+      const brainRole = b.role || this.inferBrainRole(b.model, b.label);
+      (brainRole === role ? pri : rest).push(b);
+    }
     return pri.concat(rest);
   }
-  // 按任务算首选职责(不乱:确定性映射)。caps 含 code→代码;heavy/think→深思;light→快答;否则主力。
+  // 按任务算首选职责(不乱:确定性映射)。
+  // code/think/heavy → '重任务'（兼容旧'代码'/'深思'）；light→'快答'；否则→'主力'。
   preferredRole(tier, caps) {
     caps = caps || [];
-    if (caps.includes('code')) return '代码';
-    if (tier === 'heavy' || caps.includes('think')) return '深思';
+    if (caps.includes('code') || tier === 'heavy' || caps.includes('think')) return '重任务';
     if (tier === 'light') return '快答';
     return '主力';
   }
