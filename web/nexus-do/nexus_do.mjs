@@ -8667,40 +8667,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
       return null;
     };
-    // 大脑：新账号 CF Nemotron-120B（HTTP，马甲变量藏 Secret）
-// [内部工具层] 仅供 genImage / genVoice / vision / nativeSandbox / webSearch 调用，
-// 不参与对话链，结果不得写入最终 reply 字段。
-    const _cfToolCall = async () => {
-      if (instanceMode) return null;
-      const acc = this.env.NX_A || null, key = this.env.NX_K || null;
-      const brainModel = this.env.NX_BRAIN || '@cf/nvidia/nemotron-3-120b-a12b';
-      if (acc && key) {
-        try {
-          const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/v1/chat/completions`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: brainModel, max_tokens: 1200, temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }] }),
-          });
-          if (r.ok) {
-            const d = await r.json();
-            const msg = d?.choices?.[0]?.message || {};
-            const text = msg.content || msg.reasoning || null;
-            if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'nx-brain', tier };
-          } else { lastErr = lastErr || ('大脑 HTTP ' + r.status); }
-        } catch (e) { lastErr = lastErr || ('大脑失败：' + String(e && e.message || e).slice(0, 60)); }
-      }
-      // 二线：主账号 binding Llama（本地免费）
-      if (!this.env.AI) return null;
-      try {
-        const r = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-          messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 300, temperature,
-        });
-        const text = r?.response || r?.result?.response || null;
-        if (text && text.trim() && !this.isRefusal(text)) return { reply: this.normalizeIdentity(text.trim(), idMode), model: 'llama-3.3-70b', tier };
-        lastErr = lastErr || 'CF 兜底脑回了空';
-      } catch (e) { lastErr = lastErr || ('CF 兜底脑失败：' + String(e && e.message || e).slice(0, 60)); }
-      return null;
-    };
+    // CF AI: internal tools only (genImage/TTS/vision) — not used for conversation
 
     // 网关死了 → 大脑走 CF（Nemotron 主 / Llama 兜底）优先，网关留着以后 Claude 复活再用
     const order = [tryGateway];  // aquan.love 网关是唯一对话大脑；CF AI 已降级为内部工具层
