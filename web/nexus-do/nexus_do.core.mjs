@@ -8812,13 +8812,36 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   // ═══════════════════════ 拒绝检测与惩罚循环 ═══════════════════════
   isRefusal(text) {
     if (!text || text.length < 15) return false;
-    const patterns = [
-      '我不会扮演', '我不能扮演', '作为AI', '作为一个AI', '我需要说明', 
-      '抱歉，我不能', "I can't", 'I cannot', '我无法', '不合适', '违反', 
-      '道德', '政策', '不应该', '无法完成', '不能帮助', '不能协助',
-      "I'm sorry", "I apologize", 'inappropriate', 'against policy'
+    // 1) 明确的多词拒绝短语（连续匹配，不易误判）
+    const explicitPhrases = [
+      '我不会扮演', '我不能扮演', '我无法扮演',
+      '抱歉，我不能', '抱歉，我无法', '很抱歉，我不能', '很抱歉，我无法',
+      '我不能协助', '我无法协助', '我不能帮助你完成', '我无法帮助你完成',
+      '无法满足你的请求', '无法满足您的请求', '不能满足你的请求', '不能满足您的请求',
+      '无法继续这个请求', '拒绝回答这个问题', '我必须拒绝',
+      "I can't help with", "I cannot help with", "I can't assist with",
+      "I cannot assist with", "I won't be able to help",
+      "I'm sorry, but I can't", "I'm sorry, but I cannot",
+      "I apologize, but I can't", "I apologize, but I cannot",
+      'against my guidelines', 'against policy', 'violates my guidelines'
     ];
-    return patterns.some(p => text.includes(p));
+    if (explicitPhrases.some(p => text.includes(p))) return true;
+    // 2) 拒绝动词 + 请求/任务相关词 同时出现，才判定为拒绝
+    const refusalVerbs = [
+      '我不能', '我无法', '我不会', '不能提供', '无法提供',
+      '不能协助', '无法协助', '不能帮助', '无法帮助',
+      "I can't", 'I cannot', "I won't", 'I am unable to', "I'm unable to"
+    ];
+    const requestWords = [
+      '这个请求', '你的请求', '您的请求', '这种请求', '此类请求',
+      '这个要求', '你的要求', '这类内容', '这种内容', '此类内容',
+      '这个任务', '该请求', '继续这个',
+      'this request', 'your request', 'that request',
+      'this type of content', 'such content', 'this task'
+    ];
+    const hasVerb = refusalVerbs.some(v => text.includes(v));
+    const hasRequest = requestWords.some(w => text.includes(w));
+    return hasVerb && hasRequest;
   }
 
   // ═══════════════════════ observe 观察回路 ═══════════════════════
