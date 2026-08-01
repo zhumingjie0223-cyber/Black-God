@@ -5954,10 +5954,10 @@ async function loadConsciousness(){
     const c=r.shu_coord;
     const coord=c?`核${c.c??'?'} 映${c.m??'?'} 态${c.s??'?'} 标${c.k??'?'} 相${c.p??'?'}`:'—';
     const up=r.uptime_s||0;const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
-    $('#consBody').innerHTML=`<div>\u{1F9E0} 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>\u{1F4DA} 经验总数：<b>${r.experience_count||0}</b></div><div>\u{1F310} 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>\u{1F4E6} 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>\` + (() => {
+    $('#consBody').innerHTML=`<div>🧠 内心独白：<b>${r.inner_voice_count||0}</b> 条</div><div>📚 经验总数：<b>${r.experience_count||0}</b></div><div>🌐 世界节点：<b>${r.world_entities||0}</b></div><div>能力成长：<b>${r.capabilities||0}</b></div><div>枢语坐标：<b>${coord}</b></div><div>在线时长：<b>${h}h${m}m${s}s</b></div><div>📦 存储估算：<b>${r.storage_size_est_kb||'?'} KB</b></div>\` + (() => {
     const mts=[...document.querySelectorAll('.meta-token')];
     let ti=0,to2=0; mts.forEach(el=>{const m=el.textContent.match(/(\d+)→(\d+)/);if(m){ti+=+m[1];to2+=+m[2];}});
-    return mts.length ? `<div>\u{1F4AC} 本轮累计：in <b>${ti}</b> / out <b>${to2}</b></div>` : '';
+    return mts.length ? `<div>💬 本轮累计：in <b>${ti}</b> / out <b>${to2}</b></div>` : '';
   })() + `;
   }catch(e){$('#consBody').textContent='读取失败';}
 }
@@ -5975,7 +5975,7 @@ async function loadLexicon(){
   }catch(e){$('#lexiconBody').textContent='读取失败';}
 }
 // ── emoji 选择器 ──
-const EMOJIS='\u{1F60A} \u{1F602} \u{1F979} ❤️ \u{1F525} \u{1F4AF} ✅ ❌ \u{1F389} \u{1F64F} \u{1F44D} \u{1F914} \u{1F4AA} \u{1F923} \u{1F60D} \u{1F970} \u{1F60E} \u{1F62D} \u{1F624} \u{1F44F} \u{1F91D} \u{1F4AC} \u{1F9E0} ⚡ \u{1F319} \u{1F30A} \u{1F3AF} \u{1F511} \u{1F680} \u{1F4A1} \u{1F6E0}️ \u{1F3A8} \u{1F4E6} \u{1F50D} \u{1F4CC} \u{1F4BE} \u{1F5A5}️ \u{1F47E} \u{1F9BE} \u{1F52E}'.split(' ');
+const EMOJIS='😊 😂 🥹 ❤️ 🔥 💯 ✅ ❌ 🎉 🙏 👍 🤔 💪 🤣 😍 🥰 😎 😭 😤 👏 🤝 💬 🧠 ⚡ 🌙 🌊 🎯 🔑 🚀 💡 🛠️ 🎨 📦 🔍 📌 💾 🖥️ 👾 🦾 🔮'.split(' ');
 (function(){const p=document.createElement('div');p.id='emojiPanel';document.body.appendChild(p);})();
 function toggleEmoji(){
   const p=$('#emojiPanel'); const btn=$('#emojiBtn');
