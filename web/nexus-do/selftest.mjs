@@ -336,7 +336,7 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
 {
   const OT = 'secret-owner-tok';
   const sys = resolveIdentity({ authHeader: 'Bearer ' + OT, uidHeader: 'anything', ownerToken: OT });
-  ok('身份·主人令牌 → system + 固定私密实例', sys.role === 'system' && sys.doName === 'quan-shenshu-nexus');
+  ok('身份·主人令牌 → system + 固定私密实例', sys.role === 'system' && sys.doName === 'quan-shenshu-nexus-v2');
   const a = resolveIdentity({ uidHeader: 'alice', ownerToken: OT });
   const b = resolveIdentity({ uidHeader: 'bob', ownerToken: OT });
   ok('身份·不同 uid → 不同独立实例', a.role === 'instance' && b.role === 'instance' && a.doName === 'u:alice' && b.doName === 'u:bob' && a.doName !== b.doName);
