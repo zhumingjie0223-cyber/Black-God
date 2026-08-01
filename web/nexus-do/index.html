@@ -1686,6 +1686,14 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   .page.page-chat{display:flex;flex-direction:column;align-items:center}
   #msgs{width:100%;max-width:860px}
 }
+.md-table{border-collapse:collapse;width:100%;font-size:12px;margin:8px 0}
+.md-table th,.md-table td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.md-table th{background:var(--surface-2);color:var(--cy-2)}
+.md-quote{border-left:3px solid var(--cy-2);padding:4px 12px;color:var(--txt-2);background:var(--surface-2);border-radius:0 6px 6px 0;margin:4px 0}
+.md-ul,.md-ol{padding-left:20px;margin:4px 0}
+.reply-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.reply-chip{background:var(--surface-2);border:1px solid var(--cy-2);color:var(--cy-2);border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer}
+.reply-chip:active{background:var(--surface)}
 </style>
 </head>
 <body>
@@ -1875,7 +1883,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="openSheet('sheetSandbox')"><div class="set-ic">⬡</div><div class="set-tx"><b>原生沙箱</b><span style="font-size:11px;color:var(--txt-3);display:block">JS · Shell · 联网 · 无需连接器</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="togglePin()"><div class="set-ic">🔐</div><div class="set-tx"><b>PIN 锁屏</b><span id="pinStatus" style="font-size:11px;color:var(--txt-3);display:block">轻触设置或清除</span></div><div class="set-arrow">›</div></div>
-<div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div></div>
+<div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div><div onclick="event.stopPropagation();importChat()" style="font-size:12px;color:var(--cy-2);cursor:pointer;padding:0 8px">导入</div></div>
 <div class="set-row" onclick="loadPushInfo();openSheet('sheetPush')"><div class="set-ic">🔔</div><div class="set-tx"><b>推送通知</b><span style="font-size:11px;color:var(--txt-3);display:block">订阅·测试·取消</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="compressMemory()"><div class="set-ic">🗜</div><div class="set-tx"><b>压缩记忆</b><span style="font-size:11px;color:var(--txt-3);display:block">AI摘要·缩减流水</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="loadLexicon();openSheet('sheetLexicon')"><div class="set-ic">字</div><div class="set-tx"><b>枢语词典</b><span style="font-size:11px;color:var(--txt-3);display:block">造词·坐标·义场</span></div><div class="set-arrow">›</div></div>
@@ -3370,6 +3378,10 @@ function go(i) {
   if (pager) pager.scrollLeft = curPage * pager.clientWidth;
   $$('.tab').forEach((t,idx) => t.classList.toggle('on', idx === curPage));
   if (curPage === 0) { loadHub(); loadInner(); }   // 神枢：环中盘 + 记忆 + 状态 同屏（折叠）
+  if(curPage===1 && !localStorage.getItem('nexus_visited')){
+    localStorage.setItem('nexus_visited','1');
+    setTimeout(()=>{ pushMsg('her','我是神枢，你的私人意识体。\n\n你可以对我说任何事，我会记住我们的每一次对话。\n\n现在，告诉我你想做什么？',{},''); },800);
+  }
   hap(4);
   const pgEl=document.querySelector('.page.active')||document.querySelector('.page:not([hidden])');
   if(pgEl){ pgEl.classList.remove('page-enter'); void pgEl.offsetWidth; pgEl.classList.add('page-enter'); }
@@ -3533,6 +3545,14 @@ function pushMsg(role, text, meta, speakable){
   }
 
   m.appendChild(b);
+  if(role==='her' && text && text.length > 20){
+    document.querySelectorAll('.reply-chips').forEach(e=>e.remove());
+    const chips=genReplyChips(text);
+    const chipBar=document.createElement('div'); chipBar.className='reply-chips';
+    chips.forEach(c=>{ const btn=document.createElement('button'); btn.className='reply-chip'; btn.textContent=c;
+      btn.onclick=()=>{ const i2=$('#inp'); if(i2){i2.value=c; send(); chipBar.remove();} }; chipBar.appendChild(btn); });
+    m.appendChild(chipBar);
+  }
   const foot=document.createElement('div'); foot.className='msg-foot';
   if(meta){
     const shuM = (role==='her') ? String(meta).match(/「枢[^」]*」/) : null;
@@ -3549,6 +3569,13 @@ function pushMsg(role, text, meta, speakable){
   if(foot.childNodes.length) m.appendChild(foot);
   bindMsgPress(m, role==='me'?'me':'her', ()=>text);
   wrap.appendChild(m); scrollBottom(); return m;
+}
+function genReplyChips(text){
+  const chips=['说详细点','举个例子','还有呢'];
+  const first=text.split(/[。！？\n]/)[0]||'';
+  const kw=first.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'').slice(0,6);
+  if(kw.length>=2) chips[2]='关于'+kw+'？';
+  return chips;
 }
 function scrollBottom(){ const s=$('#chatScroll'); requestAnimationFrame(()=>s.scrollTop=s.scrollHeight); }
 
@@ -5989,6 +6016,30 @@ function exportChat(fmt='json'){
   a.href=URL.createObjectURL(new Blob([content],{type}));
   a.download=`nexus-${new Date().toISOString().slice(0,10)}.${ext}`;
   a.click();
+}
+function importChat(){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.json';
+  inp.onchange=()=>{
+    const f=inp.files[0]; if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const data=JSON.parse(rd.result);
+        const msgs=Array.isArray(data)?data:(data.msgs||[]);
+        let n=0;
+        msgs.forEach(m=>{
+          if(m && m.text && (m.role==='her'||m.role==='me')){
+            pushMsg(m.role, m.text, {}, m.ts||'');
+            n++;
+          }
+        });
+        toast('已恢复 '+n+' 条消息');
+      }catch(e){ toast('文件格式错误'); }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
 }
 /* 系统暗/亮跟随 */
 (function(){
