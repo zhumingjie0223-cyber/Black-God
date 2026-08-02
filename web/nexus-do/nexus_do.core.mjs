@@ -10255,14 +10255,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         case 'talk':      out = await this.handleTalk(params.text || '', request, params.caps || []); break;
         case 'agent':     out = await this.handleAgent(params.text || '', params.context || {}); break;
         case 'device':    out = await this.recordDevice(params.info || {}, request); break;
-        case 'gen_image': out = await this.genImage(params.prompt || '', params); break;
+        case 'device_control': out = await this.deviceControl(params.action || '', params); break;
         case 'gen_voice': out = await this.genVoice(params.text || '', params); break;
         case 'gen_video': out = await this.genVideo(params.prompt || '', params); break;
         case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
         case 'exec':      out = await this.execRemote(params.command || '', { confirm: params.confirm === true }); break;
         case 'apple':     out = await this.appleTool(params.arg || params.command || '', { confirm: params.confirm === true }); break;
-        case 'device':    out = await this.deviceControl(params.action || '', params); break;
+        case 'device_control': out = await this.deviceControl(params.action || '', params); break;
         case 'watch':     out = await this.createWatch(params.text || ''); break;
         case 'analyze_target':
         case 'find_entry':
