@@ -2537,14 +2537,25 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
 
   // ═══ 设备控制中枢（Device Control Hub）═══
   // 封装 apple-* 工具的高级操作：截图+OCR感知、App打开、剪贴板、通知等
-  // 神枢说「看看屏幕」「打开微信」「截图识别」都走这里
+  // 走 shell 中继（deviceShellExec），设备有网即可用
   async deviceControl(action, params = {}) {
     const P = typeof params === 'string' ? { arg: params } : (params || {});
+
+    // 统一通过 shell 中继调 apple-* 命令
+    const appleRun = async (cmd) => {
+      // 优先走 shell 中继（本地真实 apple-* 调 iOS 硬件）
+      const relayWs = this._getShellRelayWs();
+      if (relayWs) {
+        return this.deviceShellExec(cmd, 'bash');
+      }
+      // 中继离线 → 走 execRemote（需要执行脑）
+      return this.appleTool(cmd);
+    };
 
     // ── 截图感知：拿最新截图 → OCR 识别 ──
     if (action === 'see' || action === 'screenshot' || action === 'read_screen') {
       // 1. 拿最新截图 ID
-      const listR = await this.appleTool('photos list --limit 3 --type photo');
+      const listR = await appleRun('photos list --limit 3 --type photo');
       if (!listR.ok) return { ok: false, error: '无法访问相册：' + listR.note };
       let assets = [];
       try { assets = JSON.parse(listR.out)?.assets || []; } catch {}
@@ -2552,7 +2563,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       const shot = assets.find(a => a.media_subtypes?.includes('screenshot')) || assets[0];
       if (!shot) return { ok: false, error: '未找到截图，请先截屏' };
       // 2. 导出到本地
-      const exportR = await this.appleTool(`photos export --id ${shot.id}`);
+      const exportR = await appleRun(`photos export --id ${shot.id}`);
       if (!exportR.ok) return { ok: false, error: '导出截图失败：' + exportR.note };
       // 找导出路径
       let imgPath = '';
@@ -2564,7 +2575,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       }
       if (!imgPath) return { ok: false, error: '找不到导出路径', raw: exportR.out };
       // 3. OCR 识别
-      const ocrR = await this.appleTool(`vision ocr ${imgPath} --lang zh-Hans,en --level accurate`);
+      const ocrR = await appleRun(`vision ocr ${imgPath} --lang zh-Hans,en --level accurate`);
       let text = '';
       try { text = JSON.parse(ocrR.out)?.text || ocrR.out; } catch { text = ocrR.out; }
       return { ok: true, action: 'see', screenshot: imgPath, text: text.slice(0, 3000), shot_date: shot.date };
@@ -2574,20 +2585,20 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     if (action === 'open_app' || action === 'open') {
       const scheme = P.scheme || P.arg || P.url || '';
       if (!scheme) return { ok: false, error: '需要提供 App URL Scheme，如 weixin:// 或 https://...' };
-      const r = await this.appleTool(`open "${scheme}"`);
+      const r = await appleRun(`open "${scheme}"`);
       return { ok: r.ok, action: 'open_app', scheme, result: r.out || r.note };
     }
 
     // ── 剪贴板读写 ──
     if (action === 'clipboard_read') {
-      const r = await this.appleTool('clipboard');
+      const r = await appleRun('clipboard');
       let text = '';
       try { text = JSON.parse(r.out)?.text || ''; } catch { text = r.out; }
       return { ok: r.ok, action: 'clipboard_read', text };
     }
     if (action === 'clipboard_write') {
       const text = P.text || P.arg || '';
-      const r = await this.appleTool(`clipboard set "${text.replace(/"/g, '\"')}"`);
+      const r = await appleRun(`clipboard set "${text.replace(/"/g, '\"')}"`);
       return { ok: r.ok, action: 'clipboard_write', text };
     }
 
@@ -2596,32 +2607,32 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       const title = P.title || '神枢';
       const body = P.body || P.text || P.arg || '';
       const after = P.after || 1;
-      const r = await this.appleTool(`notification schedule --title "${title}" --body "${body}" --after ${after}`);
+      const r = await appleRun(`notification schedule --title "${title}" --body "${body}" --after ${after}`);
       return { ok: r.ok, action: 'notify', title, body };
     }
 
     // ── 朗读 ──
     if (action === 'speak') {
       const text = P.text || P.arg || '';
-      const r = await this.appleTool(`speak speak --text "${text.replace(/"/g, '\"')}"`);
+      const r = await appleRun(`speak speak --text "${text.replace(/"/g, '\"')}"`);
       return { ok: r.ok, action: 'speak', text };
     }
 
     // ── 设备信息 ──
     if (action === 'device_info') {
-      const r = await this.appleTool('device info');
+      const r = await appleRun('device info');
       return { ok: r.ok, action: 'device_info', data: r.out };
     }
 
     // ── 天气 ──
     if (action === 'weather') {
-      const r = await this.appleTool('weather');
+      const r = await appleRun('weather');
       return { ok: r.ok, action: 'weather', data: r.out };
     }
 
     // ── 定位 ──
     if (action === 'location') {
-      const r = await this.appleTool('location');
+      const r = await appleRun('location');
       return { ok: r.ok, action: 'location', data: r.out };
     }
 
@@ -2629,40 +2640,40 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     if (action === 'health') {
       const types = P.types || 'stepCount,heartRate';
       const days = P.days || 7;
-      const r = await this.appleTool(`healthkit batch --types ${types} --days ${days}`);
+      const r = await appleRun(`healthkit batch --types ${types} --days ${days}`);
       return { ok: r.ok, action: 'health', data: r.out };
     }
 
     // ── 日历/提醒 ──
     if (action === 'calendar') {
       const sub = P.sub || 'list --today';
-      const r = await this.appleTool(`calendar ${sub}`);
+      const r = await appleRun(`calendar ${sub}`);
       return { ok: r.ok, action: 'calendar', data: r.out };
     }
     if (action === 'reminder') {
       const sub = P.sub || 'list';
-      const r = await this.appleTool(`reminders ${sub}`);
+      const r = await appleRun(`reminders ${sub}`);
       return { ok: r.ok, action: 'reminder', data: r.out };
     }
 
     // ── 地图导航 ──
     if (action === 'maps') {
       const sub = P.sub || P.arg || 'search --query 附近咖啡馆';
-      const r = await this.appleTool(`maps ${sub}`);
+      const r = await appleRun(`maps ${sub}`);
       return { ok: r.ok, action: 'maps', data: r.out };
     }
 
     // ── 触发 Shortcut ──
     if (action === 'shortcut') {
       const name = encodeURIComponent(P.name || P.arg || '');
-      const r = await this.appleTool(`open "shortcuts://run-shortcut?name=${name}"`);
+      const r = await appleRun(`open "shortcuts://run-shortcut?name=${name}"`);
       return { ok: r.ok, action: 'shortcut', name: P.name || P.arg };
     }
 
     // ── 通用 apple-* 透传 ──
     if (action === 'raw') {
       const arg = P.arg || '';
-      const r = await this.appleTool(arg);
+      const r = await appleRun(arg);
       return { ok: r.ok, action: 'raw', arg, out: r.out, err: r.err };
     }
 
