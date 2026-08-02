@@ -10657,177 +10657,197 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   // ═══════════════════════ 原生沙箱 ═══════════════════════
+
+  // ── 神枢沙箱 v2（by opus5）── Piston 真实执行 + 内置扩展兜底 ──────────────────
+  // 三层：Piston API（60+语言真实运行）→ 内置扩展层 → 原生兜底
+  async pistonExec(lang, code, stdin = '') {
+    const LANG_ALIAS = {
+      python3:'python',py:'python',python:'python',
+      node:'javascript',js:'javascript',javascript:'javascript',
+      sh:'bash',shell:'bash',bash:'bash',
+      rust:'rust',rs:'rust',c:'c','cpp':'c++','c++':'c++',
+      go:'go',golang:'go',java:'java',ruby:'ruby',rb:'ruby',php:'php',
+      ts:'typescript',typescript:'typescript'
+    };
+    const PISTON_ENDPOINT = 'https://emkc.org/api/v2/piston/execute';
+    const language = LANG_ALIAS[String(lang||'').toLowerCase()] || String(lang||'python');
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 30000);
+    try {
+      const res = await fetch(PISTON_ENDPOINT, {
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        signal:ctl.signal,
+        body:JSON.stringify({language, version:'*', files:[{content:String(code??'')}], stdin:String(stdin??''), run_timeout:30000})
+      });
+      const text = await res.text();
+      if (!res.ok) return {ok:false, error:`piston HTTP ${res.status}: ${text.slice(0,500)}`, via:'piston'};
+      let data; try{data=JSON.parse(text);}catch{return{ok:false,error:'piston 非 JSON: '+text.slice(0,300),via:'piston'};}
+      if (data.message && !data.run) return {ok:false, error:'piston: '+data.message, via:'piston'};
+      const run = data.run || {};
+      const comp = data.compile || null;
+      let stdout = String(run.stdout||run.output||'').slice(0,8000);
+      let stderr = String(run.stderr||'').slice(0,2000);
+      if (comp && comp.stderr) stderr = '[compile]\n'+String(comp.stderr).slice(0,1000)+(stderr?'\n'+stderr:'');
+      const exit_code = typeof run.code==='number'?run.code:(comp&&typeof comp.code==='number'&&comp.code!==0?comp.code:0);
+      try{this.broadcast({type:'sandbox_live',line:`[piston:${language}] exit=${exit_code}`,kind:exit_code===0?'stdout':'stderr',ts:Date.now()});}catch{}
+      return {ok:exit_code===0, stdout, stderr, exit_code, via:'piston'};
+    } catch(e) {
+      return {ok:false, error:e?.name==='AbortError'?'piston 超时(30s)':'piston 失败: '+(e?.message||String(e)), via:'piston'};
+    } finally { clearTimeout(timer); }
+  }
+
+  async sandboxFetch(dsl) {
+    const out=[], bcast=(line,kind='stdout')=>{out.push(line);try{this.broadcast({type:'sandbox_live',line,kind,ts:Date.now()});}catch{}};
+    for (const raw of String(dsl||'').split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('#'))) {
+      const parts = raw.split(/\s+/);
+      const method=(parts[0]||'').toUpperCase();
+      try {
+        if (method==='JSON') {
+          const [url,...rest]=parts.slice(1); const path=rest[0]||'';
+          const r=await fetch(url,{headers:{accept:'application/json'}});
+          const data=await r.json();
+          const pick=(o,p)=>{const ks=String(p||'').replace(/^\./,'').split('.').filter(Boolean);let c=o;for(const k of ks)c=c?.[k];return c;};
+          bcast(`$ JSON ${url} ${path}`); bcast(JSON.stringify(path?pick(data,path):data,null,2).slice(0,4000));
+        } else if (['GET','HEAD','DELETE','POST','PUT','PATCH'].includes(method)) {
+          const url=parts[1]; const body=parts.slice(2).join(' ');
+          const opts={method, headers:{'content-type':'application/json'}};
+          if (body && !['GET','HEAD','DELETE'].includes(method)) opts.body=body;
+          const r=await fetch(url,opts);
+          const txt=await r.text();
+          bcast(`$ ${method} ${url}`); bcast(`< ${r.status} ${txt.slice(0,4000)}`);
+        } else {
+          bcast(`unsupported: ${method}`,'stderr');
+        }
+      } catch(e) { bcast(`error: ${e?.message||String(e)}`,'stderr'); }
+    }
+    return {ok:true, stdout:out.join('\n'), stderr:'', via:'sandbox-fetch'};
+  }
+
   // 神枢自己就是运行环境：DO Worker 内 JS 沙箱 + shell 命令映射到 Worker 原生能力
   // 不依赖任何外部服务，fetch 联网，DO storage 当文件系统
   async nativeSandbox(code, lang = 'js') {
-    const timeout = 10000;
+    const bcast=(line,kind='stdout')=>{try{this.broadcast({type:'sandbox_live',line,kind,ts:Date.now()});}catch{}};
+    // 安全检查
+    if (!code || typeof code !== 'string') return {ok:false,stderr:'代码为空',stdout:'',via:'sandbox'};
+    if (code.length > 10000) return {ok:false,stderr:'代码超过10000字符限制',stdout:'',via:'sandbox'};
+    if (code.includes('nativeSandbox')) return {ok:false,stderr:'不允许递归调用沙箱',stdout:'',via:'sandbox'};
+
+    const L = String(lang||'js').toLowerCase().trim();
+
+    // fetch/http DSL
+    if (L==='fetch'||L==='http') return this.sandboxFetch(code);
+
+    // js 内置 DSL（离线可用：uuid/timestamp/fetch/echo 等）
+    if (L === 'js') return this._nativeSandboxJS(code);
+
+    // javascript/node → Piston，失败回内置 JS DSL
+    if (L === 'javascript' || L === 'node') {
+      const r = await this.pistonExec('javascript', code);
+      if (r.ok) return r;
+      return this._nativeSandboxJS(code);
+    }
+
+    // 其他语言走 Piston
+    const pistonLangs=['python','python3','py','bash','shell','sh',
+      'rust','c','cpp','c++','go','java','ruby','php','typescript','ts'];
+
+    if (pistonLangs.includes(L)) {
+      const result = await this.pistonExec(L, code);
+      if (result.ok) return result;
+      // shell 系失败 → 内置 shell 命令映射兜底
+      if (['bash','shell','sh'].includes(L)) {
+        bcast('[piston 不可用，切换内置 shell 模拟]','info');
+        return this._nativeSandboxShell(code, bcast);
+      }
+      return result;
+    }
+
+    return {ok:false, stderr:`不支持的语言: ${L}`, stdout:'', via:'sandbox',
+      supported:['js','javascript','node',...pistonLangs,'fetch','http']};
+  }
+
+  // 内置 JS DSL（lang=js，Worker 内直接运行，无需 Piston）
+  async _nativeSandboxJS(code) {
     const start = Date.now();
     const bcast = (line, kind = 'stdout') => { try { this.broadcast({ type: 'sandbox_live', line, kind, ts: Date.now() }); } catch (_) {} };
-    try {
-      if (lang === 'js') {
-        // JS DSL 模式（CF Worker 禁 new Function）
-        // 支持: fetch/json/uuid/base64/timestamp/storage_get/storage_set
-        let stdout = '', result = '';
-        const lines2 = code.trim().split('\n');
-        for (const raw2 of lines2) {
-          const t = raw2.trim(); if (!t || t.startsWith('//')) continue;
-          const [op, ...rest] = t.split(/\s+/);
-          const arg2 = rest.join(' ');
-          bcast('» ' + t, 'info');
-          try {
-            if (op === 'fetch' || op === 'json') {
-              const resp = await Promise.race([fetch(arg2), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
-              const txt = await resp.text();
-              const out2 = op === 'json' ? JSON.stringify(JSON.parse(txt), null, 2).slice(0, 1000) : txt.slice(0, 1000);
-              stdout += out2 + '\n'; result = out2; bcast(out2.split('\n')[0], 'stdout');
-            } else if (op === 'uuid') { result = crypto.randomUUID(); stdout += result + '\n'; bcast(result, 'stdout'); }
-            else if (op === 'timestamp') { result = String(Date.now()); stdout += result + '\n'; bcast(result, 'stdout'); }
-            else if (op === 'base64_encode') { result = btoa(unescape(encodeURIComponent(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
-            else if (op === 'base64_decode') { result = decodeURIComponent(escape(atob(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
-            else if (op === 'storage_get') { const v = await this.storage.get(arg2); result = JSON.stringify(v); stdout += result + '\n'; bcast(result, 'stdout'); }
-            else if (op === 'storage_set') { const [k2,...v2] = rest; await this.storage.put(k2, v2.join(' ')); result = 'ok'; stdout += 'ok\n'; bcast('ok', 'stdout'); }
-            else if (op === 'echo') {
-              result = arg2; stdout += result + '\n'; bcast(result, 'stdout');
-            }
-            else if (op === 'math' || op === 'expr' || (!/\s/.test(t) && /[\+\-\*\/\%\(\)]/.test(t)) || /^\d/.test(t)) {
-              const mathExpr = (op === 'math' || op === 'expr') ? arg2 : t;
-              // 手写递归下降解析器（CF Worker 禁 new Function/eval）
-              const _calc = (s) => {
-                s = s.trim()
-                  .replace(/Math\.PI/g, String(Math.PI))
-                  .replace(/Math\.E(?![A-Za-z])/g, String(Math.E))
-                  .replace(/Math\.sqrt\(([^)]+)\)/g, (_,x)=>String(Math.sqrt(parseFloat(_calc(x)))))
-                  .replace(/Math\.abs\(([^)]+)\)/g,  (_,x)=>String(Math.abs(parseFloat(_calc(x)))))
-                  .replace(/Math\.ceil\(([^)]+)\)/g, (_,x)=>String(Math.ceil(parseFloat(_calc(x)))))
-                  .replace(/Math\.floor\(([^)]+)\)/g,(_,x)=>String(Math.floor(parseFloat(_calc(x)))))
-                  .replace(/Math\.round\(([^)]+)\)/g,(_,x)=>String(Math.round(parseFloat(_calc(x)))))
-                  .replace(/Math\.log\(([^)]+)\)/g,  (_,x)=>String(Math.log(parseFloat(_calc(x)))))
-                  .replace(/Math\.pow\(([^,]+),([^)]+)\)/g,(_,a,b)=>String(Math.pow(parseFloat(_calc(a)),parseFloat(_calc(b)))))
-                  .replace(/Math\.max\(([^,]+),([^)]+)\)/g,(_,a,b)=>String(Math.max(parseFloat(_calc(a)),parseFloat(_calc(b)))))
-                  .replace(/Math\.min\(([^,]+),([^)]+)\)/g,(_,a,b)=>String(Math.min(parseFloat(_calc(a)),parseFloat(_calc(b)))));
-                // 括号
-                while (/\([\d\s\+\-\*\/\%\.e]+\)/.test(s)) {
-                  s = s.replace(/\(([\d\s\+\-\*\/\%\.e]+)\)/g, (_,inner)=>_calc(inner));
-                }
-                // ** 幂
-                s = s.replace(/([\d\.e]+)\s*\*\*([\s\d\.e]+)/g, (_,a,b)=>String(Math.pow(parseFloat(a),parseFloat(b))));
-                // * / %
-                s = s.replace(/([\d\.e]+)\s*([*\/%])\s*([\d\.e]+)/g, (_,a,op2,b)=>{
-                  const A=parseFloat(a),B=parseFloat(b);
-                  return String(op2==='*'?A*B:op2==='/'?A/B:A%B);
-                });
-                while (/([\d\.e]+)\s*([*\/%])\s*([\d\.e]+)/.test(s)) {
-                  s = s.replace(/([\d\.e]+)\s*([*\/%])\s*([\d\.e]+)/g, (_,a,op2,b)=>{
-                    const A=parseFloat(a),B=parseFloat(b); return String(op2==='*'?A*B:op2==='/'?A/B:A%B);
-                  });
-                }
-                // + -
-                while (/([\d\.e]+)\s*([\+\-])\s*([\d\.e]+)/.test(s)) {
-                  s = s.replace(/([\d\.e]+)\s*([\+\-])\s*([\d\.e]+)/g, (_,a,op2,b)=>{
-                    return String(op2==='+'?parseFloat(a)+parseFloat(b):parseFloat(a)-parseFloat(b));
-                  });
-                }
-                return s.trim();
-              };
-              try {
-                const val = _calc(mathExpr);
-                result = val; stdout += result + '\n'; bcast(result, 'stdout');
-              } catch(fe) {
-                stdout += 'math error: ' + String(fe.message).slice(0,80) + '\n';
-                bcast('math error: ' + String(fe.message).slice(0,80), 'stderr');
-              }
-            }
-            else { stdout += 'unknown op: ' + op + '\n'; bcast('unknown op: ' + op, 'stderr'); }
-          } catch (e2) { const em = String(e2.message||e2).slice(0,200); stdout += em + '\n'; bcast(em, 'stderr'); }
-        }
-        return { ok: true, stdout, result, stderr: '', via: 'native-sandbox-js', ms: Date.now() - start };
-      }
-
-      if (lang === 'shell') {
-        // shell 命令映射
-        const lines = String(code).trim().split('\n');
-        let stdout = '', stderr = '';
-        const live = (line, kind) => { try { this.broadcast({ type: 'sandbox_live', line, kind, ts: Date.now() }); } catch (_) {} };
-        for (const raw of lines) {
-          const line = raw.trim();
-          if (!line || line.startsWith('#')) continue;
-          live('$ ' + line, 'info');
-          const parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-          const cmd = parts[0];
-          const args = parts.slice(1).map(s => s.replace(/^['"]|['"]$/g, ''));
-          if (cmd === 'echo') { const _o = args.join(' ') + '\n'; stdout += _o; live(_o.trimEnd(), 'stdout'); }
-          else if (cmd === 'curl' || cmd === 'wget') {
-            const url = args.find(a => a.startsWith('http'));
-            if (!url) { stderr += `${cmd}: no URL\n`; continue; }
-            const r = await Promise.race([fetch(url), new Promise((_, j) => setTimeout(() => j(new Error('timeout')), 8000))]);
-            const text = await r.text();
-            const _ct = text.slice(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : '') + '\n'; stdout += _ct; live(_ct.slice(0,200).trimEnd(), 'stdout');
-          }
-          else if (cmd === 'ls') {
-            const list = await this.storage.list({ prefix: args[0] || '' });
-            const _ls=Array.from(list.keys).map(k=>k.name).join('\n')+'\n'; stdout+=_ls; live(_ls.trimEnd(),'stdout');
-          }
-          else if (cmd === 'cat') {
-            const val = await this.storage.get(args[0]);
-            const _cv=(val!==null?JSON.stringify(val,null,2):`cat: ${args[0]}: no such key`)+'\n'; stdout+=_cv; live(_cv.slice(0,200).trimEnd(),'stdout');
-          }
-          else if (cmd === 'write') {
-            const [key, ...rest] = args;
-            await this.storage.put(key, rest.join(' '));
-            stdout+=`wrote ${key}\n`; live(`wrote ${key}`,'stdout');
-          }
-          else if (cmd === 'date') { stdout += new Date().toISOString() + '\n'; }
-          else if (cmd === 'pwd') { stdout += '/nexus/sandbox\n'; }
-          else if (cmd === 'wget') {
-            const url2 = args.find(a => a.startsWith('http'));
-            const oIdx = args.indexOf('-o'); const key2 = oIdx >= 0 ? args[oIdx+1] : 'wget_output';
-            if (!url2) { stderr += 'wget: no URL\n'; live('wget: no URL','stderr'); continue; }
-            const wr = await Promise.race([fetch(url2), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
-            const wt = await wr.text();
-            await this.storage.put(key2, wt);
-            const wl = `saved ${wt.length} bytes → ${key2}`; stdout+=wl+'\n'; live(wl,'stdout');
-          }
-          else if (cmd === 'jq') {
-            const [path2, url3] = args;
-            if (!url3 || !path2) { stderr+='jq: usage jq PATH URL\n'; live('jq: usage jq PATH URL','stderr'); continue; }
-            const jr = await Promise.race([fetch(url3), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
-            const jobj = await jr.json();
-            const keys3 = path2.replace(/^\./, '').split('.');
-            let val2 = jobj; for (const k3 of keys3) { val2 = val2?.[k3]; }
-            const jl = JSON.stringify(val2); stdout+=jl+'\n'; live(jl,'stdout');
-          }
-          else if (cmd === 'ping') {
-            const url4 = args[0]; if (!url4) { stderr+='ping: no URL\n'; continue; }
-            const t0 = Date.now();
-            await Promise.race([fetch(url4,{method:'HEAD'}), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),5000))]).catch(()=>{});
-            const pl = `pong ${Date.now()-t0}ms`; stdout+=pl+'\n'; live(pl,'stdout');
-          }
-          else if (cmd === 'set') { const [k4,...v4]=args; await this.storage.put(k4,v4.join(' ')); live(`set ${k4}`,'stdout'); stdout+=`set ${k4}\n`; }
-          else if (cmd === 'del') { await this.storage.delete(args[0]); live(`deleted ${args[0]}`,'stdout'); stdout+=`deleted ${args[0]}\n`; }
-          else if (cmd === 'uuid') { const uid=crypto.randomUUID(); stdout+=uid+'\n'; live(uid,'stdout'); }
-          else if (cmd === 'base64') {
-            const [mode2,...rest2]=args; const txt2=rest2.join(' ');
-            const b64r = mode2==='encode' ? btoa(unescape(encodeURIComponent(txt2))) : decodeURIComponent(escape(atob(txt2)));
-            stdout+=b64r+'\n'; live(b64r,'stdout');
-          }
-          else if (cmd === 'head') {
-            const url5=args[0]; if(!url5){stderr+='head: no URL\n';continue;}
-            const hr=await Promise.race([fetch(url5,{method:'HEAD'}),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),5000))]);
-            const hdrs=JSON.stringify(Object.fromEntries(hr.headers),null,2).slice(0,500);
-            stdout+=hdrs+'\n'; live(hdrs.split('\n')[0],'stdout');
-          }
-          else if (cmd === 'env') { const el='OWNER_TOKEN=*** (protected)\nWORKER=nexus-do\nNODE_ENV=production'; stdout+=el+'\n'; live(el,'stdout'); }
-          else if (cmd === 'sleep') { const ns=Math.min(Number(args[0])||1,5); await new Promise(r=>setTimeout(r,ns*1000)); live(`slept ${ns}s`,'stdout'); stdout+=`slept ${ns}s\n`; }
-          else { const _se=`unsupported: ${cmd}\n`; stderr+=_se; live(_se.trimEnd(),'stderr'); }
-        }
-        return { ok: !stderr || !!stdout, stdout, stderr, result: '', via: 'native-sandbox-shell', ms: Date.now() - start };
-      }
-
-      return { ok: false, stderr: `unsupported lang: ${lang}`, stdout: '', via: 'native-sandbox' };
-    } catch (e) {
-      const msg = String(e.message || e);
-      return { ok: false, stderr: msg.includes('timeout') ? '⏱ 超时（10s）' : msg.slice(0, 300), stdout: '', via: 'native-sandbox' };
+    let stdout = '', result = '';
+    const lines2 = code.trim().split('\n');
+    for (const raw2 of lines2) {
+      const t = raw2.trim(); if (!t || t.startsWith('//')) continue;
+      const [op, ...rest] = t.split(/\s+/);
+      const arg2 = rest.join(' ');
+      bcast('» ' + t, 'info');
+      try {
+        if (op === 'fetch' || op === 'json') {
+          const resp = await Promise.race([fetch(arg2), new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),8000))]);
+          const txt = await resp.text();
+          const out2 = op === 'json' ? JSON.stringify(JSON.parse(txt), null, 2).slice(0, 1000) : txt.slice(0, 1000);
+          stdout += out2 + '\n'; result = out2; bcast(out2.split('\n')[0], 'stdout');
+        } else if (op === 'uuid') { result = crypto.randomUUID(); stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'timestamp') { result = String(Date.now()); stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'base64_encode') { result = btoa(unescape(encodeURIComponent(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'base64_decode') { result = decodeURIComponent(escape(atob(arg2))); stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'storage_get') { const v = await this.storage.get(arg2); result = JSON.stringify(v); stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'storage_set') { const [k2,...v2] = rest; await this.storage.put(k2, v2.join(' ')); result = 'ok'; stdout += 'ok\n'; bcast('ok', 'stdout'); }
+        else if (op === 'echo') { result = arg2; stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'ctx.log' || op === 'log') { result = arg2; stdout += result + '\n'; bcast(result, 'stdout'); }
+        else if (op === 'return') { result = arg2; stdout += result + '\n'; bcast(result, 'stdout'); }
+        else { const msg = 'unknown op: ' + op; stdout += msg + '\n'; bcast(msg, 'stderr'); }
+      } catch (e2) { const em = String(e2.message||e2).slice(0,200); stdout += em + '\n'; bcast(em, 'stderr'); }
     }
+    return { ok: true, stdout, result, stderr: '', via: 'native-sandbox-js', ms: Date.now() - start };
+  }
+
+  async _nativeSandboxShell(code, bcast) {    const timeout = 10000; const start = Date.now();
+    if (!bcast) bcast=(line,kind)=>{try{this.broadcast({type:'sandbox_live',line,kind,ts:Date.now()});}catch{}};
+    const lines = String(code).trim().split('\n');
+    let stdout = '', stderr = '';
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)||[];
+      const cmd=parts[0]; const args=parts.slice(1).map(s=>s.replace(/^['"]|['"]$/g,''));
+      bcast('$ '+line,'info');
+      try {
+        if (cmd==='echo'){ const o=args.join(' ')+'\n'; stdout+=o; bcast(o.trimEnd(),'stdout'); }
+        else if (cmd==='curl'||cmd==='wget'){
+          const url=args.find(a=>a.startsWith('http'));
+          if(!url){stderr+=`${cmd}: no URL\n`;continue;}
+          const r=await Promise.race([fetch(url),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),8000))]);
+          const txt=(await r.text()).slice(0,4000); stdout+=txt+'\n'; bcast(txt.slice(0,200).trimEnd(),'stdout');
+        }
+        else if (cmd==='json'){
+          const [path2,url2]=args;
+          const r=await fetch(url2); const obj=await r.json();
+          const val=path2.replace(/^\./,'').split('.').reduce((o,k)=>o?.[k],obj);
+          const jl=JSON.stringify(val); stdout+=jl+'\n'; bcast(jl,'stdout');
+        }
+        else if (cmd==='ls'){ const list=await this.storage.list({prefix:args[0]||''}); const ls=Array.from(list.keys).map(k=>k.name).join('\n')+'\n'; stdout+=ls; bcast(ls.trimEnd(),'stdout'); }
+        else if (cmd==='cat'){ const v=await this.storage.get(args[0]); const cv=(v!==null?JSON.stringify(v,null,2):`no such key: ${args[0]}`); stdout+=cv+'\n'; bcast(cv.slice(0,200).trimEnd(),'stdout'); }
+        else if (cmd==='date'){ const d=new Date().toISOString(); stdout+=d+'\n'; bcast(d,'stdout'); }
+        else if (cmd==='pwd'){ stdout+='/nexus/sandbox\n'; bcast('/nexus/sandbox','stdout'); }
+        else if (cmd==='uuid'){ const u=crypto.randomUUID(); stdout+=u+'\n'; bcast(u,'stdout'); }
+        else if (cmd==='b64'){ const [mode,...rest]=args; const txt=rest.join(' '); const r=mode==='encode'?btoa(unescape(encodeURIComponent(txt))):decodeURIComponent(escape(atob(txt))); stdout+=r+'\n'; bcast(r,'stdout'); }
+        else if (cmd==='calc'){ 
+          // 安全数学（只允许数字和运算符）
+          const expr=args.join(' ');
+          if(!/^[0-9+\-*\/().% ]+$/.test(expr)){bcast('calc: 非法字符','stderr'); continue;}
+          try{const fn=new Function('return '+expr); const r=fn(); stdout+=r+'\n'; bcast(String(r),'stdout');}catch(e){bcast('calc error: '+e.message,'stderr');}
+        }
+        else if (cmd==='ping'){ const t0=Date.now(); await fetch(args[0],{method:'HEAD'}).catch(()=>{}); const p=`pong ${Date.now()-t0}ms`; stdout+=p+'\n'; bcast(p,'stdout'); }
+        else if (cmd==='which'){ const supported=['echo','curl','wget','json','ls','cat','date','pwd','uuid','b64','calc','ping','grep','head','env','sleep']; bcast(supported.includes(args[0])?`/nexus/bin/${args[0]}`:`${args[0]}: not found`,supported.includes(args[0])?'stdout':'stderr'); }
+        else if (cmd==='grep'){ const [pat,...rest2]=args; const text=rest2.join(' '); const re2=new RegExp(pat); const matched=text.split('\n').filter(l=>re2.test(l)).join('\n'); stdout+=matched+'\n'; bcast(matched,'stdout'); }
+        else if (cmd==='head'){ const r=await fetch(args[0],{method:'HEAD'}); const h=JSON.stringify(Object.fromEntries(r.headers),null,2).slice(0,500); stdout+=h+'\n'; bcast(h,'stdout'); }
+        else if (cmd==='env'){ const e='WORKER=nexus-do\nNODE_ENV=production'; stdout+=e+'\n'; bcast(e,'stdout'); }
+        else if (cmd==='sleep'){ const n=Math.min(Number(args[0])||1,5); await new Promise(r=>setTimeout(r,n*1000)); bcast(`slept ${n}s`,'stdout'); stdout+=`slept ${n}s\n`; }
+        else if (cmd==='python3'||cmd==='python'){ const r=await this.pistonExec('python',args.join(' ')); bcast(r.stdout||r.error,'stdout'); stdout+=r.stdout||''; }
+        else if (cmd==='node'){ const r=await this.pistonExec('javascript',args.join(' ')); bcast(r.stdout||r.error,'stdout'); stdout+=r.stdout||''; }
+        else{ const se=`unsupported: ${cmd}\n`; stderr+=se; bcast(se.trimEnd(),'stderr'); }
+      } catch(e){ const em=String(e.message||e).slice(0,200); stderr+=em+'\n'; bcast(em,'stderr'); }
+      if(Date.now()-start>timeout){bcast('timeout','stderr');break;}
+    }
+    return {ok:!stderr||!!stdout, stdout, stderr, via:'native-sandbox-shell'};
   }
 
   async compressMemory() {
