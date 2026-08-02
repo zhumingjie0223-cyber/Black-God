@@ -109,6 +109,13 @@ export const CAPABILITIES = [
     owner_only: true,   // 直接操作主人私人设备，最高危：仅主人，且经执行脑隧道 token 门
   },
   {
+    id: 'device_control', name: 'iOS 设备控制中枢', layer: '行动',
+    desc: '通过执行脑隧道调用主人 iPhone 的设备动作；动作是否可用由当前设备与宿主工具返回结果决定',
+    handler: 'deviceControl', argShape: '(action, params)',
+    tier: 'system',
+    owner_only: true,
+  },
+  {
     id: 'watch', name: '自主守望（闭环神·环）', layer: '行动',
     desc: '架一条不用人守的常驻管道：她定时自己去取、真调工具推演，有变化就主动推给主人。说「帮我每小时盯一下X」即可织一条。',
     handler: 'createWatch', argShape: '(text: 盯什么·多久一次)',
