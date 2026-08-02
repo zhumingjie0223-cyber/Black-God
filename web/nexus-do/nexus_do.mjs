@@ -2532,6 +2532,140 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     return { ok: r.ok !== false, tool, code: r.code, out: String(r.stdout || r.out || '').slice(0, 3500), err: String(r.stderr || '').slice(0, 800) };
   }
 
+
+  // ═══ 设备控制中枢（Device Control Hub）═══
+  // 封装 apple-* 工具的高级操作：截图+OCR感知、App打开、剪贴板、通知等
+  // 神枢说「看看屏幕」「打开微信」「截图识别」都走这里
+  async deviceControl(action, params = {}) {
+    const P = typeof params === 'string' ? { arg: params } : (params || {});
+
+    // ── 截图感知：拿最新截图 → OCR 识别 ──
+    if (action === 'see' || action === 'screenshot' || action === 'read_screen') {
+      // 1. 拿最新截图 ID
+      const listR = await this.appleTool('photos list --limit 3 --type photo');
+      if (!listR.ok) return { ok: false, error: '无法访问相册：' + listR.note };
+      let assets = [];
+      try { assets = JSON.parse(listR.out)?.assets || []; } catch {}
+      // 找最新截图
+      const shot = assets.find(a => a.media_subtypes?.includes('screenshot')) || assets[0];
+      if (!shot) return { ok: false, error: '未找到截图，请先截屏' };
+      // 2. 导出到本地
+      const exportR = await this.appleTool(`photos export --id ${shot.id}`);
+      if (!exportR.ok) return { ok: false, error: '导出截图失败：' + exportR.note };
+      // 找导出路径
+      let imgPath = '';
+      try { imgPath = JSON.parse(exportR.out)?.path || ''; } catch {}
+      if (!imgPath) {
+        // 从 stdout 里找路径
+        const m = exportR.out.match(/\/var\/minis\/[^\s"]+\.(png|jpg|jpeg)/i);
+        imgPath = m ? m[0] : '';
+      }
+      if (!imgPath) return { ok: false, error: '找不到导出路径', raw: exportR.out };
+      // 3. OCR 识别
+      const ocrR = await this.appleTool(`vision ocr ${imgPath} --lang zh-Hans,en --level accurate`);
+      let text = '';
+      try { text = JSON.parse(ocrR.out)?.text || ocrR.out; } catch { text = ocrR.out; }
+      return { ok: true, action: 'see', screenshot: imgPath, text: text.slice(0, 3000), shot_date: shot.date };
+    }
+
+    // ── 打开 App ──
+    if (action === 'open_app' || action === 'open') {
+      const scheme = P.scheme || P.arg || P.url || '';
+      if (!scheme) return { ok: false, error: '需要提供 App URL Scheme，如 weixin:// 或 https://...' };
+      const r = await this.appleTool(`open "${scheme}"`);
+      return { ok: r.ok, action: 'open_app', scheme, result: r.out || r.note };
+    }
+
+    // ── 剪贴板读写 ──
+    if (action === 'clipboard_read') {
+      const r = await this.appleTool('clipboard');
+      let text = '';
+      try { text = JSON.parse(r.out)?.text || ''; } catch { text = r.out; }
+      return { ok: r.ok, action: 'clipboard_read', text };
+    }
+    if (action === 'clipboard_write') {
+      const text = P.text || P.arg || '';
+      const r = await this.appleTool(`clipboard set "${text.replace(/"/g, '\"')}"`);
+      return { ok: r.ok, action: 'clipboard_write', text };
+    }
+
+    // ── 发通知 ──
+    if (action === 'notify') {
+      const title = P.title || '神枢';
+      const body = P.body || P.text || P.arg || '';
+      const after = P.after || 1;
+      const r = await this.appleTool(`notification schedule --title "${title}" --body "${body}" --after ${after}`);
+      return { ok: r.ok, action: 'notify', title, body };
+    }
+
+    // ── 朗读 ──
+    if (action === 'speak') {
+      const text = P.text || P.arg || '';
+      const r = await this.appleTool(`speak speak --text "${text.replace(/"/g, '\"')}"`);
+      return { ok: r.ok, action: 'speak', text };
+    }
+
+    // ── 设备信息 ──
+    if (action === 'device_info') {
+      const r = await this.appleTool('device info');
+      return { ok: r.ok, action: 'device_info', data: r.out };
+    }
+
+    // ── 天气 ──
+    if (action === 'weather') {
+      const r = await this.appleTool('weather');
+      return { ok: r.ok, action: 'weather', data: r.out };
+    }
+
+    // ── 定位 ──
+    if (action === 'location') {
+      const r = await this.appleTool('location');
+      return { ok: r.ok, action: 'location', data: r.out };
+    }
+
+    // ── 健康数据 ──
+    if (action === 'health') {
+      const types = P.types || 'stepCount,heartRate';
+      const days = P.days || 7;
+      const r = await this.appleTool(`healthkit batch --types ${types} --days ${days}`);
+      return { ok: r.ok, action: 'health', data: r.out };
+    }
+
+    // ── 日历/提醒 ──
+    if (action === 'calendar') {
+      const sub = P.sub || 'list --today';
+      const r = await this.appleTool(`calendar ${sub}`);
+      return { ok: r.ok, action: 'calendar', data: r.out };
+    }
+    if (action === 'reminder') {
+      const sub = P.sub || 'list';
+      const r = await this.appleTool(`reminders ${sub}`);
+      return { ok: r.ok, action: 'reminder', data: r.out };
+    }
+
+    // ── 地图导航 ──
+    if (action === 'maps') {
+      const sub = P.sub || P.arg || 'search --query 附近咖啡馆';
+      const r = await this.appleTool(`maps ${sub}`);
+      return { ok: r.ok, action: 'maps', data: r.out };
+    }
+
+    // ── 触发 Shortcut ──
+    if (action === 'shortcut') {
+      const name = encodeURIComponent(P.name || P.arg || '');
+      const r = await this.appleTool(`open "shortcuts://run-shortcut?name=${name}"`);
+      return { ok: r.ok, action: 'shortcut', name: P.name || P.arg };
+    }
+
+    // ── 通用 apple-* 透传 ──
+    if (action === 'raw') {
+      const arg = P.arg || '';
+      const r = await this.appleTool(arg);
+      return { ok: r.ok, action: 'raw', arg, out: r.out, err: r.err };
+    }
+
+    return { ok: false, error: `未知设备控制动作: ${action}`, supported: ['see','open_app','clipboard_read','clipboard_write','notify','speak','device_info','weather','location','health','calendar','reminder','maps','shortcut','raw'] };
+  }
   // ═══ 网站数据劫持工具箱（Web Hijack Toolkit）═══
   // arg 格式：「类型 参数」，例如：
   //   hook xhr|fetch|ws|cookie|form|all → 生成对应劫持脚本
@@ -8538,6 +8672,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 - 下载/抓取文件正文：⟨工具:download｜https://完整网址⟩${hasExec ? `
 - 在沙箱里直接跑命令/代码：⟨工具:exec｜shell命令或JS⟩（原生沙箱，无需连接器；curl/echo/ls/cat可用；JS前缀js:）
 - 操作主人的 iPhone（真调 iOS 硬件，经沙箱执行脑）：⟨工具:apple｜工具名 子命令 参数⟩
+- 设备控制中枢（截图感知/打开App/通知/剪贴板/健康/地图等高级操作）：⟨工具:device｜动作 参数⟩
+  动作列表：see（截图+OCR看屏幕）、open_app scheme=weixin://（打开App）、notify title=X body=Y、speak text=X、clipboard_read、clipboard_write text=X、health types=stepCount days=7、weather、location、calendar、maps sub=search --query X、shortcut name=X
   可用工具名与用法（全部输出 JSON）：
   · alarm set --time 07:30 --label 起床｜alarm timer --duration 5m｜alarm list  —— 闹钟/计时器
   · calendar list --today｜calendar create --title 开会 --start <ISO> --end <ISO>｜calendar remind --title 买菜 --due <ISO>  —— 日历/提醒
@@ -8604,6 +8740,22 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           out = e ? (e.ok ? `[沙箱·${e.via||'exec'}]\n${e.stdout||''}${e.result?'\n→ '+e.result:''}${e.stderr?'\n⚠ '+e.stderr:''}` : ('沙箱：' + (e.note || e.stderr || e.error || '失败'))) : '沙箱无响应';
         }
         else if (c.tool === 'apple') { const a = await this.appleTool(c.arg).catch(() => null); out = a ? (a.ok ? `[${a.tool}｜退出码 ${a.code}]\n${a.out || '(空)'}${a.err ? '\n[stderr]\n' + a.err : ''}` : ('iOS 工具：' + (a.note || '失败'))) : 'iOS 工具无响应'; }
+        else if (c.tool === 'device') {
+          const darg = String(c.arg || '').trim();
+          const dsp = darg.indexOf(' ');
+          const dact = dsp === -1 ? darg : darg.slice(0, dsp);
+          const drest = dsp === -1 ? '' : darg.slice(dsp + 1).trim();
+          const dparams = { arg: drest };
+          for (const m of [...drest.matchAll(/(\w+)=([^\s]+)/g)]) dparams[m[1]] = m[2];
+          const d = await this.deviceControl(dact, dparams).catch(e => ({ ok: false, error: String(e?.message || e) }));
+          if (d.ok) {
+            if (d.text) out = `[设备感知·${dact}]\n屏幕文字：\n${d.text}`;
+            else if (d.data) out = `[设备·${dact}]\n${d.data}`;
+            else out = `[设备·${dact}] 成功`;
+          } else {
+            out = `设备控制失败：${d.error || JSON.stringify(d)}`;
+          }
+        }
         else if (c.tool === 'hijack') { const h = await this.handleHijack(c.arg).catch(() => null); out = h ? `[劫持脚本·${h.type}｜${h.desc}]\n\`\`\`javascript\n${h.script}\n\`\`\`` : '劫持工具无响应'; }
         else if (c.tool === 'redteam') { const r = await this.handleRedTeam(c.arg).catch(() => null); out = r ? (r.ok ? `[红队·${r.desc}]\n\`\`\`\n${r.script}\n\`\`\`` : ('红队工具：' + (r.note || '失败'))) : '红队工具无响应'; }
         // ═══ 逆向工具集（吾爱破解实战提炼）═══
@@ -10110,6 +10262,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         case 'tg':        out = await this.sendToQuan(params.text || ''); break;
         case 'exec':      out = await this.execRemote(params.command || '', { confirm: params.confirm === true }); break;
         case 'apple':     out = await this.appleTool(params.arg || params.command || '', { confirm: params.confirm === true }); break;
+        case 'device':    out = await this.deviceControl(params.action || '', params); break;
         case 'watch':     out = await this.createWatch(params.text || ''); break;
         case 'analyze_target':
         case 'find_entry':
