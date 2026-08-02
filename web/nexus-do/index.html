@@ -5060,7 +5060,31 @@ function showStatsSheet(){
   const rows=(s.名单||[]).slice(0,60).map(u=>`· ${u.昵称||'—'}　${u.地区||'—'}　${u.消息数||0}条　${fmtTs(u.最近)}`).join('\n')||'（还没有人注册）';
   alert('注册总数：'+(s.注册总数||0)+'\n今日活跃：'+(s.今日活跃||0)+'\n名单在册：'+(s.名单在册||0)+'\n\n'+rows);
 }
-function showLock(){ const g=$('#lockgate'); if(!g) return; g.classList.add('show'); setTimeout(()=>{ const i=$('#lockInput'); if(i) i.focus(); }, 220); }
+function doLoginTransition(afterFn) {
+  const lockOrb = document.querySelector('.lock-orb');
+  const hubEl   = document.querySelector('.hz-hub');
+  const gate    = document.getElementById('lockgate');
+  if (!lockOrb || !hubEl || !gate) { afterFn(); return; }
+  const lo = lockOrb.getBoundingClientRect();
+  const hu = hubEl.getBoundingClientRect();
+  const dx = (hu.left + hu.width/2) - (lo.left + lo.width/2);
+  const dy = (hu.top  + hu.height/2) - (lo.top  + lo.height/2);
+  lockOrb.style.transition = 'transform 0.45s cubic-bezier(0.22,1,0.36,1), opacity 0.2s ease 0.3s';
+  lockOrb.style.transform  = `translate(${dx}px,${dy}px) scale(0.85)`;
+  lockOrb.style.opacity    = '0';
+  gate.style.transition = 'opacity 0.4s ease 0.2s';
+  gate.style.opacity    = '0';
+  setTimeout(() => {
+    afterFn();
+    gate.style.transition = ''; gate.style.opacity = '';
+    lockOrb.style.cssText = '';
+    hubEl.style.transition = 'transform 0.4s cubic-bezier(0.22,1,0.36,1)';
+    hubEl.style.transform  = 'scale(1.22)';
+    setTimeout(() => { hubEl.style.transform = ''; setTimeout(() => { hubEl.style.transition = ''; }, 420); }, 60);
+  }, 500);
+}
+
+
 function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
 window.setOrbitState = function(s){ const r=document.querySelector('.hz-ring'); if(!r) return; const m={idle:'64s',thinking:'8s',error:'2s'}; r.style.setProperty('--orbit-dur', m[s]||'64s'); r.classList.toggle('orbit-shake', s==='error'); };
 window.flashRow = function(el){ el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'), 600); };
@@ -5095,9 +5119,12 @@ async function tryUnlock(){
   let ok=false;
   try{ const r=await fetch(Nexus.base+'/soul',{headers:{Authorization:'Bearer '+v}}); ok=r.ok; }catch(e){ ok=false; }
   btn.disabled=false; btn.textContent='解锁';
-  if(ok){ store.set('owner_token',v); store.set('unlock_fails','0'); Nexus.token=v; Nexus.mode='owner'; document.body.classList.remove('public-mode'); hideLock(); hap([10,30,10]);
-    const hubEl=document.querySelector('.hz-hub'); if(hubEl){hubEl.style.transition='transform .5s cubic-bezier(.22,1,.36,1)';hubEl.style.transform='scale(1.18)';setTimeout(()=>{hubEl.style.transform='';},500);}
-    try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub(); loadOwnerStats();
+  if(ok){ store.set('owner_token',v); store.set('unlock_fails','0'); Nexus.token=v; Nexus.mode='owner'; document.body.classList.remove('public-mode');
+    hap([10,30,10]);
+    doLoginTransition(()=>{
+      hideLock();
+      try{Nexus.ws&&Nexus.ws.close();}catch(e){} Nexus.connectWS(); refreshSoul(); loadHub(); loadOwnerStats();
+    });
   } else { noteUnlockFail(); err.textContent='密码不对，再试一次'; $('#lockInput').select&&$('#lockInput').select(); hap(30);
     const hub=document.querySelector('.hz-hub'); if(hub){hub.classList.add('orb-error');setTimeout(()=>hub.classList.remove('orb-error'),600);} setOrbitState('error'); setTimeout(()=>setOrbitState('idle'),800);
   }

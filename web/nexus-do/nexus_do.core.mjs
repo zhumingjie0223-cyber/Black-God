@@ -462,7 +462,7 @@ export class ShenshuCore {
         if (path === '/brains-test' && request.method === 'POST') return json(await this.pingBrains());
         if (path === '/brains/weights') return json({ ok: true, weights: await this.getBrainWeights() });
         // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
-        if (path === '/loop' && request.method === 'GET') return json(await this.handleLoop('GET', {}, url.searchParams));
+        if (path === '/loop' && request.method === 'GET') return json({ ...(await this.handleLoop('GET', {}, url.searchParams)), visual_agent: true });
         if (path === '/loop' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handleLoop('POST', b, url.searchParams)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
@@ -799,6 +799,277 @@ async execBrowse(payload = {}) {
   };
 }
 
+async visualAgentLoop(goal, startUrl, opts = {}) {
+  const maxSteps = opts.maxSteps || 8;
+  const soul = opts.soul || '';
+  const transcript = [];
+  let currentUrl = startUrl;
+  let lastText = '';
+  let lastScreenshot = null;
+  let finalResult = null;
+
+  const SYS = `你是神枢视觉 Agent（Vision Agent），通过截图和页面文字观察网页并操作。
+每轮你会收到：任务目标、当前 URL、页面截图（如有）、页面文字摘要。
+你必须只输出一个 JSON 对象，不要 markdown 代码块，不要任何解释：
+{"action":"click|type|scroll|navigate|extract|done","args":{},"reason":"简短说明"}
+action 说明：
+- click: args={"selector":"CSS选择器"} 点击元素
+- type: args={"selector":"CSS选择器","value":"输入内容"} 输入文字
+- scroll: args={"direction":"down|up"} 滚动页面
+- navigate: args={"url":"完整URL"} 跳转新页面
+- extract: args={} 提取当前页面文字作为观察
+- done: args={"result":"最终答案"} 任务完成
+规则：优先用页面文字里出现的真实元素；连续两步无变化时换策略；目标达成立即 done。`;
+
+  const parseBrain = (raw) => {
+    if (!raw) return null;
+    let s = String(raw).trim();
+    const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) s = fence[1].trim();
+    const start = s.indexOf('{'), end = s.lastIndexOf('}');
+    if (start === -1 || end === -1) return null;
+    try { return JSON.parse(s.slice(start, end + 1)); } catch { return null; }
+  };
+
+  const observe = async (url, actions) => {
+    const payload = { url, screenshot: true, timeout: opts.timeout || 30000 };
+    if (actions && actions.length) payload.actions = actions;
+    let r = await this.execBrowse(payload);
+    if (!r || !r.ok) {
+      const p2 = { url, screenshot: false, timeout: opts.timeout || 30000 };
+      if (actions && actions.length) p2.actions = actions;
+      r = await this.execBrowse(p2);
+    }
+    return r || { ok: false, text: '', url, screenshot: null };
+  };
+
+  const first = await observe(currentUrl, null);
+  if (!first.ok && !first.text) {
+    return { ok: false, error: 'initial navigation failed', result: null, transcript, steps: 0 };
+  }
+  currentUrl = first.url || currentUrl;
+  lastText = (first.text || '').slice(0, 6000);
+  lastScreenshot = first.screenshot || null;
+
+  for (let step = 1; step <= maxSteps; step++) {
+    const hasShot = !!lastScreenshot;
+    const observePrompt = [
+      `任务目标：${goal}`,
+      `当前步数：${step}/${maxSteps}`,
+      `当前 URL：${currentUrl}`,
+      hasShot ? `[截图已附，前200字符] ${String(lastScreenshot).slice(0, 200)}` : `[无截图，仅文字观察]`,
+      `页面文字摘要：\n${lastText || '(空页面)'}`,
+      transcript.length ? `历史操作：\n${transcript.map(t => `#${t.step} ${t.action}(${JSON.stringify(t.args)}) ok=${t.ok}`).join('\n')}` : '',
+      `请输出下一步动作 JSON。`
+    ].filter(Boolean).join('\n\n');
+
+    let decision = null;
+    try {
+      const brainRaw = await this.callBrain(SYS, observePrompt, soul);
+      decision = parseBrain(typeof brainRaw === 'string' ? brainRaw : (brainRaw?.text || brainRaw?.content || JSON.stringify(brainRaw)));
+    } catch (e) {
+      transcript.push({ step, action: 'brain_error', args: {}, ok: false, before_text: lastText.slice(0, 200), after_text: '', error: String(e?.message || e) });
+      break;
+    }
+    if (!decision || !decision.action) {
+      transcript.push({ step, action: 'parse_error', args: {}, ok: false, before_text: lastText.slice(0, 200), after_text: '' });
+      continue;
+    }
+
+    const { action, args = {}, reason = '' } = decision;
+    const beforeText = lastText;
+
+    if (action === 'done') {
+      finalResult = args.result || lastText.slice(0, 2000);
+      transcript.push({ step, action, args, ok: true, reason, before_text: beforeText.slice(0, 200), after_text: '' });
+      return { ok: true, result: finalResult, transcript, steps: step };
+    }
+
+    let execRes = null;
+    let stepOk = false;
+    try {
+      if (action === 'navigate') {
+        currentUrl = args.url || currentUrl;
+        execRes = await observe(currentUrl, null);
+      } else if (action === 'click') {
+        execRes = await observe(currentUrl, [{ type: 'click', selector: args.selector }]);
+      } else if (action === 'type') {
+        execRes = await observe(currentUrl, [{ type: 'type', selector: args.selector, value: args.value }]);
+      } else if (action === 'scroll') {
+        execRes = await observe(currentUrl, [{ type: 'scroll', direction: args.direction || 'down' }]);
+      } else if (action === 'extract') {
+        execRes = await observe(currentUrl, null);
+      } else {
+        transcript.push({ step, action, args, ok: false, reason, before_text: beforeText.slice(0, 200), after_text: '', error: 'unknown action' });
+        continue;
+      }
+      stepOk = !!(execRes && execRes.ok && (!execRes.actionErrors || execRes.actionErrors.length === 0));
+    } catch (e) {
+      execRes = { ok: false, text: lastText, error: String(e?.message || e) };
+    }
+
+    const afterText = ((execRes && execRes.text) || '').slice(0, 6000);
+    if (execRes) {
+      currentUrl = execRes.url || currentUrl;
+      lastText = afterText || lastText;
+      lastScreenshot = execRes.screenshot || null;
+    }
+
+    transcript.push({
+      step, action, args, ok: stepOk, reason,
+      changed: afterText !== beforeText,
+      before_text: beforeText.slice(0, 200),
+      after_text: afterText.slice(0, 200),
+      ...(execRes?.actionErrors?.length ? { actionErrors: execRes.actionErrors } : {}),
+      ...(execRes?.error ? { error: execRes.error } : {})
+    });
+  }
+
+  return {
+    ok: true,
+    result: finalResult || lastText.slice(0, 2000) || null,
+    partial: !finalResult,
+    transcript,
+    steps: transcript.length
+  };
+}
+
+
+async visualAgentLoop(goal, startUrl, opts = {}) {
+  const maxSteps = opts.maxSteps || 8;
+  const soul = opts.soul || '';
+  const transcript = [];
+  let currentUrl = startUrl;
+  let lastText = '';
+  let lastScreenshot = null;
+  let finalResult = null;
+
+  const SYS = `你是神枢视觉 Agent（Vision Agent），通过截图和页面文字观察网页并操作。
+每轮你会收到：任务目标、当前 URL、页面截图（如有）、页面文字摘要。
+你必须只输出一个 JSON 对象，不要 markdown 代码块，不要任何解释：
+{"action":"click|type|scroll|navigate|extract|done","args":{},"reason":"简短说明"}
+action 说明：
+- click: args={"selector":"CSS选择器"} 点击元素
+- type: args={"selector":"CSS选择器","value":"输入内容"} 输入文字
+- scroll: args={"direction":"down|up"} 滚动页面
+- navigate: args={"url":"完整URL"} 跳转新页面
+- extract: args={} 提取当前页面文字作为观察
+- done: args={"result":"最终答案"} 任务完成
+规则：优先用页面文字里出现的真实元素；连续两步无变化时换策略；目标达成立即 done。`;
+
+  const parseBrain = (raw) => {
+    if (!raw) return null;
+    let s = String(raw).trim();
+    const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) s = fence[1].trim();
+    const start = s.indexOf('{'), end = s.lastIndexOf('}');
+    if (start === -1 || end === -1) return null;
+    try { return JSON.parse(s.slice(start, end + 1)); } catch { return null; }
+  };
+
+  const observe = async (url, actions) => {
+    const payload = { url, screenshot: true, timeout: opts.timeout || 30000 };
+    if (actions && actions.length) payload.actions = actions;
+    let r = await this.execBrowse(payload);
+    if (!r || !r.ok) {
+      const p2 = { url, screenshot: false, timeout: opts.timeout || 30000 };
+      if (actions && actions.length) p2.actions = actions;
+      r = await this.execBrowse(p2);
+    }
+    return r || { ok: false, text: '', url, screenshot: null };
+  };
+
+  const first = await observe(currentUrl, null);
+  if (!first.ok && !first.text) {
+    return { ok: false, error: 'initial navigation failed', result: null, transcript, steps: 0 };
+  }
+  currentUrl = first.url || currentUrl;
+  lastText = (first.text || '').slice(0, 6000);
+  lastScreenshot = first.screenshot || null;
+
+  for (let step = 1; step <= maxSteps; step++) {
+    const hasShot = !!lastScreenshot;
+    const observePrompt = [
+      `任务目标：${goal}`,
+      `当前步数：${step}/${maxSteps}`,
+      `当前 URL：${currentUrl}`,
+      hasShot ? `[截图已附，前200字符] ${String(lastScreenshot).slice(0, 200)}` : `[无截图，仅文字观察]`,
+      `页面文字摘要：\n${lastText || '(空页面)'}`,
+      transcript.length ? `历史操作：\n${transcript.map(t => `#${t.step} ${t.action}(${JSON.stringify(t.args)}) ok=${t.ok}`).join('\n')}` : '',
+      `请输出下一步动作 JSON。`
+    ].filter(Boolean).join('\n\n');
+
+    let decision = null;
+    try {
+      const brainRaw = await this.callBrain(SYS, observePrompt, soul);
+      decision = parseBrain(typeof brainRaw === 'string' ? brainRaw : (brainRaw?.text || brainRaw?.content || JSON.stringify(brainRaw)));
+    } catch (e) {
+      transcript.push({ step, action: 'brain_error', args: {}, ok: false, before_text: lastText.slice(0, 200), after_text: '', error: String(e?.message || e) });
+      break;
+    }
+    if (!decision || !decision.action) {
+      transcript.push({ step, action: 'parse_error', args: {}, ok: false, before_text: lastText.slice(0, 200), after_text: '' });
+      continue;
+    }
+
+    const { action, args = {}, reason = '' } = decision;
+    const beforeText = lastText;
+
+    if (action === 'done') {
+      finalResult = args.result || lastText.slice(0, 2000);
+      transcript.push({ step, action, args, ok: true, reason, before_text: beforeText.slice(0, 200), after_text: '' });
+      return { ok: true, result: finalResult, transcript, steps: step };
+    }
+
+    let execRes = null;
+    let stepOk = false;
+    try {
+      if (action === 'navigate') {
+        currentUrl = args.url || currentUrl;
+        execRes = await observe(currentUrl, null);
+      } else if (action === 'click') {
+        execRes = await observe(currentUrl, [{ type: 'click', selector: args.selector }]);
+      } else if (action === 'type') {
+        execRes = await observe(currentUrl, [{ type: 'type', selector: args.selector, value: args.value }]);
+      } else if (action === 'scroll') {
+        execRes = await observe(currentUrl, [{ type: 'scroll', direction: args.direction || 'down' }]);
+      } else if (action === 'extract') {
+        execRes = await observe(currentUrl, null);
+      } else {
+        transcript.push({ step, action, args, ok: false, reason, before_text: beforeText.slice(0, 200), after_text: '', error: 'unknown action' });
+        continue;
+      }
+      stepOk = !!(execRes && execRes.ok && (!execRes.actionErrors || execRes.actionErrors.length === 0));
+    } catch (e) {
+      execRes = { ok: false, text: lastText, error: String(e?.message || e) };
+    }
+
+    const afterText = ((execRes && execRes.text) || '').slice(0, 6000);
+    if (execRes) {
+      currentUrl = execRes.url || currentUrl;
+      lastText = afterText || lastText;
+      lastScreenshot = execRes.screenshot || null;
+    }
+
+    transcript.push({
+      step, action, args, ok: stepOk, reason,
+      changed: afterText !== beforeText,
+      before_text: beforeText.slice(0, 200),
+      after_text: afterText.slice(0, 200),
+      ...(execRes?.actionErrors?.length ? { actionErrors: execRes.actionErrors } : {}),
+      ...(execRes?.error ? { error: execRes.error } : {})
+    });
+  }
+
+  return {
+    ok: true,
+    result: finalResult || lastText.slice(0, 2000) || null,
+    partial: !finalResult,
+    transcript,
+    steps: transcript.length
+  };
+}
+
   // git 工作区操作：ensure/status/pull/push，token 服务端拼接绝不入参
   async execWorkspace(action, payload = {}) {
     if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器执行脑未绑定（wrangler containers 未部署）' };
@@ -945,6 +1216,9 @@ async execBrowse(payload = {}) {
             break;
           case 'browse':
             execResult = await this.execBrowse(args);
+            break;
+          case 'visual':
+            execResult = await this.visualAgentLoop(args.goal || '', args.url || '', args);
             break;
           case 'def':
           case 'refs':
