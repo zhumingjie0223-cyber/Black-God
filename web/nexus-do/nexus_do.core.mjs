@@ -2541,15 +2541,13 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
   async deviceControl(action, params = {}) {
     const P = typeof params === 'string' ? { arg: params } : (params || {});
 
-    // 统一通过 shell 中继调 apple-* 命令
+    // 统一通过 shell 中继调 apple-* 命令（强制 deviceShellExec，不依赖 DO WS 路由）
     const appleRun = async (cmd) => {
-      // 优先走 shell 中继（本地真实 apple-* 调 iOS 硬件）
-      const relayWs = this._getShellRelayWs();
-      if (relayWs) {
-        return this.deviceShellExec(cmd, 'bash');
-      }
+      const r = await this.deviceShellExec(`${cmd} --compact 2>&1`, 'bash');
+      if (r.ok || r.stdout) return { ok: true, out: r.stdout, err: r.stderr, note: r.error || '' };
       // 中继离线 → 走 execRemote（需要执行脑）
-      return this.appleTool(cmd);
+      const r2 = await this.appleTool(cmd);
+      return r2;
     };
 
     // ── 截图感知：拿最新截图 → OCR 识别 ──
