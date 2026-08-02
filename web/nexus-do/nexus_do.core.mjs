@@ -552,6 +552,24 @@ export class ShenshuCore {
   async webSocketMessage(ws, raw) {
     try {
       const msg = JSON.parse(raw);
+      // 设备 shell 中继注册
+      if (msg.type === 'device_shell_register') {
+        ws.serializeAttachment({ role: 'shell_relay', ts: Date.now() });
+        ws.send(JSON.stringify({ type: 'device_shell_ready', ts: Date.now() }));
+        return;
+      }
+      // 设备返回逐行输出
+      if (msg.type === 'shell_line') {
+        this.broadcast({ type: 'sandbox_live', line: msg.line, kind: msg.kind || 'stdout', ts: Date.now() });
+        return;
+      }
+      // 设备返回最终结果
+      if (msg.type === 'shell_result') {
+        if (!this._shellPending) this._shellPending = new Map();
+        const resolve = this._shellPending.get(msg.id);
+        if (resolve) { this._shellPending.delete(msg.id); resolve(msg); }
+        return;
+      }
       if (msg.type === 'ping') { ws.send(JSON.stringify({ type: 'pong', ts: Date.now() })); return; }
       if (msg.type === 'watch') {
         ws.send(JSON.stringify({ type: 'soul', soul: await this.getSoulPublic() }));
@@ -10735,6 +10753,10 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
     const L = String(lang||'js').toLowerCase().trim();
 
+    // 设备 shell 中继（设备在线时优先走本地真实环境）
+    const _relayWs = this._getShellRelayWs();
+    if (_relayWs && L !== 'fetch' && L !== 'http' && L !== 'js') return this.deviceShellExec(code, L);
+
     // fetch/http DSL
     if (L==='fetch'||L==='http') return this.sandboxFetch(code);
 
@@ -10765,6 +10787,52 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
     return {ok:false, stderr:`不支持的语言: ${L}`, stdout:'', via:'sandbox',
       supported:['js','javascript','node',...pistonLangs,'fetch','http']};
+  }
+
+
+  // 找到已注册的设备 shell 中继 WebSocket
+  _getShellRelayWs() {
+    try {
+      for (const ws of this.state.getWebSockets()) {
+        try {
+          const att = ws.deserializeAttachment();
+          if (att && att.role === 'shell_relay') return ws;
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // 通过设备 shell 中继执行代码
+  async deviceShellExec(code, lang = 'bash') {
+    const ws = this._getShellRelayWs();
+    if (!ws) return { ok: false, error: '设备离线（shell 中继未连接）', via: 'device-shell' };
+    if (!this._shellPending) this._shellPending = new Map();
+    const id = crypto.randomUUID();
+    const result = await new Promise((resolve) => {
+      this._shellPending.set(id, resolve);
+      try {
+        ws.send(JSON.stringify({ type: 'shell_exec', id, code, lang, timeout: 30 }));
+      } catch (e) {
+        this._shellPending.delete(id);
+        resolve({ ok: false, error: '发送命令失败: ' + String(e?.message || e), exit_code: -1 });
+        return;
+      }
+      // 30s 超时
+      setTimeout(() => {
+        if (this._shellPending.has(id)) {
+          this._shellPending.delete(id);
+          resolve({ ok: false, error: '设备执行超时 (30s)', stdout: '', stderr: '', exit_code: -1 });
+        }
+      }, 30000);
+    });
+    return {
+      ok: result.ok !== false,
+      stdout: String(result.stdout || '').slice(0, 8000),
+      stderr: String(result.stderr || '').slice(0, 2000),
+      exit_code: result.exit_code ?? 0,
+      via: 'device-shell',
+    };
   }
 
   // 内置 JS DSL（lang=js，Worker 内直接运行，无需 Piston）
