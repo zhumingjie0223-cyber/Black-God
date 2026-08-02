@@ -2536,147 +2536,122 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
 
 
   // ═══ 设备控制中枢（Device Control Hub）═══
-  // 封装 apple-* 工具的高级操作：截图+OCR感知、App打开、剪贴板、通知等
-  // 走 shell 中继（deviceShellExec），设备有网即可用
   async deviceControl(action, params = {}) {
     const P = typeof params === 'string' ? { arg: params } : (params || {});
 
-    // 统一通过 shell 中继调 apple-* 命令（强制 deviceShellExec，不依赖 DO WS 路由）
-    const appleRun = async (cmd) => {
-      const r = await this.deviceShellExec(`${cmd} 2>&1`, 'bash');
-      if (r.ok || r.stdout) return { ok: true, out: r.stdout, err: r.stderr, note: r.error || '' };
-      // 中继离线 → 走 execRemote（需要执行脑）
-      const r2 = await this.appleTool(cmd);
-      return r2;
+    // 执行 apple-* 命令（走 shell 中继，设备有网即可）
+    const run = async (tool, args = '') => {
+      const cmd = args ? `apple-${tool} ${args}` : `apple-${tool}`;
+      const r = await this.deviceShellExec(cmd, 'bash');
+      if (!r.ok && String(r.error || '').includes('离线'))
+        return { ok: false, error: '设备 shell 中继离线，请运行 nexus_shell_relay.py' };
+      const raw = String(r.stdout || '').trim();
+      let data;
+      try { data = JSON.parse(raw); } catch { data = raw || null; }
+      return { ok: r.ok !== false || !!raw, data, raw, stderr: String(r.stderr || '') };
     };
 
-    // ── 截图感知：拿最新截图 → OCR 识别 ──
-    if (action === 'see' || action === 'screenshot' || action === 'read_screen') {
-      // 1. 拿最新截图 ID
-      const listR = await appleRun('photos list --limit 3 --type photo');
-      if (!listR.ok) return { ok: false, error: '无法访问相册：' + listR.note };
-      let assets = [];
-      try { assets = JSON.parse(listR.out)?.assets || []; } catch {}
-      // 找最新截图
-      const shot = assets.find(a => a.media_subtypes?.includes('screenshot')) || assets[0];
-      if (!shot) return { ok: false, error: '未找到截图，请先截屏' };
-      // 2. 导出到本地
-      const exportR = await appleRun(`photos export --id ${shot.id}`);
-      if (!exportR.ok) return { ok: false, error: '导出截图失败：' + exportR.note };
-      // 找导出路径
-      let imgPath = '';
-      try { imgPath = JSON.parse(exportR.out)?.path || ''; } catch {}
-      if (!imgPath) {
-        // 从 stdout 里找路径
-        const m = exportR.out.match(/\/var\/minis\/[^\s"]+\.(png|jpg|jpeg)/i);
-        imgPath = m ? m[0] : '';
-      }
-      if (!imgPath) return { ok: false, error: '找不到导出路径', raw: exportR.out };
-      // 3. OCR 识别
-      const ocrR = await appleRun(`vision ocr ${imgPath} --lang zh-Hans,en --level accurate`);
-      let text = '';
-      try { text = JSON.parse(ocrR.out)?.text || ocrR.out; } catch { text = ocrR.out; }
-      return { ok: true, action: 'see', screenshot: imgPath, text: text.slice(0, 3000), shot_date: shot.date };
+    if (action === 'weather') {
+      const r = await run('weather');
+      return { ok: r.ok, action, data: r.data, error: r.ok ? undefined : r.error };
     }
-
-    // ── 打开 App ──
-    if (action === 'open_app' || action === 'open') {
-      const scheme = P.scheme || P.arg || P.url || '';
-      if (!scheme) return { ok: false, error: '需要提供 App URL Scheme，如 weixin:// 或 https://...' };
-      const r = await appleRun(`open "${scheme}"`);
-      return { ok: r.ok, action: 'open_app', scheme, result: r.out || r.note };
+    if (action === 'location') {
+      const r = await run('location');
+      return { ok: r.ok, action, data: r.data, error: r.ok ? undefined : r.error };
     }
-
-    // ── 剪贴板读写 ──
+    if (action === 'device_info') {
+      const r = await run('device', 'info');
+      return { ok: r.ok, action, data: r.data, error: r.ok ? undefined : r.error };
+    }
     if (action === 'clipboard_read') {
-      const r = await appleRun('clipboard');
+      const r = await run('clipboard');
       let text = '';
-      try { text = JSON.parse(r.out)?.text || ''; } catch { text = r.out; }
-      return { ok: r.ok, action: 'clipboard_read', text };
+      try { text = r.data?.text || r.data?.value || r.raw || ''; } catch { text = r.raw || ''; }
+      return { ok: r.ok, action, text };
     }
     if (action === 'clipboard_write') {
-      const text = P.text || P.arg || '';
-      const r = await appleRun(`clipboard set "${text.replace(/"/g, '\"')}"`);
-      return { ok: r.ok, action: 'clipboard_write', text };
+      const text = String(P.text || P.arg || '').replace(/"/g, '\"');
+      const r = await run('clipboard', `set "${text}"`);
+      return { ok: r.ok, action, text: P.text || P.arg };
     }
-
-    // ── 发通知 ──
     if (action === 'notify') {
-      const title = P.title || '神枢';
-      const body = P.body || P.text || P.arg || '';
-      const after = P.after || 1;
-      const r = await appleRun(`notification schedule --title "${title}" --body "${body}" --after ${after}`);
-      return { ok: r.ok, action: 'notify', title, body };
+      const title = String(P.title || '神枢').replace(/"/g, '\"');
+      const body = String(P.body || P.text || P.arg || '').replace(/"/g, '\"');
+      const after = Number(P.after) || 1;
+      const r = await run('notification', `schedule --title "${title}" --body "${body}" --after ${after}`);
+      return { ok: r.ok, action, title, body };
     }
-
-    // ── 朗读 ──
     if (action === 'speak') {
-      const text = P.text || P.arg || '';
-      const r = await appleRun(`speak speak --text "${text.replace(/"/g, '\"')}"`);
-      return { ok: r.ok, action: 'speak', text };
+      const text = String(P.text || P.arg || '').replace(/"/g, '\"');
+      const r = await run('speak', `speak --text "${text}"`);
+      return { ok: r.ok, action, text: P.text || P.arg };
     }
-
-    // ── 设备信息 ──
-    if (action === 'device_info') {
-      const r = await appleRun('device info');
-      return { ok: r.ok, action: 'device_info', data: r.out };
-    }
-
-    // ── 天气 ──
-    if (action === 'weather') {
-      const r = await appleRun('weather');
-      return { ok: r.ok, action: 'weather', data: r.out };
-    }
-
-    // ── 定位 ──
-    if (action === 'location') {
-      const r = await appleRun('location');
-      return { ok: r.ok, action: 'location', data: r.out };
-    }
-
-    // ── 健康数据 ──
     if (action === 'health') {
-      const types = P.types || 'stepCount,heartRate';
-      const days = P.days || 7;
-      const r = await appleRun(`healthkit batch --types ${types} --days ${days}`);
-      return { ok: r.ok, action: 'health', data: r.out };
+      const types = String(P.types || 'stepCount,heartRate');
+      const days = Number(P.days) || 7;
+      const r = await run('healthkit', `batch --types ${types} --days ${days}`);
+      return { ok: r.ok, action, data: r.data };
     }
-
-    // ── 日历/提醒 ──
     if (action === 'calendar') {
-      const sub = P.sub || 'list --today';
-      const r = await appleRun(`calendar ${sub}`);
-      return { ok: r.ok, action: 'calendar', data: r.out };
+      const sub = String(P.sub || 'list --today');
+      const r = await run('calendar', sub);
+      return { ok: r.ok, action, data: r.data };
     }
     if (action === 'reminder') {
-      const sub = P.sub || 'list';
-      const r = await appleRun(`reminders ${sub}`);
-      return { ok: r.ok, action: 'reminder', data: r.out };
+      const sub = String(P.sub || 'list');
+      const r = await run('reminders', sub);
+      return { ok: r.ok, action, data: r.data };
     }
-
-    // ── 地图导航 ──
     if (action === 'maps') {
-      const sub = P.sub || P.arg || 'search --query 附近咖啡馆';
-      const r = await appleRun(`maps ${sub}`);
-      return { ok: r.ok, action: 'maps', data: r.out };
+      const sub = String(P.sub || P.arg || 'search --query 附近');
+      const r = await run('maps', sub);
+      return { ok: r.ok, action, data: r.data };
     }
-
-    // ── 触发 Shortcut ──
+    if (action === 'open_app' || action === 'open') {
+      const scheme = String(P.scheme || P.url || P.arg || '');
+      if (!scheme) return { ok: false, error: '需要 scheme 参数，如 weixin://' };
+      const r = await run('open', `"${scheme}"`);
+      return { ok: r.ok, action, scheme };
+    }
     if (action === 'shortcut') {
       const name = encodeURIComponent(P.name || P.arg || '');
-      const r = await appleRun(`open "shortcuts://run-shortcut?name=${name}"`);
-      return { ok: r.ok, action: 'shortcut', name: P.name || P.arg };
+      const r = await run('open', `"shortcuts://run-shortcut?name=${name}"`);
+      return { ok: r.ok, action, name: P.name || P.arg };
     }
-
-    // ── 通用 apple-* 透传 ──
+    if (action === 'see' || action === 'screenshot' || action === 'read_screen') {
+      // 1. 拿相册列表
+      const listR = await run('photos', 'list --limit 5');
+      if (!listR.ok) return { ok: false, error: '无法访问相册: ' + (listR.error || '') };
+      let assets = [];
+      try { assets = listR.data?.assets || []; } catch {}
+      const shot = assets.find(a => a.media_subtypes?.includes('screenshot') || a.subtype === 'screenshot') || assets[0];
+      if (!shot) return { ok: false, error: '未找到截图，请先截屏' };
+      // 2. 导出
+      const outDir = '/var/minis/attachments/';
+      const expR = await run('photos', `export --id ${shot.id} --output ${outDir}`);
+      if (!expR.ok) return { ok: false, error: '导出截图失败: ' + (expR.stderr || expR.error || '') };
+      // 从 stdout 里找路径
+      let imgPath = '';
+      try { imgPath = expR.data?.path || ''; } catch {}
+      if (!imgPath) {
+        const m = String(expR.raw || '').match(/\/var\/minis\/[^\s"]+\.(png|jpg|jpeg|heic)/i);
+        imgPath = m ? m[0] : '';
+      }
+      if (!imgPath) return { ok: false, error: '找不到导出路径', raw: expR.raw };
+      // 3. OCR
+      const ocrR = await run('vision', `ocr ${imgPath} --lang zh-Hans,en --level accurate`);
+      let text = '';
+      try { text = ocrR.data?.text || ocrR.raw || ''; } catch { text = ocrR.raw || ''; }
+      return { ok: true, action: 'see', text: String(text).slice(0, 3000), path: imgPath };
+    }
     if (action === 'raw') {
-      const arg = P.arg || '';
-      const r = await appleRun(arg);
-      return { ok: r.ok, action: 'raw', arg, out: r.out, err: r.err };
+      const r = await this.deviceShellExec(String(P.arg || ''), 'bash');
+      return { ok: r.ok, action, stdout: r.stdout, stderr: r.stderr, exit_code: r.exit_code };
     }
 
-    return { ok: false, error: `未知设备控制动作: ${action}`, supported: ['see','open_app','clipboard_read','clipboard_write','notify','speak','device_info','weather','location','health','calendar','reminder','maps','shortcut','raw'] };
+    return { ok: false, error: `未知动作: ${action}`, supported: ['weather','location','device_info','clipboard_read','clipboard_write','notify','speak','health','calendar','reminder','maps','open_app','shortcut','see','raw'] };
   }
+
   // ═══ 网站数据劫持工具箱（Web Hijack Toolkit）═══
   // arg 格式：「类型 参数」，例如：
   //   hook xhr|fetch|ws|cookie|form|all → 生成对应劫持脚本
