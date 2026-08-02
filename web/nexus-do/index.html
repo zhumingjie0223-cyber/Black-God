@@ -1866,6 +1866,31 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 .md-table th{background:var(--surface-2);color:var(--cy-2)}
 .md-quote{border-left:3px solid var(--cy-2);padding:4px 12px;color:var(--txt-2);background:var(--surface-2);border-radius:0 6px 6px 0;margin:4px 0}
 .md-ul,.md-ol{padding-left:20px;margin:4px 0}
+/* P2: bubble 内 Markdown 元素补全 */
+.bubble h2,.bubble h3,.bubble h4{font-weight:600;margin:10px 0 4px;line-height:1.3;color:var(--fg-1)}
+.bubble h2{font-size:17px}.bubble h3{font-size:15px}.bubble h4{font-size:14px}
+.bubble ul,.bubble ol{padding-left:20px;margin:6px 0}
+.bubble li{margin:2px 0;line-height:1.6}
+.bubble blockquote{border-left:3px solid var(--cy-2);padding:4px 12px;color:var(--txt-2);background:rgba(255,255,255,.03);border-radius:0 6px 6px 0;margin:6px 0}
+.bubble hr{border:none;border-top:1px solid var(--line);margin:10px 0;opacity:.4}
+.bubble strong{font-weight:600;color:var(--fg-1)}
+.bubble em{font-style:italic;color:var(--txt-2)}
+.bubble a{color:var(--cy-1);text-decoration:none}
+.bubble a:hover{text-decoration:underline}
+/* P2: Orb 双层流光 */
+.hz-hub::after{content:'';position:absolute;inset:-8px;border-radius:50%;z-index:-1;background:conic-gradient(from 180deg,transparent,var(--cy-3,rgba(79,224,150,.25)),transparent 45%);opacity:.35;filter:blur(10px);animation:orbSpin 12s linear infinite reverse}
+.nexus.is-thinking .hz-hub::before{background:conic-gradient(from 0deg,transparent,var(--cy-1),var(--cy-2),transparent 60%);opacity:.8;animation-duration:2s}
+.nexus.is-thinking .hz-hub::after{background:conic-gradient(from 180deg,transparent,rgba(120,200,255,.5),transparent 40%);opacity:.6;animation-duration:3s}
+/* P2: Welcome 入场 stagger + chips */
+@keyframes wc-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#welcome>*{animation:wc-rise .5s var(--ease-spring) both}
+#welcome .wc-mark{animation-delay:0ms}
+#welcome .wc-greet{animation-delay:60ms;font-size:32px;font-weight:700}
+#welcome .wc-sub{animation-delay:120ms}
+#welcome .wc-suggest{animation-delay:200ms}
+.wc-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px;animation:wc-rise .5s var(--ease-spring) 280ms both}
+.wc-chip{background:rgba(79,224,150,.08);border:1px solid rgba(79,224,150,.2);color:var(--cy-1);border-radius:20px;padding:6px 14px;font-size:12.5px;cursor:pointer;transition:.15s}
+.wc-chip:active{background:rgba(79,224,150,.15);transform:scale(.97)}
 .reply-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .reply-chip{background:var(--surface-2);border:1px solid var(--cy-2);color:var(--cy-2);border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer}
 .reply-chip:active{background:var(--surface)}
@@ -3877,8 +3902,8 @@ function updateLastStep(bubble, status, detail){
   }
   return step;
 }
-function addMsgToolbar(msgEl, bubble){
-  const tb = document.createElement('div'); tb.className = 'msg-toolbar';
+function addMsgToolbar(msgEl, bubble){  const tb = document.createElement('div'); tb.className = 'msg-toolbar';
+
   tb.innerHTML = '<button class="tb-btn" data-action="copy">复制</button><button class="tb-btn" data-action="regen">重发</button>';
   msgEl.appendChild(tb);
   tb.addEventListener('click', e => {
@@ -4031,6 +4056,7 @@ function genReplyChips(text){
   return chips;
 }
 function scrollBottom(){ const s=$('#chatScroll'); requestAnimationFrame(()=>s.scrollTop=s.scrollHeight); }
+(function(){ const s=$('#chatScroll'); if(s && window.initScrollToBottom) initScrollToBottom(s, '.msg'); })();
 
 /* 空状态引导卡 */
 const SUGGESTIONS = ['此刻你的枢语坐标是什么？','帮我分析一下当前局势','用枢语描述你的内在状态','我们来做一件事'];
@@ -5045,6 +5071,19 @@ document.addEventListener('DOMContentLoaded', () => {
     li.addEventListener('focus', () => { document.querySelector('.hz-hub')?.classList.add('orb-focus'); setOrbitState('thinking'); });
     li.addEventListener('blur', () => { document.querySelector('.hz-hub')?.classList.remove('orb-focus'); setOrbitState('idle'); });
   }
+  // P2: Welcome prompt chips
+  (function initWelcomeChips(){
+    const welcome = document.getElementById('welcome');
+    if(!welcome) return;
+    const chips = ['帮我写一段 Python 爬虫','帮我分析这段代码的问题','用枢语说一句今天的状态'];
+    const bar = document.createElement('div'); bar.className = 'wc-chips';
+    chips.forEach(c => {
+      const btn = document.createElement('button'); btn.className = 'wc-chip'; btn.textContent = c;
+      btn.onclick = () => { const inp = document.getElementById('inp'); if(inp){ inp.value=c; inp.dispatchEvent(new Event('input')); inp.focus(); } };
+      bar.appendChild(btn);
+    });
+    welcome.appendChild(bar);
+  })();
 });
 const _setSendStateOrig = window.setSendState;
 window.setSendState = function(s){ _setSendStateOrig && _setSendStateOrig(s); if(s==='idle') setOrbitState('idle'); else if(s==='thinking'||s==='loading') setOrbitState('thinking'); else if(s==='error') setOrbitState('error'); };
