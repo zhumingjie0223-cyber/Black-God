@@ -2535,123 +2535,341 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
   }
 
 
-  // ═══ 设备控制中枢（Device Control Hub）═══
+  // ═══ 设备控制中枢（Device Control Hub — by opus5）═══
   async deviceControl(action, params = {}) {
-    const P = typeof params === 'string' ? { arg: params } : (params || {});
+    const OFFLINE_MSG = '设备 shell 中继离线';
+    const ATTACH_DIR = '/var/minis/attachments/';
 
-    // 执行 apple-* 命令（走 shell 中继，设备有网即可）
-    const run = async (tool, args = '') => {
-      const cmd = args ? `apple-${tool} ${args}` : `apple-${tool}`;
-      const r = await this.deviceShellExec(cmd, 'bash');
-      if (!r.ok && String(r.error || '').includes('离线'))
-        return { ok: false, error: '设备 shell 中继离线，请运行 nexus_shell_relay.py' };
-      const raw = String(r.stdout || '').trim();
-      let data;
-      try { data = JSON.parse(raw); } catch { data = raw || null; }
-      return { ok: r.ok !== false || !!raw, data, raw, stderr: String(r.stderr || '') };
+    // ---- shell quoting ----
+    const esc = (v) =>
+      String(v ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/`/g, '\\`');
+    const q = (v) => `"${esc(v)}"`;
+
+    // ---- offline marker ----
+    const offlineError = () => {
+      const e = new Error(OFFLINE_MSG);
+      e.__offline = true;
+      return e;
     };
 
-    if (action === 'weather') {
-      const r = await run('weather');
-      return { ok: r.ok, action, data: r.data, error: r.ok ? undefined : r.error };
-    }
-    if (action === 'location') {
-      const r = await run('location');
-      return { ok: r.ok, action, data: r.data, error: r.ok ? undefined : r.error };
-    }
-    if (action === 'device_info') {
-      const r = await run('device', 'info');
-      return { ok: r.ok, action, data: r.data, error: r.ok ? undefined : r.error };
-    }
-    if (action === 'clipboard_read') {
-      const r = await run('clipboard');
-      let text = '';
-      try { text = r.data?.text || r.data?.value || r.raw || ''; } catch { text = r.raw || ''; }
-      return { ok: r.ok, action, text };
-    }
-    if (action === 'clipboard_write') {
-      const text = String(P.text || P.arg || '').replace(/"/g, '\"');
-      const r = await run('clipboard', `set "${text}"`);
-      return { ok: r.ok, action, text: P.text || P.arg };
-    }
-    if (action === 'notify') {
-      const title = String(P.title || '神枢').replace(/"/g, '\"');
-      const body = String(P.body || P.text || P.arg || '').replace(/"/g, '\"');
-      const after = Number(P.after) || 1;
-      const r = await run('notification', `schedule --title "${title}" --body "${body}" --after ${after}`);
-      return { ok: r.ok, action, title, body };
-    }
-    if (action === 'speak') {
-      const text = String(P.text || P.arg || '').replace(/"/g, '\"');
-      const r = await run('speak', `speak --text "${text}"`);
-      return { ok: r.ok, action, text: P.text || P.arg };
-    }
-    if (action === 'health') {
-      const types = String(P.types || 'steps,heart-rate');
-      const days = Number(P.days) || 7;
-      const r = await run('healthkit', `batch --types ${types} --days ${days}`);
-      return { ok: r.ok, action, data: r.data };
-    }
-    if (action === 'calendar') {
-      const sub = String(P.sub || 'list --today');
-      const r = await run('calendar', sub);
-      return { ok: r.ok, action, data: r.data };
-    }
-    if (action === 'reminder') {
-      const sub = String(P.sub || 'list');
-      const r = await run('reminders', sub);
-      return { ok: r.ok, action, data: r.data };
-    }
-    if (action === 'maps') {
-      const sub = String(P.sub || P.arg || 'search --query 附近');
-      const r = await run('maps', sub);
-      return { ok: r.ok, action, data: r.data };
-    }
-    if (action === 'open_app' || action === 'open') {
-      const scheme = String(P.scheme || P.url || P.arg || '');
-      if (!scheme) return { ok: false, error: '需要 scheme 参数，如 weixin://' };
-      const r = await run('open', `"${scheme}"`);
-      return { ok: r.ok, action, scheme };
-    }
-    if (action === 'shortcut') {
-      const name = encodeURIComponent(P.name || P.arg || '');
-      const r = await run('open', `"shortcuts://run-shortcut?name=${name}"`);
-      return { ok: r.ok, action, name: P.name || P.arg };
-    }
-    if (action === 'see' || action === 'screenshot' || action === 'read_screen') {
-      // 1. 拿相册列表
-      const listR = await run('photos', 'list --limit 5');
-      if (!listR.ok) return { ok: false, error: '无法访问相册: ' + (listR.error || '') };
-      let assets = [];
-      try { assets = listR.data?.assets || []; } catch {}
-      const shot = assets.find(a => a.media_subtypes?.includes('screenshot') || a.subtype === 'screenshot') || assets[0];
-      if (!shot) return { ok: false, error: '未找到截图，请先截屏' };
-      // 2. 导出
-      const outDir = '/var/minis/attachments/';
-      const expR = await run('photos', `export --id ${shot.id} --output ${outDir}`);
-      if (!expR.ok) return { ok: false, error: '导出截图失败: ' + (expR.stderr || expR.error || '') };
-      // 从 stdout 里找路径
-      let imgPath = '';
-      try { imgPath = expR.data?.path || ''; } catch {}
-      if (!imgPath) {
-        const m = String(expR.raw || '').match(/\/var\/minis\/[^\s"]+\.(png|jpg|jpeg|heic)/i);
-        imgPath = m ? m[0] : '';
+    // ---- core runner: apple-<tool> <args> ----
+    const run = async (tool, args = '') => {
+      const cmd = `apple-${tool}${args ? ' ' + args : ''}`.trim();
+      let res;
+      try {
+        res = await this.deviceShellExec(cmd, 'bash');
+      } catch (e) {
+        const msg = String((e && e.message) || e || '');
+        if (msg.includes('离线')) throw offlineError();
+        res = { ok: false, stdout: '', stderr: msg, exit_code: -1 };
       }
-      if (!imgPath) return { ok: false, error: '找不到导出路径', raw: expR.raw };
-      // 3. OCR
-      const ocrR = await run('vision', `ocr ${imgPath} --lang zh-Hans,en --level accurate`);
-      let text = '';
-      try { text = ocrR.data?.text || ocrR.raw || ''; } catch { text = ocrR.raw || ''; }
-      return { ok: true, action: 'see', text: String(text).slice(0, 3000), path: imgPath };
-    }
-    if (action === 'raw') {
-      const r = await this.deviceShellExec(String(P.arg || ''), 'bash');
-      return { ok: r.ok, action, stdout: r.stdout, stderr: r.stderr, exit_code: r.exit_code };
-    }
+      res = res || {};
 
-    return { ok: false, error: `未知动作: ${action}`, supported: ['weather','location','device_info','clipboard_read','clipboard_write','notify','speak','health','calendar','reminder','maps','open_app','shortcut','see','raw'] };
+      const stderr = String(res.stderr || '');
+      const errStr = String(res.error || '');
+      if (errStr.includes('离线') || stderr.includes('离线')) throw offlineError();
+
+      const raw = typeof res.stdout === 'string' ? res.stdout.trim() : String(res.stdout ?? '').trim();
+      let data = raw;
+      if (raw && (raw[0] === '{' || raw[0] === '[')) {
+        try { data = JSON.parse(raw); } catch { data = raw; }
+      } else if (raw) {
+        try { data = JSON.parse(raw); } catch { data = raw; }
+      } else {
+        data = null;
+      }
+
+      const ok =
+        res.ok !== false &&
+        (res.exit_code === undefined || res.exit_code === null || res.exit_code === 0);
+
+      return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null };
+    };
+
+    const fail = (r, fallback = '命令执行失败') => ({
+      ok: false,
+      action,
+      error: (r && (r.stderr || r.raw)) || fallback,
+      cmd: r && r.cmd,
+      exit_code: r && r.exit_code,
+    });
+
+    const pickPath = (r) => {
+      const d = r.data;
+      if (d && typeof d === 'object') {
+        const p = d.path || d.file || d.output || d.outputPath || d.output_path ||
+          (Array.isArray(d.files) && d.files[0]) ||
+          (Array.isArray(d.exported) && (d.exported[0]?.path || d.exported[0]));
+        if (p) return String(p);
+      }
+      const m = String(r.raw || '').match(/\/[^\s"']+\.(?:jpe?g|png|heic|heif|tiff?|webp)/i);
+      return m ? m[0] : '';
+    };
+
+    const pickText = (r) => {
+      const d = r.data;
+      if (d && typeof d === 'object') {
+        if (typeof d.text === 'string') return d.text;
+        if (Array.isArray(d.lines)) return d.lines.map((l) => (typeof l === 'string' ? l : l?.text || '')).join('\n');
+        if (Array.isArray(d.results)) return d.results.map((l) => (typeof l === 'string' ? l : l?.text || '')).join('\n');
+        if (Array.isArray(d.observations)) return d.observations.map((l) => l?.text || '').join('\n');
+      }
+      if (Array.isArray(d)) return d.map((l) => (typeof l === 'string' ? l : l?.text || '')).join('\n');
+      return String(r.raw || '');
+    };
+
+    try {
+      switch (String(action || '').toLowerCase()) {
+        // ---------- 天气 ----------
+        case 'weather': {
+          const args = [];
+          if (params.lat != null && params.lon != null) args.push(`--lat ${Number(params.lat)}`, `--lon ${Number(params.lon)}`);
+          if (params.days) args.push(`--days ${parseInt(params.days, 10)}`);
+          const r = await run('weather', args.join(' '));
+          if (!r.ok) return fail(r);
+          return { ok: true, action: 'weather', weather: r.data, raw: r.raw };
+        }
+
+        // ---------- 定位 ----------
+        case 'location': {
+          const r = await run('location');
+          if (!r.ok) return fail(r);
+          const d = r.data && typeof r.data === 'object' ? r.data : {};
+          return {
+            ok: true,
+            action: 'location',
+            location: r.data,
+            latitude: d.latitude ?? d.lat ?? null,
+            longitude: d.longitude ?? d.lon ?? d.lng ?? null,
+            raw: r.raw,
+          };
+        }
+
+        // ---------- 设备信息 ----------
+        case 'device_info': {
+          const r = await run('device', 'info');
+          if (!r.ok) return fail(r);
+          return { ok: true, action: 'device_info', device: r.data, raw: r.raw };
+        }
+
+        // ---------- 剪贴板读 ----------
+        case 'clipboard_read': {
+          const r = await run('clipboard');
+          if (!r.ok) return fail(r);
+          const text = typeof r.data === 'string' ? r.data : (r.data?.text ?? r.raw);
+          return { ok: true, action: 'clipboard_read', text, raw: r.raw };
+        }
+  // ---------- 剪贴板写 ----------
+        case 'clipboard_write': {
+          const text = params.text ?? params.content ?? '';
+          if (!String(text).length) return { ok: false, action, error: '缺少 text 参数' };
+          const r = await run('clipboard', `set ${q(text)}`);
+          if (!r.ok) return fail(r);
+          return { ok: true, action: 'clipboard_write', written: String(text), raw: r.raw };
+        }
+
+        // ---------- 通知 ----------
+        case 'notify': {
+          const title = params.title ?? 'Minis';
+          const body = params.body ?? params.text ?? '';
+          const after = Number.isFinite(Number(params.after)) ? Number(params.after) : 1;
+          const args = [
+            'schedule',
+            `--title ${q(title)}`,
+            `--body ${q(body)}`,
+            `--after ${after}`,
+          ].join(' ');
+          const r = await run('notification', args);
+          if (!r.ok) return fail(r, '通知调度失败');
+          return { ok: true, action: 'notify', title: String(title), body: String(body), after, result: r.data, raw: r.raw };
+        }
+
+        // ---------- 朗读 ----------
+        case 'speak': {
+          const text = params.text ?? params.content ?? '';
+          if (!String(text).length) return { ok: false, action, error: '缺少 text 参数' };
+          const args = ['speak', `--text ${q(text)}`];
+          if (params.rate != null) args.push(`--rate ${Number(params.rate)}`);
+          if (params.voice) args.push(`--voice ${q(params.voice)}`);
+          if (params.lang) args.push(`--lang ${q(params.lang)}`);
+          const r = await run('speak', args.join(' '));
+          if (!r.ok) return fail(r, '语音播报失败');
+          return { ok: true, action: 'speak', text: String(text), raw: r.raw };
+        }
+
+        // ---------- 健康数据 ----------
+        case 'health': {
+          const types = Array.isArray(params.types)
+            ? params.types.join(',')
+            : (params.types || 'steps,heart-rate');
+          const days = Number.isFinite(Number(params.days)) ? Number(params.days) : 7;
+          const r = await run('healthkit', `batch --types ${q(types)} --days ${days}`);
+          if (!r.ok) return fail(r, '健康数据读取失败');
+          return { ok: true, action: 'health', types: String(types), days, health: r.data, raw: r.raw };
+        }
+
+        // ---------- 日历 ----------
+        case 'calendar': {
+          const args = ['list'];
+          if (params.days != null) args.push(`--days ${parseInt(params.days, 10)}`);
+          else args.push('--today');
+          const r = await run('calendar', args.join(' '));
+          if (!r.ok) return fail(r, '日历读取失败');
+          const events = Array.isArray(r.data) ? r.data : (r.data?.events ?? r.data);
+          return { ok: true, action: 'calendar', events, raw: r.raw };
+        }
+
+        // ---------- 提醒事项 ----------
+        case 'reminder': {
+          const args = ['list'];
+          if (params.list) args.push(`--list ${q(params.list)}`);
+          if (params.completed) args.push('--completed');
+          const r = await run('reminders', args.join(' '));
+          if (!r.ok) return fail(r, '提醒事项读取失败');
+          const reminders = Array.isArray(r.data) ? r.data : (r.data?.reminders ?? r.data);
+          return { ok: true, action: 'reminder', reminders, raw: r.raw };
+        }
+
+        // ---------- 地图搜索 ----------
+        case 'maps': {
+          const query = params.query ?? params.q ?? '';
+          if (!String(query).length) return { ok: false, action, error: '缺少 query 参数' };
+          const args = [`search --query ${q(query)}`];
+          if (params.limit != null) args.push(`--limit ${parseInt(params.limit, 10)}`);
+          const r = await run('maps', args.join(' '));
+          if (!r.ok) return fail(r, '地图搜索失败');
+          const places = Array.isArray(r.data) ? r.data : (r.data?.results ?? r.data?.places ?? r.data);
+          return { ok: true, action: 'maps', query: String(query), places, raw: r.raw };
+        }
+
+        // ---------- 打开 App / URL Scheme ----------
+        case 'open_app':
+        case 'shortcut': {
+          let url = params.url ?? params.scheme ?? '';
+          if (action === 'shortcut') {
+            const name = params.name ?? params.shortcut ?? '';
+            if (!url) {
+              if (!String(name).length) return { ok: false, action, error: '缺少 name 参数' };
+              url = `shortcuts://run-shortcut?name=${encodeURIComponent(String(name))}`;
+              if (params.input != null) url += `&input=text&text=${encodeURIComponent(String(params.input))}`;
+            }
+          }
+          if (!String(url).length) return { ok: false, action, error: '缺少 url 参数' };
+          const r = await run('open', q(url));
+          if (!r.ok) return fail(r, '打开失败');
+          return { ok: true, action, url: String(url), raw: r.raw };
+        }
+
+        // ---------- 看一眼:相册 → 导出 → OCR ----------
+        case 'see': {
+          const limit = Number.isFinite(Number(params.limit)) ? Number(params.limit) : 5;
+          const lang = params.lang || 'zh-Hans,en';
+
+          // 1) 列出最近照片
+          const listRes = await run('photos', `list --limit ${limit}`);
+          if (!listRes.ok) return fail(listRes, '相册读取失败');
+          const d = listRes.data;
+          const assets = Array.isArray(d) ? d : (d?.assets ?? d?.items ?? []);
+          if (!Array.isArray(assets) || assets.length === 0) {
+            return { ok: false, action: 'see', error: '相册中未找到照片', raw: listRes.raw };
+          }
+
+          // 2) 选定并导出
+          const target = params.id
+            ? assets.find((a) => String(a?.id ?? a?.localIdentifier ?? a) === String(params.id)) || { id: params.id }
+            : assets[0];
+          const assetId = target?.id ?? target?.localIdentifier ?? target?.identifier ?? String(target);
+          if (!assetId) return { ok: false, action: 'see', error: '无法解析照片 ID', assets };
+
+          const expRes = await run('photos', `export --id ${q(assetId)} --output ${q(ATTACH_DIR)}`);
+          if (!expRes.ok) return fail(expRes, '照片导出失败');
+          const path = pickPath(expRes);
+          if (!path) {
+            return { ok: false, action: 'see', error: '导出成功但未获得文件路径', raw: expRes.raw };
+          }
+
+          // 3) OCR
+          const ocrRes = await run('vision', `ocr ${q(path)} --lang ${q(lang)}`);
+          if (!ocrRes.ok) {
+            return {
+              ok: true,
+              action: 'see',
+              assetId: String(assetId),
+              path,
+              text: '',
+              ocrError: ocrRes.stderr || ocrRes.raw || 'OCR 失败',
+              assets,
+            };
+          }
+          return {
+            ok: true,
+            action: 'see',
+            assetId: String(assetId),
+            path,
+            lang: String(lang),
+            text: pickText(ocrRes),
+            ocr: ocrRes.data,
+            count: assets.length,
+          };
+        }
+
+        // ---------- 原始命令 ----------
+        case 'raw': {
+          const cmd = params.cmd ?? params.command ?? '';
+          if (!String(cmd).length) return { ok: false, action, error: '缺少 cmd 参数' };
+          let res;
+          try {
+            res = await this.deviceShellExec(String(cmd), 'bash');
+          } catch (e) {
+            const msg = String((e && e.message) || e || '');
+            if (msg.includes('离线')) throw offlineError();
+            return { ok: false, action: 'raw', error: msg, cmd: String(cmd) };
+          }
+          res = res || {};
+          const stderr = String(res.stderr || '');
+          if (String(res.error || '').includes('离线') || stderr.includes('离线')) throw offlineError();
+          const raw = String(res.stdout ?? '').trim();
+          let data = raw;
+          try { data = JSON.parse(raw); } catch { data = raw; }
+          return {
+            ok: res.ok !== false && (res.exit_code == null || res.exit_code === 0),
+            action: 'raw',
+            cmd: String(cmd),
+            data,
+            stdout: raw,
+            stderr,
+            exit_code: res.exit_code ?? null,
+          };
+        }
+
+        // ---------- 未知动作 ----------
+        default:
+          return {
+            ok: false,
+            action,
+            error: `未知的 deviceControl 动作: ${action}`,
+            supported: [
+              'weather', 'location', 'device_info', 'clipboard_read', 'clipboard_write',
+              'notify', 'speak', 'health', 'calendar', 'reminder', 'maps',
+              'open_app', 'shortcut', 'see', 'raw',
+            ],
+          };
+      }
+    } catch (err) {
+      if (err && err.__offline) {
+        return { ok: false, error: OFFLINE_MSG };
+      }
+      const msg = String((err && err.message) || err || '未知错误');
+      if (msg.includes('离线')) {
+        return { ok: false, error: OFFLINE_MSG };
+      }
+      return { ok: false, action, error: msg };
+    }
   }
-
   // ═══ 网站数据劫持工具箱（Web Hijack Toolkit）═══
   // arg 格式：「类型 参数」，例如：
   //   hook xhr|fetch|ws|cookie|form|all → 生成对应劫持脚本
