@@ -2394,6 +2394,15 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 @keyframes synRipple{from{transform:scale(1);opacity:.9}to{transform:scale(3.2);opacity:0}}
 .bubble pre{background:#0a0c0e;border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;overflow-x:auto;font-size:12.5px;line-height:1.55;margin:8px 0 4px}
 .bubble pre code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8dade;white-space:pre}
+
+/* P0: 代码块视觉升级 */
+.codeblk{background:#070C09;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;margin:10px 0}
+.codeblk .hdr{background:rgba(255,255,255,.04);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06)}
+.codeblk .hdr span{font-size:11px;color:rgba(255,255,255,.4);font-family:monospace}
+.codeblk .cp-btn{font-size:11px;color:var(--cy-1,#4fe096);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;transition:.15s}
+.codeblk .cp-btn:active{opacity:.6}
+.codeblk pre{padding:12px 14px;margin:0;overflow-x:auto;font-size:12.5px;line-height:1.6;background:none;border:none;border-radius:0}
+.codeblk code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8dade;white-space:pre}
 .code-bar{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
 .code-lang{font-size:10.5px;color:var(--text-3);letter-spacing:.05em}
 .code-act{display:flex;gap:6px}
@@ -2773,7 +2782,20 @@ window.md = window.md || function(src) {
     code.textContent = b.code;
     pre.appendChild(code);
     const hdr = document.createElement('header');
-    hdr.innerHTML = `<span>${esc(b.lang)}</span><button class="cp-btn" onclick="navigator.clipboard.writeText(this.closest('.codeblk').querySelector('code').textContent).then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>`;
+    hdr.innerHTML = `<span>${esc(b.lang)}</span>`;
+    const cpBtn = document.createElement('button');
+    cpBtn.className = 'cp-btn';
+    cpBtn.textContent = 'Copy';
+    cpBtn.addEventListener('click', function(){
+      const code = this.closest('.codeblk').querySelector('code').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        this.textContent = '✓';
+        this.style.color = 'var(--cy-1)';
+        this.style.fontWeight = '600';
+        setTimeout(() => { this.textContent = 'Copy'; this.style.color = ''; this.style.fontWeight = ''; }, 1500);
+      });
+    });
+    hdr.appendChild(cpBtn);
     d.append(hdr, pre);
     const tmp = document.createElement('div');
     tmp.appendChild(d);
@@ -3881,7 +3903,7 @@ function pushMsg(role, text, meta, speakable){
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
   m.dataset.ts = Date.now();
   queueMicrotask(()=>{ const t=document.createElement('span'); t.className='msg-time'; t.textContent=fmtTs(Number(m.dataset.ts)); m.appendChild(t); });
-  const b=document.createElement('div'); b.className='bubble';
+  const b=document.createElement('div'); b.className='bubble '+(role==='me'?'bubble--user':'bubble--assistant');
 
   if(role==='her' && text){
     let blocks=null;
@@ -4104,13 +4126,23 @@ async function send(){
   }
 }
 async function doChat(text){
-  showTyping();
+  setSendState('sending');
+  showTyping('正在思考');
   const imgs = window._pendingImages ? [...window._pendingImages] : [];
   window._pendingImages = [];
   document.querySelectorAll('.img-preview').forEach(el => el.remove());
-  const res = await Nexus.talk(text, [...caps], imgs.length ? imgs : undefined);
-  hideTyping();
-  if (res) handleReply(res);
+  try{
+    const res = await Nexus.talk(text, [...caps], imgs.length ? imgs : undefined);
+    hideTyping();
+    if (res) handleReply(res);
+  }catch(e){
+    hideTyping();
+    pushMsg('her', '请求失败：' + (e && e.message ? e.message : e), '错误');
+  }finally{
+    setSendState('idle');
+    _sendController = null;
+  }
+}
   else {
     (function(){
       const rq = indexedDB.open('nexus-offline', 1);
