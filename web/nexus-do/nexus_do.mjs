@@ -2543,7 +2543,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
 
     // 统一通过 shell 中继调 apple-* 命令（强制 deviceShellExec，不依赖 DO WS 路由）
     const appleRun = async (cmd) => {
-      const r = await this.deviceShellExec(`${cmd} --compact 2>&1`, 'bash');
+      const r = await this.deviceShellExec(`${cmd} 2>&1`, 'bash');
       if (r.ok || r.stdout) return { ok: true, out: r.stdout, err: r.stderr, note: r.error || '' };
       // 中继离线 → 走 execRemote（需要执行脑）
       const r2 = await this.appleTool(cmd);
