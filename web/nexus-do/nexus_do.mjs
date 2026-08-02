@@ -2587,7 +2587,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       return { ok: r.ok, action, text: P.text || P.arg };
     }
     if (action === 'health') {
-      const types = String(P.types || 'stepCount,heartRate');
+      const types = String(P.types || 'steps,heart-rate');
       const days = Number(P.days) || 7;
       const r = await run('healthkit', `batch --types ${types} --days ${days}`);
       return { ok: r.ok, action, data: r.data };
