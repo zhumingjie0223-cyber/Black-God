@@ -1692,7 +1692,9 @@ body::before{
 .nexus.is-thinking .orb-ring{animation:orbSpin .8s linear infinite}
 .nexus.is-thinking .orb-glow{transform:scale(1.35);opacity:.9;
   transition:transform .4s var(--ease-spring),opacity .4s ease}
-.nexus.is-error .orb-ring{border-color:var(--err,#e5645c);
+.nexus.is-thinking{--orbit-dur:6s}
+.nexus.is-error{--orbit-dur:2s}
+.nexus.is-error .hz-ring{border-color:rgba(229,100,92,.45)}
   box-shadow:0 0 18px rgba(229,100,92,.5);animation:orbShake .45s ease}
 @keyframes orbShake{0%,100%{transform:translateX(0)}
   25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
@@ -2395,7 +2397,29 @@ body.mood-low .hz-couplet{color:rgba(120,160,200,.7)}
 .bubble pre{background:#0a0c0e;border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;overflow-x:auto;font-size:12.5px;line-height:1.55;margin:8px 0 4px}
 .bubble pre code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8dade;white-space:pre}
 
-/* P0: 代码块视觉升级 */
+/* P1: 执行日志分步展开 */
+.exec-step{display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-size:12px;line-height:1.5;flex-wrap:wrap}
+.step-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0;background:rgba(255,255,255,.2)}
+.exec-step.is-running .step-dot{background:var(--cy-1);animation:pulse 1s infinite}
+.exec-step.is-done .step-dot{background:var(--cy-1);animation:none}
+.exec-step.is-error .step-dot{background:var(--err);animation:none}
+.step-text{color:var(--txt-2);flex:1}
+.exec-step.is-running .step-text{color:var(--fg-1)}
+.exec-step details{width:100%;margin-top:4px;padding-left:16px}
+.exec-step summary{font-size:11px;color:rgba(255,255,255,.35);cursor:pointer;list-style:none}
+.exec-step summary::-webkit-details-marker{display:none}
+.exec-step pre{margin:4px 0 0;font-size:11px;max-height:120px;overflow-y:auto;white-space:pre-wrap;opacity:.75;color:#d8dade}
+/* P1: Toast 容器定位 */
+.toast-host{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:16px;z-index:700;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-host .toast{pointer-events:auto}
+/* P1: 消息工具条 */
+.msg.her{position:relative}
+.msg-toolbar{display:none;position:absolute;bottom:-32px;right:8px;flex-direction:row;gap:6px;z-index:10}
+.msg.her:hover .msg-toolbar,.msg.her.show-toolbar .msg-toolbar{display:flex}
+.msg.her:hover,.msg.her.show-toolbar{margin-bottom:36px}
+.tb-btn{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:var(--surface-2);color:var(--txt-2);cursor:pointer;min-height:28px;transition:.15s}
+.tb-btn:active{opacity:.6}
+.tb-btn.ok{color:var(--cy-1);border-color:rgba(79,224,150,.4)}
 .codeblk{background:#070C09;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;margin:10px 0}
 .codeblk .hdr{background:rgba(255,255,255,.04);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06)}
 .codeblk .hdr span{font-size:11px;color:rgba(255,255,255,.4);font-family:monospace}
@@ -2944,6 +2968,8 @@ function setNexusState(state){
   if(!n) return;
   n.classList.remove('is-idle','is-thinking','is-error');
   n.classList.add('is-' + (state || 'idle'));
+  const durMap = { idle:'64s', thinking:'6s', error:'2s' };
+  document.documentElement.style.setProperty('--orbit-dur', durMap[state] || '64s');
   if(state === 'error'){ haptic('error');
     setTimeout(()=>setNexusState('idle'), 900); }
 }
@@ -3826,7 +3852,56 @@ function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-t
 
 /* ============ Toast ============ */
 let toastT;
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1900); }
+function toast(msg, type='info', ms=2200){ window.toast(msg, type, ms); }
+
+function addExecStep(bubble, text, status = 'pending'){
+  let live = bubble.querySelector('.exec-live');
+  if(!live){ live = document.createElement('div'); live.className = 'exec-live'; bubble.appendChild(live); }
+  const step = document.createElement('div');
+  step.className = 'exec-step is-' + status;
+  const dot = document.createElement('span'); dot.className = 'step-dot';
+  const txt = document.createElement('span'); txt.className = 'step-text'; txt.textContent = text;
+  step.appendChild(dot); step.appendChild(txt);
+  live.appendChild(step); live.scrollTop = live.scrollHeight;
+  return step;
+}
+function updateLastStep(bubble, status, detail){
+  const steps = bubble.querySelectorAll('.exec-step'); if(!steps.length) return;
+  const step = steps[steps.length - 1];
+  step.classList.remove('is-pending','is-running','is-done','is-error');
+  step.classList.add('is-' + status);
+  if(detail){
+    let det = step.querySelector('details');
+    if(!det){ det = document.createElement('details'); const sum = document.createElement('summary'); sum.textContent='查看输出'; const pre=document.createElement('pre'); det.appendChild(sum); det.appendChild(pre); step.appendChild(det); }
+    det.querySelector('pre').textContent = detail;
+  }
+  return step;
+}
+function addMsgToolbar(msgEl, bubble){
+  const tb = document.createElement('div'); tb.className = 'msg-toolbar';
+  tb.innerHTML = '<button class="tb-btn" data-action="copy">复制</button><button class="tb-btn" data-action="regen">重发</button>';
+  msgEl.appendChild(tb);
+  tb.addEventListener('click', e => {
+    const btn = e.target.closest('.tb-btn'); if(!btn) return;
+    e.stopPropagation();
+    if(btn.dataset.action === 'copy'){
+      const text = bubble.textContent.trim();
+      const done = () => { btn.classList.add('ok'); btn.textContent='✓'; setTimeout(()=>{ btn.classList.remove('ok'); btn.textContent='复制'; }, 1200); };
+      if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>{ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); });
+      else { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+    } else if(btn.dataset.action === 'regen'){
+      const mine = document.querySelectorAll('#msgs .msg.me .bubble');
+      if(!mine.length){ toast('没有可重发的消息','error'); return; }
+      const inp = document.querySelector('#inp');
+      if(inp) inp.value = mine[mine.length-1].textContent.trim();
+      msgEl.classList.remove('show-toolbar'); send();
+    }
+  });
+  let pressTimer = null;
+  msgEl.addEventListener('touchstart', ()=>{ pressTimer = setTimeout(()=>{ document.querySelectorAll('.msg.show-toolbar').forEach(m=>{ if(m!==msgEl) m.classList.remove('show-toolbar'); }); msgEl.classList.add('show-toolbar'); try{haptic&&haptic('light');}catch(e){} }, 300); }, {passive:true});
+  msgEl.addEventListener('touchend', ()=>clearTimeout(pressTimer));
+  msgEl.addEventListener('touchmove', ()=>clearTimeout(pressTimer), {passive:true});
+}
 
 /* ============ 对话 ============ */
 const caps = new Set();
@@ -3922,6 +3997,7 @@ function pushMsg(role, text, meta, speakable){
   }
 
   m.appendChild(b);
+  if(role === 'her') addMsgToolbar(m, b);
   if(role==='her' && text && text.length > 20){
     document.querySelectorAll('.reply-chips').forEach(e=>e.remove());
     const chips=genReplyChips(text);
