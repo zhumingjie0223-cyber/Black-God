@@ -393,179 +393,6 @@ button,input,textarea{font-family:inherit;color:inherit}
 .page-head{padding:14px 18px 6px}
 .page-eyebrow{font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--chrome-2);font-weight:600}
 .page-h1{font-family:var(--serif);font-size:29px;font-weight:600;letter-spacing:.02em;margin-top:5px}
-/* ============================================================
-   NavCore v3 —— 导航层（by fable · 2026-08-02）
-   ============================================================ */
-:root {
-  --nav-ease-in:  cubic-bezier(0.22, 1, 0.36, 1);
-  --nav-ease-out: cubic-bezier(0.55, 0, 1, 0.45);
-  --nav-dur-in:  280ms;
-  --nav-dur-out: 220ms;
-  --hit-min: 44px;
-}
-/* 废弃旧 pager */
-.pager, .pages { display: none !important; }
-
-/* ── Tab 主导航 ── */
-.tab-panels {
-  display: flex;
-  width: calc(var(--nav-tab-count, 2) * 100%);
-  height: 100%;
-  will-change: transform;
-  touch-action: pan-y;
-  transition: transform var(--nav-dur-in) var(--nav-ease-in);
-}
-.tab-panels[data-anim="out"] {
-  transition: transform var(--nav-dur-out) var(--nav-ease-out);
-}
-.tab-panels.no-anim { transition: none; }
-.tab-panel {
-  width: calc(100% / var(--nav-tab-count, 2));
-  height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  flex-shrink: 0;
-}
-.tab-panel[data-inactive="1"] {
-  content-visibility: hidden;
-  pointer-events: none;
-}
-
-/* ── Push 层 ── */
-#pushStack {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  pointer-events: none;
-}
-.push-page {
-  position: absolute;
-  inset: 0;
-  background: var(--bg, #0d0f14);
-  transform: translateX(100%);
-  will-change: transform;
-  pointer-events: auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-}
-.push-page.entering {
-  transition: transform var(--nav-dur-in) var(--nav-ease-in);
-  transform: translateX(0);
-}
-.push-page.leaving {
-  transition: transform var(--nav-dur-out) var(--nav-ease-out);
-  transform: translateX(100%);
-}
-.push-page.dragging { transition: none; }
-.push-nav {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  min-height: calc(var(--hit-min) + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
-  padding-left: 8px;
-  background: var(--bg, #0d0f14);
-  z-index: 2;
-  border-bottom: 1px solid var(--line-2);
-}
-.push-back {
-  min-width: var(--hit-min);
-  min-height: var(--hit-min);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--cy-1, #4fe096);
-  font-size: 22px;
-  cursor: pointer;
-}
-.push-title {
-  font-size: 17px;
-  font-weight: 600;
-  margin-left: 4px;
-}
-.push-body { padding: 18px 16px; }
-
-/* ── Sheet 层（懒加载版，DOM 最多 1 个）── */
-#sheetRoot {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  pointer-events: none;
-}
-.sheet-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0);
-  transition: background var(--nav-dur-in) var(--nav-ease-in);
-  pointer-events: auto;
-}
-.sheet-backdrop.show   { background: rgba(0,0,0,.48); }
-.sheet-backdrop.hiding {
-  transition: background var(--nav-dur-out) var(--nav-ease-out);
-  background: rgba(0,0,0,0);
-}
-/* Sheet 本体（覆盖旧 .sheet 规则，保留毛玻璃设计） */
-.sheet {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  max-height: min(88vh, calc(100dvh - env(safe-area-inset-top) - 8px));
-  background: color-mix(in srgb, var(--bg-2, #171a21) 82%, transparent);
-  backdrop-filter: blur(40px) saturate(1.4);
-  -webkit-backdrop-filter: blur(40px) saturate(1.4);
-  border-radius: 26px 26px 0 0;
-  border-top: 1px solid var(--line-2);
-  padding: 0 18px calc(24px + env(safe-area-inset-bottom));
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  will-change: transform;
-  pointer-events: auto;
-  transform: translateY(100%);
-  box-shadow: 0 -20px 60px rgba(0,0,0,.5);
-}
-.sheet.entering {
-  transition: transform var(--nav-dur-in) var(--nav-ease-in);
-  transform: translateY(0);
-}
-.sheet.leaving {
-  transition: transform var(--nav-dur-out) var(--nav-ease-out);
-  transform: translateY(100%);
-}
-.sheet.dragging { transition: none; }
-.sheet-grabber {
-  position: sticky;
-  top: 0;
-  height: var(--hit-min);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: inherit;
-  border-radius: inherit;
-  touch-action: none;
-  margin: 0 -18px;
-}
-.sheet-grabber::before {
-  content: "";
-  width: 36px;
-  height: 5px;
-  border-radius: 3px;
-  background: rgba(255,255,255,.25);
-}
-
-/* ── 底栏触控区保底 44x44 ── */
-.tabbar .tab {
-  min-height: var(--hit-min);
-  min-width: var(--hit-min);
-}
-button, [role="button"] {
-  min-width: var(--hit-min);
-  min-height: var(--hit-min);
-}
-
 
 /* ============ 对话页 ============ */
 #chat{display:flex;flex-direction:column;padding-bottom:calc(var(--tab-h) + var(--safe-bot));overflow:hidden}
@@ -3576,225 +3403,80 @@ function setAgentStatus(state){
 /* 触觉反馈 */
 function hap(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
-
-/* ============================================================
- * NavCore v3 —— 导航内核（by fable · 2026-08-02）
- * Layer 0: Tab  |  Layer 1: Push  |  Layer 2: Sheet
- * ============================================================ */
-function _pt(e){return e.touches&&e.touches.length?e.touches[0]:e.changedTouches&&e.changedTouches.length?e.changedTouches[0]:e;}
-
-/* ── Layer 0: Tab ── */
-let _tabIdx = 0;
-const _tabPanels  = document.querySelector('.tab-panels');
-const _tabCount   = _tabPanels ? _tabPanels.children.length : 2;
-const _tabButtons = document.querySelectorAll('.tabbar .tab');
-
-function switchTab(idx, animate){
-  if(!_tabPanels) return;
-  idx = Math.max(0, Math.min(_tabCount-1, idx));
-  _tabIdx = idx;
-  _tabPanels.style.transition = (animate===false)
-    ? 'none'
-    : 'transform var(--nav-dur-in) var(--nav-ease-in)';
-  _tabPanels.style.transform = 'translateX('+(-idx*100)+'%)';
-  _tabButtons.forEach((b,i)=>{
-    const on=(i===idx);
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-selected', on?'true':'false');
-  });
-}
-function go(i){
-  const idx = i - 1; // 旧接口 go(1)=对话 go(2)=设置 偏移1
-  switchTab(idx, true);
-  if(idx===0){try{loadHub&&loadHub();loadInner&&loadInner();}catch(e){}}
-  if(idx===1&&!localStorage.getItem('nexus_visited')){
+/* ============ Pager / Tab / 手势 ============ */
+let curPage = 0;
+const PAGES = 3;
+const STEP = 100 / PAGES;
+function go(i) {
+  curPage = Math.max(0, Math.min(PAGES-1, i));
+  // 使用像素 left，不依赖 transform 百分比；兼容 iOS WebKit 与缩放视口。
+  const pager = $('#pager');
+  // iOS WebKit 在部分缩放/嵌入视口会忽略带 smooth 的 scrollTo，直接赋值最可靠。
+  if (pager) pager.scrollLeft = curPage * pager.clientWidth;
+  $$('.tab').forEach((t,idx) => t.classList.toggle('on', idx === curPage));
+  if (curPage === 0) { loadHub(); loadInner(); }   // 神枢：环中盘 + 记忆 + 状态 同屏（折叠）
+  if(curPage===1 && !localStorage.getItem('nexus_visited')){
     localStorage.setItem('nexus_visited','1');
-    setTimeout(()=>{ try{pushMsg('her','我是神枢，你的私人意识体。
-
-你可以对我说任何事，我会记住我们的每一次对话。
-
-现在，告诉我你想做什么？',{},'');}catch(e){}},800);
+    setTimeout(()=>{ pushMsg('her','我是神枢，你的私人意识体。\n\n你可以对我说任何事，我会记住我们的每一次对话。\n\n现在，告诉我你想做什么？',{},''); },800);
   }
-  try{hap&&hap(4);}catch(e){}
+  hap(4);
+  const pgEl=document.querySelector('.page.active')||document.querySelector('.page:not([hidden])');
+  if(pgEl){ pgEl.classList.remove('page-enter'); void pgEl.offsetWidth; pgEl.classList.add('page-enter'); }
 }
-(function initTabSwipe(){
-  if(!_tabPanels) return;
-  let sx=0,sy=0,dx=0,t0=0,dragging=false,locked=false;
-  _tabPanels.addEventListener('touchstart',function(e){
-    if(pushStack.length>0||activeSheet){locked=true;return;}
-    const p=_pt(e); sx=p.clientX;sy=p.clientY;dx=0;t0=Date.now();dragging=false;locked=false;
-  },{passive:true});
-  _tabPanels.addEventListener('touchmove',function(e){
-    if(locked)return;
-    const p=_pt(e); dx=p.clientX-sx; const dy=p.clientY-sy;
-    if(!dragging){
-      if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){locked=true;return;}
-      if(Math.abs(dx)>8)dragging=true; else return;
+/* 横向滑动切 Tab */
+(function initSwipe(){
+  const pager = $('#pager'), pages = $('#pages');
+  let x0=null, y0=null, dx=0, locked=null, w=0;
+  pager.addEventListener('touchstart', e => {
+    if (e.target.closest('.chat-scroll') && e.target.closest('#msgs')) {} // 允许
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx=0; locked=null; w = pager.clientWidth;
+  }, {passive:true});
+  pager.addEventListener('touchmove', e => {
+    if (x0===null) return;
+    const cx = e.touches[0].clientX, cy = e.touches[0].clientY;
+    const mx = cx - x0, my = cy - y0;
+    if (locked===null) { if (Math.abs(mx) > 8 || Math.abs(my) > 8) locked = Math.abs(mx) > Math.abs(my) ? 'x' : 'y'; }
+    if (locked !== 'x') return;
+    dx = mx;
+    // 边缘阻尼
+    if ((curPage===0 && dx>0) || (curPage===PAGES-1 && dx<0)) dx *= 0.32;
+    pages.classList.add('dragging');
+    pager.scrollLeft = curPage * w - dx;
+  }, {passive:true});
+  pager.addEventListener('touchend', () => {
+    if (locked==='x') {
+      pages.classList.remove('dragging');
+      if (dx < -w*0.22) go(curPage+1);
+      else if (dx > w*0.22) go(curPage-1);
+      else go(curPage);
     }
-    if((_tabIdx===0&&dx>0)||(_tabIdx===_tabCount-1&&dx<0))dx*=0.3;
-    e.preventDefault();
-    _tabPanels.style.transition='none';
-    _tabPanels.style.transform='translateX('+(-_tabIdx*_tabPanels.clientWidth+dx)+'px)';
-  },{passive:false});
-  _tabPanels.addEventListener('touchend',function(){
-    if(locked||!dragging){locked=false;return;}
-    const dt=Math.max(1,Date.now()-t0),v=dx/dt,w=_tabPanels.clientWidth;
-    let t=_tabIdx;
-    if(dx<-w*0.35||v<-0.3)t=_tabIdx+1;
-    else if(dx>w*0.35||v>0.3)t=_tabIdx-1;
-    switchTab(t,true);
-    if(t!==_tabIdx)try{hap&&hap(4);}catch(e){}
-    dragging=false;locked=false;
-  },{passive:true});
-  _tabPanels.addEventListener('touchcancel',function(){
-    switchTab(_tabIdx,true);dragging=false;locked=false;
-  },{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)switchTab(_tabIdx,false);});
-  window.addEventListener('orientationchange',()=>setTimeout(()=>switchTab(_tabIdx,false),120));
-  switchTab(0,false);
+    x0=y0=null; locked=null; dx=0;
+  }, {passive:true});
+  // iOS 系统手势/来电/通知会触发 touchcancel（touchend 不来）——不接住就卡在两页中间（页面串门）
+  pager.addEventListener('touchcancel', () => {
+    pages.classList.remove('dragging'); go(curPage);
+    x0=y0=null; locked=null; dx=0;
+  }, {passive:true});
+  // 兜底：回到前台/转屏后强制吸附回整页位
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) go(curPage); });
+  window.addEventListener('orientationchange', () => setTimeout(()=>go(curPage), 120));
 })();
 
-/* ── Layer 1: Push ── */
-const pushStack=[];
-const _pushRoot=document.getElementById('pushStack');
-function pushPage(title,renderFn){
-  if(!_pushRoot)return;
-  const page=document.createElement('div');
-  page.className='push-page';
-  page.innerHTML='<div class="push-nav"><button class="push-back" onclick="popPage()">‹</button><span class="push-title">'+title+'</span></div><div class="push-body">'+(renderFn?renderFn():'')+'</div>';
-  _pushRoot.appendChild(page);
-  pushStack.push(page);
-  _pushRoot.style.pointerEvents='auto';
-  requestAnimationFrame(()=>requestAnimationFrame(()=>page.classList.add('entering')));
-  _bindPushSwipe(page);
-  try{hap&&hap(6);}catch(e){}
-  return page;
+/* ============ Sheet（抽屉 + 拖拽关闭）============ */
+let openS = null;
+function openSheet(id){ const s=$('#'+id); if(!s)return; $('#mask').classList.add('show'); s.classList.add('show'); openS=s; initSheetDrag(s);
+  if(id==='sheetPersona') fillPersona(); if(id==='sheetApi') fillApi(); if(id==='sheetExec') fillExec(); if(id==='sheetBrains') fillBrains(); if(id==='sheetCheckpoint') fillCheckpoints(); }
+function closeSheet(){ if(openS){ openS.classList.remove('show'); openS=null; } $('#mask').classList.remove('show'); }
+function initSheetDrag(s){
+  if (s._drag) return; s._drag = true;
+  let y0=null, dy=0;
+  const onStart = e => { if (s.scrollTop > 2) return; y0 = e.touches[0].clientY; dy=0; };
+  const onMove = e => { if (y0===null) return; dy = e.touches[0].clientY - y0; if (dy<0) dy=0; s.classList.add('dragging'); s.style.transform=`translateY(${dy}px)`; };
+  const onEnd = () => { if (y0===null) return; s.classList.remove('dragging'); s.style.transform=''; if (dy>120) closeSheet(); y0=null; dy=0; };
+  s.addEventListener('touchstart', onStart, {passive:true});
+  s.addEventListener('touchmove', onMove, {passive:true});
+  s.addEventListener('touchend', onEnd, {passive:true});
 }
-function popPage(){
-  const page=pushStack.pop();
-  if(!page)return;
-  page.classList.remove('entering');
-  page.classList.add('leaving');
-  page.style.transform='';
-  let done=false;
-  const kill=()=>{if(done)return;done=true;page.remove();if(!pushStack.length&&_pushRoot)_pushRoot.style.pointerEvents='none';};
-  page.addEventListener('transitionend',kill,{once:true});
-  setTimeout(kill,450);
-  try{hap&&hap(4);}catch(e){}
-}
-function _bindPushSwipe(page){
-  let sx=0,sy=0,dx=0,t0=0,dragging=false,locked=false;
-  page.addEventListener('touchstart',function(e){
-    const p=_pt(e);sx=p.clientX;sy=p.clientY;dx=0;t0=Date.now();
-    dragging=false;locked=(sx>44);
-  },{passive:true});
-  page.addEventListener('touchmove',function(e){
-    if(locked)return;
-    const p=_pt(e);dx=p.clientX-sx;const dy=p.clientY-sy;
-    if(!dragging){if(Math.abs(dy)>Math.abs(dx)){locked=true;return;}if(dx>8)dragging=true;else return;}
-    e.preventDefault();
-    page.style.transition='none';
-    page.style.transform='translateX('+Math.max(0,dx)+'px)';
-  },{passive:false});
-  page.addEventListener('touchend',function(){
-    if(locked||!dragging){locked=false;return;}
-    const dt=Math.max(1,Date.now()-t0),v=dx/dt;
-    page.style.transition='';
-    if(dx>80||v>0.3)popPage();else page.style.transform='';
-    dragging=false;locked=false;
-  },{passive:true});
-}
-
-/* ── Layer 2: Sheet（懒加载，DOM 最多 1 个）── */
-let activeSheet=null;
-const _sheetRoot=document.getElementById('sheetRoot');
-function openSheet(id,renderFn){
-  if(!_sheetRoot)return;
-  // 单例：已有则先硬移除
-  if(activeSheet){activeSheet.sheet.remove();activeSheet.backdrop.remove();activeSheet=null;}
-  // 内容来源：renderFn > template#tpl_{id} > 旧式#id.sheet 兼容
-  let html='';
-  if(typeof renderFn==='function'){html=renderFn();}
-  else{
-    const tpl=document.getElementById('tpl_'+id);
-    if(tpl)html=tpl.innerHTML;
-    else{
-      // 兼容旧式预渲染 sheet（当 template 尚未迁移时）
-      const legacy=document.getElementById(id);
-      if(legacy)html=legacy.innerHTML;
-      else{console.warn('[NavCore] sheet not found:',id);return;}
-    }
-  }
-  // 回调填充（旧逻辑）
-  if(id==='sheetPersona')setTimeout(()=>{try{fillPersona();}catch(e){}},0);
-  if(id==='sheetApi')setTimeout(()=>{try{fillApi();}catch(e){}},0);
-  if(id==='sheetExec')setTimeout(()=>{try{fillExec();}catch(e){}},0);
-  if(id==='sheetBrains')setTimeout(()=>{try{fillBrains();}catch(e){}},0);
-  if(id==='sheetCheckpoint')setTimeout(()=>{try{fillCheckpoints();}catch(e){}},0);
-
-  const backdrop=document.createElement('div');
-  backdrop.className='sheet-backdrop';
-  backdrop.addEventListener('click',closeSheet);
-  _sheetRoot.appendChild(backdrop);
-
-  const sheet=document.createElement('div');
-  sheet.className='sheet';
-  sheet.id=id+'_active';
-  sheet.setAttribute('role','dialog');
-  sheet.innerHTML='<div class="sheet-grabber"></div>'+html;
-  _sheetRoot.appendChild(sheet);
-
-  _sheetRoot.style.pointerEvents='auto';
-  activeSheet={sheet,backdrop,id};
-
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    backdrop.classList.add('show');
-    sheet.classList.add('entering');
-  }));
-
-  // 抓握条下划关闭手势
-  const grabber=sheet.querySelector('.sheet-grabber');
-  if(grabber){
-    let sy=0,dy=0,t0=0,active=false;
-    grabber.addEventListener('touchstart',e=>{sy=_pt(e).clientY;dy=0;t0=Date.now();active=true;},{passive:true});
-    grabber.addEventListener('touchmove',e=>{
-      if(!active)return;
-      dy=_pt(e).clientY-sy;
-      if(dy<0)dy=0;
-      sheet.classList.add('dragging');
-      sheet.style.transform='translateY('+dy+'px)';
-    },{passive:true});
-    grabber.addEventListener('touchend',()=>{
-      if(!active)return;
-      active=false;
-      const dt=Math.max(1,Date.now()-t0),v=dy/dt;
-      sheet.classList.remove('dragging');
-      sheet.style.transform='';
-      if(dy>120||v>0.5)closeSheet();
-    },{passive:true});
-  }
-  try{hap&&hap(6);}catch(e){}
-}
-function closeSheet(){
-  if(!activeSheet)return;
-  const {sheet,backdrop}=activeSheet;
-  activeSheet=null;
-  backdrop.classList.add('hiding');
-  backdrop.classList.remove('show');
-  sheet.classList.remove('entering');
-  sheet.classList.add('leaving');
-  let done=false;
-  const kill=()=>{
-    if(done)return;done=true;
-    sheet.remove();backdrop.remove();
-    if(_sheetRoot)_sheetRoot.style.pointerEvents='none';
-  };
-  sheet.addEventListener('transitionend',kill,{once:true});
-  setTimeout(kill,450);
-  try{hap&&hap(3);}catch(e){}
-}
-// 废弃旧 initSheetDrag，保留空函数防报错
-function initSheetDrag(){}
 
 /* ============ 主题 ============ */
 function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); store.set('theme', t);
@@ -6447,8 +6129,5 @@ window.importChat = function importChat(){
   inp.click();
 };
 </script>
-
-<div id="pushStack" style="pointer-events:none"></div>
-<div id="sheetRoot" style="pointer-events:none"></div>
 </body>
 </html>
