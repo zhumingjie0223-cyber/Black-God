@@ -377,7 +377,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -464,6 +464,8 @@ export class ShenshuCore {
         // 闭环神·环：自主守望管道（GET 列表 / POST 建·停·续·删·立即跑）
         if (path === '/loop' && request.method === 'GET') return json({ ...(await this.handleLoop('GET', {}, url.searchParams)), visual_agent: true });
         if (path === '/loop' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.handleLoop('POST', b, url.searchParams)); }
+        // 设备控制中枢：截图OCR / 打开App / 剪贴板 / 通知 / 健康 / 地图等
+        if (path === '/device/control' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.deviceControl(b.action || '', b)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
