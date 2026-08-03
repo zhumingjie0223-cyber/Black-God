@@ -2587,18 +2587,25 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         res.ok !== false &&
         (res.exit_code === undefined || res.exit_code === null || res.exit_code === 0);
 
-      return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null };
+      let interrupt = { type: 'none', confidence: 'high', hint: '' };
+      if (!ok || data === null) {
+        interrupt = this.detectInterrupt({ stderr: stderr || errStr, data, stdout: raw, exit_code: res.exit_code ?? null, error: errStr });
+      }
+      return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null, interrupt };
     };
 
     const fail = (r, fallback = '命令执行失败') => {
       const errStr = String((r && (r.stderr || r.raw || r.error)) || fallback);
-      const ft = /离线|offline/i.test(errStr) ? 'offline'
-        : /权限|permission|denied/i.test(errStr) ? 'permission'
-        : /超时|timeout|timed.?out/i.test(errStr) ? 'timeout'
-        : /找不到|not.?found|不存在/i.test(errStr) ? 'not_found'
-        : 'unknown';
+      const interrupt = (r && r.interrupt) || this.detectInterrupt(r || {});
+      const ft = (interrupt && interrupt.type !== 'none')
+        ? interrupt.type
+        : (/离线|offline/i.test(errStr) ? 'offline'
+          : /权限|permission|denied/i.test(errStr) ? 'permission'
+          : /超时|timeout|timed.?out/i.test(errStr) ? 'timeout'
+          : /找不到|not.?found|不存在/i.test(errStr) ? 'not_found'
+          : 'unknown');
       traceDevice(false, ft);
-      return { ok: false, action, error: errStr, cmd: r && r.cmd, exit_code: r && r.exit_code };
+      return { ok: false, action, error: errStr, interrupt, cmd: r && r.cmd, exit_code: r && r.exit_code };
     };
 
     const pickPath = (r) => {
@@ -8926,11 +8933,36 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
   // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
   // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
+  detectInterrupt(shellResult) {
+    const res = shellResult || {};
+    const exit = res.exit_code;
+    const stderr = String(res.stderr || res.raw || res.error || '');
+    const stdout = String(res.data ?? res.stdout ?? '');
+    const nonZero = exit !== undefined && exit !== null && exit !== 0;
+
+    if (nonZero && /locked|passcode|unlock|Device is locked/i.test(stderr)) {
+      return { type: 'locked', confidence: 'high', hint: '设备已锁屏，请解锁后原路重试，不要换路径' };
+    }
+    if (nonZero && /NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(stderr + '\n' + stdout)) {
+      return { type: 'permission_dialog', confidence: 'high', hint: 'iOS 权限弹窗，需用户手动授权，之后重试同一动作' };
+    }
+    if (/interrupted|call/i.test(stderr)) {
+      return { type: 'call_incoming', confidence: 'high', hint: '来电打断当前操作，稍后原路重试' };
+    }
+    if ((exit === 0 || exit === undefined || exit === null) && stdout.trim() === '') {
+      return { type: 'system_dialog', confidence: 'low', hint: '疑似系统对话框覆盖导致无输出，等待消失后重试（低置信）' };
+    }
+    return { type: 'none', confidence: 'high', hint: '' };
+  }
+
   classifyFailure(out) {
     const s = typeof out === 'string' ? out : JSON.stringify(out || '');
     if (/离线|offline/i.test(s)) return 'offline';
     if (/need_confirm/.test(s)) return 'need_confirm';
     if (/缺少.{0,12}参数|param_missing/i.test(s)) return 'param_missing';
+    if (/locked|passcode|Device is locked/i.test(s)) return 'locked';
+    if (/NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(s)) return 'permission_dialog';
+    if (/interrupted|call.*incoming/i.test(s)) return 'call_incoming';
     if (/权限|permission|denied/i.test(s)) return 'permission';
     if (/超时|timeout|timed.?out/i.test(s)) return 'timeout';
     if (/找不到|not.?found|不存在/i.test(s)) return 'not_found';
@@ -9141,21 +9173,34 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           };
         }
         if (!_ok) {
-          // 结构化失败消息注入，替代空白的「（无结果）」
-          const failMsg = `⚠ [步骤${stepIndex}失败·${_failureType}] ${c.tool}(${String(c.arg || '').slice(0, 60)})\n原因：${out || '工具无响应'}\n→ 请换路径重规划，不要重复同样的调用。`;
-          obs.push(`【${c.tool}｜${c.arg}】\n${failMsg}`);
-
-          // 连续同类失败累计 → 强制换路提示注入候选池
-          const failKey = `${c.tool}:${_failureType}`;
-          failCount[failKey] = (failCount[failKey] || 0) + 1;
-          if (failCount[failKey] >= 2) {
-            scratchCandidates.push({
-              content: `⛔ 你已连续 ${failCount[failKey]} 次在「${c.tool}」遇到「${_failureType}」错误。必须换完全不同的工具或方法，不能再用「${c.tool}」。`,
-              source: 'replanner',
-              ts: Date.now(),
-              isFailed: false,
-              priority: 999,
-            });
+          const ft = _failureType;
+          const INTERRUPT_TYPES = new Set(['locked', 'call_incoming', 'system_dialog', 'permission_dialog']);
+          if (INTERRUPT_TYPES.has(ft)) {
+            // 中断态：不计 failCount，注入等待/重试提示而非换路提示
+            const hint = ft === 'locked'
+              ? '设备已锁屏，请解锁后重试，不要换动作'
+              : ft === 'call_incoming'
+              ? '来电打断，稍后重试'
+              : ft === 'permission_dialog'
+              ? 'iOS 权限弹窗，请用户授权后重试同一动作'
+              : '系统对话框，等待消失后重试';
+            obs.push(`【${c.tool}｜${c.arg}】\n⏸ [中断·${ft}] ${hint}`);
+          } else {
+            // 结构化失败消息注入，替代空白的「（无结果）」
+            const failMsg = `⚠ [步骤${stepIndex}失败·${ft}] ${c.tool}(${String(c.arg || '').slice(0, 60)})\n原因：${out || '工具无响应'}\n→ 请换路径重规划，不要重复同样的调用。`;
+            obs.push(`【${c.tool}｜${c.arg}】\n${failMsg}`);
+            // 连续同类失败累计 → 强制换路提示注入候选池
+            const failKey = `${c.tool}:${ft}`;
+            failCount[failKey] = (failCount[failKey] || 0) + 1;
+            if (failCount[failKey] >= 2) {
+              scratchCandidates.push({
+                content: `⛔ 你已连续 ${failCount[failKey]} 次在「${c.tool}」遇到「${ft}」错误。必须换完全不同的工具或方法，不能再用「${c.tool}」。`,
+                source: 'replanner',
+                ts: Date.now(),
+                isFailed: false,
+                priority: 999,
+              });
+            }
           }
         } else {
           obs.push(`【${c.tool}｜${c.arg}】\n${out}`);
