@@ -2589,7 +2589,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
 
       let interrupt = { type: 'none', confidence: 'high', hint: '' };
       if (!ok || data === null) {
-        interrupt = this.detectInterrupt({ stderr: stderr || errStr, data, stdout: raw, exit_code: res.exit_code ?? null, error: errStr });
+        interrupt = this.detectInterrupt({ ok, stderr: stderr || errStr, data, stdout: raw, exit_code: res.exit_code ?? null, error: errStr });
       }
       return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null, interrupt };
     };
@@ -2646,13 +2646,18 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     const traceDevice = (ok, failureType = '') => {
       try {
         const { __planId, __stepIndex, ...traceParams } = params;
+        const SENSITIVE_ACTIONS = new Set(['clipboard_write', 'speak', 'notify', 'raw']);
+        const safeParams = SENSITIVE_ACTIONS.has(act)
+          ? Object.fromEntries(Object.entries(traceParams).map(([k, v]) =>
+              ['text', 'content', 'body', 'cmd', 'command'].includes(k) ? [k, '[redacted]'] : [k, v]))
+          : traceParams;
         this.broadcast({
           type: 'device_trace',
           planId: __planId || '',
           stepIndex: typeof __stepIndex === 'number' ? __stepIndex : -1,
           tool: 'device_control',
           action: act,
-          arg: JSON.stringify(traceParams).slice(0, 120),
+          arg: JSON.stringify(safeParams).slice(0, 120),
           ok,
           failureType,
           latencyMs: Date.now() - t0,
@@ -2665,7 +2670,8 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       let needConfirm = CONFIRM_ACTIONS.has(act);
       if (!needConfirm && act === 'open_app') {
         const url = String(params.url ?? params.scheme ?? '');
-        needConfirm = /pay|alipay|transfer|weixin:\/\/pay/i.test(url);
+        const decodedUrl = (() => { try { return decodeURIComponent(url); } catch { return url; } })();
+        needConfirm = /pay|alipay|transfer|weixin:\/\/pay/i.test(decodedUrl);
       }
       if (needConfirm && !params.confirm) {
         traceDevice(false, 'need_confirm');
@@ -2816,7 +2822,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         case 'open_app':
         case 'shortcut': {
           let url = params.url ?? params.scheme ?? '';
-          if (action === 'shortcut') {
+          if (act === 'shortcut') {
             const name = params.name ?? params.shortcut ?? '';
             if (!url) {
               if (!String(name).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 name 参数' }; }
@@ -8939,6 +8945,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     const stderr = String(res.stderr || res.raw || res.error || '');
     const stdout = String(res.data ?? res.stdout ?? '');
     const nonZero = exit !== undefined && exit !== null && exit !== 0;
+    const ok = res.ok !== undefined
+      ? res.ok !== false
+      : !nonZero;
 
     if (nonZero && /locked|passcode|unlock|Device is locked/i.test(stderr)) {
       return { type: 'locked', confidence: 'high', hint: '设备已锁屏，请解锁后原路重试，不要换路径' };
@@ -8946,10 +8955,10 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     if (nonZero && /NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(stderr + '\n' + stdout)) {
       return { type: 'permission_dialog', confidence: 'high', hint: 'iOS 权限弹窗，需用户手动授权，之后重试同一动作' };
     }
-    if (/interrupted|call/i.test(stderr)) {
+    if (/incoming.call|call.*interrupt|interrupt.*call/i.test(stderr)) {
       return { type: 'call_incoming', confidence: 'high', hint: '来电打断当前操作，稍后原路重试' };
     }
-    if ((exit === 0 || exit === undefined || exit === null) && stdout.trim() === '') {
+    if (!ok && (exit === 0 || exit === undefined || exit === null) && stdout.trim() === '') {
       return { type: 'system_dialog', confidence: 'low', hint: '疑似系统对话框覆盖导致无输出，等待消失后重试（低置信）' };
     }
     return { type: 'none', confidence: 'high', hint: '' };
@@ -9073,7 +9082,20 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           for (const m of [...drest.matchAll(/(\w+)=([^\s]+)/g)]) dparams[m[1]] = m[2];
           const d = await this.deviceControl(dact, dparams).catch(e => ({ ok: false, error: String(e?.message || e) }));
           if (d.need_confirm) {
-            // 危险动作未确认 → 不继续轮次，让用户决策
+            // 危险动作未确认 → 先补 toolLog，再 early return
+            const ncRec = {
+              planId,
+              stepIndex,
+              tool: c.tool,
+              action: dact,
+              arg: darg.slice(0, 120),
+              ok: false,
+              failureType: 'need_confirm',
+              latencyMs: Date.now() - tStart,
+              ts: Date.now(),
+            };
+            toolLog.push(ncRec);
+            try { this.broadcast({ type: 'agent_step_done', ...ncRec }); } catch (_) {}
             return {
               ...(last || {}),
               reply: `⚠️ 操作「${dact}」需要你确认才能执行。确认后请重发。`,
@@ -9143,7 +9165,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           const r = await this.callBrain(prompt, c.arg, null, { tier: 'heavy' }).catch(() => null);
           out = r ? `[${c.tool}]\n${r.reply || r}` : `${c.tool}工具无响应`;
         }
-        const _ok = !!out;
+        const _ok = !!out && !/^(?:设备控制失败：|出图失败：|出声失败：|下载失败：|沙箱：|iOS 工具：|红队工具：|劫持工具无响应|沙箱无响应|iOS 工具无响应|红队工具无响应|.*工具无响应)/.test(String(out));
         const _failureType = _ok ? '' : this.classifyFailure(out);
         const rec = {
           planId,
@@ -9192,7 +9214,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
             // 连续同类失败累计 → 强制换路提示注入候选池
             const failKey = `${c.tool}:${ft}`;
             failCount[failKey] = (failCount[failKey] || 0) + 1;
-            if (failCount[failKey] >= 2) {
+            if (failCount[failKey] === 2) {
               scratchCandidates.push({
                 content: `⛔ 你已连续 ${failCount[failKey]} 次在「${c.tool}」遇到「${ft}」错误。必须换完全不同的工具或方法，不能再用「${c.tool}」。`,
                 source: 'replanner',
@@ -9203,6 +9225,10 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
             }
           }
         } else {
+          // 成功时清空该 tool 的所有 failCount（不再视为连续失败）
+          for (const k of Object.keys(failCount)) {
+            if (k.startsWith(`${c.tool}:`)) delete failCount[k];
+          }
           obs.push(`【${c.tool}｜${c.arg}】\n${out}`);
         }
       }

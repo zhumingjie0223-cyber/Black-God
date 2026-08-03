@@ -27,13 +27,14 @@ test('2b. detectInterrupt 识别权限弹窗（passcode 不误触 permission_dia
   assert.equal(r.type, 'locked');
 });
 
-test('3. detectInterrupt 识别 system_dialog（stdout 空 + exit 0）', () => {
-  const r = proto.detectInterrupt({ exit_code: 0, data: '', stderr: '' });
+test('3. detectInterrupt 识别 system_dialog（ok=false + exit=0 + stdout 空）', () => {
+  // system_dialog: 工具调用返回 ok:false，但 exit=0 且无输出（被系统弹窗覆盖）
+  const r = proto.detectInterrupt({ ok: false, exit_code: 0, data: '', stderr: '' });
   assert.equal(r.type, 'system_dialog');
   assert.equal(r.confidence, 'low');
 });
 
-test('3b. detectInterrupt 正常有输出不误判 system_dialog', () => {
+test('3b. detectInterrupt exit=0 + ok 正常 → type:none', () => {
   const r = proto.detectInterrupt({ exit_code: 0, data: '{"temp":20}', stderr: '' });
   assert.equal(r.type, 'none');
 });
