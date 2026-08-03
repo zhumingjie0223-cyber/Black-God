@@ -9002,6 +9002,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     let scratchCandidates = [], toolLog = [], last = null, mediaAll = [];
     const planId = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     let planStepIndex = 0;
+    // P0-2 重规划回环：key = `${tool}:${failureType}`，value = 连续失败次数
+    const failCount = {};
     for (let step = 0; step < 5; step++) {
       // P0 GWT：每轮从候选池仲裁，只注入赢者，不无差别追加
       const gwWinners = this.gw.arbitrate(scratchCandidates, text, soul);
@@ -9038,6 +9040,18 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           const dparams = { arg: drest };
           for (const m of [...drest.matchAll(/(\w+)=([^\s]+)/g)]) dparams[m[1]] = m[2];
           const d = await this.deviceControl(dact, dparams).catch(e => ({ ok: false, error: String(e?.message || e) }));
+          if (d.need_confirm) {
+            // 危险动作未确认 → 不继续轮次，让用户决策
+            return {
+              ...(last || {}),
+              reply: `⚠️ 操作「${dact}」需要你确认才能执行。确认后请重发。`,
+              need_confirm: true,
+              action: dact,
+              agent_steps: step,
+              tool_log: toolLog,
+              media: mediaAll,
+            };
+          }
           if (d.ok) {
             if (d.text) out = `[设备感知·${dact}]\n屏幕文字：\n${d.text}`;
             else if (d.data) out = `[设备·${dact}]\n${d.data}`;
@@ -9112,7 +9126,40 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         };
         toolLog.push(rec);
         try { this.broadcast({ type: 'agent_step_done', ...rec }); } catch (e) {}
-        obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
+
+        // ---- P0-2 重规划回环 ----
+        if (!_ok && _failureType === 'need_confirm') {
+          // need_confirm 是用户决策，不可自动重规划 → early return
+          return {
+            ...(last || {}),
+            reply: `⚠️ 操作「${String(c.arg || '').slice(0, 60)}」需要你确认才能执行。确认后请重发。`,
+            need_confirm: true,
+            action: c.arg,
+            agent_steps: step,
+            tool_log: toolLog,
+            media: mediaAll,
+          };
+        }
+        if (!_ok) {
+          // 结构化失败消息注入，替代空白的「（无结果）」
+          const failMsg = `⚠ [步骤${stepIndex}失败·${_failureType}] ${c.tool}(${String(c.arg || '').slice(0, 60)})\n原因：${out || '工具无响应'}\n→ 请换路径重规划，不要重复同样的调用。`;
+          obs.push(`【${c.tool}｜${c.arg}】\n${failMsg}`);
+
+          // 连续同类失败累计 → 强制换路提示注入候选池
+          const failKey = `${c.tool}:${_failureType}`;
+          failCount[failKey] = (failCount[failKey] || 0) + 1;
+          if (failCount[failKey] >= 2) {
+            scratchCandidates.push({
+              content: `⛔ 你已连续 ${failCount[failKey]} 次在「${c.tool}」遇到「${_failureType}」错误。必须换完全不同的工具或方法，不能再用「${c.tool}」。`,
+              source: 'replanner',
+              ts: Date.now(),
+              isFailed: false,
+              priority: 999,
+            });
+          }
+        } else {
+          obs.push(`【${c.tool}｜${c.arg}】\n${out}`);
+        }
       }
       // P0 GWT：工具结果入候选池竞争，不无差别追加
       for (const o of obs) {
