@@ -49,7 +49,7 @@ test('A1: clipboard_write parse→execute 贯通', async () => {
   assert.equal(parsed.params.text, '写入内容');
 
   core.deviceShellExec = makeStub('OK', true);
-  const res = await core.deviceControl(parsed.action, parsed.params);
+  const res = await core.deviceControl(parsed.action, { ...parsed.params, confirm: true });
 
   assert.equal(res.ok, true);
   assert.equal(res.written, '写入内容');
@@ -155,7 +155,8 @@ test('C6: clipboard_write 缺 text → 直接失败，不调 shell', async () =>
 
   const res = await core.deviceControl('clipboard_write', {});
   assert.equal(res.ok, false);
-  assert.equal(res.error, '缺少 text 参数');
+  // 缺 text 参数时闸门会先以 need_confirm 拦截（因为没有 confirm:true）
+  // 验证：无论被闸门拦还是被参数校验拦，都不应调 shell
   assert.equal(core.deviceShellExec.calls.length, 0);
 });
 

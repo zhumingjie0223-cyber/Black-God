@@ -2622,8 +2622,32 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       return String(r.raw || '');
     };
 
+    // ---- danger gate ----
+    // 分级：SAFE(只读/低影响) 直接执行 / CONFIRM(不可逆/高影响) 需 params.confirm === true
+    const SAFE_ACTIONS = new Set([
+      'weather', 'location', 'device_info', 'clipboard_read',
+      'health', 'calendar', 'reminder', 'maps', 'see',
+    ]);
+    const CONFIRM_ACTIONS = new Set(['clipboard_write', 'notify', 'speak', 'shortcut', 'raw']);
+    const act = String(action || '').toLowerCase();
+    if (!SAFE_ACTIONS.has(act)) {
+      let needConfirm = CONFIRM_ACTIONS.has(act);
+      if (!needConfirm && act === 'open_app') {
+        const url = String(params.url ?? params.scheme ?? '');
+        needConfirm = /pay|alipay|transfer|weixin:\/\/pay/i.test(url);
+      }
+      if (needConfirm && !params.confirm) {
+        return {
+          ok: false,
+          need_confirm: true,
+          action: act,
+          note: `⚠️ 「${act}」是不可逆操作，需二次确认。确认无误请带 confirm:true 重发。`,
+        };
+      }
+    }
+
     try {
-      switch (String(action || '').toLowerCase()) {
+      switch (act) {
         // ---------- 天气 ----------
         case 'weather': {
           const args = [];
@@ -8885,6 +8909,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   · health types 只能用以下枚举：steps / heart-rate / sleep / hrv / calories / distance / spo2 / weight（逗号分隔）
   · maps 必须带 sub=search 和 --query 查询词；weather/location 无必填参数；clipboard_write 必须带 text=
   · 禁止在标记内部使用换行
+  · 不可逆动作（clipboard_write / notify / speak / shortcut / raw）必须在参数里带 confirm=true，否则我会先暂停询问权哥
   可用工具名与用法（全部输出 JSON）：
   · alarm set --time 07:30 --label 起床｜alarm timer --duration 5m｜alarm list  —— 闹钟/计时器
   · calendar list --today｜calendar create --title 开会 --start <ISO> --end <ISO>｜calendar remind --title 买菜 --due <ISO>  —— 日历/提醒
