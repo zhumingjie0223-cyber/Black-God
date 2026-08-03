@@ -8877,7 +8877,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 - 在沙箱里直接跑命令/代码：⟨工具:exec｜shell命令或JS⟩（原生沙箱，无需连接器；curl/echo/ls/cat可用；JS前缀js:）
 - 操作主人的 iPhone（真调 iOS 硬件，经沙箱执行脑）：⟨工具:apple｜工具名 子命令 参数⟩
 - 设备控制中枢（截图感知/打开App/通知/剪贴板/健康/地图等高级操作）：⟨工具:device｜动作 参数⟩
-  动作列表：see（截图+OCR看屏幕）、open_app scheme=weixin://（打开App）、notify title=X body=Y、speak text=X、clipboard_read、clipboard_write text=X、health types=stepCount days=7、weather、location、calendar、maps sub=search --query X、shortcut name=X
+  动作列表：see（截图+OCR看屏幕）、open_app scheme=weixin://（打开App）、notify title=X body=Y、speak text=X、clipboard_read、clipboard_write text=X、health types=steps,heart-rate days=7、weather、location、calendar、maps sub=search --query X、shortcut name=X
+  ⚠️ 参数格式铁律（违反不执行）：
+  · 每次只发一个 ⟨工具:device｜…⟩ 标记，禁止一条消息多个
+  · 动作名必须是上面列表里的原词（英文、下划线），禁止自造
+  · 参数用 key=value 格式，value 中含空格时直接写不加引号（解析器自动截断到下一个 key=）
+  · health types 只能用以下枚举：steps / heart-rate / sleep / hrv / calories / distance / spo2 / weight（逗号分隔）
+  · maps 必须带 sub=search 和 --query 查询词；weather/location 无必填参数；clipboard_write 必须带 text=
+  · 禁止在标记内部使用换行
   可用工具名与用法（全部输出 JSON）：
   · alarm set --time 07:30 --label 起床｜alarm timer --duration 5m｜alarm list  —— 闹钟/计时器
   · calendar list --today｜calendar create --title 开会 --start <ISO> --end <ISO>｜calendar remind --title 买菜 --due <ISO>  —— 日历/提醒
