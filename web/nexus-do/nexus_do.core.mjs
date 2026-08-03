@@ -8949,10 +8949,10 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       ? res.ok !== false
       : !nonZero;
 
-    if (nonZero && /locked|passcode|unlock|Device is locked/i.test(stderr)) {
+    if ((nonZero || !ok) && /locked|passcode|unlock|Device is locked/i.test(stderr)) {
       return { type: 'locked', confidence: 'high', hint: '设备已锁屏，请解锁后原路重试，不要换路径' };
     }
-    if (nonZero && /NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(stderr + '\n' + stdout)) {
+    if ((nonZero || !ok) && /NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(stderr + '\n' + stdout)) {
       return { type: 'permission_dialog', confidence: 'high', hint: 'iOS 权限弹窗，需用户手动授权，之后重试同一动作' };
     }
     if (/incoming.call|call.*interrupt|interrupt.*call/i.test(stderr)) {

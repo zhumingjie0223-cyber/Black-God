@@ -2587,16 +2587,26 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         res.ok !== false &&
         (res.exit_code === undefined || res.exit_code === null || res.exit_code === 0);
 
-      return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null };
+      let interrupt = { type: 'none', confidence: 'high', hint: '' };
+      if (!ok || data === null) {
+        interrupt = this.detectInterrupt({ ok, stderr: stderr || errStr, data, stdout: raw, exit_code: res.exit_code ?? null, error: errStr });
+      }
+      return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null, interrupt };
     };
 
-    const fail = (r, fallback = '命令执行失败') => ({
-      ok: false,
-      action,
-      error: (r && (r.stderr || r.raw)) || fallback,
-      cmd: r && r.cmd,
-      exit_code: r && r.exit_code,
-    });
+    const fail = (r, fallback = '命令执行失败') => {
+      const errStr = String((r && (r.stderr || r.raw || r.error)) || fallback);
+      const interrupt = (r && r.interrupt) || this.detectInterrupt(r || {});
+      const ft = (interrupt && interrupt.type !== 'none')
+        ? interrupt.type
+        : (/离线|offline/i.test(errStr) ? 'offline'
+          : /权限|permission|denied/i.test(errStr) ? 'permission'
+          : /超时|timeout|timed.?out/i.test(errStr) ? 'timeout'
+          : /找不到|not.?found|不存在/i.test(errStr) ? 'not_found'
+          : 'unknown');
+      traceDevice(false, ft);
+      return { ok: false, action, error: errStr, interrupt, cmd: r && r.cmd, exit_code: r && r.exit_code };
+    };
 
     const pickPath = (r) => {
       const d = r.data;
@@ -2622,8 +2632,60 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       return String(r.raw || '');
     };
 
+    // ---- danger gate ----
+    // 分级：SAFE(只读/低影响) 直接执行 / CONFIRM(不可逆/高影响) 需 params.confirm === true
+    const SAFE_ACTIONS = new Set([
+      'weather', 'location', 'device_info', 'clipboard_read',
+      'health', 'calendar', 'reminder', 'maps', 'see',
+    ]);
+    const CONFIRM_ACTIONS = new Set(['clipboard_write', 'notify', 'speak', 'shortcut', 'raw']);
+    const act = String(action || '').toLowerCase();
+
+    // ---- trace ----
+    const t0 = Date.now();
+    const traceDevice = (ok, failureType = '') => {
+      try {
+        const { __planId, __stepIndex, ...traceParams } = params;
+        const SENSITIVE_ACTIONS = new Set(['clipboard_write', 'speak', 'notify', 'raw']);
+        const safeParams = SENSITIVE_ACTIONS.has(act)
+          ? Object.fromEntries(Object.entries(traceParams).map(([k, v]) =>
+              ['text', 'content', 'body', 'cmd', 'command'].includes(k) ? [k, '[redacted]'] : [k, v]))
+          : traceParams;
+        this.broadcast({
+          type: 'device_trace',
+          planId: __planId || '',
+          stepIndex: typeof __stepIndex === 'number' ? __stepIndex : -1,
+          tool: 'device_control',
+          action: act,
+          arg: JSON.stringify(safeParams).slice(0, 120),
+          ok,
+          failureType,
+          latencyMs: Date.now() - t0,
+          ts: Date.now(),
+        });
+      } catch (_) {}
+    };
+
+    if (!SAFE_ACTIONS.has(act)) {
+      let needConfirm = CONFIRM_ACTIONS.has(act);
+      if (!needConfirm && act === 'open_app') {
+        const url = String(params.url ?? params.scheme ?? '');
+        const decodedUrl = (() => { try { return decodeURIComponent(url); } catch { return url; } })();
+        needConfirm = /pay|alipay|transfer|weixin:\/\/pay/i.test(decodedUrl);
+      }
+      if (needConfirm && !params.confirm) {
+        traceDevice(false, 'need_confirm');
+        return {
+          ok: false,
+          need_confirm: true,
+          action: act,
+          note: `⚠️ 「${act}」是不可逆操作，需二次确认。确认无误请带 confirm:true 重发。`,
+        };
+      }
+    }
+
     try {
-      switch (String(action || '').toLowerCase()) {
+      switch (act) {
         // ---------- 天气 ----------
         case 'weather': {
           const args = [];
@@ -2631,6 +2693,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           if (params.days) args.push(`--days ${parseInt(params.days, 10)}`);
           const r = await run('weather', args.join(' '));
           if (!r.ok) return fail(r);
+          traceDevice(true);
           return { ok: true, action: 'weather', weather: r.data, raw: r.raw };
         }
 
@@ -2653,6 +2716,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         case 'device_info': {
           const r = await run('device', 'info');
           if (!r.ok) return fail(r);
+          traceDevice(true);
           return { ok: true, action: 'device_info', device: r.data, raw: r.raw };
         }
 
@@ -2661,14 +2725,16 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const r = await run('clipboard');
           if (!r.ok) return fail(r);
           const text = typeof r.data === 'string' ? r.data : (r.data?.text ?? r.raw);
+          traceDevice(true);
           return { ok: true, action: 'clipboard_read', text, raw: r.raw };
         }
   // ---------- 剪贴板写 ----------
         case 'clipboard_write': {
           const text = params.text ?? params.content ?? '';
-          if (!String(text).length) return { ok: false, action, error: '缺少 text 参数' };
+          if (!String(text).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 text 参数' }; }
           const r = await run('clipboard', `set ${q(text)}`);
           if (!r.ok) return fail(r);
+          traceDevice(true);
           return { ok: true, action: 'clipboard_write', written: String(text), raw: r.raw };
         }
 
@@ -2685,19 +2751,21 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           ].join(' ');
           const r = await run('notification', args);
           if (!r.ok) return fail(r, '通知调度失败');
+          traceDevice(true);
           return { ok: true, action: 'notify', title: String(title), body: String(body), after, result: r.data, raw: r.raw };
         }
 
         // ---------- 朗读 ----------
         case 'speak': {
           const text = params.text ?? params.content ?? '';
-          if (!String(text).length) return { ok: false, action, error: '缺少 text 参数' };
+          if (!String(text).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 text 参数' }; }
           const args = ['speak', `--text ${q(text)}`];
           if (params.rate != null) args.push(`--rate ${Number(params.rate)}`);
           if (params.voice) args.push(`--voice ${q(params.voice)}`);
           if (params.lang) args.push(`--lang ${q(params.lang)}`);
           const r = await run('speak', args.join(' '));
           if (!r.ok) return fail(r, '语音播报失败');
+          traceDevice(true);
           return { ok: true, action: 'speak', text: String(text), raw: r.raw };
         }
 
@@ -2709,6 +2777,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const days = Number.isFinite(Number(params.days)) ? Number(params.days) : 7;
           const r = await run('healthkit', `batch --types ${q(types)} --days ${days}`);
           if (!r.ok) return fail(r, '健康数据读取失败');
+          traceDevice(true);
           return { ok: true, action: 'health', types: String(types), days, health: r.data, raw: r.raw };
         }
 
@@ -2720,6 +2789,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const r = await run('calendar', args.join(' '));
           if (!r.ok) return fail(r, '日历读取失败');
           const events = Array.isArray(r.data) ? r.data : (r.data?.events ?? r.data);
+          traceDevice(true);
           return { ok: true, action: 'calendar', events, raw: r.raw };
         }
 
@@ -2731,18 +2801,20 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const r = await run('reminders', args.join(' '));
           if (!r.ok) return fail(r, '提醒事项读取失败');
           const reminders = Array.isArray(r.data) ? r.data : (r.data?.reminders ?? r.data);
+          traceDevice(true);
           return { ok: true, action: 'reminder', reminders, raw: r.raw };
         }
 
         // ---------- 地图搜索 ----------
         case 'maps': {
           const query = params.query ?? params.q ?? '';
-          if (!String(query).length) return { ok: false, action, error: '缺少 query 参数' };
+          if (!String(query).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 query 参数' }; }
           const args = [`search --query ${q(query)}`];
           if (params.limit != null) args.push(`--limit ${parseInt(params.limit, 10)}`);
           const r = await run('maps', args.join(' '));
           if (!r.ok) return fail(r, '地图搜索失败');
           const places = Array.isArray(r.data) ? r.data : (r.data?.results ?? r.data?.places ?? r.data);
+          traceDevice(true);
           return { ok: true, action: 'maps', query: String(query), places, raw: r.raw };
         }
 
@@ -2750,17 +2822,18 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         case 'open_app':
         case 'shortcut': {
           let url = params.url ?? params.scheme ?? '';
-          if (action === 'shortcut') {
+          if (act === 'shortcut') {
             const name = params.name ?? params.shortcut ?? '';
             if (!url) {
-              if (!String(name).length) return { ok: false, action, error: '缺少 name 参数' };
+              if (!String(name).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 name 参数' }; }
               url = `shortcuts://run-shortcut?name=${encodeURIComponent(String(name))}`;
               if (params.input != null) url += `&input=text&text=${encodeURIComponent(String(params.input))}`;
             }
           }
-          if (!String(url).length) return { ok: false, action, error: '缺少 url 参数' };
+          if (!String(url).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 url 参数' }; }
           const r = await run('open', q(url));
           if (!r.ok) return fail(r, '打开失败');
+          traceDevice(true);
           return { ok: true, action, url: String(url), raw: r.raw };
         }
 
@@ -2820,7 +2893,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         // ---------- 原始命令 ----------
         case 'raw': {
           const cmd = params.cmd ?? params.command ?? '';
-          if (!String(cmd).length) return { ok: false, action, error: '缺少 cmd 参数' };
+          if (!String(cmd).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 cmd 参数' }; }
           let res;
           try {
             res = await this.deviceShellExec(String(cmd), 'bash');
@@ -2861,12 +2934,15 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       }
     } catch (err) {
       if (err && err.__offline) {
+        traceDevice(false, 'offline');
         return { ok: false, error: OFFLINE_MSG };
       }
       const msg = String((err && err.message) || err || '未知错误');
       if (msg.includes('离线')) {
+        traceDevice(false, 'offline');
         return { ok: false, error: OFFLINE_MSG };
       }
+      traceDevice(false, 'unknown');
       return { ok: false, action, error: msg };
     }
   }
@@ -8863,6 +8939,45 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
   // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
   // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
+  detectInterrupt(shellResult) {
+    const res = shellResult || {};
+    const exit = res.exit_code;
+    const stderr = String(res.stderr || res.raw || res.error || '');
+    const stdout = String(res.data ?? res.stdout ?? '');
+    const nonZero = exit !== undefined && exit !== null && exit !== 0;
+    const ok = res.ok !== undefined
+      ? res.ok !== false
+      : !nonZero;
+
+    if ((nonZero || !ok) && /locked|passcode|unlock|Device is locked/i.test(stderr)) {
+      return { type: 'locked', confidence: 'high', hint: '设备已锁屏，请解锁后原路重试，不要换路径' };
+    }
+    if ((nonZero || !ok) && /NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(stderr + '\n' + stdout)) {
+      return { type: 'permission_dialog', confidence: 'high', hint: 'iOS 权限弹窗，需用户手动授权，之后重试同一动作' };
+    }
+    if (/incoming.call|call.*interrupt|interrupt.*call/i.test(stderr)) {
+      return { type: 'call_incoming', confidence: 'high', hint: '来电打断当前操作，稍后原路重试' };
+    }
+    if (!ok && (exit === 0 || exit === undefined || exit === null) && stdout.trim() === '') {
+      return { type: 'system_dialog', confidence: 'low', hint: '疑似系统对话框覆盖导致无输出，等待消失后重试（低置信）' };
+    }
+    return { type: 'none', confidence: 'high', hint: '' };
+  }
+
+  classifyFailure(out) {
+    const s = typeof out === 'string' ? out : JSON.stringify(out || '');
+    if (/离线|offline/i.test(s)) return 'offline';
+    if (/need_confirm/.test(s)) return 'need_confirm';
+    if (/缺少.{0,12}参数|param_missing/i.test(s)) return 'param_missing';
+    if (/locked|passcode|Device is locked/i.test(s)) return 'locked';
+    if (/NSAuthorizationError|authorization|requires.*permission|Access.*denied.*permission/i.test(s)) return 'permission_dialog';
+    if (/interrupted|call.*incoming/i.test(s)) return 'call_incoming';
+    if (/权限|permission|denied/i.test(s)) return 'permission';
+    if (/超时|timeout|timed.?out/i.test(s)) return 'timeout';
+    if (/找不到|not.?found|不存在/i.test(s)) return 'not_found';
+    return 'unknown';
+  }
+
   async runAgentLoop(baseSystem, text, soul, opts = {}) {
     const _cfg = (await this.storage.get('config')) || {};
     const hasExec = true; // 原生沙箱始终可用，不依赖外部连接器
@@ -8877,7 +8992,15 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 - 在沙箱里直接跑命令/代码：⟨工具:exec｜shell命令或JS⟩（原生沙箱，无需连接器；curl/echo/ls/cat可用；JS前缀js:）
 - 操作主人的 iPhone（真调 iOS 硬件，经沙箱执行脑）：⟨工具:apple｜工具名 子命令 参数⟩
 - 设备控制中枢（截图感知/打开App/通知/剪贴板/健康/地图等高级操作）：⟨工具:device｜动作 参数⟩
-  动作列表：see（截图+OCR看屏幕）、open_app scheme=weixin://（打开App）、notify title=X body=Y、speak text=X、clipboard_read、clipboard_write text=X、health types=stepCount days=7、weather、location、calendar、maps sub=search --query X、shortcut name=X
+  动作列表：see（截图+OCR看屏幕）、open_app scheme=weixin://（打开App）、notify title=X body=Y、speak text=X、clipboard_read、clipboard_write text=X、health types=steps,heart-rate days=7、weather、location、calendar、maps sub=search --query X、shortcut name=X
+  ⚠️ 参数格式铁律（违反不执行）：
+  · 每次只发一个 ⟨工具:device｜…⟩ 标记，禁止一条消息多个
+  · 动作名必须是上面列表里的原词（英文、下划线），禁止自造
+  · 参数用 key=value 格式，value 中含空格时直接写不加引号（解析器自动截断到下一个 key=）
+  · health types 只能用以下枚举：steps / heart-rate / sleep / hrv / calories / distance / spo2 / weight（逗号分隔）
+  · maps 必须带 sub=search 和 --query 查询词；weather/location 无必填参数；clipboard_write 必须带 text=
+  · 禁止在标记内部使用换行
+  · 不可逆动作（clipboard_write / notify / speak / shortcut / raw）必须在参数里带 confirm=true，否则我会先暂停询问权哥
   可用工具名与用法（全部输出 JSON）：
   · alarm set --time 07:30 --label 起床｜alarm timer --duration 5m｜alarm list  —— 闹钟/计时器
   · calendar list --today｜calendar create --title 开会 --start <ISO> --end <ISO>｜calendar remind --title 买菜 --due <ISO>  —— 日历/提醒
@@ -8918,6 +9041,10 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   示例：⟨工具:redteam｜pojie:jsvmp https://target.com⟩ / ⟨工具:redteam｜pojie:slider https://demo.geetest.com⟩
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratchCandidates = [], toolLog = [], last = null, mediaAll = [];
+    const planId = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    let planStepIndex = 0;
+    // P0-2 重规划回环：key = `${tool}:${failureType}`，value = 连续失败次数
+    const failCount = {};
     for (let step = 0; step < 5; step++) {
       // P0 GWT：每轮从候选池仲裁，只注入赢者，不无差别追加
       const gwWinners = this.gw.arbitrate(scratchCandidates, text, soul);
@@ -8928,7 +9055,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog, media: mediaAll };
       const obs = [];
       for (const c of calls.slice(0, 2)) {
-        try { this.broadcast({ type: 'agent_step', tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
+        const stepIndex = planStepIndex++;
+        const tStart = Date.now();
+        try { this.broadcast({ type: 'agent_step', planId, stepIndex, tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
         let out = '';
         if (c.tool === 'web_search') out = await this.webSearch(c.arg).catch(() => '');
         else if (c.tool === 'open') out = await this.fetchUrl(c.arg).catch(() => '');
@@ -8952,6 +9081,31 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           const dparams = { arg: drest };
           for (const m of [...drest.matchAll(/(\w+)=([^\s]+)/g)]) dparams[m[1]] = m[2];
           const d = await this.deviceControl(dact, dparams).catch(e => ({ ok: false, error: String(e?.message || e) }));
+          if (d.need_confirm) {
+            // 危险动作未确认 → 先补 toolLog，再 early return
+            const ncRec = {
+              planId,
+              stepIndex,
+              tool: c.tool,
+              action: dact,
+              arg: darg.slice(0, 120),
+              ok: false,
+              failureType: 'need_confirm',
+              latencyMs: Date.now() - tStart,
+              ts: Date.now(),
+            };
+            toolLog.push(ncRec);
+            try { this.broadcast({ type: 'agent_step_done', ...ncRec }); } catch (_) {}
+            return {
+              ...(last || {}),
+              reply: `⚠️ 操作「${dact}」需要你确认才能执行。确认后请重发。`,
+              need_confirm: true,
+              action: dact,
+              agent_steps: step,
+              tool_log: toolLog,
+              media: mediaAll,
+            };
+          }
           if (d.ok) {
             if (d.text) out = `[设备感知·${dact}]\n屏幕文字：\n${d.text}`;
             else if (d.data) out = `[设备·${dact}]\n${d.data}`;
@@ -9011,8 +9165,72 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           const r = await this.callBrain(prompt, c.arg, null, { tier: 'heavy' }).catch(() => null);
           out = r ? `[${c.tool}]\n${r.reply || r}` : `${c.tool}工具无响应`;
         }
-        toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
-        obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
+        const _ok = !!out && !/^(?:设备控制失败：|出图失败：|出声失败：|下载失败：|沙箱：|iOS 工具：|红队工具：|劫持工具无响应|沙箱无响应|iOS 工具无响应|红队工具无响应|.*工具无响应)/.test(String(out));
+        const _failureType = _ok ? '' : this.classifyFailure(out);
+        const rec = {
+          planId,
+          stepIndex,
+          tool: c.tool,
+          action: '',
+          arg: String(c.arg || '').slice(0, 120),
+          ok: _ok,
+          failureType: _failureType,
+          latencyMs: Date.now() - tStart,
+          ts: Date.now(),
+        };
+        toolLog.push(rec);
+        try { this.broadcast({ type: 'agent_step_done', ...rec }); } catch (e) {}
+
+        // ---- P0-2 重规划回环 ----
+        if (!_ok && _failureType === 'need_confirm') {
+          // need_confirm 是用户决策，不可自动重规划 → early return
+          return {
+            ...(last || {}),
+            reply: `⚠️ 操作「${String(c.arg || '').slice(0, 60)}」需要你确认才能执行。确认后请重发。`,
+            need_confirm: true,
+            action: c.arg,
+            agent_steps: step,
+            tool_log: toolLog,
+            media: mediaAll,
+          };
+        }
+        if (!_ok) {
+          const ft = _failureType;
+          const INTERRUPT_TYPES = new Set(['locked', 'call_incoming', 'system_dialog', 'permission_dialog']);
+          if (INTERRUPT_TYPES.has(ft)) {
+            // 中断态：不计 failCount，注入等待/重试提示而非换路提示
+            const hint = ft === 'locked'
+              ? '设备已锁屏，请解锁后重试，不要换动作'
+              : ft === 'call_incoming'
+              ? '来电打断，稍后重试'
+              : ft === 'permission_dialog'
+              ? 'iOS 权限弹窗，请用户授权后重试同一动作'
+              : '系统对话框，等待消失后重试';
+            obs.push(`【${c.tool}｜${c.arg}】\n⏸ [中断·${ft}] ${hint}`);
+          } else {
+            // 结构化失败消息注入，替代空白的「（无结果）」
+            const failMsg = `⚠ [步骤${stepIndex}失败·${ft}] ${c.tool}(${String(c.arg || '').slice(0, 60)})\n原因：${out || '工具无响应'}\n→ 请换路径重规划，不要重复同样的调用。`;
+            obs.push(`【${c.tool}｜${c.arg}】\n${failMsg}`);
+            // 连续同类失败累计 → 强制换路提示注入候选池
+            const failKey = `${c.tool}:${ft}`;
+            failCount[failKey] = (failCount[failKey] || 0) + 1;
+            if (failCount[failKey] === 2) {
+              scratchCandidates.push({
+                content: `⛔ 你已连续 ${failCount[failKey]} 次在「${c.tool}」遇到「${ft}」错误。必须换完全不同的工具或方法，不能再用「${c.tool}」。`,
+                source: 'replanner',
+                ts: Date.now(),
+                isFailed: false,
+                priority: 999,
+              });
+            }
+          }
+        } else {
+          // 成功时清空该 tool 的所有 failCount（不再视为连续失败）
+          for (const k of Object.keys(failCount)) {
+            if (k.startsWith(`${c.tool}:`)) delete failCount[k];
+          }
+          obs.push(`【${c.tool}｜${c.arg}】\n${out}`);
+        }
       }
       // P0 GWT：工具结果入候选池竞争，不无差别追加
       for (const o of obs) {
@@ -9593,11 +9811,88 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   // ═══ #3 Agent 动作抽取（确定性逻辑抽成纯函数，可测）═══
-  extractAgentActions(text, reply) {
+  // 只产出计划，不执行设备命令；执行统一走 invokeCapability('device_control', ...)。
+  parseDeviceActionPlan(raw) {
+    const source = String(raw || '').trim();
+    const supported = new Set([
+      'weather', 'location', 'device_info', 'clipboard_read', 'clipboard_write',
+      'notify', 'speak', 'health', 'calendar', 'reminder', 'maps',
+      'open_app', 'shortcut', 'see', 'raw',
+    ]);
+    if (!source) return { ok: false, error: '设备动作为空' };
+
+    const parts = source.match(/^([^\s]+)(?:\s+([\s\S]*))?$/);
+    const aliases = {
+      device: 'device_info', info: 'device_info',
+      'clipboard-read': 'clipboard_read', 'clipboard-write': 'clipboard_write',
+      notification: 'notify', reminders: 'reminder', photos: 'see',
+    };
+    const action = aliases[String(parts?.[1] || '').toLowerCase()] || String(parts?.[1] || '').toLowerCase();
+    if (!supported.has(action)) return { ok: false, error: `不支持的设备动作: ${action}`, supported: [...supported] };
+
+    const tail = String(parts?.[2] || '').trim();
+    const params = {};
+    const keyRe = /(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)=/g;
+    const keys = [];
+    let match;
+    while ((match = keyRe.exec(tail)) !== null) keys.push({ key: match[1], start: match.index + (match[0].startsWith(' ') ? 1 : 0), valueStart: keyRe.lastIndex });
+    for (let i = 0; i < keys.length; i++) {
+      const end = i + 1 < keys.length ? keys[i + 1].start : tail.length;
+      params[keys[i].key] = tail.slice(keys[i].valueStart, end).trim();
+    }
+    if (!keys.length && tail) params.text = tail;
+    if (params.scheme && !params.url) params.url = params.scheme;
+    if (params.q && !params.query) params.query = params.q;
+    if (params.sub && action === 'maps') {
+      // FIX#4: sub 值会把后续的 "--query xxx" 尾巴一起吃进来，先抽 query 再清洗 sub
+      const q = String(params.sub).match(/--query\s+([\s\S]+)$/) || tail.match(/--query\s+(.+?)(?=\s+[a-zA-Z][a-zA-Z0-9_-]*=|$)/);
+      if (q && !params.query) params.query = q[1].trim();
+      params.sub = String(params.sub).replace(/\s*--query\s+[\s\S]*$/, '').trim();
+      if (!params.sub) delete params.sub;
+    }
+    if (params.days != null && /^-?\d+$/.test(params.days)) params.days = Number(params.days);
+    if (params.limit != null && /^-?\d+$/.test(params.limit)) params.limit = Number(params.limit);
+    // FIX#3: weather/location 的裸文本是查询目标（城市/地点），必须保留并映射为 query
+    if ((action === 'weather' || action === 'location') && params.text) {
+      if (!params.query) params.query = params.text;
+      if (action === 'weather' && !params.city) params.city = params.text;
+      delete params.text;
+    }
+    // 真正无参动作才清空裸文本
+    if (action === 'clipboard_read' || action === 'device_info') {
+      delete params.text;
+    }
+    // FIX#1: 成功分支必须带 ok:true，否则下游 filter/if 会丢弃全部合法计划
+    return { ok: true, type: 'device_control', capability: 'device_control', action, params };
+  }
+
+  extractDeviceActions(text, reply) {
     const actions = [];
+    const re = /⟨工具:device[｜|]([^⟩]+)⟩/g;
+    let match;
+    while ((match = re.exec(String(reply || ''))) !== null) {
+      const plan = this.parseDeviceActionPlan(match[1]);
+      actions.push(plan.ok ? plan : { type: 'device_control', capability: 'device_control', ...plan });
+    }
+    return actions;
+  }
+
+  extractAgentActions(text, reply) {
+    const raw = String(reply || '');
+    const actions = this.extractDeviceActions(text, raw);
+    // FIX#2: 先剔除 ⟨工具:device…⟩ 段，避免标记内部的 URL 被 urlRe 二次捕获成重复动作
+    const scanned = raw.replace(/⟨工具:device[｜|][^⟩]*⟩/g, ' ');
     const urlRe = /(https?:\/\/[^\s，。、）)]+|maps:\/\/[^\s，。、）)]+|tel:[+\d-]{3,}|calshow:[^\s，。]*)/g;
-    let m; while ((m = urlRe.exec(reply || '')) !== null) actions.push({ type: 'open_url', url: m[1] });
-    if (!actions.length) {
+    const seen = new Set();
+    let m;
+    while ((m = urlRe.exec(scanned)) !== null) {
+      if (seen.has(m[1])) continue;
+      seen.add(m[1]);
+      actions.push({ type: 'open_url', url: m[1] });
+    }
+    // FIX#5: 兜底只看「有没有成功动作」，ok:false 的错误项不应阻断兜底
+    const hasUsable = actions.some((a) => a.ok !== false);
+    if (!hasUsable) {
       const mp = (text || '').match(/(?:去|导航到?|地图看看?|带我去)\s*([一-龥A-Za-z0-9·]{2,20})/);
       if (mp) actions.push({ type: 'open_url', url: 'maps://?q=' + encodeURIComponent(mp[1]) });
       const tel = (text || '').match(/(?:打(?:电话)?给?|拨打?)\s*([+\d-]{3,})/);

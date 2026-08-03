@@ -39,6 +39,26 @@ test('3b. detectInterrupt exit=0 + ok 正常 → type:none', () => {
   assert.equal(r.type, 'none');
 });
 
+test('3c. detectInterrupt 锁屏经 ok:false 而非非零退出码上报（exit_code:null）', () => {
+  // 设备锁屏工具可能置 ok:false 但进程正常退出（exit_code 缺失 → null）；
+  // 仍须识别为 locked，不得因退出码非非零而漏判成 system_dialog/none。
+  const r = proto.detectInterrupt({ ok: false, exit_code: null, stderr: 'Device is locked' });
+  assert.equal(r.type, 'locked');
+  assert.equal(r.confidence, 'high');
+});
+
+test('3d. detectInterrupt 锁屏 ok:false + exit=0 + 有 stdout 仍识别 locked', () => {
+  // stdout 非空时旧逻辑会返回 type:none（完全漏判中断），这里回归钉死。
+  const r = proto.detectInterrupt({ ok: false, exit_code: 0, stderr: 'Device is locked', stdout: 'partial output' });
+  assert.equal(r.type, 'locked');
+});
+
+test('3e. detectInterrupt 权限弹窗经 ok:false 上报（exit_code:null）', () => {
+  const r = proto.detectInterrupt({ ok: false, exit_code: null, stderr: 'NSAuthorizationError requires permission' });
+  assert.equal(r.type, 'permission_dialog');
+  assert.equal(r.confidence, 'high');
+});
+
 test('4. detectInterrupt 识别来电', () => {
   const r = proto.detectInterrupt({ exit_code: 1, stderr: 'operation interrupted by incoming call' });
   assert.equal(r.type, 'call_incoming');
