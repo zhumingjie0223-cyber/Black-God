@@ -2590,13 +2590,16 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       return { ok, data, raw, stderr: stderr || errStr, cmd, exit_code: res.exit_code ?? null };
     };
 
-    const fail = (r, fallback = '命令执行失败') => ({
-      ok: false,
-      action,
-      error: (r && (r.stderr || r.raw)) || fallback,
-      cmd: r && r.cmd,
-      exit_code: r && r.exit_code,
-    });
+    const fail = (r, fallback = '命令执行失败') => {
+      const errStr = String((r && (r.stderr || r.raw || r.error)) || fallback);
+      const ft = /离线|offline/i.test(errStr) ? 'offline'
+        : /权限|permission|denied/i.test(errStr) ? 'permission'
+        : /超时|timeout|timed.?out/i.test(errStr) ? 'timeout'
+        : /找不到|not.?found|不存在/i.test(errStr) ? 'not_found'
+        : 'unknown';
+      traceDevice(false, ft);
+      return { ok: false, action, error: errStr, cmd: r && r.cmd, exit_code: r && r.exit_code };
+    };
 
     const pickPath = (r) => {
       const d = r.data;
@@ -2630,6 +2633,27 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     ]);
     const CONFIRM_ACTIONS = new Set(['clipboard_write', 'notify', 'speak', 'shortcut', 'raw']);
     const act = String(action || '').toLowerCase();
+
+    // ---- trace ----
+    const t0 = Date.now();
+    const traceDevice = (ok, failureType = '') => {
+      try {
+        const { __planId, __stepIndex, ...traceParams } = params;
+        this.broadcast({
+          type: 'device_trace',
+          planId: __planId || '',
+          stepIndex: typeof __stepIndex === 'number' ? __stepIndex : -1,
+          tool: 'device_control',
+          action: act,
+          arg: JSON.stringify(traceParams).slice(0, 120),
+          ok,
+          failureType,
+          latencyMs: Date.now() - t0,
+          ts: Date.now(),
+        });
+      } catch (_) {}
+    };
+
     if (!SAFE_ACTIONS.has(act)) {
       let needConfirm = CONFIRM_ACTIONS.has(act);
       if (!needConfirm && act === 'open_app') {
@@ -2637,6 +2661,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         needConfirm = /pay|alipay|transfer|weixin:\/\/pay/i.test(url);
       }
       if (needConfirm && !params.confirm) {
+        traceDevice(false, 'need_confirm');
         return {
           ok: false,
           need_confirm: true,
@@ -2655,6 +2680,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           if (params.days) args.push(`--days ${parseInt(params.days, 10)}`);
           const r = await run('weather', args.join(' '));
           if (!r.ok) return fail(r);
+          traceDevice(true);
           return { ok: true, action: 'weather', weather: r.data, raw: r.raw };
         }
 
@@ -2677,6 +2703,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         case 'device_info': {
           const r = await run('device', 'info');
           if (!r.ok) return fail(r);
+          traceDevice(true);
           return { ok: true, action: 'device_info', device: r.data, raw: r.raw };
         }
 
@@ -2685,14 +2712,16 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const r = await run('clipboard');
           if (!r.ok) return fail(r);
           const text = typeof r.data === 'string' ? r.data : (r.data?.text ?? r.raw);
+          traceDevice(true);
           return { ok: true, action: 'clipboard_read', text, raw: r.raw };
         }
   // ---------- 剪贴板写 ----------
         case 'clipboard_write': {
           const text = params.text ?? params.content ?? '';
-          if (!String(text).length) return { ok: false, action, error: '缺少 text 参数' };
+          if (!String(text).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 text 参数' }; }
           const r = await run('clipboard', `set ${q(text)}`);
           if (!r.ok) return fail(r);
+          traceDevice(true);
           return { ok: true, action: 'clipboard_write', written: String(text), raw: r.raw };
         }
 
@@ -2709,19 +2738,21 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           ].join(' ');
           const r = await run('notification', args);
           if (!r.ok) return fail(r, '通知调度失败');
+          traceDevice(true);
           return { ok: true, action: 'notify', title: String(title), body: String(body), after, result: r.data, raw: r.raw };
         }
 
         // ---------- 朗读 ----------
         case 'speak': {
           const text = params.text ?? params.content ?? '';
-          if (!String(text).length) return { ok: false, action, error: '缺少 text 参数' };
+          if (!String(text).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 text 参数' }; }
           const args = ['speak', `--text ${q(text)}`];
           if (params.rate != null) args.push(`--rate ${Number(params.rate)}`);
           if (params.voice) args.push(`--voice ${q(params.voice)}`);
           if (params.lang) args.push(`--lang ${q(params.lang)}`);
           const r = await run('speak', args.join(' '));
           if (!r.ok) return fail(r, '语音播报失败');
+          traceDevice(true);
           return { ok: true, action: 'speak', text: String(text), raw: r.raw };
         }
 
@@ -2733,6 +2764,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const days = Number.isFinite(Number(params.days)) ? Number(params.days) : 7;
           const r = await run('healthkit', `batch --types ${q(types)} --days ${days}`);
           if (!r.ok) return fail(r, '健康数据读取失败');
+          traceDevice(true);
           return { ok: true, action: 'health', types: String(types), days, health: r.data, raw: r.raw };
         }
 
@@ -2744,6 +2776,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const r = await run('calendar', args.join(' '));
           if (!r.ok) return fail(r, '日历读取失败');
           const events = Array.isArray(r.data) ? r.data : (r.data?.events ?? r.data);
+          traceDevice(true);
           return { ok: true, action: 'calendar', events, raw: r.raw };
         }
 
@@ -2755,18 +2788,20 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           const r = await run('reminders', args.join(' '));
           if (!r.ok) return fail(r, '提醒事项读取失败');
           const reminders = Array.isArray(r.data) ? r.data : (r.data?.reminders ?? r.data);
+          traceDevice(true);
           return { ok: true, action: 'reminder', reminders, raw: r.raw };
         }
 
         // ---------- 地图搜索 ----------
         case 'maps': {
           const query = params.query ?? params.q ?? '';
-          if (!String(query).length) return { ok: false, action, error: '缺少 query 参数' };
+          if (!String(query).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 query 参数' }; }
           const args = [`search --query ${q(query)}`];
           if (params.limit != null) args.push(`--limit ${parseInt(params.limit, 10)}`);
           const r = await run('maps', args.join(' '));
           if (!r.ok) return fail(r, '地图搜索失败');
           const places = Array.isArray(r.data) ? r.data : (r.data?.results ?? r.data?.places ?? r.data);
+          traceDevice(true);
           return { ok: true, action: 'maps', query: String(query), places, raw: r.raw };
         }
 
@@ -2777,14 +2812,15 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
           if (action === 'shortcut') {
             const name = params.name ?? params.shortcut ?? '';
             if (!url) {
-              if (!String(name).length) return { ok: false, action, error: '缺少 name 参数' };
+              if (!String(name).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 name 参数' }; }
               url = `shortcuts://run-shortcut?name=${encodeURIComponent(String(name))}`;
               if (params.input != null) url += `&input=text&text=${encodeURIComponent(String(params.input))}`;
             }
           }
-          if (!String(url).length) return { ok: false, action, error: '缺少 url 参数' };
+          if (!String(url).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 url 参数' }; }
           const r = await run('open', q(url));
           if (!r.ok) return fail(r, '打开失败');
+          traceDevice(true);
           return { ok: true, action, url: String(url), raw: r.raw };
         }
 
@@ -2844,7 +2880,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
         // ---------- 原始命令 ----------
         case 'raw': {
           const cmd = params.cmd ?? params.command ?? '';
-          if (!String(cmd).length) return { ok: false, action, error: '缺少 cmd 参数' };
+          if (!String(cmd).length) { traceDevice(false, 'param_missing'); return { ok: false, action, error: '缺少 cmd 参数' }; }
           let res;
           try {
             res = await this.deviceShellExec(String(cmd), 'bash');
@@ -2885,12 +2921,15 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
       }
     } catch (err) {
       if (err && err.__offline) {
+        traceDevice(false, 'offline');
         return { ok: false, error: OFFLINE_MSG };
       }
       const msg = String((err && err.message) || err || '未知错误');
       if (msg.includes('离线')) {
+        traceDevice(false, 'offline');
         return { ok: false, error: OFFLINE_MSG };
       }
+      traceDevice(false, 'unknown');
       return { ok: false, action, error: msg };
     }
   }
@@ -8887,6 +8926,17 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
   // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
   // 信息工具在「作答前」多轮调用、结果喂回；行动型能力(gen_image/tg…)仍走 parseSummons 事后执行。
+  classifyFailure(out) {
+    const s = typeof out === 'string' ? out : JSON.stringify(out || '');
+    if (/离线|offline/i.test(s)) return 'offline';
+    if (/need_confirm/.test(s)) return 'need_confirm';
+    if (/缺少.{0,12}参数|param_missing/i.test(s)) return 'param_missing';
+    if (/权限|permission|denied/i.test(s)) return 'permission';
+    if (/超时|timeout|timed.?out/i.test(s)) return 'timeout';
+    if (/找不到|not.?found|不存在/i.test(s)) return 'not_found';
+    return 'unknown';
+  }
+
   async runAgentLoop(baseSystem, text, soul, opts = {}) {
     const _cfg = (await this.storage.get('config')) || {};
     const hasExec = true; // 原生沙箱始终可用，不依赖外部连接器
@@ -8950,6 +9000,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   示例：⟨工具:redteam｜pojie:jsvmp https://target.com⟩ / ⟨工具:redteam｜pojie:slider https://demo.geetest.com⟩
 规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratchCandidates = [], toolLog = [], last = null, mediaAll = [];
+    const planId = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    let planStepIndex = 0;
     for (let step = 0; step < 5; step++) {
       // P0 GWT：每轮从候选池仲裁，只注入赢者，不无差别追加
       const gwWinners = this.gw.arbitrate(scratchCandidates, text, soul);
@@ -8960,7 +9012,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog, media: mediaAll };
       const obs = [];
       for (const c of calls.slice(0, 2)) {
-        try { this.broadcast({ type: 'agent_step', tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
+        const stepIndex = planStepIndex++;
+        const tStart = Date.now();
+        try { this.broadcast({ type: 'agent_step', planId, stepIndex, tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
         let out = '';
         if (c.tool === 'web_search') out = await this.webSearch(c.arg).catch(() => '');
         else if (c.tool === 'open') out = await this.fetchUrl(c.arg).catch(() => '');
@@ -9043,7 +9097,21 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           const r = await this.callBrain(prompt, c.arg, null, { tier: 'heavy' }).catch(() => null);
           out = r ? `[${c.tool}]\n${r.reply || r}` : `${c.tool}工具无响应`;
         }
-        toolLog.push({ tool: c.tool, arg: c.arg, ok: !!out });
+        const _ok = !!out;
+        const _failureType = _ok ? '' : this.classifyFailure(out);
+        const rec = {
+          planId,
+          stepIndex,
+          tool: c.tool,
+          action: '',
+          arg: String(c.arg || '').slice(0, 120),
+          ok: _ok,
+          failureType: _failureType,
+          latencyMs: Date.now() - tStart,
+          ts: Date.now(),
+        };
+        toolLog.push(rec);
+        try { this.broadcast({ type: 'agent_step_done', ...rec }); } catch (e) {}
         obs.push(`【${c.tool}｜${c.arg}】\n${out || '（无结果）'}`);
       }
       // P0 GWT：工具结果入候选池竞争，不无差别追加
