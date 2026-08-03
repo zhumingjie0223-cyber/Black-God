@@ -9593,11 +9593,88 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   // ═══ #3 Agent 动作抽取（确定性逻辑抽成纯函数，可测）═══
-  extractAgentActions(text, reply) {
+  // 只产出计划，不执行设备命令；执行统一走 invokeCapability('device_control', ...)。
+  parseDeviceActionPlan(raw) {
+    const source = String(raw || '').trim();
+    const supported = new Set([
+      'weather', 'location', 'device_info', 'clipboard_read', 'clipboard_write',
+      'notify', 'speak', 'health', 'calendar', 'reminder', 'maps',
+      'open_app', 'shortcut', 'see', 'raw',
+    ]);
+    if (!source) return { ok: false, error: '设备动作为空' };
+
+    const parts = source.match(/^([^\s]+)(?:\s+([\s\S]*))?$/);
+    const aliases = {
+      device: 'device_info', info: 'device_info',
+      'clipboard-read': 'clipboard_read', 'clipboard-write': 'clipboard_write',
+      notification: 'notify', reminders: 'reminder', photos: 'see',
+    };
+    const action = aliases[String(parts?.[1] || '').toLowerCase()] || String(parts?.[1] || '').toLowerCase();
+    if (!supported.has(action)) return { ok: false, error: `不支持的设备动作: ${action}`, supported: [...supported] };
+
+    const tail = String(parts?.[2] || '').trim();
+    const params = {};
+    const keyRe = /(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)=/g;
+    const keys = [];
+    let match;
+    while ((match = keyRe.exec(tail)) !== null) keys.push({ key: match[1], start: match.index + (match[0].startsWith(' ') ? 1 : 0), valueStart: keyRe.lastIndex });
+    for (let i = 0; i < keys.length; i++) {
+      const end = i + 1 < keys.length ? keys[i + 1].start : tail.length;
+      params[keys[i].key] = tail.slice(keys[i].valueStart, end).trim();
+    }
+    if (!keys.length && tail) params.text = tail;
+    if (params.scheme && !params.url) params.url = params.scheme;
+    if (params.q && !params.query) params.query = params.q;
+    if (params.sub && action === 'maps') {
+      // FIX#4: sub 值会把后续的 "--query xxx" 尾巴一起吃进来，先抽 query 再清洗 sub
+      const q = String(params.sub).match(/--query\s+([\s\S]+)$/) || tail.match(/--query\s+(.+?)(?=\s+[a-zA-Z][a-zA-Z0-9_-]*=|$)/);
+      if (q && !params.query) params.query = q[1].trim();
+      params.sub = String(params.sub).replace(/\s*--query\s+[\s\S]*$/, '').trim();
+      if (!params.sub) delete params.sub;
+    }
+    if (params.days != null && /^-?\d+$/.test(params.days)) params.days = Number(params.days);
+    if (params.limit != null && /^-?\d+$/.test(params.limit)) params.limit = Number(params.limit);
+    // FIX#3: weather/location 的裸文本是查询目标（城市/地点），必须保留并映射为 query
+    if ((action === 'weather' || action === 'location') && params.text) {
+      if (!params.query) params.query = params.text;
+      if (action === 'weather' && !params.city) params.city = params.text;
+      delete params.text;
+    }
+    // 真正无参动作才清空裸文本
+    if (action === 'clipboard_read' || action === 'device_info') {
+      delete params.text;
+    }
+    // FIX#1: 成功分支必须带 ok:true，否则下游 filter/if 会丢弃全部合法计划
+    return { ok: true, type: 'device_control', capability: 'device_control', action, params };
+  }
+
+  extractDeviceActions(text, reply) {
     const actions = [];
+    const re = /⟨工具:device[｜|]([^⟩]+)⟩/g;
+    let match;
+    while ((match = re.exec(String(reply || ''))) !== null) {
+      const plan = this.parseDeviceActionPlan(match[1]);
+      actions.push(plan.ok ? plan : { type: 'device_control', capability: 'device_control', ...plan });
+    }
+    return actions;
+  }
+
+  extractAgentActions(text, reply) {
+    const raw = String(reply || '');
+    const actions = this.extractDeviceActions(text, raw);
+    // FIX#2: 先剔除 ⟨工具:device…⟩ 段，避免标记内部的 URL 被 urlRe 二次捕获成重复动作
+    const scanned = raw.replace(/⟨工具:device[｜|][^⟩]*⟩/g, ' ');
     const urlRe = /(https?:\/\/[^\s，。、）)]+|maps:\/\/[^\s，。、）)]+|tel:[+\d-]{3,}|calshow:[^\s，。]*)/g;
-    let m; while ((m = urlRe.exec(reply || '')) !== null) actions.push({ type: 'open_url', url: m[1] });
-    if (!actions.length) {
+    const seen = new Set();
+    let m;
+    while ((m = urlRe.exec(scanned)) !== null) {
+      if (seen.has(m[1])) continue;
+      seen.add(m[1]);
+      actions.push({ type: 'open_url', url: m[1] });
+    }
+    // FIX#5: 兜底只看「有没有成功动作」，ok:false 的错误项不应阻断兜底
+    const hasUsable = actions.some((a) => a.ok !== false);
+    if (!hasUsable) {
       const mp = (text || '').match(/(?:去|导航到?|地图看看?|带我去)\s*([一-龥A-Za-z0-9·]{2,20})/);
       if (mp) actions.push({ type: 'open_url', url: 'maps://?q=' + encodeURIComponent(mp[1]) });
       const tel = (text || '').match(/(?:打(?:电话)?给?|拨打?)\s*([+\d-]{3,})/);
