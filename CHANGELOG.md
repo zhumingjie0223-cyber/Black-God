@@ -19,6 +19,8 @@
 ### 配置清理
 - 归档删除过期部署配置 `web/nexus-do/wrangler.toml`(备份 `docs/archive/wrangler.toml.2026-08-09.bak`)；
   生产权威配置为 `wrangler.jsonc`，CI 全部工作流核实无一引用 toml。(backlog「wrangler 双配置」一条销案)
+- `container/package.json` 的 `playwright-core` 由 `"latest"` 锁定为 `"1.62.1"`(权哥拍板锁稳定版)，容器镜像可复现。
+- backlog 全账清零：空 catch 观察项按"非 bug 维持现状"销案；至此 2026-08-03 立的三条全部处置完毕。
 
 ### 测试
 - 构建、selftest 236/236、sync-ui、check-sync(词族/编号表一致)、枢语 JS 27/27 + Python 9/9 全部通过。
