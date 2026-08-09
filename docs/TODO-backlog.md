@@ -17,7 +17,10 @@
 | `container/task_runner.mjs:53/284` | 容器任务清理/解析 | 清理路径,吞异常合理,保留 |
 | `reverse_kb.mjs:154/705` | **代码生成模板字符串内**的 Frida hook 片段 | 是生成物,不是运行时逻辑,正确无误 |
 
-## 2. wrangler 双配置文件并存(建议清理,涉部署红线,待确认)
+## 2. wrangler 双配置文件并存 —— ✅ 已销案(2026-08-09 权哥拍板执行)
+
+核实 CI 全部工作流无一引用 `wrangler.toml` 后,已归档删除(备份 `docs/archive/wrangler.toml.2026-08-09.bak`)。
+以下为原始记录:
 
 `web/nexus-do/` 同时存在:
 - `wrangler.toml` —— 旧,`compatibility_date = 2025-01-01`,只有 `SHENSHU` 一个 DO 绑定,**缺** `AGENT_STATE_MACHINE`/`EXEC_CONTAINER` 绑定、缺 `migrations`、缺 `containers`、缺 `account_id`。
