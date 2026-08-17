@@ -2,6 +2,33 @@
 
 本项目重要变更记录。日期用绝对日期(UTC)。
 
+## 2026-08-17 — 项目状态复核 + 文档收口(里子文档不许骗)
+
+**代码零故障，问题全在文档层**：本次全量体检 301 条测试(selftest 236 + 单测 65)、
+双副本同步、枢语双实现(JS 27 + Python 9)全绿零失败，未查出任何 bug；
+但查出文档与实现严重脱节，已当场修掉。完整三段式报告见
+`docs/done/神枢项目状态查询与文档收口-2026-08-17.md`。
+
+### 文档
+- `README.md`:修 12 处死链与幻影路径。7 个「核心文档」链接在 7 月目录重整后全部 404,
+  已逐条 `test -e` 验证后重指到 `docs/architecture/`、`docs/spec/`、`docs/archive/` 下的真实文件;
+  「本地起 & 自测」原教程指向 2026-08-09 已归档的 `server/`、`mock_gateway.py`、`/studio`,
+  照着跑必然失败,改为真实可跑的 `build.mjs / selftest.mjs / npm test` 并加历史说明;
+  目录结构图对齐现状(移除已不存在的 `server/`、`shuyu_v2/`)。
+- `docs/plan/LAUNCH_CHECKLIST.md`:4 条早已完成却仍标未完成的项,对着代码实测复核后回填,
+  并逐条写明残留缺口(限流已落地/`max_tokens` 已从 320 提到 2048/测试已从 10 条到 301 条/UI 已收口)。
+
+### CI 加固
+- `.github/workflows/exec-shell.yml`:命令值改由 `env: CMD` 传给 `bash -c "$CMD"`,
+  不再用 `${{ }}` 直接内插进脚本正文。**不是权限提升漏洞**(本工作流按设计即执行调用方命令,
+  上游 `execDispatchGH` 有长度限制+危险命令黑名单+令牌把关),真实收益是防止命令内容
+  搅乱 `::group::Command Output` / `::endgroup::` 标记——`parseGHLogs` 全靠这两个标记切结果,
+  一乱神枢回收到的执行结果就是错的。同时补注释锁死这两个标记。
+
+### 测试
+- 改动后复跑:构建、selftest 236/236、sync-ui 双副本一致、check-sync 引擎层全同步、
+  exec-shell.yml YAML 可解析且 group 标记原样保留。零回退。
+
 ## 2026-08-09 — UI 收口 + 词库恢复 + 配置清理(版本确认)
 
 **版本确认(权哥拍板)：主界面 `web/nexus-do/index.html`(Black God)是唯一 UI，今后 UI 只做更新，不再维护多副本/多入口。**
