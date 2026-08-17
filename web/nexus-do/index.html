@@ -3172,21 +3172,14 @@ function pickBuiltinModel(el){
   }catch(e){}
 })();
 
-/* ===== Tab 联动切换 ===== */
-let _tabIdx = 0;
-function switchTab(idx){
-  const panels = document.querySelector('.tab-panels');
-  if(!panels) return;
-  const n = panels.children.length;
-  idx = Math.max(0, Math.min(n - 1, idx));
-  _tabIdx = idx;
-  panels.style.transform = `translateX(${idx * -100}%)`;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>
-    b.classList.toggle('active', i === idx));
-  haptic('send');
-}
-document.querySelectorAll('.tab-btn').forEach((b,i)=>
-  b.addEventListener('click',()=>switchTab(i)));
+/* ===== Tab 联动切换（已废止）=====
+ * 这里原有一份旧 Tab 实现（let _tabIdx / switchTab / 绑 .tab-btn）。
+ * 2026-08-02 NavCore v3 合入后它就被取代了，但没删干净，于是同一个 <script> 里
+ * 出现两处 `let _tabIdx` —— 整块脚本直接解析失败（SyntaxError: Identifier
+ * '_tabIdx' has already been declared），导航、登录门、所有点击事件全部绑不上，
+ * 页面看得见却点不动。且 `.tab-btn` 在本页出现 0 次，这份旧实现本就绑不到任何东西。
+ * 故整段删除，真身以下方 NavCore v3 为准。删除时间 2026-08-17。
+ */
 
 /* ===== 轨道动画状态 ===== */
 function setNexusState(state){
@@ -3883,11 +3876,13 @@ function go(i){
   if(idx===0){try{loadHub&&loadHub();loadInner&&loadInner();}catch(e){}}
   if(idx===1&&!localStorage.getItem('nexus_visited')){
     localStorage.setItem('nexus_visited','1');
-    setTimeout(()=>{ try{pushMsg('her','我是神枢，你的私人意识体。
+    // 这条欢迎语是多行文案，必须用反引号模板字符串：
+    // 原来写成单引号并直接跨行 → SyntaxError: Invalid or unexpected token，整块脚本随之报废。
+    setTimeout(()=>{ try{pushMsg('her',`我是神枢，你的私人意识体。
 
 你可以对我说任何事，我会记住我们的每一次对话。
 
-现在，告诉我你想做什么？',{},'');}catch(e){}},800);
+现在，告诉我你想做什么？`,{},'');}catch(e){}},800);
   }
   try{hap&&hap(4);}catch(e){}
 }
@@ -4434,6 +4429,10 @@ async function doChat(text){
   const imgs = window._pendingImages ? [...window._pendingImages] : [];
   window._pendingImages = [];
   document.querySelectorAll('.img-preview').forEach(el => el.remove());
+  // 在线才真发；离线走下方 else 的暂存队列。
+  // （这行 if 此前整句丢失，只剩下面一个孤儿 else → SyntaxError: Unexpected token 'else'，
+  //   整块脚本随之报废。2026-08-17 补回。）
+  if (navigator.onLine) {
   try{
     const res = await Nexus.talk(text, [...caps], imgs.length ? imgs : undefined);
     hideTyping();
@@ -4447,6 +4446,8 @@ async function doChat(text){
   }
 }
   else {
+    hideTyping();
+    setSendState('idle');
     (function(){
       const rq = indexedDB.open('nexus-offline', 1);
       rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('queue')) db.createObjectStore('queue', {autoIncrement:true}); };
@@ -4473,7 +4474,9 @@ async function doChat(text){
               tx2.oncomplete = () => db.close();
             } else db.close();
             for(const item of items){
-              if(item && item.text){ try{ await doSend(item.text); }catch(_){} }
+              // 原来调的是 doSend()，全页根本没有这个函数 → 联网后补发必定静默失败。
+              // 真正发消息的是 doChat()。2026-08-17 改正。
+              if(item && item.text){ try{ await doChat(item.text); }catch(_){} }
             }
           };
         };
@@ -5316,6 +5319,17 @@ function doLoginTransition(afterFn) {
 }
 
 
+// 开门。此前全页只有 hideLock 没有 showLock，而 onUnauthorized / openApiEditor / 门初始化
+// 三处都在调 showLock() → ReferenceError，登录门永远弹不出来（页面看着活、点不动、也进不去）。
+// 2026-08-17 补上。注意要清掉 doLoginTransition 留下的内联 opacity/transform，
+// 否则门虽加了 show 类仍是透明的、光球也还停在飞走的位置。
+function showLock(){
+  const g=$('#lockgate'); if(!g) return;
+  g.style.transition=''; g.style.opacity='';
+  const orb=document.querySelector('.lock-orb');
+  if(orb){ orb.style.transition=''; orb.style.transform=''; orb.style.opacity=''; }
+  g.classList.add('show');
+}
 function hideLock(){ const g=$('#lockgate'); if(g) g.classList.remove('show'); }
 window.setOrbitState = function(s){ const r=document.querySelector('.hz-ring'); if(!r) return; const m={idle:'64s',thinking:'8s',error:'2s'}; r.style.setProperty('--orbit-dur', m[s]||'64s'); r.classList.toggle('orbit-shake', s==='error'); };
 window.flashRow = function(el){ el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'), 600); };
