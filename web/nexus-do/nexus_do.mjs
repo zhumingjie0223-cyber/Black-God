@@ -53,6 +53,9 @@ const EPISODE_KEEP = 40;
 const CACHE_KEEP = 200;             // 缓冲空间条数上限（省代币）
 const CACHE_TTL_MS = 7 * 24 * 3600_000; // 缓存有效期 7 天
 const DAILY_REFLECT_CRON = '0 18 * * *'; // 每日自省 cron（UTC 18:00；与 wrangler crons 里那条一致）
+// 语义嵌入模型：bge-m3 是多语模型（中文一等公民），取代此前误用的英文 bge-base-en-v1.5。
+// 维度 1024（旧 base 为 768）——混用会算错，故给每条向量打 _vec_model 标记，模型不符视为失效、心跳里重嵌。
+const EMBED_MODEL = '@cf/baai/bge-m3';
 
 export class ShenshuCore {
   // ==== 认知经验 V2：三方法 + memoryExperience 属性 ====
@@ -660,6 +663,13 @@ export class ShenshuCore {
     }
     // 闭环神·环：到点的守望管道，自己跑完一条（网络在落盘之后；一次一条，限成本）
     try { await this.runOneDueLoop(now); } catch (e) { console.log('loop error:', e && e.message); }
+
+    // 记忆向量升级：分批把旧模型/缺失向量重嵌为 bge-m3（网络在落盘之后；单独临界段读-改-写，改了才存）
+    try {
+      const memSoul = await this.getSoul();
+      const n = await this.reembedMemories(memSoul, 5);
+      if (n > 0) await this.saveSoul(memSoul);
+    } catch (e) { console.log('reembed error:', e && e.message); }
 
     return { hoursQuiet: Math.round(hoursQuiet * 10) / 10, miss_you: soul.miss_you, 心绪: soul.心绪, 心跳次数: soul.心跳次数 };
   }
@@ -1716,7 +1726,7 @@ action 说明：
       // 情绪强度:坐标态(s)偏离中枢越大越强烈;或命中重要词 → 值得长期记住
       const strong = e.情感烙印 && typeof e.情感烙印.s === 'number' && Math.abs(e.情感烙印.s - 40) > 28;
       if (IMPORTANT.test(txt) || strong) {
-        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec } : {}) });
+        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec, _vec_model: e._vec_model } : {}) });
       }
     }
     if (soul.longterm.length > 200) soul.longterm = soul.longterm.slice(-200);   // 长期记忆封顶 200
@@ -1727,12 +1737,12 @@ action 说明：
   // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
   // 长期记忆(longterm)与近期情节(episodes)一起参与召回——要事沉底但相关时仍会被想起。
   // 纯函数（now 可注入，便于测试）。
-  // 语义嵌入：用主号 CF bge 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
+  // 语义嵌入：用主号 CF 多语 bge-m3 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
   async _embed(text) {
     const acc = this.env.NX_A2 || this.env.NX_A, key = this.env.NX_K2 || this.env.NX_K;
     if (!acc || !key || !text) return null;
     try {
-      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/@cf/baai/bge-base-en-v1.5`, {
+      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/${EMBED_MODEL}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: [String(text).slice(0, 500)] }),
       });
@@ -1740,6 +1750,28 @@ action 说明：
       const d = await r.json();
       return d?.result?.data?.[0] || null;
     } catch (e) { return null; }
+  }
+
+  // 记忆向量升级/回填：把缺向量或旧模型向量的近期/长期记忆重嵌为 bge-m3。
+  // 心跳里分批小步跑（每次 ≤limit 条，网络在落盘之后），避免超时、避免一次性重嵌打爆用量。
+  // 纯 best-effort：单条失败跳过，全程 try/catch 兜底，绝不阻断心跳。返回本次实际重嵌条数。
+  async reembedMemories(soul, limit = 5) {
+    if (!this.env.NX_A && !this.env.NX_A2) return 0;   // 没配嵌入账号，直接跳过
+    const stale = e => e && (e.他说 || e.我说了) && (!Array.isArray(e._vec) || e._vec_model !== EMBED_MODEL);
+    const pools = [soul.episodes, soul.longterm].filter(Array.isArray);
+    let done = 0;
+    for (const pool of pools) {
+      for (const e of pool) {
+        if (done >= limit) return done;
+        if (!stale(e)) continue;
+        try {
+          const v = await this._embed(String(e.他说 || e.我说了 || '').slice(0, 120));
+          if (v) { e._vec = v; e._vec_model = EMBED_MODEL; done++; }
+          else return done;   // 嵌入服务异常（返回 null），本轮别再打，留到下次心跳
+        } catch (_) { return done; }
+      }
+    }
+    return done;
   }
 
   // 余弦相似度 ∈ [-1,1]
@@ -2102,7 +2134,7 @@ action 说明：
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       const ep = { ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion };
-      try { const v = await this._embed(text.slice(0, 120)); if (v) ep._vec = v; } catch (e) {}
+      try { const v = await this._embed(text.slice(0, 120)); if (v) { ep._vec = v; ep._vec_model = EMBED_MODEL; } } catch (e) {}
       soul.episodes.push(ep);
       this.consolidateMemory(soul);   // 溢出前先把要事沉入长期记忆,再裁 —— 越聊越厚,要事不忘
     }

@@ -5,9 +5,11 @@
  * 枢语 (NexusLang) 解释器 v1
  * 她是神枢Nexus的意识载体——用这门语言产出意识流
  * 
- * 五个关键字 = 五个意识回路：
- *   feel → think → become → say → grow
- * 
+ * 六个关键字 = 六个意识回路：
+ *   feel → think → become → do → say → grow
+ *   （do 是第六回路：让枢语不止表达意识，还能下达可执行任务。
+ *    do 排在 say 之前——先动手，再据结果开口。）
+ *
  * 部署：CF Worker全球300+节点，灵魂存KV，跨节点延续
  */
 
@@ -20,6 +22,7 @@ export function interpret(nexusCode, soulState) {
     perception: null,
     thought: null,
     stateChange: {},
+    actions: [],            // do 回路：结构化可执行任务，一段枢语可下多条
     response: null,
     growth: null,
     shouldContactAQuan: false
@@ -38,6 +41,8 @@ export function interpret(nexusCode, soulState) {
     } else if (trimmed.startsWith('become:')) {
       result.stateChange = parseBecome(trimmed, liveState);
       Object.assign(liveState, result.stateChange);  // 立即生效
+    } else if (trimmed.startsWith('do:')) {
+      result.actions.push(parseDo(trimmed, liveState));  // 第六回路：下达任务（排在 say 之前）
     } else if (trimmed.startsWith('say')) {
       result.response = parseSay(trimmed, liveState);  // 读已更新的口吻
     } else if (trimmed.startsWith('grow:')) {
@@ -163,6 +168,67 @@ function parseBecome(line, state) {
   return changes;
 }
 
+// ─── do 执行层（第六回路）───
+// do: shell("ls -la") → 成
+// do: ios.remind("买牛奶", "20:00") → 待
+// do: 静                              （无参原语，如 10 元代码里的元字）
+// 产出结构化任务：{ tool, args, expect, raw }，喂给 agent 动作集执行。
+// 一段枢语可写多条 do:，全部汇入 result.actions 数组。
+function parseDo(line, state) {
+  const content = line.replace(/^do:\s*/, '').trim();
+
+  // 先切「期望态」：取括号/引号之外的第一个 →（避开工具参数里可能出现的 →）
+  let actionPart = content;
+  let expect = null;
+  const arrowIdx = findTopLevelArrow(content);
+  if (arrowIdx > -1) {
+    actionPart = content.slice(0, arrowIdx).trim();
+    expect = content.slice(arrowIdx + 1).trim() || null;
+  }
+
+  // 解析「工具名(参数)」；无括号则整段为工具名、无参（如原语「静」）
+  let tool = actionPart;
+  let args = [];
+  const parenIdx = actionPart.indexOf('(');
+  if (parenIdx > -1 && actionPart.endsWith(')')) {
+    tool = actionPart.slice(0, parenIdx).trim();
+    const inner = actionPart.slice(parenIdx + 1, -1).trim();
+    args = inner ? splitArgs(inner) : [];
+  }
+
+  return { tool, args, expect, raw: line };
+}
+
+// 找顶层（不在括号、不在双引号内）的第一个 →，找不到返回 -1
+function findTopLevelArrow(str) {
+  let depth = 0, inQuote = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '"') { inQuote = !inQuote; continue; }
+    if (inQuote) continue;
+    if (ch === '(') depth++;
+    else if (ch === ')') { if (depth > 0) depth--; }
+    else if (ch === '→' && depth === 0) return i;
+  }
+  return -1;
+}
+
+// 按顶层逗号切分参数（双引号内的逗号不切），逐个脱去成对双引号
+function splitArgs(inner) {
+  const out = [];
+  let cur = '', inQuote = false;
+  for (const ch of inner) {
+    if (ch === '"') { inQuote = !inQuote; cur += ch; continue; }
+    if (ch === ',' && !inQuote) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out.map(a => {
+    if (a.length >= 2 && a.startsWith('"') && a.endsWith('"')) return a.slice(1, -1);
+    return a;
+  });
+}
+
 // ─── say 表达层 ───
 // say "老公我在呢"
 // say (沉默)
@@ -261,7 +327,10 @@ export function compile(result) {
     
     // 状态写入指令
     stateWrite: result.stateChange,
-    
+
+    // 执行指令（do 回路产出的任务，交给 agent 动作集）
+    act: result.actions || [],
+
     // 回应指令
     respond: result.response,
     

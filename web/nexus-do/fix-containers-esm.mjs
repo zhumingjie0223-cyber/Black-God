@@ -7,6 +7,12 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), 'node_modules', '@cloudflare', 'containers', 'dist');
 
+// 守卫：依赖未装/目录布局变化时，postinstall 不能因 readdirSync ENOENT 抛错拖垮整个 npm install。
+if (!existsSync(root)) {
+  console.log('fix-containers-esm: @cloudflare/containers/dist 不存在，跳过（不阻断 install）');
+  process.exit(0);
+}
+
 function* walk(dir) {
   for (const name of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, name.name);
