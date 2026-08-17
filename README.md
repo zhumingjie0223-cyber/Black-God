@@ -48,25 +48,25 @@
 
 - **工作台 UI**：已于 2026-08-09 收口归档（页面存 `docs/archive/ui-收口-2026-08-09/`）——主界面 `web/nexus-do/index.html` 是唯一 UI 入口，今后只做更新不再多副本
 - **流式端点**：`POST /api/agent/stream`（SSE 逐事件推流，前端实时渲染计划清单与执行时间线）
+- **运行主体**：全部跑在 `web/nexus-do/` 的 Cloudflare Workers Durable Object 里，无独立后端进程
 - **真 token 流式**：模型回复逐字流出（`token` 事件），交付物边生成边显示（上游不支持流式自动回退）
 - **可下载产物**：`write_deliverable` 工具把成果写成文件（`report.md` 等），`artifact` 事件 + `GET /api/artifact/<id>/<file>` 直接下载
 - **随时停止**：工作台「停止」按钮中断执行（客户端 abort，服务端优雅收尾）
 - **时间线回放**：`GET /api/task/<id>`（计划 / 每步工具调用 / 用量 / 产物 / 交付物全部落库，可点历史回放）
-- **离线可跑**：无真实 API Key 时用内置 `mock_gateway.py` 走通「规划→流式→工具→产物→交付」全链路
+- **网关可换**：外接大脑走 OpenAI 兼容协议（`NEXUS_GATEWAY_URL/KEY/MODEL` 三个 Secret），换脑不换魂
 
-**本地起 & 自测：**
+**本地构建 & 自测：**
 
 ```bash
-# 端到端冒烟（自动拉起 Mock 网关 + 内核，验证完整链路）
-python3 server/test_agent_studio.py
-
-# 真机跑：先起 Mock 网关，再起内核，浏览器打开工作台
-python3 mock_gateway.py &
-BG_BASE=http://127.0.0.1:9000/v1 BG_KEY=x BG_MODEL=auto python3 server/server.py
-# → http://127.0.0.1:8765/studio
+cd web/nexus-do
+node build.mjs        # index.html + core → nexus_do.mjs
+node selftest.mjs     # 纯逻辑自测（236 项）
+npm test              # 全量回归（selftest + 全部 *.test.mjs）
 ```
 
-接真实模型时，把 `BG_BASE/BG_KEY/BG_MODEL` 换成你的网关即可（OpenAI 兼容）。
+> 历史说明：早期 Agent Studio 依赖一套 Python 内核（`server/`）与 `mock_gateway.py` 本地跑，
+> 这条线已于 2026-08-09 UI 收口时整体归档到 `docs/archive/server/`，**不再是运行路径**。
+> 现在全部能力都在 Workers DO 内，本地只需构建 + 自测，真机验证走部署后的线上域名。
 
 ---
 
@@ -91,27 +91,39 @@ black-god/
 ├── ui-spec/                  ← UI 设计规格
 │   ├── UI_V2_SPEC.md         ← 配色/动态/字体规范
 │   └── design_reference_10sets.html  ← 10 套高端设计参考
-├── docs/                     ← 项目文档（含历史交接/复盘归档）
-│   ├── api/                  ← API 文档
-│   └── done/                 ← 已完成任务归档
-├── server/                   ← 服务端代码
-├── shuyu/ shuyu_v2/          ← 枢语引擎（JS/Python 双实现）
-├── ios-app/                  ← iOS 原生 App 骨架
+├── docs/                     ← 项目文档
+│   ├── README.md             ← docs 目录导航（先看这个）
+│   ├── INDEX.md              ← 逐文件清单
+│   ├── architecture/         ← 架构文档
+│   ├── spec/                 ← 设计纲领与释义
+│   ├── plan/                 ← 规划与上线清单
+│   ├── product/              ← 产品定位与对外材料
+│   ├── done/                 ← 已完成任务归档
+│   └── archive/              ← 历史归档（旧 server/ 内核、收口下线的页面等）
+├── shuyu/                    ← ★ 枢语引擎权威源（JS + Python 双实现 + 词根表 + 测试）
+├── ios-app/                  ← iOS 原生 App 骨架（Xcode 工程，未签名）
 ├── android/                  ← Android TWA 上架材料
-└── tools/                    ← 同步/测试工具
+├── skills/ config/           ← 技能定义与配置
+└── tools/                    ← 同步校验工具（check-sync / sync-ui）
 ```
+
+> `web/nexus-do/` 是**唯一部署主体**。`web/` 下的旧静态壳已废弃（见 `web/DEPRECATED_LEGACY_UI.md`），
+> 早期的 Python 服务端 `server/` 与独立的 `shuyu_v2/` 已归档进 `docs/archive/`，均不在运行路径上。
 
 ---
 
 ## 核心文档
 
-- 📄 [BLACK_GOD_COMPLETE_HANDOVER.md](docs/BLACK_GOD_COMPLETE_HANDOVER.md) — 完整交接档案（16 章）
-- 📄 [ARCHITECTURE.md](ARCHITECTURE.md) — 系统架构
-- 📄 [CORE_PHILOSOPHY.md](CORE_PHILOSOPHY.md) — 核心哲学
-- 📄 [DESIGN_CHARTER_v2.md](DESIGN_CHARTER_v2.md) — 设计纲领 v2
-- 📄 [OPTIMIZATION_DESIGN.md](OPTIMIZATION_DESIGN.md) — 优化设计
-- 📄 [PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md](PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md) — 回溯与升级
-- 📄 [FABLE5_INTEGRATION_TASK.md](FABLE5_INTEGRATION_TASK.md) — 给 Fable 5 的整合任务
+- 📄 [docs/README.md](docs/README.md) — **文档总导航（从这里进）**
+- 📄 [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) — 系统架构
+- 📄 [docs/spec/CORE_PHILOSOPHY.md](docs/spec/CORE_PHILOSOPHY.md) — 核心哲学
+- 📄 [docs/spec/DESIGN_CHARTER_v2.md](docs/spec/DESIGN_CHARTER_v2.md) — 设计纲领 v2
+- 📄 [docs/plan/OPTIMIZATION_DESIGN.md](docs/plan/OPTIMIZATION_DESIGN.md) — 优化设计
+- 📄 [docs/plan/LAUNCH_CHECKLIST.md](docs/plan/LAUNCH_CHECKLIST.md) — 上线就绪清单
+- 📄 [docs/plan/神枢私人版强化方案-整理-2026-07-29.md](docs/plan/神枢私人版强化方案-整理-2026-07-29.md) — 六轴强化方案（待施工）
+- 📄 [CHANGELOG.md](CHANGELOG.md) — 变更日志
+- 📄 [docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md](docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md) — 完整交接档案（历史归档）
+- 📄 [docs/archive/retrospective/PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md](docs/archive/retrospective/PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md) — 回溯与升级（历史归档）
 
 ---
 
@@ -156,7 +168,7 @@ npx wrangler secret put NEXUS_GATEWAY_MODEL
 - `<QUAN_TG_CHAT_ID_ENV>` → Owner TG Chat ID
 - `<NEXUS_URL>` → 神枢 Worker URL
 - `<SERVER_IP_ENV>` → 服务器 IP
-- 其他见 `docs/BLACK_GOD_COMPLETE_HANDOVER.md`
+- 其他见 `docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md`
 
 ---
 
