@@ -5,5 +5,8 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
 COPY task_runner.mjs .
+# 伪命令桥：沙箱里可直接敲 nexus-memory / nexus-shuyu / nexus-soul 调神枢能力
+COPY bin/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/nexus.mjs /usr/local/bin/nexus-memory /usr/local/bin/nexus-shuyu /usr/local/bin/nexus-soul
 EXPOSE 8080
 CMD ["node","task_runner.mjs"]

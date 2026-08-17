@@ -53,8 +53,38 @@ function killProcessGroup(pid) {
   } catch (e) {}
 }
 
+// ═══ 伪命令桥（借鉴 Minis 原生卸载）═══
+// DO 在派发 /exec 时附 bridge 信封 {url, token}，runner 代持；沙箱里的 nexus-* 命令
+// 打到本机 /bridge，由 runner 附上令牌转发回神枢。机密不进 shell 环境、不落沙箱文件。
+let BRIDGE = null;
+
+async function handleBridge(body) {
+  const { cap, params = {} } = body || {};
+  if (!cap) return { ok: false, error: 'cap required' };
+  if (!BRIDGE || !BRIDGE.url || !BRIDGE.token) {
+    return { ok: false, error: 'bridge 未配置（需神枢先派发过一次带桥信封的任务）' };
+  }
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10000);
+    const r = await fetch(BRIDGE.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Bridge-Token': BRIDGE.token },
+      body: JSON.stringify({ cap, params }),
+      signal: ctl.signal
+    });
+    clearTimeout(timer);
+    return await r.json();
+  } catch (err) {
+    return { ok: false, error: ('bridge 回连失败: ' + err.message).slice(0, 200) };
+  }
+}
+
 async function handleExec(body) {
-  const { command, timeout = 30 } = body;
+  // 兼容双字段：runner 契约是 command，DO 历史侧发 cmd
+  const command = body.command || body.cmd;
+  const { timeout = 30 } = body;
+  if (body.bridge && body.bridge.url && body.bridge.token) BRIDGE = body.bridge;
   if (!command) return { ok: false, error: 'command required' };
 
   return new Promise((resolve) => {
@@ -86,6 +116,7 @@ async function handleExec(body) {
       resolve({
         ok: true,
         exitCode: killed ? null : code,
+        code: killed ? null : code,   // 别名:DO 历史侧读 code
         stdout: stdout.slice(0, 8000),
         stderr: stderr.slice(0, 2000),
         killed
@@ -101,7 +132,9 @@ async function handleExec(body) {
 
 // ═══ SSE 流式执行：实时输出每一行 ═══
 async function handleExecStream(body, res) {
-  const { command, timeout = 60 } = body;
+  const command = body.command || body.cmd;
+  const { timeout = 60 } = body;
+  if (body.bridge && body.bridge.url && body.bridge.token) BRIDGE = body.bridge;
   if (!command) {
     res.writeHead(400, { 'Content-Type': 'text/event-stream' });
     res.end('data: {"error":"command required"}\n\n');
@@ -435,6 +468,8 @@ const server = createServer(async (req, res) => {
       result = await handleRefs(body);
     } else if (req.url === '/browse') {
       result = await handleBrowse(body);
+    } else if (req.url === '/bridge') {
+      result = await handleBridge(body);
     } else {
       res.writeHead(404);
       res.end(JSON.stringify({ ok: false, error: 'not found' }));

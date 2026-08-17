@@ -386,6 +386,16 @@ export class ShenshuCore {
     // 故不进私密 API 门，改用「webhook 密钥 + 主人 chat_id」双闸自保：密钥不符或非主人本人，一律无视。
     if (path === '/tg/webhook' && request.method === 'POST') return json(await this.handleTgWebhook(request));
 
+    // —— 伪命令桥（借鉴 Minis 原生卸载模式）：容器沙箱里的 nexus-* 命令由此回连神枢能力 ——
+    // 鉴权独立于 OWNER_TOKEN：X-Bridge-Token 须等于派生桥令牌（主人令牌的单向哈希，
+    // 容器侧只见哈希不见本体）；未配 OWNER_TOKEN 则桥关死（fail-closed）。
+    if (path === '/bridge' && request.method === 'POST') {
+      const bt = await this._bridgeToken();
+      if (!bt || (request.headers.get('X-Bridge-Token') || '') !== bt) return json({ ok: false, error: 'unauthorized' }, 403);
+      const b = await request.json().catch(() => ({}));
+      return json(await this.handleBridge(String(b.cap || ''), b.params || {}));
+    }
+
     // —— 能力契约层（借鉴 Minis）——
     // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
     if (path === '/capabilities') return json({ action: 'list', data: describeCapabilities(authed) });
@@ -762,9 +772,23 @@ export class ShenshuCore {
 
   // 容器执行脑统一请求：封装 getByName + fetch，调用方不感知容器细节
   // SSE 流式：实时把容器 stdout/stderr 推给调用方
+  // 执行类请求出门前统一整备：① cmd/command 双写（DO 侧历史用 cmd、runner 契约是 command，
+  // 双写兼容线上镜像新旧两版）② 附桥信封（runner 代持桥令牌，沙箱 shell 环境里不落任何机密）
+  async _withBridgeEnvelope(path, bodyObj) {
+    const b = { ...(bodyObj || {}) };
+    if (b.cmd && !b.command) b.command = b.cmd;
+    if (path === '/exec' || path === '/exec/stream') {
+      const token = await this._bridgeToken();
+      const pub = String(this.env.PUBLIC_URL || '').replace(/\/+$/, '');
+      if (token && pub) b.bridge = { url: pub + '/bridge', token };
+    }
+    return b;
+  }
+
   async _containerStream(path, bodyObj, onChunk) {
     if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器未绑定' };
     try {
+      bodyObj = await this._withBridgeEnvelope(path, bodyObj);
       const c = this.env.EXEC_CONTAINER.getByName('exec-main');
       const resp = await c.fetch('http://container' + path, {
         method: 'POST',
@@ -796,9 +820,51 @@ export class ShenshuCore {
     }
   }
 
+  // ═══ 伪命令桥（借鉴 Minis 原生卸载模式）═══
+  // 桥令牌 = OWNER_TOKEN 的单向哈希：沙箱只拿哈希、拿不到主人令牌本体；没配 OWNER_TOKEN 桥即关死。
+  async _bridgeToken() {
+    if (!this.env?.OWNER_TOKEN) return '';
+    if (this._bridgeTok) return this._bridgeTok;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('nexus-bridge:' + this.env.OWNER_TOKEN));
+    this._bridgeTok = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    return this._bridgeTok;
+  }
+  // 能力白名单：只开只读与追加型低危能力；执行/导入/设备控制/配置一概不上桥（危险确认闸不绕过）。
+  async handleBridge(cap, params = {}) {
+    try {
+      if (cap === 'memory.search') {
+        const q = String(params.q || '').slice(0, 200);
+        if (!q) return { ok: false, error: '缺关键词 q' };
+        const hits = this._ensureMemoryExperience().search(q).slice(0, 10)
+          .map(r => ({ kind: r.kind, at: r.at, payload: r.payload }));
+        return { ok: true, cap, count: hits.length, hits };
+      }
+      if (cap === 'memory.note') {
+        const text = String(params.text || '').trim().slice(0, 500);
+        if (!text) return { ok: false, error: '缺内容 text' };
+        const rec = this._ensureMemoryExperience().remember('note', { text, via: 'bridge', ts: Date.now() });
+        this.markCognitiveDirty();
+        return { ok: true, cap, id: rec.id };
+      }
+      if (cap === 'shuyu.query') {
+        const q = String(params.q || '').slice(0, 100);
+        const dict = (await this.storage.get('词典')) || { 词条: {}, 总数: 0 };
+        return { ok: true, cap, ...this.searchLexicon(dict, q, 20) };
+      }
+      if (cap === 'soul.status') {
+        const soul = (await this.storage.get('soul')) || {};
+        return { ok: true, cap, version: soul.version || 0, coord: soul.current_shu_coord || null, miss_you: soul.miss_you ?? null };
+      }
+      return { ok: false, error: '未知能力：' + cap + '（白名单：memory.search / memory.note / shuyu.query / soul.status）' };
+    } catch (e) {
+      return { ok: false, error: String(e && e.message || e).slice(0, 120) };
+    }
+  }
+
   async _containerFetch(path, bodyObj) {
     if (!this.env.EXEC_CONTAINER) return { ok: false, note: '容器执行脑未绑定（wrangler containers 未部署）' };
     try {
+      bodyObj = await this._withBridgeEnvelope(path, bodyObj);
       const c = this.env.EXEC_CONTAINER.getByName('exec-main');
       const r = await c.fetch(new Request('http://container' + path, {
         method: 'POST',
@@ -1167,7 +1233,8 @@ action 说明：
     }
     const r = await this._containerFetch('/exec', { cmd, timeout: 60 });
     if (r && r.note) return { ok: false, note: r.note };
-    return { ok: !!(r && r.ok), output: String((r && r.stdout) || '') + String((r && r.stderr) || ''), code: r && r.code };
+    // runner 回 exitCode，历史字段是 code，双读兼容
+    return { ok: !!(r && r.ok), output: String((r && r.stdout) || '') + String((r && r.stderr) || ''), code: r && (r.code ?? r.exitCode) };
   }
 
   // 精准编辑容器工作区文件：search 全文件唯一才替换，防误改
@@ -9049,7 +9116,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     if (!url && this.env.EXEC_CONTAINER) {
       const j = await this._containerFetch('/exec', { cmd: command, timeout: 60 });
       if (j && !j.note) {
-        return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null, via: 'container' };
+        return { ok: j.ok !== false, code: j.code ?? j.exitCode, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null, via: 'container' };
       }
       console.log('容器执行脑异常，落 GitHub 兜底:', j && j.note);
     }
