@@ -220,8 +220,17 @@ export class ShenshuCore {
     try {
       return await this._fetch(request);
     } catch (e) {
-      console.error('[DO.fetch] unhandled:', e?.message);
-      return new Response(JSON.stringify({ error: 'internal', msg: e?.message || 'unknown' }), {
+      // 安全收敛：报错原文只回给持 OWNER_TOKEN 的主人；未鉴权调用方只给错误编号(日志里可对照)，防内部信息泄露
+      const errId = Math.random().toString(36).slice(2, 10);
+      console.error(`[DO.fetch] unhandled #${errId}:`, e?.message, e?.stack);
+      let toOwner = false;
+      try {
+        const t = (request.headers.get('Authorization') || '').replace('Bearer ', '') || new URL(request.url).searchParams.get('token') || '';
+        toOwner = !!this.env?.OWNER_TOKEN && t === this.env.OWNER_TOKEN;
+      } catch {}
+      return new Response(JSON.stringify(toOwner
+        ? { error: 'internal', id: errId, msg: e?.message || 'unknown' }
+        : { error: 'internal', id: errId }), {
         status: 500,
         headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }
       });
