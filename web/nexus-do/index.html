@@ -395,7 +395,10 @@ button,input,textarea{font-family:inherit;color:inherit}
 @media (prefers-reduced-motion:reduce){.corner-pill{animation:none}}
 
 /* —— 页面容器（横向 pager）—— */
-.pager{flex:1;position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* overflow-x 必须是 hidden：翻页靠 NavCore 的 transform 位移完成，容器自身再能横向滚动就会打架——
+   手指一滑先滚了容器，之后每一页都永久偏移那么多像素（内容左边被切、右边露出隔壁页）。
+   2026-08-17 由 auto 改为 hidden。*/
+.pager{flex:1;position:relative;overflow-x:hidden;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .pager::-webkit-scrollbar{display:none}
 .pages{display:flex;height:100%;width:calc(var(--pages,3)*100%);
   transition:none}
@@ -3862,6 +3865,8 @@ function switchTab(idx, animate){
   _tabPanels.style.transition = (animate===false)
     ? 'none'
     : 'transform var(--nav-dur-in) var(--nav-ease-in)';
+  // 双保险：把容器自身的横向滚动归零，免得历史遗留的偏移一直跟着（老会话里可能已经滚歪了）
+  try{ const _pr=_tabPanels.parentElement; if(_pr && _pr.scrollLeft) _pr.scrollLeft=0; }catch(e){}
   _tabPanels.style.transform = 'translateX('+(-idx*_tabStep())+'%)';
   _tabButtons.forEach((b,i)=>{
     const on=(i===idx);
