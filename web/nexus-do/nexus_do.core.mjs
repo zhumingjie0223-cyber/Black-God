@@ -380,7 +380,16 @@ export class ShenshuCore {
         cf: request.cf,
         json: async () => ({ text, uid: 'quan', source: 'tg' }),
       };
-      return this.handleTelegramWebhook(update, tgReq, ctx);
+      // ⚠ Durable Object 的 fetch(request) 没有 ExecutionContext（那是 Worker 入口才有的东西）。
+      // 这里此前直接引用未声明的 ctx，每条 TG 消息必抛 ReferenceError → 500，
+      // Telegram 反复重投也永远进不来。而处理器把「调大脑 + 回消息」全放在 ctx?.waitUntil?.() 里，
+      // 光传 undefined 会让这段被静默跳过（Telegram 收 200、权哥收不到回话，更难查）。
+      // 故给一个垫片：接住后台任务，返回前 await 掉，保证真跑。重投由 update_id 去重兜着。
+      const _pending = [];
+      const _tgCtx = { waitUntil: (p) => { _pending.push(Promise.resolve(p).catch(() => {})); } };
+      const _resp = await this.handleTelegramWebhook(update, tgReq, _tgCtx);
+      if (_pending.length) await Promise.allSettled(_pending);
+      return _resp;
     }
     // Telegram 入站：主人在 TG 里回消息 → 喂进大脑 → 回话发回 TG。这是公开入口（Telegram 不带 OWNER_TOKEN），
     // 故不进私密 API 门，改用「webhook 密钥 + 主人 chat_id」双闸自保：密钥不符或非主人本人，一律无视。
@@ -11257,6 +11266,12 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   async handleTelegramWebhook(update, tgReq, ctx) {
+    // ⚠ 本方法内 7 处用到 json()，但那是 _fetch 里的局部函数，方法作用域里根本看不见——
+    // 此前每条 TG 消息走到任意一个 return 都必抛 ReferenceError（叠加 ctx 未声明，入站链路从未通过）。
+    // 在此就地补一个同形状的，Telegram 只认状态码与 body，无需 CORS 头。
+    const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
+      status, headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
     // 1. secret token 鉴权
     const wantSecret = String(this.env.TG_WEBHOOK_SECRET || '').trim();
     const gotSecret = tgReq?.headers?.get?.('X-Telegram-Bot-Api-Secret-Token') || '';
