@@ -6,7 +6,7 @@ import SwiftUI
 
 struct MeView: View {
     @EnvironmentObject var appState: AppState
-    @State private var showAPIConfig = false
+    @State private var showNexusConnection = false
 
     var body: some View {
         ScrollView {
@@ -27,8 +27,8 @@ struct MeView: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 24).bgCard()
                 .padding(.horizontal, 16).padding(.top, 8)
                 VStack(spacing: 0) {
-                    Button { appState.haptic(); showAPIConfig = true } label: {
-                        SettingRow(icon: "key.fill", title: "API 配置", value: "点击设置", color: .bgGold)
+                    Button { appState.haptic(); showNexusConnection = true } label: {
+                        SettingRow(icon: "shield.lefthalf.filled", title: "神枢连接", value: "Cloudflare · Keychain", color: .bgGold)
                     }
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "waveform", title: "语音音色", value: "灵光·甜美", color: .bgPurple)
@@ -45,7 +45,7 @@ struct MeView: View {
             .padding(.bottom, 100)
         }
         .padding(.top, 50)
-        .sheet(isPresented: $showAPIConfig) {
+        .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }
     }

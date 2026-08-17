@@ -15,8 +15,8 @@ import Foundation
 
 // 神枢核心（她活在 Cloudflare Workers 上）
 enum NexusIntentAPI {
-    static var base: String { UserDefaults.standard.string(forKey: "nexus_base") ?? "https://aquan.lufei.uk" }
-    static var token: String? { UserDefaults.standard.string(forKey: "owner_token") }
+    static var base: String { UserDefaults.standard.string(forKey: "nexus_base") ?? "https://nexus-do.jjiebbay.workers.dev" }
+    static var token: String? { NexusKeychain.read(.ownerToken) }
 
     private static func request(_ path: String, method: String = "GET", body: [String: Any]? = nil) -> URLRequest {
         var req = URLRequest(url: URL(string: base + path)!)

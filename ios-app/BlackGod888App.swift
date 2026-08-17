@@ -22,7 +22,6 @@ class AppState: ObservableObject {
     @Published var isUnlocked = false
     @Published var currentTab: AppTab = .chat
     @Published var hapticEnabled = true
-    let apiBase = "http://<SERVER_IP_ENV>:8765"
 
     func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
         guard hapticEnabled else { return }

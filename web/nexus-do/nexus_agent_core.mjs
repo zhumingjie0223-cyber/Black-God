@@ -12,6 +12,7 @@ import {
   redactSecrets,
 } from './nexus_agent_protocol.mjs';
 import { ShuyuBridge } from './nexus_shuyu_bridge.mjs';
+import { preflightToolCall } from './nexus_tool_preflight.mjs';
 
 const PHASE = Object.freeze({ IDLE: 'IDLE', DISPATCHING: 'DISPATCHING', WAITING_FOR_INPUT: 'WAITING_FOR_INPUT' });
 const LEASE_TTL_MS = 30_000;
@@ -122,9 +123,11 @@ export class AgentStateMachineDO {
     if (!capability) return this._json({ error: 'capability_required' }, 400);
     const params = body.params && typeof body.params === 'object' && !Array.isArray(body.params) ? body.params : {};
     const role = String(body.role || 'system');
+    const preflight = preflightToolCall(capability, params, { phase: 'plan' });
+    if (!preflight.ok) return this._json({ error: 'tool_preflight_failed', capability, errors: preflight.errors, warnings: preflight.warnings }, 400);
     const plan = this.protocol.createPlan({
       capability,
-      params,
+      params: preflight.normalized,
       role,
       coordinate: body.coordinate || null,
       requestId: body.idempotencyKey || null,

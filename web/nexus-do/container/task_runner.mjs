@@ -9,6 +9,16 @@ const TASK_TOKEN = process.env.TASK_TOKEN || '';
 const REQUIRE_AUTH = TASK_TOKEN.length > 0;
 
 let _browser = null;
+// 单个 Chromium 实例只允许一个受控浏览任务进入页面操作区，避免多请求互相争夺 CPU/内存。
+let _browseTail = Promise.resolve();
+async function withBrowserSlot(task) {
+  const previous = _browseTail;
+  let release;
+  _browseTail = new Promise((resolve) => { release = resolve; });
+  await previous;
+  try { return await task(); }
+  finally { release(); }
+}
 async function getBrowser() {
   if (!_browser || !_browser.isConnected()) {
     _browser = await chromium.launch({
@@ -369,7 +379,13 @@ async function handleRefs(body) {
 async function handleBrowse(body) {
   const { url, actions = [], screenshot = false, timeout = 25 } = body;
   if (!url) return { ok: false, error: 'url required' };
+  let parsed;
+  try { parsed = new URL(url); } catch { return { ok: false, error: 'url invalid' }; }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return { ok: false, error: 'url protocol must be http/https' };
+  const safeTimeout = Math.max(1, Math.min(45, Number(timeout) || 25));
+  const safeActions = Array.isArray(actions) ? actions.slice(0, 25) : [];
 
+  return withBrowserSlot(async () => {
   let page = null;
   try {
     const browser = await getBrowser();
@@ -378,21 +394,23 @@ async function handleBrowse(body) {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15'
     });
 
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeout * 1000 });
-    await page.waitForTimeout(1500);
+    await page.goto(parsed.href, { waitUntil: 'domcontentloaded', timeout: safeTimeout * 1000 });
+    await page.waitForTimeout(Math.min(1500, safeTimeout * 1000));
 
     const actionErrors = [];
-    for (let i = 0; i < actions.length; i++) {
-      const action = actions[i];
+    for (let i = 0; i < safeActions.length; i++) {
+      const action = safeActions[i] || {};
       try {
         if (action.type === 'click') {
           await page.click(action.selector, { timeout: 5000 });
+          // 点击可能触发跨域导航；等待 DOM 就绪但不因站点长连接无限阻塞。
+          await page.waitForLoadState('domcontentloaded', { timeout: Math.min(5000, safeTimeout * 1000) }).catch(() => {});
         } else if (action.type === 'type') {
           await page.fill(action.selector, action.text);
         } else if (action.type === 'scroll') {
           await page.evaluate(() => window.scrollBy(0, 800));
         } else if (action.type === 'wait') {
-          await page.waitForTimeout(action.ms || 1000);
+          await page.waitForTimeout(Math.max(0, Math.min(10_000, Number(action.ms) || 1000)));
         }
       } catch (err) {
         actionErrors.push({ index: i, error: err.message.slice(0, 200) });
@@ -401,7 +419,7 @@ async function handleBrowse(body) {
 
     const title = await page.title();
     const finalUrl = page.url();
-    const text = (await page.evaluate(() => document.body.innerText)).slice(0, 4000);
+    const text = (await page.evaluate(() => document.body?.innerText || '')).slice(0, 4000);
 
     const result = { ok: true, title, url: finalUrl, text };
     if (actionErrors.length > 0) result.actionErrors = actionErrors;
@@ -417,6 +435,7 @@ async function handleBrowse(body) {
     if (page) await page.close().catch(() => {});
     return { ok: false, error: err.message.slice(0, 200) };
   }
+  });
 }
 
 const server = createServer(async (req, res) => {

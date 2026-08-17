@@ -32,6 +32,7 @@ targets:
         INFOPLIST_KEY_NSAppTransportSecurity: ""
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: BlackGod888.entitlements
     info:
       path: Info.plist
       properties:
@@ -39,4 +40,28 @@ targets:
           NSAllowsArbitraryLoads: true
         NSMicrophoneUsageDescription: "语音输入需要麦克风权限"
         NSPhotoLibraryUsageDescription: "保存生成的图片"
+        NSLocalNetworkUsageDescription: "神枢仅在你主动连接受控设备桥接或局域网运行时访问本地网络。"
+        NSBonjourServices:
+          - "_nexus-bridge._tcp"
         UIAppFonts: []
+
+  NexusPacketTunnel:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: NexusPacketTunnel
+        includes:
+          - "*.swift"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.blackgod888.app.nexustunnel
+        CODE_SIGN_ENTITLEMENTS: NexusPacketTunnel.entitlements
+        SKIP_INSTALL: YES
+    info:
+      path: NexusPacketTunnel/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).PacketTunnelProvider"
+        NSLocalNetworkUsageDescription: "神枢受控网络扩展仅在主人显式启用后建立受管理网络路径。"

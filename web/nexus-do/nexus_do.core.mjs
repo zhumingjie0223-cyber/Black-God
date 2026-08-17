@@ -24,6 +24,10 @@ import { WorldGraph } from './nexus_world_graph.mjs';
 import { ShuyuBridge } from './nexus_shuyu_bridge.mjs';
 import { SelfImprove } from './nexus_self_improve.mjs';
 import { ExperienceMemory } from './memory/experience_memory.mjs';
+import { NexusTurnEngine, compactAgentHistory, repairAgentHistory } from './nexus_turn_engine.mjs';
+import { buildProviderRequest, normalizeProviderResponse } from './nexus_provider_adapter.mjs';
+import { preflightToolCall } from './nexus_tool_preflight.mjs';
+import { NexusSQLiteStore } from './nexus_sqlite_store.mjs';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability, CapabilityGrowth } from './capabilities.mjs';
 import { REVERSE_KB, REVERSE_KB_EXT } from './reverse_kb.mjs';
 import { resolveIdentity, SYSTEM_DO, resolveShadow, isSystemOnlyPath } from './tenancy.mjs';
@@ -155,6 +159,8 @@ export class ShenshuCore {
     this.state = state;
     this.env = env;
     this.storage = state.storage;
+    // DO SQLite 是规范会话 history/outbox 的持久化投影；无 sql runtime 的本地自测会如实降级。
+    this.sqliteStore = new NexusSQLiteStore(this.storage);
     // 认知科学三模块实例化（P0 GWT / P1 主动推理 / P2 现象自我模型）
     this.gw = new GlobalWorkspace({ maxSlots: 5, maxCharsPerSlot: 800 });
     this.aiEngine = new ActiveInferenceEngine((s, m, soul, o) => this.callBrain(s, m, soul, o));
@@ -417,8 +423,12 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/agent/plan', '/agent/approve', '/agent/execute', '/agent/run', '/agent/audit', '/agent/cancel', '/config', '/oauth/start', '/oauth/callback', '/exec', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
-    if (API.has(path)) {
+    // 私密路由必须以 pathname 判定（查询参数不会改变 path），且要封住命名空间子路径。
+    // 否则 /agent/run/<任意串> 之类的未知路径会绕过 API 精确匹配，回退为公开 UI HTML。
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/agent/plan', '/agent/approve', '/agent/execute', '/agent/run', '/agent/audit', '/agent/cancel', '/config', '/config/models', '/oauth/start', '/oauth/callback', '/exec', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
+    const PRIVATE_PREFIXES = ['/agent/', '/config/'];
+    const isPrivateApiPath = API.has(path) || PRIVATE_PREFIXES.some((prefix) => path.startsWith(prefix));
+    if (isPrivateApiPath) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(内置工作台/造像造声造影/推送/迁移/跨用户统计/守望等)。
       if (_mt && _role === 'instance' && isSystemOnlyPath(path)) {
@@ -510,12 +520,14 @@ export class ShenshuCore {
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
         // 枢语原生 Agent 账本：计划与真实副作用分离。高风险能力必须先领取、再确认、后执行。
-        if (path === '/agent/plan' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentPlan(b, _role)); }
-        if (path === '/agent/approve' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentApprove(b)); }
-        if (path === '/agent/execute' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentExecute(b, _role, request)); }
-        if (path === '/agent/cancel' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentLedgerRequest('/cancel', 'POST', b)); }
-        if (path === '/agent/run' && request.method === 'GET') return json(await this.agentLedgerRequest('/run?runId=' + encodeURIComponent(url.searchParams.get('runId') || ''), 'GET'));
-        if (path === '/agent/audit' && request.method === 'GET') return json(await this.agentLedgerRequest('/audit?runId=' + encodeURIComponent(url.searchParams.get('runId') || ''), 'GET'));
+        // 账本的 201/4xx/409 是协议的一部分，必须透传，不能一律包装成 HTTP 200。
+        const agentResponse = (payload) => json(payload, Number.isInteger(payload?._http_status) ? payload._http_status : 200);
+        if (path === '/agent/plan' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return agentResponse(await this.agentPlan(b, _role)); }
+        if (path === '/agent/approve' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return agentResponse(await this.agentApprove(b)); }
+        if (path === '/agent/execute' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return agentResponse(await this.agentExecute(b, _role, request)); }
+        if (path === '/agent/cancel' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return agentResponse(await this.agentLedgerRequest('/cancel', 'POST', b)); }
+        if (path === '/agent/run' && request.method === 'GET') return agentResponse(await this.agentLedgerRequest('/run?runId=' + encodeURIComponent(url.searchParams.get('runId') || ''), 'GET'));
+        if (path === '/agent/audit' && request.method === 'GET') return agentResponse(await this.agentLedgerRequest('/audit?runId=' + encodeURIComponent(url.searchParams.get('runId') || ''), 'GET'));
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
         if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket(request));
         // 注册统计：只有主人能看「多少人注册在用」
@@ -750,6 +762,41 @@ export class ShenshuCore {
   async getSoul() { return (await this.storage.get('soul')) || genesisState(); }
   async saveSoul(soul) { await this.storage.put('soul', soul); }
 
+  // 规范 Agent history 与 UI stream 是两份不同的数据：
+  // - `stream` 是用户可见的对话投影，可按 UI 需要裁剪；
+  // - `agent_history_v1` 是 Provider 回灌所需的规范工具帧，不允许被 UI/流式 partial 污染。
+  async getAgentHistory({ compact = false, maxMessages = 120 } = {}) {
+    const history = repairAgentHistory(await this.storage.get('agent_history_v1'));
+    if (!compact) return history;
+    const result = compactAgentHistory(history, { maxMessages });
+    if (result.changed) {
+      await this.storage.put('agent_history_v1', result.history);
+      try {
+        await this.sqliteStore?.persistHistory('agent_history_v1', result.history, {
+          ownerScope: this.isShadow ? 'shadow' : 'system',
+          revision: Date.now(),
+        });
+      } catch (e) { console.error('agent_history_compact_sqlite:', String(e?.message || e).slice(0, 160)); }
+    }
+    return result.history;
+  }
+
+  async appendAgentHistoryTurn(turn = {}) {
+    const engine = new NexusTurnEngine(await this.storage.get('agent_history_v1'));
+    const next = engine.append(turn);
+    await this.storage.put('agent_history_v1', next);
+    try {
+      await this.sqliteStore?.persistHistory('agent_history_v1', next, {
+        ownerScope: this.isShadow ? 'shadow' : 'system',
+        revision: Date.now(),
+      });
+    } catch (e) {
+      // SQLite 投影失败不应毁坏已提交的 KV history；保留主副本并让下一次写入自愈。
+      console.error('agent_history_sqlite:', String(e?.message || e).slice(0, 160));
+    }
+    return next;
+  }
+
   // ═══════════════════════ 逆向借鉴①：Checkpoint 时间旅行回滚（源自 Replit chateau 三合一）══════════
   // 给 soul 状态加"存档点"：聊崩了/人格漂偏了，能一键回退到之前任一存档。
   // 存 storage 键 ckpt:<ts>，列表键 _ckpt_index（最多留 KEEP 个，超了删最旧）。
@@ -932,11 +979,12 @@ async execBrowse(payload = {}) {
     return { ok: false, note: 'url 必须是 http/https' };
   }
   
+  const boundedTimeout = Math.max(1, Math.min(45, Number(timeout) || 30));
   const reqBody = {
     url,
-    actions: Array.isArray(actions) ? actions : undefined,
+    actions: Array.isArray(actions) ? actions.slice(0, 25) : undefined,
     screenshot: typeof screenshot === 'boolean' ? screenshot : undefined,
-    timeout
+    timeout: boundedTimeout
   };
   
   const r = await this._containerFetch('/browse', reqBody);
@@ -1888,6 +1936,7 @@ action 说明：
   // callBrain 之后一段「仅 storage 操作」的连续临界段里（DO 输入门保证原子，无丢失更新）。
   async handleTalk(text, request, capsIn, imagesIn, instanceMode = false) {
     const now = Date.now();
+    const turnId = crypto.randomUUID();
     const caps = Array.isArray(capsIn) ? capsIn : [];
     const images = Array.isArray(imagesIn) ? imagesIn : [];
     // 三级权限确认：__exec_confirm__:cmd 前缀，带 confirm=true 重跑执行脑，不走 AI
@@ -2154,9 +2203,25 @@ action 说明：
     stream.push({ ts: now, text, reply, emotion: af.emotion, shu_coord: nextCoord, model: brainResult.model });
     if (stream.length > STREAM_KEEP) stream = stream.slice(-STREAM_KEEP);
     await this.storage.put('stream', stream);
+    // UI stream 与 provider-neutral Agent history 分离保存：history 中的工具调用/结果保持成对，
+    // 即使前端裁剪聊天记录或某次流式输出中断，也不会污染下一次模型回灌。
+    try {
+      await this.appendAgentHistoryTurn({
+        turnId,
+        userText: text,
+        assistantText: reply,
+        toolLog: brainResult.tool_log || [],
+        createdAt: now,
+        provider: brainResult.provider || null,
+        model: brainResult.model || null,
+      });
+    } catch (e) {
+      // 历史审计失败不应把已经完成的主人对话伪装成失败；记录后由心跳/诊断面修复。
+      console.log('agent_history_write:', String(e?.message || e).slice(0, 160));
+    }
 
     const pub = await this.getSoulPublic(soul);
-    this.broadcast({ type: 'new_talk', text, reply, soul: pub, shu_meaning: shuMeaning, coord: nextCoord, coin: { 词: _mark.词, 义: _mark.义 || '' }, tier: brainResult.tier || null, ts: now });
+    this.broadcast({ type: 'new_talk', turnId, text, reply, soul: pub, shu_meaning: shuMeaning, coord: nextCoord, coin: { 词: _mark.词, 义: _mark.义 || '' }, tier: brainResult.tier || null, ts: now });
 
     // —— 4) 观察回路（内部自网络后重读-改-存，见 observe）——
     this.observe(text, reply, nextCoord).catch(e => console.log('observe:', e && e.message));
@@ -2171,7 +2236,7 @@ action 说明：
       this.broadcast({ type: 'summon', summoned, ts: now });
     }
 
-    return { reply, soul: pub, shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness, model: brainResult.model, summoned, ...(brainResult.tool_log && brainResult.tool_log.length ? { steps: brainResult.tool_log.map(s => ({ name: s.name, status: s.status, ms: s.ms })) } : {}), ...(brainResult.agent_steps ? { agent_steps: brainResult.agent_steps } : {}) };
+    return { turnId, reply, soul: pub, shu_coord: nextCoord, shu_meaning: shuMeaning, emotion: af.emotion, time_awareness: timeAwareness, model: brainResult.model, summoned, ...(brainResult.tool_log && brainResult.tool_log.length ? { steps: brainResult.tool_log.map(s => ({ name: s.name, status: s.status, ms: s.ms })) } : {}), ...(brainResult.agent_steps ? { agent_steps: brainResult.agent_steps } : {}) };
   }
 
   // ═══════════════════════ 枢语坐标演算 ═══════════════════════
@@ -9111,7 +9176,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   • 工具：pojie:pypack（Pyinstaller重打包）
   触发时机：用户问JS加密/混淆分析 → pojie:jsvmp；问滑块验证码 → pojie:slider；问AES解密 → pojie:aes；问frida抓包 → pojie:sslkey；问webpack/补环境 → pojie:webpack/webenv；问so加载/frida → pojie:antif或soload；问pyinstaller逆向 → pojie:pypack；问下载B站视频 → pojie:m4s
   示例：⟨工具:redteam｜pojie:jsvmp https://target.com⟩ / ⟨工具:redteam｜pojie:slider https://demo.geetest.com⟩
-规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，本轮只输出一个工具标记、不要同时作答；我把结果回给你，你再决定继续或作答。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
+规则：需要外部/实时/事实信息${hasExec ? '、或需要真动手操作主人的服务器与 iPhone' : ''}时，可把彼此独立的只读工具一起输出（最多10个）；任何设备、执行、写入、通知或可能产生副作用的工具仍必须一次只输出一个，等待确认和结果后再继续。够了就直接给最终答案、不带任何工具标记；别原地打转。`;
     let scratchCandidates = [], toolLog = [], last = null, mediaAll = [];
     const planId = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     let planStepIndex = 0;
@@ -9125,8 +9190,56 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       last = await this.callBrain(sys, text, soul, opts);
       const calls = this.parseToolCalls(last.reply);
       if (!calls.length) return { ...last, reply: this.stripToolMarks(last.reply), agent_steps: step, tool_log: toolLog, media: mediaAll };
+      // OpenMinis 式并发：最多十个彼此独立的读/生成任务同时跑，结果始终按模型原始索引回灌。
+      // 任何设备、Shell、写入、通知等副作用工具保持下方的串行确认路径，绝不因并发而扩大权限面。
+      const batchCalls = calls.slice(0, 10);
+      const READ_ONLY_PARALLEL = new Set(['web_search', 'open', 'download', 'draw', 'speak']);
+      if (batchCalls.length > 1 && batchCalls.every((call) => READ_ONLY_PARALLEL.has(call.tool))) {
+        const batch = await NexusTurnEngine.execute(batchCalls, async ({ call }) => {
+          if (call.tool === 'web_search') {
+            const text = await this.webSearch(call.arguments?.raw || '').catch(() => '');
+            return { ok: !!text, text: text || '检索失败：无结果' };
+          }
+          if (call.tool === 'open' || call.tool === 'download') {
+            const url = call.arguments?.raw || '';
+            const text = await this.fetchUrl(url).catch(() => '');
+            const prefix = call.tool === 'download' && text ? `[已下载并提取正文｜${url}]\n` : '';
+            return { ok: !!text, text: text ? prefix + text : '读取失败：无法读取该地址' };
+          }
+          if (call.tool === 'draw') {
+            const prompt = call.arguments?.raw || '';
+            const made = await this.genImage(prompt).catch(() => null);
+            const url = made && (made.imageUrl || made.image);
+            return url ? { ok: true, text: `[已出图｜${prompt}]`, media: { kind: 'image', url } } : { ok: false, text: '出图失败：' + ((made && made.error) || '未知') };
+          }
+          const speech = await this.genVoice(call.arguments?.raw || '').catch(() => null);
+          const url = speech && (speech.audioUrl || speech.audio);
+          return url ? { ok: true, text: '[已出声]', media: { kind: 'audio', url } } : { ok: false, text: '出声失败：' + ((speech && speech.error) || '未知') };
+        }, { concurrency: 10 });
+        const obs = [];
+        for (const result of batch) {
+          const payload = result.output || {};
+          const out = String(payload.text || result.error || '工具无响应');
+          if (payload.media) mediaAll.push(payload.media);
+          const ok = result.ok && payload.ok !== false;
+          const rec = {
+            planId, stepIndex: planStepIndex++, tool: result.name, action: '', arg: String(batchCalls[result.source_index]?.arg || '').slice(0, 120),
+            ok, failureType: ok ? '' : this.classifyFailure(out), latencyMs: 0, ts: Date.now(), source_index: result.source_index,
+          };
+          toolLog.push(rec);
+          try { this.broadcast({ type: 'agent_step_done', ...rec }); } catch (_) {}
+          obs.push(`【${result.name}｜${String(batchCalls[result.source_index]?.arg || '')}】\n${ok ? out : `⚠ [步骤${rec.stepIndex}失败·${rec.failureType}] ${out}`}`);
+        }
+        for (const observation of obs) {
+          scratchCandidates.push({ content: observation, source: 'tool', ts: Date.now(), isFailed: observation.includes('失败') || observation.includes('❌') });
+        }
+        if (scratchCandidates.length > 20) scratchCandidates = scratchCandidates.slice(-20);
+        continue;
+      }
+      // 若本轮包含副作用工具，模型即使违规输出多个标记也只能执行第一个；其余必须下一轮重新规划。
+      const sequentialCalls = batchCalls.some((call) => !READ_ONLY_PARALLEL.has(call.tool)) ? batchCalls.slice(0, 1) : batchCalls;
       const obs = [];
-      for (const c of calls.slice(0, 2)) {
+      for (const c of sequentialCalls) {
         const stepIndex = planStepIndex++;
         const tStart = Date.now();
         try { this.broadcast({ type: 'agent_step', planId, stepIndex, tool: c.tool, arg: c.arg.slice(0, 60), step, ts: Date.now() }); } catch (e) {}
@@ -9328,63 +9441,30 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   brainProvider(base, model, explicit) {
     if (explicit) return explicit;
     const b = String(base || '').toLowerCase(), m = String(model || '').toLowerCase();
+    if (b.includes('/responses') || m.includes('responses')) return 'openai-responses';
+    if (b.includes('generativelanguage.googleapis.com') || b.includes('/v1beta/models/') || m.startsWith('gemini')) return 'gemini';
     if (b.includes('anthropic.com') || b.includes('/v1/messages') || b.includes('/anthropic') || m.startsWith('claude')) return 'anthropic';
     return 'openai';   // kimi / gpt / deepseek / qwen / glm / groq 等 OpenAI 兼容
   }
 
-  // 造请求：各家端点/头/体不同。opts:{ temperature(省略=不带), maxTokens }
+  // 造请求：所有 Provider 先经过规范 history 与工具帧适配层，杜绝把 UI stream/半截流直接喂给模型。
   buildBrainReq(provider, base, key, model, system, userMsg, opts = {}) {
-    const mt = opts.maxTokens || 320;
-    const hasT = typeof opts.temperature === 'number';
-    if (provider === 'anthropic') {
-      const url = /\/v1\/messages$/.test(base) ? base : String(base).replace(/\/+$/, '') + '/v1/messages';
-      // Claude 有两种认证:标准 API key(sk-ant-api…)走 x-api-key;OAuth token(sk-ant-oat…,如 Claude Code 令牌)走 Bearer + oauth beta 头。
-      const isOAuth = /^sk-ant-oat/i.test(String(key || ''));
-      const auth = key ? (isOAuth ? { Authorization: 'Bearer ' + key, 'anthropic-beta': 'oauth-2025-04-20' } : { 'x-api-key': key }) : {};
-      return {
-        url,
-        headers: { 'Content-Type': 'application/json', ...auth, 'anthropic-version': '2023-06-01' },
-        body: { model, max_tokens: mt, ...(system ? { system } : {}), messages: [{ role: 'user', content: userMsg }], ...(hasT ? { temperature: opts.temperature } : {}) },
-      };
-    }
-    if (provider === 'gemini' || provider === 'google') {
-      // 谷歌 Gemini 原生协议：POST {base}/v1beta/models/{model}:generateContent?key=…
-      // base 允许填 https://generativelanguage.googleapis.com（不带尾巴）。
-      const root = String(base || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '').replace(/\/v1beta.*$/, '');
-      const url = `${root}/v1beta/models/${encodeURIComponent(model || 'gemini-2.0-flash')}:generateContent?key=${encodeURIComponent(key || '')}`;
-      return {
-        url,
-        headers: { 'Content-Type': 'application/json' },
-        body: {
-          ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-          contents: [{ role: 'user', parts: [{ text: userMsg }] }],
-          generationConfig: { maxOutputTokens: mt, ...(hasT ? { temperature: opts.temperature } : {}) },
-        },
-      };
-    }
-    // openai 兼容（默认，含 xai/grok/kimi/deepseek/openrouter/qwen/glm 等）
-    const url = /\/(chat\/completions|completions|messages)$/.test(base) ? base : String(base).replace(/\/+$/, '') + '/chat/completions';
-    return {
-      url,
-      headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
-      body: { model, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: mt, ...(hasT ? { temperature: opts.temperature } : {}) },
-    };
+    return buildProviderRequest({
+      provider,
+      base,
+      key,
+      model,
+      system,
+      userInput: userMsg,
+      history: opts.history || null,
+      temperature: opts.temperature,
+      maxTokens: opts.maxTokens || 320,
+      apiMode: opts.apiMode || (provider === 'openai-responses' ? 'responses' : 'chat'),
+    });
   }
 
-  // 解析回复文本（兼容各家返回体）
-  parseBrainText(provider, d) {
-    if (!d) return null;
-    if (provider === 'anthropic') {
-      if (Array.isArray(d.content)) { const t = d.content.filter(x => x && x.type === 'text').map(x => x.text || '').join('').trim(); return t || null; }
-      return null;
-    }
-    if (provider === 'gemini' || provider === 'google') {
-      const c = d?.candidates?.[0]?.content?.parts;
-      if (Array.isArray(c)) { const t = c.map(x => x?.text || '').join('').trim(); return t || null; }
-      return null;
-    }
-    return d?.choices?.[0]?.message?.content || d?.reply || d?.response || null;
-  }
+  // 解析回复文本（兼容各家返回体；Responses output 数组亦在 Adapter 内统一）。
+  parseBrainText(provider, d) { return normalizeProviderResponse(provider, d); }
 
   // ═══════════════════════ 身份出口归一化（换脑不换魂 · 系统层 · 柱1）═══════════════════════
   // 底层模型被追问时可能自曝"我是Kimi/由月之暗面开发"——出口确定性抹掉，归到神枢/赵思涵。
@@ -9549,6 +9629,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     const instanceMode = !!opts.instanceMode;
     const idMode = instanceMode ? 'public' : 'owner';   // 身份归一：主人=赵思涵，其余=神枢
     let lastErr = null;   // 捕获真实失败原因，用于诚实报错（不空回响 · 柱3）
+    // 只读取已完成、已修复的规范历史；UI stream 与任何流式 partial 均不得直接进入 provider payload。
+    const canonicalHistory = opts.history || await this.getAgentHistory({ compact: true, maxMessages: 120 });
     if (instanceMode) {
       const cfg = (await this.storage.get('config')) || {};
       if (!cfg.gateway_url && !(Array.isArray(cfg.brains) && cfg.brains.some(x => x && x.url && x.on !== false))) {
@@ -9586,11 +9668,11 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         // 神枢自己试出格式:锁定过(显式或缓存)就直连;否则依次试会的方言,哪种通就锁哪种(之后秒回直连)。
         const locked = brain.provider || cfg._provider[brain.url] || '';
         const guess = locked || this.brainProvider(brain.url, model);
-        const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
+        const dialects = locked ? [locked] : [guess, ...['openai', 'openai-responses', 'anthropic', 'gemini'].filter(p => p !== guess)];
         for (const provider of dialects) {
           try {
             const send = (withT) => {
-              const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500 });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
+              const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500, history: canonicalHistory, apiMode: provider === 'openai-responses' ? 'responses' : 'chat' });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
               return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
             };
             let r = await send(true);
@@ -9604,7 +9686,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
                 const _hh = cfg._health[_brainKey]; if (!_hh || _hh.fails) { cfg._health[_brainKey] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
                 if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
                 try { await this.updateBrainWeight(brain.url, true, Date.now() - _t0); } catch (e) {}   // MACE:成功加分
-                return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier };
+                return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier, provider };
               }
               // 连通但解析空:可能方言选错(解析路径不对)→ 未锁定则试下一种方言
               lastErr = `${tag}：回了空/被挡`; diagBody = '回了空/被挡';
@@ -10814,6 +10896,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   async invokeCapability(id, params = {}, ownerCtx = false, request = null) {
     const r = resolveCapability(id, ownerCtx);
     if (!r.ok) return { action: 'error', data: { reason: r.reason, id } };
+    const preflight = preflightToolCall(id, params, { phase: 'execute' });
+    if (!preflight.ok) return { action: 'error', data: { reason: 'tool_preflight_failed', id, errors: preflight.errors, warnings: preflight.warnings } };
+    params = preflight.normalized;
     const cap = r.cap;
     const fn = this[cap.handler];
     if (typeof fn !== 'function') {
@@ -10827,6 +10912,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         case 'agent':     out = await this.handleAgent(params.text || '', params.context || {}); break;
         case 'device':    out = await this.recordDevice(params.info || {}, request); break;
         case 'device_control': out = await this.deviceControl(params.action || '', params); break;
+        case 'gen_image': out = await this.genImage(params.prompt || '', params); break;
         case 'gen_voice': out = await this.genVoice(params.text || '', params); break;
         case 'gen_video': out = await this.genVideo(params.prompt || '', params); break;
         case 'push':      out = await this.pushToAll(params.title || '神枢', params.body || '', params.url || '/'); break;
@@ -10891,7 +10977,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
 
   async agentLedgerRequest(path, method = 'GET', body = null) {
     const stub = this.agentLedgerStub();
-    if (!stub) return { ok: false, error: 'agent_state_machine_unavailable' };
+    if (!stub) return { ok: false, error: 'agent_state_machine_unavailable', _http_status: 503 };
     const init = { method, headers: { 'Content-Type': 'application/json' } };
     if (body !== null && method !== 'GET') init.body = JSON.stringify(body);
     try {
@@ -10899,7 +10985,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       const data = await response.json().catch(() => ({ error: 'agent_ledger_invalid_response' }));
       return { ...data, _http_status: response.status };
     } catch (e) {
-      return { ok: false, error: 'agent_ledger_unreachable', detail: String(e?.message || e).slice(0, 160) };
+      return { ok: false, error: 'agent_ledger_unreachable', detail: String(e?.message || e).slice(0, 160), _http_status: 503 };
     }
   }
 
@@ -10907,14 +10993,16 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     const capability = String(body.capability || body.id || '').trim();
     const idempotencyKey = String(body.idempotencyKey || body.requestId || '').trim();
     // 新协议不为调用方猜测幂等键：重放安全必须由发起者的稳定请求 ID 提供。
-    if (!idempotencyKey || idempotencyKey.length > 160) return { ok: false, error: 'idempotency_key_required' };
+    if (!idempotencyKey || idempotencyKey.length > 160) return { ok: false, error: 'idempotency_key_required', _http_status: 400 };
     const resolved = resolveCapability(capability, { role });
-    if (!resolved.ok) return { ok: false, error: resolved.reason || 'capability_denied', capability };
+    if (!resolved.ok) return { ok: false, error: resolved.reason || 'capability_denied', capability, _http_status: 403 };
+    const preflight = preflightToolCall(capability, body.params, { phase: 'plan' });
+    if (!preflight.ok) return { ok: false, error: 'tool_preflight_failed', capability, errors: preflight.errors, warnings: preflight.warnings, _http_status: 400 };
     const soul = await this.getSoul().catch(() => ({}));
     const coordinate = soul?.current_shu_coord || null;
     const response = await this.agentLedgerRequest('/plan', 'POST', {
       capability,
-      params: body.params && typeof body.params === 'object' && !Array.isArray(body.params) ? body.params : {},
+      params: preflight.normalized,
       role,
       coordinate,
       idempotencyKey,
@@ -10926,12 +11014,12 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   async agentApprove(body = {}) {
-    if (!body.runId || !body.approvalToken) return { ok: false, error: 'run_id_and_approval_token_required' };
+    if (!body.runId || !body.approvalToken) return { ok: false, error: 'run_id_and_approval_token_required', _http_status: 400 };
     return this.agentLedgerRequest('/approve', 'POST', { runId: body.runId, approvalToken: body.approvalToken });
   }
 
   async agentExecute(body = {}, role = 'system', request = null) {
-    if (!body.runId) return { ok: false, error: 'run_id_required' };
+    if (!body.runId) return { ok: false, error: 'run_id_required', _http_status: 400 };
     const claim = await this.agentLedgerRequest('/claim', 'POST', { runId: body.runId });
     if (!claim.ok || !claim.run || !claim.leaseToken) return claim;
     const run = claim.run;

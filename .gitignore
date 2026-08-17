@@ -30,6 +30,7 @@ web/nexus-do/index.built.html
 # nexus_do.mjs 由 build.mjs 从 nexus_do.core.mjs + index.html 注入生成(构建产物,勿手改)
 web/nexus-do/nexus_do.mjs
 web/nexus-do/node_modules/
+web/nexus-do/container/node_modules/
 web/nexus-do/package-lock.json
 .wrangler
 web/_old_backup/

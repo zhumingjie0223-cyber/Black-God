@@ -2139,6 +2139,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
             <button type="button" class="nx2-cap" onclick="openSheet('sheetRedTeam')"><span class="tag">HOT</span><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div><div class="t">红队工坊</div><div class="d">逆向 · 免杀 · 载荷</div></button>
             <button type="button" class="nx2-cap" onclick="openGitOps()"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/></svg></div><div class="t">Git 操作</div><div class="d">提交 · 推送 · 日志</div></button>
             <button type="button" class="nx2-cap" onclick="openSheet('sheetSandbox')"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="t">神枢工作台</div><div class="d">内置 Shell · Web · 审计</div></button>
+            <button type="button" class="nx2-cap" onclick="openAgentConsole()"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="8"/></svg></div><div class="t">Agent 控制台</div><div class="d">计划 · 确认 · 执行 · 审计</div></button>
             <button type="button" class="nx2-cap" onclick="openWorkWeb()"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 8h18M7 6h.01M10 6h.01M13 6h.01M8 22h8"/></svg></div><div class="t">内置 Web</div><div class="d">真实浏览 · 截图 · 审计</div></button>
             <button type="button" class="nx2-cap" onclick="openSheet('sheetCheckpoint')"><div class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="t">存档点</div><div class="d">记忆快照 · 回滚</div></button>
             <button type="button" class="nx2-cap" onclick="openBrainSettings()"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3z"/></svg></div><div class="t">大脑舰队</div><div class="d">多脑 · 自动调度</div></button>
@@ -2238,6 +2239,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openDevice()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div><div class="set-tx"><b>设备信息</b></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="doExport()"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg></div><div class="set-tx"><b>导出数据</b></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="openSheet('sheetSandbox')"><div class="set-ic">⬡</div><div class="set-tx"><b>原生沙箱</b><span style="font-size:11px;color:var(--txt-3);display:block">JS · Shell · 联网 · 无需连接器</span></div><div class="set-arrow">›</div></div>
+<div class="set-row" onclick="openAgentConsole()"><div class="set-ic">◇</div><div class="set-tx"><b>Agent 控制台</b><span style="font-size:11px;color:var(--txt-3);display:block">计划 · 一次性确认 · 执行 · 审计</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="togglePin()"><div class="set-ic">🔐</div><div class="set-tx"><b>PIN 锁屏</b><span id="pinStatus" style="font-size:11px;color:var(--txt-3);display:block">轻触设置或清除</span></div><div class="set-arrow">›</div></div>
 <div class="set-row" onclick="exportChat('json')"><div class="set-ic">⬇</div><div class="set-tx"><b>导出对话</b><span style="font-size:11px;color:var(--txt-3);display:block">JSON / MD</span></div><div class="set-arrow" onclick="event.stopPropagation();exportChat('md')" style="font-size:12px;color:var(--cy-2)">MD</div><div onclick="event.stopPropagation();importChat()" style="font-size:12px;color:var(--cy-2);cursor:pointer;padding:0 8px">导入</div></div>
 <div class="set-row" onclick="loadPushInfo();openSheet('sheetPush')"><div class="set-ic">🔔</div><div class="set-tx"><b>推送通知</b><span style="font-size:11px;color:var(--txt-3);display:block">订阅·测试·取消</span></div><div class="set-arrow">›</div></div>
@@ -2520,6 +2522,16 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <details id="wbTextWrap" class="nx-web-text" style="display:none"><summary>页面文字</summary><pre id="wbText"></pre></details>
 </div>
 <button class="btn ghost" onclick="closeSheet()" style="width:100%;margin-top:12px">关闭</button>
+</div>
+<div class="sheet" id="sheetAgent"><div class="sheet-handle"></div><div class="sheet-title">◇ Agent 控制台</div><div class="sheet-sub">先计划；涉及设备、通信、调度或生成时，必须消费一次性确认令牌后才可执行。</div>
+  <div class="field"><label>能力</label><select id="agentCapability"><option value="exec">内置 Linux 执行（需确认）</option><option value="device_control">设备控制（需确认）</option><option value="push">推送（需确认）</option><option value="tg">消息发送（需确认）</option><option value="gen_image">图像生成（需确认）</option><option value="talk">对话（只读回合）</option></select></div>
+  <div class="field"><label>参数 JSON</label><textarea id="agentParams" rows="4" spellcheck="false">{"command":"echo 神枢 Agent 已就绪"}</textarea></div>
+  <button class="btn" onclick="agentCreatePlan()">创建安全计划</button>
+  <div id="agentRunInfo" style="display:none;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap"></div>
+  <div id="agentApprovalBox" style="display:none;margin-top:10px"><div class="field"><label>一次性确认令牌（只在本页内存中保留）</label><input id="agentApprovalToken" type="password" autocomplete="off" placeholder="输入或使用本次计划返回的令牌"/></div><div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="agentUseReturnedToken()">载入本次令牌</button><button class="btn" style="flex:1" onclick="agentApprovePlan()">确认计划</button></div></div>
+  <div id="agentActionBox" style="display:none;gap:8px;margin-top:10px"><button class="btn" style="flex:1" onclick="agentExecutePlan()">执行已确认计划</button><button class="btn ghost" style="flex:1" onclick="agentRefreshAudit()">刷新审计</button></div>
+  <pre id="agentAuditLog" style="display:none;max-height:180px;overflow:auto;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px;font:11px/1.5 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap"></pre>
+  <button class="btn ghost" onclick="closeSheet()" style="width:100%;margin-top:12px">关闭</button>
 </div>
 <div class="sheet" id="sheetLexicon"><div class="sheet-handle"></div><div class="sheet-title">枢语词典</div><div class="sheet-sub">当前会话造词记录</div><div id="lexiconBody" style="font-size:12px;line-height:1.8;color:var(--txt-2);max-height:60vh;overflow-y:auto"></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
 <div class="sheet" id="sheetCapRank"><div class="sheet-handle"></div><div class="sheet-title">🏆 能力成长排行</div><div class="sheet-sub">前10项已成长能力</div><div id="capRankBody" style="font-size:13px;line-height:2;color:var(--txt-2);max-height:60vh;overflow-y:auto">加载中…</div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
@@ -6818,6 +6830,59 @@ async function runSandbox(){
     if(!r?.ok && r?.error) sbAppend('❌ '+r.error,'stderr');
     sbAppend('['+(r?.via||'sandbox')+'  '+(r?.ms??'?')+'ms]','info');
   }catch(e){ sbAppend('❌ '+e.message,'stderr'); }
+}
+
+const AgentConsole = { run: null, approvalToken: null };
+function agentSetInfo(value){ const el=document.getElementById('agentRunInfo'); if(el){el.style.display='block';el.textContent=typeof value==='string'?value:JSON.stringify(value,null,2);} }
+function agentSetAudit(value){ const el=document.getElementById('agentAuditLog'); if(el){el.style.display='block';el.textContent=typeof value==='string'?value:JSON.stringify(value,null,2);} }
+function openAgentConsole(){
+  const runInfo=document.getElementById('agentRunInfo'), approval=document.getElementById('agentApprovalBox'), actions=document.getElementById('agentActionBox'), audit=document.getElementById('agentAuditLog');
+  if(runInfo) runInfo.style.display='none'; if(approval) approval.style.display='none'; if(actions) actions.style.display='none'; if(audit) audit.style.display='none';
+  AgentConsole.run=null; AgentConsole.approvalToken=null;
+  openSheet('sheetAgent');
+}
+async function agentCreatePlan(){
+  if(Nexus.mode!=='owner'){ toast('Agent 控制台仅主人令牌可用','err',2600); return; }
+  const capability=String(document.getElementById('agentCapability')?.value||'').trim();
+  let params={};
+  try { params=JSON.parse(document.getElementById('agentParams')?.value||'{}'); }
+  catch { agentSetInfo('参数 JSON 解析失败。请修正后再创建计划。'); return; }
+  if(!params || Array.isArray(params) || typeof params!=='object'){ agentSetInfo('参数必须是 JSON 对象。'); return; }
+  agentSetInfo('正在创建安全计划…');
+  const idempotencyKey=(crypto.randomUUID?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const response=await Nexus.agentPlan({capability,params,idempotencyKey});
+  if(!response.ok){ agentSetInfo({error:response.data?.error||'agent_plan_failed',details:response.data}); return; }
+  const data=response.data||{}; AgentConsole.run=data.run||null; AgentConsole.approvalToken=data.approvalToken||null;
+  agentSetInfo({run:data.run,reused:!!data.reused,approval_required:!!data.run?.approvalRequired});
+  const approval=document.getElementById('agentApprovalBox'), actions=document.getElementById('agentActionBox'), token=document.getElementById('agentApprovalToken');
+  if(data.run?.approvalRequired){ if(approval) approval.style.display='block'; if(actions) actions.style.display='none'; if(token) token.value=''; toast('计划已生成。请在本地核验后输入一次性确认令牌。','info',3200); }
+  else { if(approval) approval.style.display='none'; if(actions) actions.style.display='flex'; }
+}
+function agentUseReturnedToken(){ const input=document.getElementById('agentApprovalToken'); if(input && AgentConsole.approvalToken){ input.value=AgentConsole.approvalToken; input.focus(); } }
+async function agentApprovePlan(){
+  const run=AgentConsole.run, input=document.getElementById('agentApprovalToken');
+  const approvalToken=String(input?.value||AgentConsole.approvalToken||'').trim();
+  if(!run?.runId || !approvalToken){ agentSetInfo('缺少 runId 或一次性确认令牌。'); return; }
+  const response=await Nexus.agentApprove({runId:run.runId,approvalToken});
+  AgentConsole.approvalToken=null; if(input) input.value='';
+  if(!response.ok){ agentSetInfo({error:response.data?.error||'agent_approval_failed',details:response.data}); return; }
+  AgentConsole.run=response.data?.run||run; agentSetInfo({run:AgentConsole.run,approved:true});
+  const approval=document.getElementById('agentApprovalBox'), actions=document.getElementById('agentActionBox'); if(approval) approval.style.display='none'; if(actions) actions.style.display='flex';
+  toast('确认令牌已消费；现在可显式执行此计划。','ok',2800);
+}
+async function agentExecutePlan(){
+  const run=AgentConsole.run; if(!run?.runId){ agentSetInfo('请先创建有效计划。'); return; }
+  agentSetInfo({run,notice:'正在领取受限执行租约并执行…'});
+  const response=await Nexus.agentExecute({runId:run.runId});
+  if(!response.ok){ agentSetInfo({error:response.data?.error||'agent_execute_failed',details:response.data}); return; }
+  AgentConsole.run=response.data?.run||run; agentSetInfo({run:AgentConsole.run,result:response.data?.result||null});
+  await agentRefreshAudit();
+}
+async function agentRefreshAudit(){
+  const run=AgentConsole.run; if(!run?.runId){ agentSetAudit('暂无 run。'); return; }
+  const response=await Nexus.agentAudit(run.runId);
+  if(!response.ok){ agentSetAudit({error:response.data?.error||'agent_audit_failed',details:response.data}); return; }
+  agentSetAudit(response.data?.audit||response.data);
 }
 
 let _wbCurrentUrl = '';
