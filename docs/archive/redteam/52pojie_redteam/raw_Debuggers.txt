@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Debuggers\/",
+    "success" : true,
+    "text" : "Text (699 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nDebuggers\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nAPI_Monitor_v2r13_x86_x64.zip\t8.1 MB\t1 年前\nCheatEngine_v7.7.exe\t33.1 MB\t1 个月前\nNanomite.x64.rar\t6.6 MB\t13 年前\nOllyDbg v2.01.zip\t6.6 MB\t13 年前\nOllyICE_1.10.zip\t5.2 MB\t10 年前\nWinDbg_X64_v10.0.26100.6584.msi\t38.9 MB\t8 个月前\nWinDbg_X86_v10.0.26100.6584.msi\t32.9 MB\t8 个月前\nWindbg_amd64_6.12.2.633.rar\t16.3 MB\t14 年前\nWindbg_x86_6.12.2.633.rar\t17.9 MB\t14 年前\nx64dbg_2026-05_27.zip\t30.1 MB\t1 个月前\n吾爱破解专用版Ollydbg.rar\t12.3 MB\t11 年前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:07:53+07:00",
+  "tool" : "minis-browser-use"
+}

@@ -1,0 +1,24 @@
+name = "nexus-do"
+main = "nexus_do.mjs"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "aquan.lufei.uk", zone_id = "824bdc2b31476c82c066e28ca1fa5a68" }
+]
+
+[[durable_objects.bindings]]
+name = "SHENSHU"
+class_name = "ShenshuCore"
+
+
+[[kv_namespaces]]
+binding = "SOUL_KV"
+id = "2978edea205e462d97cd3613f4745fbf"
+
+[ai]
+binding = "AI"
+
+[vars]
+# 曼谷多模态工厂（生图/18情绪语音/真视频），神枢优先调它，CF AI 兜底
+FACTORY_URL = "https://factory.aquan.xin"

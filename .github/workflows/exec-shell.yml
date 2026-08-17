@@ -1,0 +1,22 @@
+name: Execute Shell Command
+
+on:
+  workflow_dispatch:
+    inputs:
+      cmd:
+        description: 'Shell command to execute'
+        required: true
+        type: string
+
+jobs:
+  run-cmd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute command
+        id: exec
+        run: |
+          echo "::group::Command Output"
+          ${{ inputs.cmd }}
+          echo "::endgroup::"
+        shell: bash
+        continue-on-error: true

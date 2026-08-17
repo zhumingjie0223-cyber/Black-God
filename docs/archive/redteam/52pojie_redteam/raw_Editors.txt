@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Editors\/",
+    "success" : true,
+    "text" : "Text (1151 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nEditors\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\n010_Editor_All_Versions_For_Windows_CracKed.7z\t7.1 MB\t3 年前\nBeyond.Compare.Pro.v4.3.6.25063.Linux.CracKed.zip\t77.1 MB\t6 年前\nBeyond.Compare.Pro.v4.x.Windows.CracKed.v2.7z\t6.4 MB\t6 年前\nCmpDisasm v0.84.zip\t284.2 KB\t10 年前\nCmpPE+_v0.4_beta.rar\t56.5 KB\t9 年前\nEverEdit_x32_v3.7.1_4226_Portable.zip\t4.2 MB\t8 年前\nEverEdit_x64_v3.7.1_4226_Portable.zip\t4.7 MB\t8 年前\nFairdell_HexCmp_v2.34_汉化版.zip\t564.5 KB\t3 年前\nGetVBRes.v0.9.Cracked.7z\t1 MB\t12 年前\nHexWorkshop_v6.8.0.5419.rar\t17.7 MB\t6 年前\nHextor_v0.15.exe\t4.8 MB\t3 个月前\nRegistry_Workshop_v5.1.0.rar\t1.1 MB\t2 年前\nResEdit-win32.7z\t500.9 KB\t11 年前\nResEdit-x64.7z\t589.3 KB\t11 年前\nResScope_v1.96.7z\t1.1 MB\t5 年前\nResource_Hacker_v5.2.8.rar\t4.6 MB\t1 年前\nResource_Tuner_v2.23.0.442.rar\t4.3 MB\t3 年前\nRestorator_2018_v3.90_Build_1793.7z\t3.4 MB\t6 年前\nWinHex_v21.6.7z\t4.8 MB\t9 个月前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:08:45+07:00",
+  "tool" : "minis-browser-use"
+}

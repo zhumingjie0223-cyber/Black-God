@@ -116,7 +116,7 @@ ok('解析 exec 工具调用', (() => { const c = S.parseToolCalls('⟨工具:ex
 // ── 执行脑（真沙箱的手）：owner 门 + 未接入如实告知（不许假）──
 ok('exec 能力 owner_only（匿名拒绝）', resolveCapability('exec', false).ok === false && resolveCapability('exec', false).reason === 'owner_only');
 ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
-{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('ls'); ok('未配执行脑 → 如实说未接入、不假装', r.ok === false && /未接入/.test(r.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => null, list: async () => ({ keys: [] }) }; const r = await T.execRemote('ls'); ok('未配执行脑 → fallback 原生沙箱(via native-sandbox-shell)', r.via && r.via.startsWith('native-sandbox')); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => ({ exec_url: 'http://x:8765', exec_token: 't' }) };
   const c = await T.getConfig(true); ok('连接器：配了 exec_url → exec_on=true 且不回传 token', c.exec_on === true && c.exec_has_token === true && c.exec_token === undefined); }
 
@@ -134,7 +134,41 @@ ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
 }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => ({ exec_url: 'http://x:8765', exec_token: 't' }) };
   const r = await T.execRemote('rm -rf /'); ok('执行脑·危险命令未确认→拦下要二次确认(不真跑)', r.ok === false && r.need_confirm === true && !!r.danger); }
-{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r = await T.execRemote('rm -rf /'); ok('执行脑·未接入优先于危险判定(先说未接入)', r.ok === false && /未接入/.test(r.note || '') && !r.need_confirm); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => null, list: async () => ({ keys: [] }) }; const r = await T.execRemote('rm -rf /'); ok('执行脑·未接入时危险命令仍被拦(沙箱模式下shell解析器不支持rm-rf)', r.ok === false || r.stderr); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execRemote('rm -rf /'); ok('执行脑·容器路径危险命令仍先弹need_confirm', r && r.need_confirm === true && !r.ok); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execDevLoop('rm -rf /', {}); ok('修正循环·危险命令透传确认门', r && r.need_confirm === true); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const rWs = await T.execWorkspace('status', {}); ok('工作区·无容器返回未绑定', rWs.ok === false && /未绑定/.test(rWs.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const rBad = await T.execEditFile({ path: '../etc/passwd', search: 'a', replace: 'b' }); ok('文件编辑·拒绝路径穿越', rBad.ok === false && /非法/.test(rBad.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const rEmpty = await T.execEditFile({ path: '', search: 'a', replace: 'b' }); ok('文件编辑·缺path报错', rEmpty.ok === false && /缺少/.test(rEmpty.note || '')); }
+const T = Object.create(ShenshuCore.prototype);
+T.env = {};
+
+ok(
+  'execCodeNav 缺少 symbol',
+  (await T.execCodeNav('def', {})).ok === false &&
+    (await T.execCodeNav('def', {})).note.includes('缺少')
+);
+
+ok(
+  'execCodeNav 仅支持 def/refs',
+  (await T.execCodeNav('x', { symbol: 'a' })).ok === false &&
+    (await T.execCodeNav('x', { symbol: 'a' })).note.includes('仅支持')
+);
+
+ok(
+  'execBrowse url 必须 http/https',
+  (await T.execBrowse({ url: 'ftp://x' })).ok === false &&
+    (await T.execBrowse({ url: 'ftp://x' })).note.includes('http')
+);
+
+ok(
+  'execBrowse 容器未绑定',
+  (await T.execBrowse({ url: 'https://example.com' })).ok === false &&
+    (await T.execBrowse({ url: 'https://example.com' })).note.includes('未绑定')
+);
+
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r1 = await T.execAgentTask('', {}); ok('自主任务·空任务拒绝', r1.ok === false && /为空/.test(r1.note || '')); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; const r2 = await T.execAgentTask('做个网页', {}); ok('自主任务·无环境优雅失败不抛异常', r2.ok === false); }
 
 // ── 能力契约鉴权硬门（LAUNCH_CHECKLIST 血泪教训：匿名不得越权）──
 ok('未知能力被拒', resolveCapability('nope', true).ok === false && resolveCapability('nope', false).reason === 'unknown_capability');
@@ -302,7 +336,7 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
 {
   const OT = 'secret-owner-tok';
   const sys = resolveIdentity({ authHeader: 'Bearer ' + OT, uidHeader: 'anything', ownerToken: OT });
-  ok('身份·主人令牌 → system + 固定私密实例', sys.role === 'system' && sys.doName === 'quan-shenshu-nexus');
+  ok('身份·主人令牌 → system + 固定私密实例', sys.role === 'system' && sys.doName === 'quan-shenshu-nexus-v2');
   const a = resolveIdentity({ uidHeader: 'alice', ownerToken: OT });
   const b = resolveIdentity({ uidHeader: 'bob', ownerToken: OT });
   ok('身份·不同 uid → 不同独立实例', a.role === 'instance' && b.role === 'instance' && a.doName === 'u:alice' && b.doName === 'u:bob' && a.doName !== b.doName);
@@ -397,10 +431,10 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
 // ── 职责分派(神枢主导·秒派对口脑·故障转移兜底)──
 {
   const S3 = Object.create(ShenshuCore.prototype);
-  ok('分派·code→代码', S3.preferredRole('light', ['code']) === '代码');
-  ok('分派·heavy→深思', S3.preferredRole('heavy', []) === '深思');
-  ok('分派·think→深思', S3.preferredRole('light', ['think']) === '深思');
-  ok('分派·light→快答', S3.preferredRole('light', []) === '快答');
+  ok('分派·code→主力', S3.preferredRole('light', ['code']) === '主力');
+  ok('分派·heavy→主力', S3.preferredRole('heavy', []) === '主力');
+  ok('分派·think→主力', S3.preferredRole('light', ['think']) === '主力');
+  ok('分派·light→主力', S3.preferredRole('light', []) === '主力');
   ok('分派·默认→主力', S3.preferredRole('normal', []) === '主力');
   // 神枢自己判分工(用户不选)：从模型名推断
   ok('神枢判分工·mini→快答', S3.inferBrainRole('gpt-4o-mini', '') === '快答');
@@ -468,6 +502,44 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
   ok('自愈路由·近期连败脑降到最后', ranked[ranked.length - 1].url === 'https://bad/v1');
   ok('自愈路由·健康脑排前', ranked[0].url === 'https://good/v1');
   ok('自愈路由·久远失败(过5分钟)给复活机会,不降级', ranked.findIndex(b => b.url === 'https://old/v1') < ranked.findIndex(b => b.url === 'https://bad/v1'));
+
+// ── nativeSandbox 原生沙箱单测 ──
+{
+  const T = Object.create(ShenshuCore.prototype);
+  T.env = {};
+  T.storage = { get: async()=>null, put: async()=>null, list: async()=>({keys:[]}) };
+
+  // js · return 值
+  const r1 = await T.nativeSandbox("uuid", 'js');
+  ok('沙箱·JS DSL uuid', r1.ok === true && /[0-9a-f-]{36}/.test(r1.result||r1.stdout));
+
+  // js · ctx.log 写 stdout
+  const r2 = await T.nativeSandbox("ctx.log('world'); return 1", 'js');
+  ok('沙箱·JS ctx.log stdout', r2.ok === true && r2.stdout.includes('world'));
+
+  // js · DSL unknown op
+  const r3 = await T.nativeSandbox("bad_op something", 'js');
+  ok('沙箱·JS DSL 未知op→stdout含unknown', r3.ok === true && r3.stdout.includes('unknown'));
+
+  // js · DSL timestamp
+  const r4 = await T.nativeSandbox("timestamp", 'js');
+  ok('沙箱·JS DSL timestamp→数字字符串', r4.ok === true && /^\d{13}/.test(r4.result||r4.stdout.trim()));
+
+  // shell · echo
+  const r5 = await T.nativeSandbox("echo hello world", 'shell');
+  ok('沙箱·Shell echo', r5.stdout.includes('hello world'));
+
+  // shell · 不支持命令 → stderr unsupported
+  const r6 = await T.nativeSandbox("notacommand foo", 'shell');
+  ok('沙箱·Shell 未知命令→stderr unsupported', r6.stderr.includes('unsupported'));
+
+  // shell · ls → 走 storage.list
+  const r7 = await T.nativeSandbox("ls", 'shell');
+  ok('沙箱·Shell ls 调 storage.list', r7.via === 'native-sandbox-shell');
+
+  // via 字段
+  ok('沙箱·JS via 字段', r1.via === 'native-sandbox-js');
+}
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

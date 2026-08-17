@@ -1,0 +1,10 @@
+  "action" : "get_text",
+  "data" : {
+    "page_url" : "https:\/\/down.52pojie.cn\/Tools\/Anti_Rootkit\/",
+    "success" : true,
+    "text" : "Text (1181 chars):\n爱盘 - 在线破解工具包\n爱盘首页\n关于 & 帮助\n常用链接\n\n爱盘限制多线程下载访问，请使用单线程进行下载访问，多并发会被禁止访问。\n迫于无奈，部分安全软件被杀软和Chrome误报，所以添加了压缩密码，默认解压密码：www.52pojie.cn\n×\nhttps:\/\/down.52pojie.cn\nTools\nAnti_Rootkit\n查找文件：\n\n搜索\n全部文件\n文件名\t文件大小\t上传日期\nATool_20250723.1204.zip\t70.1 MB\t1 年前\nAutoruns.exe\t1.7 MB\t1 个月前\nAutoruns64.exe\t1.8 MB\t1 个月前\nDarkArk_v1.1.7z\t4.9 MB\t4 个月前\nKernel Detective v1.4.0.zip\t1.2 MB\t7 年前\nKswordARK-.-5.1.2.2-4-.R0.7z\t16 MB\t9 天前\nMalware Defender_setup_chs.zip\t1.7 MB\t12 年前\nNoOne_v1.0.13.24.zip\t14.3 MB\t6 个月前\nOpenArk_v2.0.0.7z\t19.5 MB\t1 个月前\nPCHunter_free.zip\t6.9 MB\t7 年前\nPCHunter_v1.6.rar\t2.7 MB\t25 天前\nProcexp.exe\t4.4 MB\t4 个月前\nProcmon.exe\t4 MB\t1 个月前\nPyark_20260519.zip\t23.7 MB\t1 个月前\nQDoctor.exe\t40.2 MB\t1 个月前\nRKUnhookerLE.exe\t396.5 KB\t15 年前\nSysinternalsSuite.zip\t184.1 MB\t1 个月前\nSystem Safety Monitor(SSM)-2.4.0.622-beta.rar\t4.3 MB\t12 年前\nSysteminformer_v3.2.25011.zip\t21.9 MB\t1 年前\nWKE_20251214.rar\t20.1 MB\t6 个月前\nWKTools.exe\t19.7 MB\t8 个月前\nXueTr吾爱破解论坛专版.rar\t3.3 MB\t15 年前\nYDArk_v1.0.3.3.7z\t13.9 MB\t2 年前\ngmer.zip\t362.6 KB\t4 年前\nprocexp.exe\t4.4 MB\t3 个月前\nCopyright © 2008-2026 52pojie.cn All Rights Reserved 版权所有 京ICP备16042023号 京公网安备11010502030087号\n\n文件列表加载完成。最后更新于 7 天前，包含 457 个文件、104 个文件夹，共计 15 GB。\n爱盘搜索扩展插件加载完成，正在加载文件列表\n  tab_id: 0"
+  },
+  "ok" : true,
+  "timestamp" : "2026-07-24T23:08:12+07:00",
+  "tool" : "minis-browser-use"
+}

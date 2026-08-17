@@ -109,6 +109,13 @@ export const CAPABILITIES = [
     owner_only: true,   // 直接操作主人私人设备，最高危：仅主人，且经执行脑隧道 token 门
   },
   {
+    id: 'device_control', name: 'iOS 设备控制中枢', layer: '行动',
+    desc: '通过执行脑隧道调用主人 iPhone 的设备动作；动作是否可用由当前设备与宿主工具返回结果决定',
+    handler: 'deviceControl', argShape: '(action, params)',
+    tier: 'system',
+    owner_only: true,
+  },
+  {
     id: 'watch', name: '自主守望（闭环神·环）', layer: '行动',
     desc: '架一条不用人守的常驻管道：她定时自己去取、真调工具推演，有变化就主动推给主人。说「帮我每小时盯一下X」即可织一条。',
     handler: 'createWatch', argShape: '(text: 盯什么·多久一次)',
@@ -157,4 +164,26 @@ export function resolveCapability(id, ctx = false) {
   // anon
   if (cap.owner_only) return { ok: false, reason: 'owner_only', id };
   return { ok: true, cap };
+}
+
+// —— 能力成长账本：由认知闭环写入 cognitive_v2 快照，不改变静态权限契约 ——
+export class CapabilityGrowth {
+  constructor(state = {}, options = {}) {
+    this.items = state && typeof state === 'object' ? JSON.parse(JSON.stringify(state)) : {};
+    this.maxItems = Math.max(10, options.maxItems || 100);
+    this.clock = options.clock || Date.now;
+  }
+  recordGrowth(event = {}) {
+    const id = String(event.capability || event.id || '').trim();
+    if (!id || id === '__proto__' || id === 'constructor' || id === 'prototype') return null;
+    const old = this.items[id] || { successes: 0, score: 0 };
+    const score = Math.max(0, Math.min(1, Number(event.score) || 0));
+    const next = { ...old, id, successes: old.successes + 1, score: Math.max(old.score || 0, score), updated: this.clock(), evidence: event.evidence || null };
+    this.items[id] = next;
+    const ids = Object.keys(this.items);
+    if (ids.length > this.maxItems) for (const key of ids.sort((a,b)=>(this.items[a].updated||0)-(this.items[b].updated||0)).slice(0, ids.length-this.maxItems)) delete this.items[key];
+    return { ...next };
+  }
+  get(id) { return this.items[id] ? { ...this.items[id] } : null; }
+  export() { return JSON.parse(JSON.stringify(this.items)); }
 }

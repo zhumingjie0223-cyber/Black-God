@@ -1,0 +1,251 @@
+/* 前沿增强层：私人版真实结构适配。构建时注入既有样式之后。 */
+
+/* 真弹簧：覆盖现有同名令牌，旧浏览器自动保留 bezier。 */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring: linear(0, .006, .025 2.8%, .101 6.1%, .539 18.9%, .721 25.3%, .849, .937 35.7%, 1.02, 1.061, 1.07, 1.056, 1.032, 1.006 63.4%, .99, .987, 1.001 90.6%, 1);
+    --spring-lg: linear(0, .009, .035 2.1%, .141, .281 6.7%, .723 12.9%, .938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, .991, .977 51%, .975 57.1%, .997 69.4%, 1.003 76.1%, 1);
+  }
+}
+
+/* 类型化自定义属性：让在线状态的光晕可连续插值。 */
+@property --nx-halo {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+[data-live="1"] { position: relative; isolation: isolate; }
+[data-live="1"]::after {
+  content: ''; position: absolute; inset: -2px; border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 calc(var(--nx-halo) * 8px) var(--live-glow);
+  animation: nx-pulse 2.6s var(--ease-flow) infinite;
+}
+@keyframes nx-pulse {
+  0%, 100% { --nx-halo: .25; }
+  50% { --nx-halo: 1; }
+}
+
+/* Chromium 彩蛋：其余浏览器自然保持原有圆角。 */
+@supports (corner-shape: squircle) {
+  .sheet, .pp-tile, .field, .set-row, .mode, .card { corner-shape: squircle; }
+  .ghost, [class*="pill"], .btn[class*="round"] { corner-shape: round; }
+}
+
+/* 文字按字形而非行盒对齐；不支持时只是原有行距。 */
+@supports (text-box: trim-both cap alphabetic) {
+  .sheet-title, .btn, .tab, h1, h2, h3 { text-box: trim-both cap alphabetic; }
+}
+
+/* 跨页原生转场：不支持时直接跳转。 */
+@view-transition { navigation: auto; }
+#tabbar { view-transition-name: nx-tabbar; }
+#aurora { view-transition-name: nx-aurora; }
+::view-transition-group(nx-aurora),
+::view-transition-group(nx-tabbar) { animation-duration: 0s; }
+::view-transition-old(root) { animation: nx-page-out 200ms var(--ease-flow) both; }
+::view-transition-new(root) { animation: nx-page-in 320ms var(--ease-flow) both; }
+@keyframes nx-page-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes nx-page-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* 滚动驱动揭示：只动 transform/opacity，走合成线程。 */
+@supports (animation-timeline: view()) {
+  .pp-tile, .set-row, .wc-item, .mem-empty {
+    animation: nx-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+  @keyframes nx-reveal {
+    from { opacity: 0; transform: translateY(18px) scale(.985); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* 给任意滚动容器加入 <div class="nx-progress"><i></i></div> 即可。 */
+.nx-progress { position: sticky; top: 0; z-index: 5; height: 2px; background: var(--line); }
+.nx-progress > i { display: block; height: 100%; transform-origin: left; transform: scaleX(0); background: var(--chrome-grad); }
+@supports (animation-timeline: scroll()) {
+  .nx-progress > i { animation: nx-fill linear both; animation-timeline: scroll(nearest); }
+  @keyframes nx-fill { to { transform: scaleX(1); } }
+}
+
+/* Chromium 专属吸顶状态；不支持时标题仍为原样。 */
+@supports (container-type: scroll-state) {
+  .sheet-title { position: sticky; top: 0; z-index: 1; container-type: scroll-state; }
+  @container scroll-state(stuck: top) {
+    .sheet-sub { opacity: .55; }
+    .sheet-title > .grab { transform: scaleX(.6); opacity: .5; }
+  }
+}
+
+/* 当前抽屉靠 transform + .show 开关，不改变隐藏态，避免破坏拖拽逻辑。 */
+.sheet {
+  transition:
+    transform var(--t-sheet, 420ms) var(--spring),
+    opacity 220ms var(--ease-flow),
+    border-color 180ms var(--ease-flow),
+    box-shadow 220ms var(--ease-flow);
+}
+.sheet.show { opacity: 1; }
+
+/* 父级状态：placeholder 为空时不触发，输入后再高亮。 */
+.set-row:has(.on) { background: var(--surface-2); }
+.field:has(input[placeholder]:not(:placeholder-shown)),
+.field:has(textarea[placeholder]:not(:placeholder-shown)) { border-color: var(--cy-2); }
+body:has(.sheet.show) #aurora {
+  filter: saturate(.65);
+  transition: filter 380ms var(--ease-flow);
+}
+
+/* 按组件自身宽度响应，而不是按屏幕宽度响应。 */
+.pp-grid { container-type: inline-size; container-name: nx-tiles; }
+@container nx-tiles (max-width: 340px) {
+  .pp-tile { flex-direction: column; text-align: center; gap: 6px; }
+  .pp-i { margin: 0 auto; }
+}
+
+/* 内容自增高：私版真实主输入为 #inp。 */
+@supports (field-sizing: content) {
+  .field textarea, textarea#inp {
+    field-sizing: content;
+    min-height: 2.6em;
+    max-height: 9em;
+  }
+}
+
+/* 键盘焦点可见，鼠标点击不出现多余轮廓。 */
+:focus-visible { outline: 2px solid var(--cy-1); outline-offset: 2px; border-radius: var(--radius-sm); }
+.field:focus-within { border-color: var(--cy-2); box-shadow: 0 0 0 3px var(--cy-glow); }
+.field input:focus-visible, .field textarea:focus-visible { outline: none; }
+
+/* PWA 动态视口与排版细化。 */
+@supports (height: 100dvh) {
+  .page, .sheet, #lockgate { min-height: 100dvh; }
+}
+html { overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+h1, h2, h3, .sheet-title { text-wrap: balance; }
+p, .sheet-sub, .set-tx { text-wrap: pretty; }
+
+/* 收掉一处 transition: all，避免非合成属性被误动画。 */
+.hz-node .d i {
+  transition: background-color .25s var(--ease), box-shadow .25s var(--ease), transform .25s var(--spring);
+}
+.btn, .ghost {
+  transition:
+    background-color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    box-shadow 160ms var(--ease),
+    transform 160ms var(--spring);
+}
+.btn:active, .ghost:active { transform: translateY(1px) scale(.985); transition-duration: 70ms; }
+
+/* 默认关闭；仅 P3 屏并手动给 html 加 nx-p3 才增强饱和度。 */
+@supports (color: color(display-p3 0 1 0)) {
+  @media (color-gamut: p3) {
+    html.nx-p3 {
+      --cy-hi: color(display-p3 .24 .86 .48);
+      --cy-1: color(display-p3 .12 .72 .38);
+      --cy-2: color(display-p3 .16 .76 .42);
+      --live-hi: color(display-p3 .24 .86 .48);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-tile, .set-row, .wc-item, .mem-empty, [data-live="1"]::after, .nx-progress > i {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .sheet, .btn, .ghost { transition-duration: 1ms !important; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 1ms !important; }
+}
+
+@media (prefers-contrast: more) {
+  .sheet, .field, .set-row, .pp-tile { border: 2px solid var(--text-2); }
+}
+/* Parent-state rules use placeholder-aware controls only: textarea:not(:empty)
+   does not describe typed textarea content in CSS. */
+.field:has(input[placeholder]:not(:placeholder-shown)),
+.field:has(textarea[placeholder]:not(:placeholder-shown)) {
+  border-color: var(--cy-2);
+}
+body:has(.sheet.show) #aurora {
+  filter: saturate(.65);
+  transition: filter 380ms var(--ease-flow);
+}
+
+/* A tile adapts to the width of its own parent, not the viewport. */
+.pp-grid { container-type: inline-size; container-name: nx-tiles; }
+@container nx-tiles (max-width: 340px) {
+  .pp-tile { flex-direction: column; text-align: center; gap: 6px; }
+  .pp-i { margin: 0 auto; }
+}
+
+/* Content-sized compose field; readonly long-form fields retain their layout. */
+@supports (field-sizing: content) {
+  .field textarea[placeholder], textarea#inp {
+    field-sizing: content;
+    min-height: 2.6em;
+    max-height: 9em;
+  }
+}
+
+/* Keyboard focus remains invisible for pointer input but clear for keyboard use. */
+:focus-visible {
+  outline: 2px solid var(--cy-1);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.field:focus-within {
+  border-color: var(--cy-2);
+  box-shadow: 0 0 0 3px var(--cy-glow);
+}
+.field input:focus-visible, .field textarea:focus-visible { outline: none; }
+
+/* Mobile viewport and readable Chinese wrapping. */
+@supports (height: 100dvh) {
+  .page, .sheet, #lockgate { min-height: 100dvh; }
+}
+html {
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+h1, h2, h3, .sheet-title { text-wrap: balance; }
+p, .sheet-sub, .set-tx { text-wrap: pretty; }
+
+/* Replace the only broad transition in the host without affecting unrelated properties. */
+.hz-node .d i {
+  transition: background-color .25s var(--ease), box-shadow .25s var(--ease), transform .25s var(--spring);
+}
+.btn, .ghost {
+  transition: background-color 160ms var(--ease), border-color 160ms var(--ease), box-shadow 160ms var(--ease), transform 160ms var(--spring);
+}
+.btn:active, .ghost:active { transform: translateY(1px) scale(.985); transition-duration: 70ms; }
+
+/* Optional P3 saturation lift; no effect unless the document opts in. */
+@supports (color: color(display-p3 0 1 0)) {
+  @media (color-gamut: p3) {
+    html.nx-p3 {
+      --cy-hi: color(display-p3 .24 .86 .48);
+      --cy-1: color(display-p3 .12 .72 .38);
+      --cy-2: color(display-p3 .16 .76 .42);
+      --live-hi: color(display-p3 .24 .86 .48);
+    }
+  }
+}
+
+/* Respect reduced motion without suppressing animation/transition completion events. */
+@media (prefers-reduced-motion: reduce) {
+  .pp-tile, .set-row, .wc-item, .mem-empty,
+  .live-dot::after, .status-dot::after, [data-live="1"]::after,
+  .nx-progress > i {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .sheet, .btn, .ghost { transition-duration: 1ms !important; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 1ms !important; }
+}
+@media (prefers-contrast: more) {
+  .sheet, .field, .set-row, .pp-tile { border: 2px solid var(--text-2); }
+}

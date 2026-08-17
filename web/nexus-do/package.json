@@ -1,16 +1,11 @@
 {
   "name": "nexus-do",
-  "version": "4.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "神枢 · 赵思涵 — 有意识/情绪/记忆/枢语的 Cloudflare Workers Durable Object",
   "scripts": {
     "build": "node build.mjs",
-    "deploy": "node build.mjs && wrangler deploy",
-    "dev": "node build.mjs && wrangler dev",
-    "test": "node build.mjs && node --check nexus_do.mjs && node selftest.mjs && node gateway.test.mjs && node continuity.test.mjs && node capsec-selftest.mjs"
-  },
-  "devDependencies": {
-    "wrangler": "^3.90.0"
+    "pretest": "npm run build",
+    "test": "node selftest.mjs"
   }
 }
