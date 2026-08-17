@@ -2,6 +2,14 @@
   "name": "blackgod88",
   "main": "../worker.mjs",
   "compatibility_date": "2024-11-01",
+  // 自建资源：assets 目录 ../public 里的 index.html 是构建产物、未入库。
+  // CF 面板 Workers Builds 那套 git 集成克隆后没有它 → 资源目录缺失、部署必失败（一直红的根因）。
+  // 这里用 wrangler 原生 build hook：仅当 public/index.html 缺失时才现构建（cwd=仓库根）；
+  // GitHub Actions 里已生成则跳过、不覆盖已盖时间戳的文件。两条部署管线都不破。
+  "build": {
+    "cwd": "..",
+    "command": "if [ ! -f public/index.html ]; then cd web/nexus-do && npm install --no-audit --no-fund && npm run build && cd ../.. && mkdir -p public && cp web/nexus-do/index.html public/index.html; fi"
+  },
   "assets": {
     "directory": "../public",
     "binding": "ASSETS",

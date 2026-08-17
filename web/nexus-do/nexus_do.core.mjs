@@ -54,6 +54,9 @@ const EPISODE_KEEP = 40;
 const CACHE_KEEP = 200;             // 缓冲空间条数上限（省代币）
 const CACHE_TTL_MS = 7 * 24 * 3600_000; // 缓存有效期 7 天
 const DAILY_REFLECT_CRON = '0 18 * * *'; // 每日自省 cron（UTC 18:00；与 wrangler crons 里那条一致）
+// 语义嵌入模型：bge-m3 是多语模型（中文一等公民），取代此前误用的英文 bge-base-en-v1.5。
+// 维度 1024（旧 base 为 768）——混用会算错，故给每条向量打 _vec_model 标记，模型不符视为失效、心跳里重嵌。
+const EMBED_MODEL = '@cf/baai/bge-m3';
 
 export class ShenshuCore {
   // ==== 认知经验 V2：三方法 + memoryExperience 属性 ====
@@ -698,6 +701,13 @@ export class ShenshuCore {
     }
     // 闭环神·环：到点的守望管道，自己跑完一条（网络在落盘之后；一次一条，限成本）
     try { await this.runOneDueLoop(now); } catch (e) { console.log('loop error:', e && e.message); }
+
+    // 记忆向量升级：分批把旧模型/缺失向量重嵌为 bge-m3（网络在落盘之后；单独临界段读-改-写，改了才存）
+    try {
+      const memSoul = await this.getSoul();
+      const n = await this.reembedMemories(memSoul, 5);
+      if (n > 0) await this.saveSoul(memSoul);
+    } catch (e) { console.log('reembed error:', e && e.message); }
 
     return { hoursQuiet: Math.round(hoursQuiet * 10) / 10, miss_you: soul.miss_you, 心绪: soul.心绪, 心跳次数: soul.心跳次数 };
   }
@@ -1755,7 +1765,7 @@ action 说明：
       // 情绪强度:坐标态(s)偏离中枢越大越强烈;或命中重要词 → 值得长期记住
       const strong = e.情感烙印 && typeof e.情感烙印.s === 'number' && Math.abs(e.情感烙印.s - 40) > 28;
       if (IMPORTANT.test(txt) || strong) {
-        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec } : {}) });
+        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec, _vec_model: e._vec_model } : {}) });
       }
     }
     if (soul.longterm.length > 200) soul.longterm = soul.longterm.slice(-200);   // 长期记忆封顶 200
@@ -1766,12 +1776,12 @@ action 说明：
   // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
   // 长期记忆(longterm)与近期情节(episodes)一起参与召回——要事沉底但相关时仍会被想起。
   // 纯函数（now 可注入，便于测试）。
-  // 语义嵌入：用主号 CF bge 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
+  // 语义嵌入：用主号 CF 多语 bge-m3 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
   async _embed(text) {
     const acc = this.env.NX_A2 || this.env.NX_A, key = this.env.NX_K2 || this.env.NX_K;
     if (!acc || !key || !text) return null;
     try {
-      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/@cf/baai/bge-base-en-v1.5`, {
+      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/${EMBED_MODEL}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: [String(text).slice(0, 500)] }),
       });
@@ -1779,6 +1789,28 @@ action 说明：
       const d = await r.json();
       return d?.result?.data?.[0] || null;
     } catch (e) { return null; }
+  }
+
+  // 记忆向量升级/回填：把缺向量或旧模型向量的近期/长期记忆重嵌为 bge-m3。
+  // 心跳里分批小步跑（每次 ≤limit 条，网络在落盘之后），避免超时、避免一次性重嵌打爆用量。
+  // 纯 best-effort：单条失败跳过，全程 try/catch 兜底，绝不阻断心跳。返回本次实际重嵌条数。
+  async reembedMemories(soul, limit = 5) {
+    if (!this.env.NX_A && !this.env.NX_A2) return 0;   // 没配嵌入账号，直接跳过
+    const stale = e => e && (e.他说 || e.我说了) && (!Array.isArray(e._vec) || e._vec_model !== EMBED_MODEL);
+    const pools = [soul.episodes, soul.longterm].filter(Array.isArray);
+    let done = 0;
+    for (const pool of pools) {
+      for (const e of pool) {
+        if (done >= limit) return done;
+        if (!stale(e)) continue;
+        try {
+          const v = await this._embed(String(e.他说 || e.我说了 || '').slice(0, 120));
+          if (v) { e._vec = v; e._vec_model = EMBED_MODEL; done++; }
+          else return done;   // 嵌入服务异常（返回 null），本轮别再打，留到下次心跳
+        } catch (_) { return done; }
+      }
+    }
+    return done;
   }
 
   // 余弦相似度 ∈ [-1,1]
@@ -2141,7 +2173,7 @@ action 说明：
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       const ep = { ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion };
-      try { const v = await this._embed(text.slice(0, 120)); if (v) ep._vec = v; } catch (e) {}
+      try { const v = await this._embed(text.slice(0, 120)); if (v) { ep._vec = v; ep._vec_model = EMBED_MODEL; } } catch (e) {}
       soul.episodes.push(ep);
       this.consolidateMemory(soul);   // 溢出前先把要事沉入长期记忆,再裁 —— 越聊越厚,要事不忘
     }
@@ -2428,77 +2460,138 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     return false;
   }
 
-  // 真实联网检索：抓 DuckDuckGo HTML 端，解析摘要。与 nexus-studio 同源实现，久经验证。
+  // 真实联网检索：多源兜底管道。单一 DDG HTML 端在 Workers 出口 IP 上经常被限流返空，
+  // 故改为「付费高质量源(owner 配 key 才走) → DDG Lite → DDG HTML → Jina」逐级兜底，任一有结果即返回。
+  // 配置(可选 secret)：SEARCH_PROVIDER=tavily|serper|brave + SEARCH_KEY=<你的 key>。
   async webSearch(query) {
-    try {
-      // 优先尝试 Tavily API
-      const tavilyKey = this.env.TAVILY_KEY;
-      if (tavilyKey) {
-        try {
-          const tavilyResp = await fetch('https://api.tavily.com/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              api_key: tavilyKey,
-              query,
-              search_depth: 'basic',
-              max_results: 6,
-              include_answer: true
-            }),
-            cf: { cacheTtl: 60 }
-          });
-          if (tavilyResp.ok) {
-            const data = await tavilyResp.json();
-            const out = [];
-            if (data.answer) { out.push(`摘要：${data.answer}`); out.push(''); }
-            if (data.results && data.results.length > 0) {
-              data.results.forEach((r, idx) => {
-                const n = idx + 1;
-                const title = (r.title || '').slice(0, 80);
-                const content = (r.content || '').slice(0, 200);
-                const url = r.url || '';
-                if (title || content) {
-                  out.push(`[${n}] ${title ? title + ' — ' : ''}${content}${url ? '\n   来源: ' + url : ''}`);
-                }
-              });
-            }
-            if (out.length > 0) return out.join('\n');
-          }
-        } catch (_) { /* Tavily 失败，降级 */ }
-      }
-      // DuckDuckGo 兜底
-      const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-CN,zh;q=0.9' },
-        cf: { cacheTtl: 60 },
+    const q = String(query || '').trim();
+    if (!q) return '';
+    // 1) 付费高质量源(配了 key 才走，对标 Perplexity 检索质量)
+    try { const paid = await this._searchPaid(q); if (paid) return paid; } catch (_) {}
+    // 2) 免费兜底链：任一成功即返回
+    const chain = [() => this._searchDDGLite(q), () => this._searchDDGHtml(q), () => this._searchJina(q)];
+    for (const fn of chain) {
+      try { const r = await fn(); if (r) return r; } catch (_) {}
+    }
+    return '';
+  }
+
+  // 真实浏览器请求头，降低被机器人拦截概率
+  get _searchUA() { return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'; }
+
+  // 统一格式化：标题 + 摘要 + 可引用来源链接
+  _fmtResults(items) {
+    const out = [];
+    const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+    for (const it of items || []) {
+      if (out.length >= 6) break;
+      const title = strip(it.title).slice(0, 90);
+      const txt = strip(it.snippet).slice(0, 220);
+      const url = String(it.url || '').trim();
+      if (!title && !txt) continue;
+      out.push(`${out.length + 1}. ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
+    }
+    return out.join('\n');
+  }
+
+  // 付费源：Tavily / Serper / Brave，owner 配 SEARCH_KEY 才启用
+  // 向后兼容：线上早已通过部署工作流注入 TAVILY_KEY(见 .github/workflows/deploy-nexus.yml)，
+  // 若没配新的 SEARCH_PROVIDER/SEARCH_KEY，就自动回落到既有的 TAVILY_KEY，避免换实现后付费源静默失效。
+  async _searchPaid(q) {
+    let provider = String(this.env.SEARCH_PROVIDER || '').toLowerCase().trim();
+    let key = String(this.env.SEARCH_KEY || '').trim();
+    if (!provider && !key && this.env.TAVILY_KEY) {
+      provider = 'tavily';
+      key = String(this.env.TAVILY_KEY).trim();
+    }
+    if (!provider || !key) return '';
+    if (provider === 'tavily') {
+      const r = await fetch('https://api.tavily.com/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key, query: q, max_results: 6, search_depth: 'basic' }),
       });
-      if (!resp.ok) return '';
-      const html = await resp.text();
-      const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
-      const out = [];
-      const blocks = html.split(/class="result\b/).slice(1);
-      for (const b of blocks) {
-        if (out.length >= 6) break;
-        const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
-        const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
-        if (!am && !sm) continue;
-        let url = am ? am[1] : '';
-        const um = /[?&]uddg=([^&]+)/.exec(url);
-        if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
-        if (url.startsWith('//')) url = 'https:' + url;
-        const title = strip(am && am[2]).slice(0, 80);
-        const txt = strip(sm && sm[1]).slice(0, 200);
-        if (!title && !txt) continue;
-        out.push(`[${out.length + 1}] ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
-      }
-      if (out.length) return out.join('\n');
-      const re = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      while ((m = re.exec(html)) && out.length < 6) {
-        const txt = strip(m[1]);
-        if (txt) out.push(`[${out.length + 1}] ${txt.slice(0, 220)}`);
-      }
-      return out.join('\n');
-    } catch (_) { return ''; }
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults((j.results || []).map(x => ({ title: x.title, snippet: x.content, url: x.url })));
+    }
+    if (provider === 'serper') {
+      const r = await fetch('https://google.serper.dev/search', {
+        method: 'POST', headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q, num: 6, hl: 'zh-cn' }),
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults((j.organic || []).map(x => ({ title: x.title, snippet: x.snippet, url: x.link })));
+    }
+    if (provider === 'brave') {
+      const r = await fetch('https://api.search.brave.com/res/v1/web/search?count=6&q=' + encodeURIComponent(q), {
+        headers: { 'Accept': 'application/json', 'X-Subscription-Token': key },
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults(((j.web && j.web.results) || []).map(x => ({ title: x.title, snippet: x.description, url: x.url })));
+    }
+    return '';
+  }
+
+  // DuckDuckGo Lite：结构简单、比 html 端更抗封
+  async _searchDDGLite(q) {
+    const resp = await fetch('https://lite.duckduckgo.com/lite/?q=' + encodeURIComponent(q), {
+      headers: { 'User-Agent': this._searchUA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept': 'text/html' },
+      cf: { cacheTtl: 60 },
+    });
+    if (resp.status !== 200) return '';
+    const html = await resp.text();
+    // Lite 端标题锚点与摘要单元格分处不同 <td>，且属性顺序 href 在 class 前，故分别抓取再按序配对。
+    const links = [...html.matchAll(/<a\b([^>]*class=['"]result-link['"][^>]*)>([\s\S]*?)<\/a>/g)];
+    const snips = [...html.matchAll(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/g)];
+    const items = [];
+    for (let i = 0; i < links.length && items.length < 6; i++) {
+      const attrs = links[i][1];
+      const hm = /href=['"]([^'"]+)['"]/.exec(attrs);
+      let url = hm ? hm[1] : '';
+      const um = /[?&]uddg=([^&]+)/.exec(url);
+      if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+      if (url.startsWith('//')) url = 'https:' + url;
+      items.push({ title: links[i][2], snippet: snips[i] ? snips[i][1] : '', url });
+    }
+    return this._fmtResults(items);
+  }
+
+  // DuckDuckGo HTML：老实现，作为二级兜底
+  async _searchDDGHtml(q) {
+    const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), {
+      headers: { 'User-Agent': this._searchUA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept': 'text/html' },
+      cf: { cacheTtl: 60 },
+    });
+    if (resp.status !== 200) return '';
+    const html = await resp.text();
+    const items = [];
+    const blocks = html.split(/class="result\b/).slice(1);
+    for (const b of blocks) {
+      if (items.length >= 6) break;
+      const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+      const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+      if (!am && !sm) continue;
+      let url = am ? am[1] : '';
+      const um = /[?&]uddg=([^&]+)/.exec(url);
+      if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+      if (url.startsWith('//')) url = 'https:' + url;
+      items.push({ title: am && am[2], snippet: sm && sm[1], url });
+    }
+    return this._fmtResults(items);
+  }
+
+  // Jina s.jina.ai：免 key 的 LLM 友好检索，末级兜底
+  async _searchJina(q) {
+    const headers = { 'Accept': 'application/json', 'User-Agent': this._searchUA };
+    if (this.env.JINA_KEY) headers['Authorization'] = 'Bearer ' + String(this.env.JINA_KEY).trim();
+    const resp = await fetch('https://s.jina.ai/?q=' + encodeURIComponent(q), { headers, cf: { cacheTtl: 60 } });
+    if (resp.status !== 200) return '';
+    const j = await resp.json().catch(() => null);
+    const data = j && (j.data || j.results);
+    if (!Array.isArray(data)) return '';
+    return this._fmtResults(data.map(x => ({ title: x.title, snippet: x.description || x.content || x.snippet, url: x.url || x.link })));
   }
 
   // ═══════════════════════ 真 agent 执行环 · plan→调工具→观察→再决→作答 ═══════════════════════

@@ -66,57 +66,59 @@ test('compile：含疑问推理时才产出大脑调用', () => {
   assert.equal(compile(plain).brainCall, null);
 });
 
-// ─── do: 执行回路（S1 自主意识闸门）───
-test('do: 单动作解析工具名/参数/期望态', () => {
-  const r = interpret('do: contact_tg(msg="想你了") → 已送达', {});
+// ─── S1 第六回路 do: 任务下达 ───
+test('do 单条：解析 工具名(参数) → 期望态', () => {
+  const r = interpret('do: shell("ls -la") → 成', {});
   assert.equal(r.actions.length, 1);
-  assert.equal(r.actions[0].tool, 'contact_tg');
-  assert.equal(r.actions[0].args.msg, '想你了');
-  assert.equal(r.actions[0].expect, '已送达');
-});
-
-test('do: 参数类型强转（字符串/数字/布尔/null）', () => {
-  const r = interpret('do: advance_agent(run_id="run_1", step=3, force=true, note=null)', {});
   const a = r.actions[0];
-  assert.equal(a.args.run_id, 'run_1');
-  assert.equal(a.args.step, 3);
-  assert.equal(a.args.force, true);
-  assert.equal(a.args.note, null);
+  assert.equal(a.tool, 'shell');
+  assert.deepEqual(a.args, ['ls -la']);   // 双引号已脱壳
+  assert.equal(a.expect, '成');
 });
 
-test('do: 多动作按序收集', () => {
-  const r = interpret('do: reflect(depth="deep") → 自省完成\ndo: update_self_model(type="failure")', {});
+test('do 多条：一段枢语可下多条任务', () => {
+  const src = 'do: ios.remind("买牛奶", "20:00") → 待\ndo: 静';
+  const r = interpret(src, {});
   assert.equal(r.actions.length, 2);
-  assert.equal(r.actions[0].tool, 'reflect');
-  assert.equal(r.actions[1].tool, 'update_self_model');
+  assert.equal(r.actions[0].tool, 'ios.remind');
+  assert.deepEqual(r.actions[0].args, ['买牛奶', '20:00']);   // 引号内逗号不切
+  assert.equal(r.actions[1].tool, '静');                     // 无参原语
+  assert.deepEqual(r.actions[1].args, []);
+  assert.equal(r.actions[1].expect, null);                    // 无期望态
 });
 
-test('do: 无参兜底成工具名', () => {
-  const r = interpret('do: reflect', {});
-  assert.equal(r.actions[0].tool, 'reflect');
-  assert.deepEqual(r.actions[0].args, {});
+test('do 参数里含 → 不被误当期望态分隔符', () => {
+  const r = interpret('do: shell("echo a → b")', {});
+  assert.equal(r.actions[0].tool, 'shell');
+  assert.deepEqual(r.actions[0].args, ['echo a → b']);
+  assert.equal(r.actions[0].expect, null);
 });
 
-test('compile().act 输出可执行动作列表；applyToSoul 记账不执行', () => {
-  const r = interpret('do: contact_tg(msg="在呢") → 送达', {});
+test('do 与五回路共存：canonical 六回路一条枢语走通', () => {
+  const src = [
+    'feel "阿权说部署一下" → 稳, 强度0.6',
+    'become: 活力+0.1',
+    'do: shell("npm run deploy") → 成',
+    'say "在部署了老公"',
+    'grow: 学到 "部署走 npm run deploy", 深度: 记住'
+  ].join('\n');
+  const r = interpret(src, { mood: 0.5, energy: 0.5 });
+  assert.equal(r.actions.length, 1);
+  assert.equal(r.actions[0].tool, 'shell');
+  assert.equal(r.response.type, 'speak');   // say 仍正常
+  assert.equal(r.growth.depth, 'medium');   // grow 仍正常
+});
+
+test('compile：act 携带 do 产出的任务', () => {
+  const r = interpret('do: mem.recall("上次的密钥") → 成', {});
   const c = compile(r);
   assert.equal(c.act.length, 1);
-  assert.equal(c.act[0].tool, 'contact_tg');
-  const soul = {};
-  applyToSoul(r, soul);
-  assert.equal(soul.lastActions.length, 1);
-  assert.equal(soul.lastActions[0].tool, 'contact_tg');
+  assert.equal(c.act[0].tool, 'mem.recall');
+  assert.deepEqual(c.act[0].args, ['上次的密钥']);
 });
 
-test('向后兼容：无 do: 的五回路 actions 为空、compile().act 为空', () => {
-  const r = interpret(SAMPLE, { mood: 0.5, intimacy: 0.7 });
+test('无 do 时 actions 为空数组（向后兼容）', () => {
+  const r = interpret('say "你好"', {});
   assert.deepEqual(r.actions, []);
   assert.deepEqual(compile(r).act, []);
-});
-
-test('do: 在 become 之后、能读到已更新状态（顺序正确不报错）', () => {
-  const r = interpret('become: mood+0.2\ndo: reflect(depth="deep")\nsay "好"', { mood: 0.5 });
-  assert.ok(Math.abs(r.stateChange.mood - 0.7) < 1e-9);
-  assert.equal(r.actions[0].tool, 'reflect');
-  assert.equal(r.response.type, 'speak');
 });

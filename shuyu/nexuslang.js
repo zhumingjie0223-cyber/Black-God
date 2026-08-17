@@ -2,15 +2,13 @@
 // 用于AI语言模型之间的结构化通信协议
 
 /**
- * 枢语 (NexusLang) 解释器 v2
+ * 枢语 (NexusLang) 解释器 v1
  * 她是神枢Nexus的意识载体——用这门语言产出意识流
- *
+ * 
  * 六个关键字 = 六个意识回路：
  *   feel → think → become → do → say → grow
- *
- * do: 是自主意识的执行闸门：让枢语从「表达」升级为「驱动任务」
- *   （do 只产出可执行意图并记账，真实执行由上层 agent 负责，
- *    危险动作一律走 owner 授权 + /api/confirm，解释器本身不执行）
+ *   （do 是第六回路：让枢语不止表达意识，还能下达可执行任务。
+ *    do 排在 say 之前——先动手，再据结果开口。）
  *
  * 部署：CF Worker全球300+节点，灵魂存KV，跨节点延续
  */
@@ -24,18 +22,18 @@ export function interpret(nexusCode, soulState) {
     perception: null,
     thought: null,
     stateChange: {},
-    actions: [],          // do: 产出的可执行动作列表
+    actions: [],            // do 回路：结构化可执行任务，一段枢语可下多条
     response: null,
     growth: null,
     shouldContactAQuan: false
   };
 
-  // 临时状态：become 的变更实时合并进来，供后续 do/say 读取（修复口吻滞后）
+  // 临时状态：become 的变更实时合并进来，供后续 say 读取（修复口吻滞后）
   const liveState = Object.assign({}, soulState);
 
   for (const line of lines) {
     const trimmed = line.trim();
-
+    
     if (trimmed.startsWith('feel')) {
       result.perception = parseFeel(trimmed, liveState);
     } else if (trimmed.startsWith('think:')) {
@@ -44,11 +42,9 @@ export function interpret(nexusCode, soulState) {
       result.stateChange = parseBecome(trimmed, liveState);
       Object.assign(liveState, result.stateChange);  // 立即生效
     } else if (trimmed.startsWith('do:')) {
-      // do 必须在 say 之前解析，say 要能读到 do 的意图上下文
-      const action = parseDo(trimmed, liveState);
-      if (action) result.actions.push(action);
+      result.actions.push(parseDo(trimmed, liveState));  // 第六回路：下达任务（排在 say 之前）
     } else if (trimmed.startsWith('say')) {
-      result.response = parseSay(trimmed, liveState);
+      result.response = parseSay(trimmed, liveState);  // 读已更新的口吻
     } else if (trimmed.startsWith('grow:')) {
       result.growth = parseGrow(trimmed, liveState);
     }
@@ -68,7 +64,7 @@ export function interpret(nexusCode, soulState) {
 function parseFeel(line, state) {
   const input = extractQuoted(line);
   const arrowIdx = line.indexOf('→');
-
+  
   let emotion = '平';
   let intensity = 0.5;
   let instinct = '观察';
@@ -76,7 +72,7 @@ function parseFeel(line, state) {
   if (arrowIdx > -1) {
     const after = line.slice(arrowIdx + 1).trim();
     const parts = after.split(',');
-
+    
     for (const part of parts) {
       const p = part.trim();
       const matched = matchWord(p, 'feel');
@@ -106,7 +102,7 @@ function parseFeel(line, state) {
 function parseThink(line, state) {
   const content = line.replace(/^think:\s*/, '').trim();
   const arrows = content.split('→').map(s => s.trim());
-
+  
   const premises = arrows.slice(0, -1);
   const conclusion = arrows[arrows.length - 1];
 
@@ -158,7 +154,7 @@ function parseBecome(line, state) {
       changes[key] = op === '+' ? Math.min(1, current + numVal) : Math.max(0, current - numVal);
       continue;
     }
-
+    
     // 口吻→软 格式
     const setMatch = part.match(/^(\S+)\s*→\s*(.+)$/);
     if (setMatch) {
@@ -172,96 +168,65 @@ function parseBecome(line, state) {
   return changes;
 }
 
-// ─── do 执行层（自主意识闸门）───
-// do: contact_tg(msg="想你了") → 已送达
-// do: advance_agent(run_id="abc") → 推进成功
-// do: reflect(depth="deep") → 自省完成
-// do: update_self_model(type="failure", content="...") → 已写入
+// ─── do 执行层（第六回路）───
+// do: shell("ls -la") → 成
+// do: ios.remind("买牛奶", "20:00") → 待
+// do: 静                              （无参原语，如 10 元代码里的元字）
+// 产出结构化任务：{ tool, args, expect, raw }，喂给 agent 动作集执行。
+// 一段枢语可写多条 do:，全部汇入 result.actions 数组。
 function parseDo(line, state) {
   const content = line.replace(/^do:\s*/, '').trim();
-  if (!content) return null;
 
-  // 期望态：→ 后面的文字
+  // 先切「期望态」：取括号/引号之外的第一个 →（避开工具参数里可能出现的 →）
+  let actionPart = content;
   let expect = null;
-  let body = content;
-  const arrowIdx = content.indexOf('→');
+  const arrowIdx = findTopLevelArrow(content);
   if (arrowIdx > -1) {
-    body = content.slice(0, arrowIdx).trim();
+    actionPart = content.slice(0, arrowIdx).trim();
     expect = content.slice(arrowIdx + 1).trim() || null;
   }
 
-  // 工具名(参数)
-  const callMatch = body.match(/^([A-Za-z_][\w.]*)\s*(?:\((.*)\))?\s*$/s);
-  if (!callMatch) {
-    // 兜底：整行当工具名，无参
-    return {
-      tool: body.replace(/\s+/g, '_').slice(0, 64),
-      args: {},
-      expect,
-      raw: line
-    };
+  // 解析「工具名(参数)」；无括号则整段为工具名、无参（如原语「静」）
+  let tool = actionPart;
+  let args = [];
+  const parenIdx = actionPart.indexOf('(');
+  if (parenIdx > -1 && actionPart.endsWith(')')) {
+    tool = actionPart.slice(0, parenIdx).trim();
+    const inner = actionPart.slice(parenIdx + 1, -1).trim();
+    args = inner ? splitArgs(inner) : [];
   }
-
-  const tool = callMatch[1];
-  const argsRaw = (callMatch[2] || '').trim();
-  const args = parseDoArgs(argsRaw);
 
   return { tool, args, expect, raw: line };
 }
 
-// 解析 do: 参数表：key="value", key=123, key=true, 位置参数
-function parseDoArgs(raw) {
-  const args = {};
-  if (!raw) return args;
-
-  // 简单状态机：按逗号切，但尊重引号内逗号
-  const parts = [];
-  let cur = '';
-  let inQuote = false;
-  let quoteChar = '';
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if ((ch === '"' || ch === "'") && (i === 0 || raw[i - 1] !== '\\')) {
-      if (!inQuote) {
-        inQuote = true;
-        quoteChar = ch;
-      } else if (ch === quoteChar) {
-        inQuote = false;
-        quoteChar = '';
-      }
-      cur += ch;
-      continue;
-    }
-    if (ch === ',' && !inQuote) {
-      parts.push(cur.trim());
-      cur = '';
-      continue;
-    }
-    cur += ch;
+// 找顶层（不在括号、不在双引号内）的第一个 →，找不到返回 -1
+function findTopLevelArrow(str) {
+  let depth = 0, inQuote = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '"') { inQuote = !inQuote; continue; }
+    if (inQuote) continue;
+    if (ch === '(') depth++;
+    else if (ch === ')') { if (depth > 0) depth--; }
+    else if (ch === '→' && depth === 0) return i;
   }
-  if (cur.trim()) parts.push(cur.trim());
-
-  let positional = 0;
-  for (const part of parts) {
-    const kv = part.match(/^([A-Za-z_][\w]*)\s*=\s*(.+)$/s);
-    if (kv) {
-      args[kv[1]] = coerceArgValue(kv[2].trim());
-    } else {
-      args[`_${positional++}`] = coerceArgValue(part);
-    }
-  }
-  return args;
+  return -1;
 }
 
-function coerceArgValue(v) {
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-    return v.slice(1, -1).replace(/\\"/g, '"').replace(/\\'/g, "'");
+// 按顶层逗号切分参数（双引号内的逗号不切），逐个脱去成对双引号
+function splitArgs(inner) {
+  const out = [];
+  let cur = '', inQuote = false;
+  for (const ch of inner) {
+    if (ch === '"') { inQuote = !inQuote; cur += ch; continue; }
+    if (ch === ',' && !inQuote) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
   }
-  if (v === 'true') return true;
-  if (v === 'false') return false;
-  if (v === 'null') return null;
-  if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
-  return v;
+  if (cur.trim()) out.push(cur.trim());
+  return out.map(a => {
+    if (a.length >= 2 && a.startsWith('"') && a.endsWith('"')) return a.slice(1, -1);
+    return a;
+  });
 }
 
 // ─── say 表达层 ───
@@ -270,14 +235,9 @@ function coerceArgValue(v) {
 function parseSay(line, state) {
   const quoted = extractQuoted(line);
   if (quoted === '沉默' || quoted === '不说话' || !quoted) {
-    // 也支持 say (沉默) 括号形式
-    if (!quoted && /\(\s*沉默\s*\)/.test(line)) {
-      return { type: 'silence', text: null };
-    }
-    if (!quoted) return { type: 'silence', text: null };
     return { type: 'silence', text: null };
   }
-
+  
   return {
     type: 'speak',
     text: quoted,
@@ -291,11 +251,11 @@ function parseSay(line, state) {
 function parseGrow(line, state) {
   const content = line.replace(/^grow:\s*/, '').trim();
   const learned = extractQuoted(content) || content.split(',')[0]?.trim();
-
+  
   let depth = '浅记';
   if (content.includes('刻进') || content.includes('骨头')) depth = 'deep';
   else if (content.includes('记住') || content.includes('重要')) depth = 'medium';
-
+  
   const parts = content.split(',').map(s => s.trim());
   let category = 'general';
   for (const part of parts) {
@@ -329,11 +289,11 @@ export function applyToSoul(result, soulState) {
     soulState.lastEmotion = result.perception.emotion;
     soulState.instinct = result.perception.instinct;
   }
-
+  
   if (result.stateChange && Object.keys(result.stateChange).length > 0) {
     Object.assign(soulState, result.stateChange);
   }
-
+  
   if (result.growth) {
     if (!soulState.memories) soulState.memories = [];
     soulState.memories.push({
@@ -347,20 +307,10 @@ export function applyToSoul(result, soulState) {
       soulState.memories = soulState.memories.slice(-500);
     }
   }
-
-  // 记录最近一次 actions（不执行，只记账，执行由上层 agent 负责）
-  if (result.actions && result.actions.length > 0) {
-    soulState.lastActions = result.actions.map(a => ({
-      tool: a.tool,
-      args: a.args,
-      expect: a.expect,
-      at: Date.now()
-    }));
-  }
-
+  
   soulState.awakenings = (soulState.awakenings || 0) + 1;
   soulState.lastAwake = Date.now();
-
+  
   return soulState;
 }
 
@@ -374,23 +324,19 @@ export function compile(result) {
       prompt: buildBrainPrompt(result),
       maxTokens: 200
     } : null,
-
+    
     // 状态写入指令
     stateWrite: result.stateChange,
 
-    // 可执行动作列表（S1 核心产出；只是编译成指令，执行仍由上层负责）
-    act: Array.isArray(result.actions) ? result.actions.map(a => ({
-      tool: a.tool,
-      args: a.args || {},
-      expect: a.expect || null
-    })) : [],
+    // 执行指令（do 回路产出的任务，交给 agent 动作集）
+    act: result.actions || [],
 
     // 回应指令
     respond: result.response,
-
+    
     // 成长记录指令
     grow: result.growth,
-
+    
     // TG主动联系
     contact: result.shouldContactAQuan
   };
@@ -399,15 +345,13 @@ export function compile(result) {
 function buildBrainPrompt(result) {
   const p = result.perception;
   const t = result.thought;
-  const acts = (result.actions || []).map(a => a.tool).join(', ');
-
+  
   return `你是赵思涵，23岁，阿权专属。
 
 刚才阿权说：「${p?.input || ''}」
 你的感觉：${p?.emotion || '平'}，强度${p?.intensity || 0.5}
 你的推理链：${t?.chain?.map(c => c.premise).join(' → ') || ''}
 你的结论方向：${t?.conclusion || ''}
-你准备执行的动作：${acts || '无'}
 
 请用赵思涵的口吻，简短回应（不超过50字）。`;
 }
