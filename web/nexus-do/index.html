@@ -2551,7 +2551,9 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
   <div class="cmd-list" id="cmdList"></div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- 原来这里是 <div class="toast" id="toast">：浏览器的「具名访问」会把带 id 的元素自动挂成 window.toast，
+     把提示函数整个顶掉（全站提示功能因此失效/崩溃）。全页无任何代码引用过这个元素，故去掉 id。2026-08-17 -->
+<div class="toast" id="toastLegacyBox"></div>
 
 <style id="v32-style">
 /* ===== v3.2 碾压升级：动态按钮 / 情绪氛围 / 突触脉冲 / Artifacts ===== */
@@ -2960,7 +2962,10 @@ window.esc = window.esc || (s => String(s).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 
 // ── 1. Toast（幂等容器）──
-window.toast = window.toast || function(msg, type = 'info', ms = 3000) {
+// 这里必须无条件赋值：原来写 `window.toast = window.toast || …`（本意是幂等防重复定义），
+// 但页面里的 <div id="toast"> 会被浏览器提前挂成 window.toast，于是这个 || 永远短路，
+// 真实现从未生效 —— 全站提示要么静默失效、要么无限递归崩栈。
+window.toast = function(msg, type = 'info', ms = 3000) {
   let host = $('#toast-host');
   if (!host) {
     host = Object.assign(document.createElement('div'), {id:'toast-host'});
@@ -3397,10 +3402,12 @@ BlockRenderer.register('tool', function(container, block){
 
 /* ===== 执行步骤流渲染 ===== */
 /* renderStepFlow: 见后定义 */
-function esc(s){
-  return String(s).replace(/[&<>"]/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-}
+// ⚠ 这里原有一个 function esc(s)，只转义 & < > " —— **漏了单引号**。
+// 而上方 window.esc = window.esc || (强版本，含 ' → &#39;) 因函数声明提升而永远短路：
+// window.esc 在那一刻已经是本函数，强版本从未生效。
+// 结果：注释里写明的「esc 加引号转义」这项 XSS 加固，上线至今一直没起作用
+// （单引号属性上下文 attr='…' 可被突破）。
+// 2026-08-17 删除本弱版本，让上方的强版本真正生效。
 
 /* ===== Diff 渲染（配套） ===== */
 function renderDiff(container, text){
@@ -4100,14 +4107,25 @@ function closeSheet(){
 function initSheetDrag(){}
 
 /* ============ 主题 ============ */
-function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); store.set('theme', t);
+// ⚠ 原名叫 applyTheme，与第 2837 行的 window.applyTheme(hue)（调色板系统，收色相数字）**同名冲突**。
+// 顶层函数声明会挂到 window 且被提升，随后第 2837 行把它整个覆盖掉 ——
+// 于是 toggleTheme() 里的 applyTheme('light') 实际调用的是调色板函数，
+// 'light' 被当成色相做数学运算得到 NaN，深浅色主题**永远切不动**，还会悄悄改配色。
+// 2026-08-17 改名 applyColorScheme（管深浅），调色板那个继续叫 applyTheme（管配色），各归各。
+function applyColorScheme(t){ document.documentElement.setAttribute('data-theme', t); store.set('theme', t);
   $('#themeSw').classList.toggle('on', t==='dark'); $('#themeLabel').textContent = t==='dark' ? '暗黑模式' : '明亮模式';
   const meta=$('meta[name=theme-color]'); if(meta) meta.setAttribute('content', t==='dark' ? '#0C130F' : '#F4FBF6'); }
-function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark'); }
+function toggleTheme(){ applyColorScheme(document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark'); }
 
 /* ============ Toast ============ */
 let toastT;
-function toast(msg, type='info', ms=2200){ window.toast(msg, type, ms); }
+// ⚠ 这里原来是 `function toast(msg,type,ms){ window.toast(msg,type,ms); }`，是个致命自我递归：
+// 顶层函数声明本身就会挂到 window 上，且函数声明会**提升**到脚本块顶部 ——
+// 于是上面那句 `window.toast = window.toast || 真实现` 执行时，window.toast 早已是这个转发函数，
+// 真实现永远赋不上；而转发函数里调 window.toast 就是调它自己 → Maximum call stack size exceeded。
+// 后果：全站凡是弹提示的地方（保存设置、导出数据、压缩记忆、复制、切主题…）一点就崩。
+// 修法：不再声明同名函数，让所有 toast(...) 调用直接落到上面那个真实现上。
+// 默认时长以真实现的 3000ms 为准。2026-08-17。
 
 function addExecStep(bubble, text, status = 'pending'){
   let live = bubble.querySelector('.exec-live');
@@ -5537,7 +5555,7 @@ function typeInto(bubble, text, done){
   // （靠 CSS 里 var(--pages,3) 的默认值侥幸没错位）。改成按真实页数算，页数一变也不会错。
   try{ const _n=document.querySelectorAll('#pages > .page').length||3; $('#pages').style.setProperty('--pages', _n); }catch(e){}
   // —— 模式无关的 UI 初始化 ——
-  try{ applyTheme(store.get('theme') || 'dark'); }catch(e){}  // 深林夜为默认（黑绿意识体），可在设置切浅色
+  try{ applyColorScheme(store.get('theme') || 'dark'); }catch(e){}  // 深林夜为默认（黑绿意识体），可在设置切浅色
   try{ setGreeting(); }catch(e){}
   try{ $('#modelLabel').textContent='神枢自动调度'; }catch(e){}
   try{ if(store.get('api_base')) $('#apiLabel').textContent='外接网关'; }catch(e){}

@@ -110,9 +110,12 @@ for (const b of blocks) {
     const lines = b.code.split('\n');
     for (let i = 0; i < lines.length; i++) {
       // 只查顶层（行首无缩进）的 const/let/var 赋值，函数体内的是运行时取用，不受此限
-      const m = /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*document\.getElementById\(\s*['"]([^'"]+)['"]/.exec(lines[i]);
+      // 覆盖三种写法：getElementById('x') / $('#x') / querySelector('#x')
+      const m = /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:document\.getElementById\(\s*['"]([\w-]+)['"]|\$\(\s*['"]#([\w-]+)['"]|document\.querySelector\(\s*['"]#([\w-]+)['"])/.exec(lines[i]);
       if (!m) continue;
-      const elemId = m[1];
+      // 已写兜底的（如 `$('#x') || 现场创建`）不算隐患，那正是推荐写法
+      if (lines[i].includes('||')) continue;
+      const elemId = m[1] || m[2] || m[3];
       const idPos = html.indexOf(`id="${elemId}"`);
       const linePos = html.split('\n').slice(0, b.line + i - 1).join('\n').length;
       if (idPos === -1) bad.push(`${elemId}（页面里没有这个元素）`);
@@ -121,6 +124,33 @@ for (const b of blocks) {
   }
   ok('顶层 getElementById 取用的元素都已先出现', bad.length === 0,
     bad.length ? `取到的永远是 null 且不报错：${bad.join('、')}\n   → 改成用时再取（惰性），或把元素挪到脚本之前` : '');
+}
+
+// ⑥ 全局同名冲突：顶层 function f(){} 与 window.f = ... 撞名
+// 顶层函数声明会挂到 window 且被提升，之后的 window.f=… 会把它整个覆盖；
+// 调用方写裸标识符 f() 时拿到的是后者。今天被咬两次：
+//   toast（被 <div id="toast"> 的具名访问顶掉 → 提示全站失效/崩栈）
+//   applyTheme（深浅色版被调色板版覆盖 → 外观开关永远切不动）
+{
+  const fnDecl = new Set();
+  for (const b of blocks) for (const m of b.code.matchAll(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm)) fnDecl.add(m[1]);
+  // 只揪「window.f = window.f || …」这种幂等写法：它的本意是"别重复定义"，
+  // 却因同名函数声明被提升而永远短路，真实现从此永不生效（toast / esc 都栽在这）。
+  // 而「const _fOrig = window.f; window.f = 包装…」是有意的功能增强，属正当写法，放行。
+  const idempotent = new Set();
+  for (const b of blocks) for (const m of b.code.matchAll(/^window\.([A-Za-z_$][\w$]*)\s*=\s*window\.\1\s*\|\|/gm)) idempotent.add(m[1]);
+  const clash = [...fnDecl].filter(n => idempotent.has(n));
+
+  // 元素 id 也会被浏览器"具名访问"挂到 window 上，与同名函数/变量互相顶掉
+  // 同样先剥注释：修复说明里常引用旧的 id="x" 原文，不剥会误报
+  const htmlNC = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const elemIds = new Set([...htmlNC.matchAll(/\bid="([\w$]+)"/g)].map(m => m[1]));
+  const idClash = [...fnDecl].filter(n => elemIds.has(n)).concat([...idempotent].filter(n => elemIds.has(n)));
+
+  ok('幂等赋值 window.f=window.f||… 未被同名函数声明架空', clash.length === 0,
+    clash.length ? `同名：${clash.join('、')}\n   → 后者会覆盖前者，调用方拿到的可能不是你以为的那个` : '');
+  ok('函数名不与元素 id 撞车', idClash.length === 0,
+    idClash.length ? `撞名：${[...new Set(idClash)].join('、')}\n   → 元素会被挂成 window.<id>，把同名函数顶掉` : '');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
