@@ -3930,15 +3930,29 @@ function go(i){
 
 /* ── Layer 1: Push ── */
 const pushStack=[];
-const _pushRoot=document.getElementById('pushStack');
+// 与 #sheetRoot 同一个病：#pushStack 容器在 HTML 里位于本脚本之后（约第 6926 行），
+// 这行却在第 3933 行执行，取到的永远是 null → pushPage 一进门就 return → 所有二级页面
+// 静默打不开，且不报错。改为惰性取用，没有就现场建。
+let _pushRootEl = null;
+function _pushRootGet(){
+  if(_pushRootEl && document.body.contains(_pushRootEl)) return _pushRootEl;
+  _pushRootEl = document.getElementById('pushStack');
+  if(!_pushRootEl){
+    _pushRootEl = document.createElement('div');
+    _pushRootEl.id = 'pushStack';
+    _pushRootEl.style.pointerEvents = 'none';
+    document.body.appendChild(_pushRootEl);
+  }
+  return _pushRootEl;
+}
 function pushPage(title,renderFn){
-  if(!_pushRoot)return;
+  const _pr=_pushRootGet(); if(!_pr)return;
   const page=document.createElement('div');
   page.className='push-page';
   page.innerHTML='<div class="push-nav"><button class="push-back" onclick="popPage()">‹</button><span class="push-title">'+title+'</span></div><div class="push-body">'+(renderFn?renderFn():'')+'</div>';
-  _pushRoot.appendChild(page);
+  _pr.appendChild(page);
   pushStack.push(page);
-  _pushRoot.style.pointerEvents='auto';
+  _pr.style.pointerEvents='auto';
   requestAnimationFrame(()=>requestAnimationFrame(()=>page.classList.add('entering')));
   _bindPushSwipe(page);
   try{hap&&hap(6);}catch(e){}
@@ -3951,7 +3965,7 @@ function popPage(){
   page.classList.add('leaving');
   page.style.transform='';
   let done=false;
-  const kill=()=>{if(done)return;done=true;page.remove();if(!pushStack.length&&_pushRoot)_pushRoot.style.pointerEvents='none';};
+  const kill=()=>{if(done)return;done=true;page.remove();if(!pushStack.length){const _r=_pushRootGet(); if(_r)_r.style.pointerEvents='none';}};
   page.addEventListener('transitionend',kill,{once:true});
   setTimeout(kill,450);
   try{hap&&hap(4);}catch(e){}
@@ -3981,9 +3995,24 @@ function _bindPushSwipe(page){
 
 /* ── Layer 2: Sheet（懒加载，DOM 最多 1 个）── */
 let activeSheet=null;
-const _sheetRoot=document.getElementById('sheetRoot');
+// ⚠ #sheetRoot 容器在 HTML 里位于本脚本之后（约第 6900 行），而这行在第 3984 行就执行了，
+// 于是原来的 const _sheetRoot 恒为 null → openSheet 一进门就 return → 所有设置面板点了都
+// 静默不开（表现为"整个界面点不动"，且不报任何错，极难查）。
+// 改为惰性取用：第一次真要用时才找；万一 HTML 里没有就现场建一个，彻底不受脚本/DOM 先后顺序影响。
+let _sheetRootEl = null;
+function _sheetRootGet(){
+  if(_sheetRootEl && document.body.contains(_sheetRootEl)) return _sheetRootEl;
+  _sheetRootEl = document.getElementById('sheetRoot');
+  if(!_sheetRootEl){
+    _sheetRootEl = document.createElement('div');
+    _sheetRootEl.id = 'sheetRoot';
+    _sheetRootEl.style.pointerEvents = 'none';
+    document.body.appendChild(_sheetRootEl);
+  }
+  return _sheetRootEl;
+}
 function openSheet(id,renderFn){
-  if(!_sheetRoot)return;
+  const _sr=_sheetRootGet(); if(!_sr)return;
   // 单例：已有则先硬移除
   if(activeSheet){activeSheet.sheet.remove();activeSheet.backdrop.remove();activeSheet=null;}
   // 内容来源：renderFn > template#tpl_{id} > 旧式#id.sheet 兼容
@@ -4009,16 +4038,16 @@ function openSheet(id,renderFn){
   const backdrop=document.createElement('div');
   backdrop.className='sheet-backdrop';
   backdrop.addEventListener('click',closeSheet);
-  _sheetRoot.appendChild(backdrop);
+  _sr.appendChild(backdrop);
 
   const sheet=document.createElement('div');
   sheet.className='sheet';
   sheet.id=id+'_active';
   sheet.setAttribute('role','dialog');
   sheet.innerHTML='<div class="sheet-grabber"></div>'+html;
-  _sheetRoot.appendChild(sheet);
+  _sr.appendChild(sheet);
 
-  _sheetRoot.style.pointerEvents='auto';
+  _sr.style.pointerEvents='auto';
   activeSheet={sheet,backdrop,id};
 
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -4061,7 +4090,7 @@ function closeSheet(){
   const kill=()=>{
     if(done)return;done=true;
     sheet.remove();backdrop.remove();
-    if(_sheetRoot)_sheetRoot.style.pointerEvents='none';
+    { const _r=_sheetRootGet(); if(_r) _r.style.pointerEvents='none'; }
   };
   sheet.addEventListener('transitionend',kill,{once:true});
   setTimeout(kill,450);

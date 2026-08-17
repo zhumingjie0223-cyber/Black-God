@@ -100,5 +100,28 @@ for (const b of blocks) {
       ? '.tab-panels 有 CSS 却没有对应 HTML 元素 —— 迁移只做了一半\n   → 要么补齐 HTML，要么把这套样式/脚本删干净，别留半拉子' : '');
 }
 
+// ⑤ 顶层 getElementById 不得取用「还没出现的元素」
+// 经典 <script> 是边解析边执行：写在第 3984 行的 const x=getElementById('foo')，
+// 若 foo 在第 6912 行才出现，取到的永远是 null，且不报任何错。今天已被咬两次
+// （#sheetRoot → 所有设置面板静默打不开，表现为"整个界面点不动"；fmtTs 同类顺序问题）。
+{
+  const bad = [];
+  for (const b of blocks) {
+    const lines = b.code.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      // 只查顶层（行首无缩进）的 const/let/var 赋值，函数体内的是运行时取用，不受此限
+      const m = /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*document\.getElementById\(\s*['"]([^'"]+)['"]/.exec(lines[i]);
+      if (!m) continue;
+      const elemId = m[1];
+      const idPos = html.indexOf(`id="${elemId}"`);
+      const linePos = html.split('\n').slice(0, b.line + i - 1).join('\n').length;
+      if (idPos === -1) bad.push(`${elemId}（页面里没有这个元素）`);
+      else if (idPos > linePos) bad.push(`${elemId}（元素在第 ${html.slice(0, idPos).split('\n').length} 行，取用却在第 ${b.line + i} 行）`);
+    }
+  }
+  ok('顶层 getElementById 取用的元素都已先出现', bad.length === 0,
+    bad.length ? `取到的永远是 null 且不报错：${bad.join('、')}\n   → 改成用时再取（惰性），或把元素挪到脚本之前` : '');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
