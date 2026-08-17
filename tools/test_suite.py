@@ -16,7 +16,9 @@ def call(name, path, method="GET", data=None, timeout=20):
             req = urllib.request.Request(url, data=json.dumps(data).encode(), method=method)
             req.add_header("Content-Type", "application/json")
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            body = r.read().decode()
+            raw = r.read()
+            ct = r.headers.get("Content-Type", "")
+            body = raw.decode("utf-8") if "image" not in ct else f"<binary {len(raw)} bytes>"
             code = r.status
         dt = (time.time() - t0) * 1000
         ok = code == 200

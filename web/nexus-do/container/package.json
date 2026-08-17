@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "playwright-core": "latest"
+    "playwright-core": "1.62.1"
   }
 }
