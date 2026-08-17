@@ -503,8 +503,11 @@ button,input,textarea{font-family:inherit;color:inherit}
   --nav-dur-out: 220ms;
   --hit-min: 44px;
 }
-/* 废弃旧 pager */
-.pager, .pages { display: none !important; }
+/* ⚠ 这里原来是 `.pager, .pages { display:none !important; }`（注释写「废弃旧 pager」）。
+ * 但 NavCore v3(2026-08-02) 只加了新容器 .tab-panels 的 CSS 与 JS，**从没往 HTML 里加过
+ * .tab-panels 元素**（全页出现 0 次），三个页面（枢机/对话/设置）至今仍装在 #pager > #pages 里。
+ * 于是这条规则把整个应用内容永久隐藏 —— 页面除了顶栏和底栏就是一片黑，谁都看不见。
+ * 迁移没做完就不能拆旧的：规则删除，下方 NavCore 改为直接驱动现存的 #pages。2026-08-17。 */
 
 /* ── Tab 主导航 ── */
 .tab-panels {
@@ -3852,8 +3855,18 @@ function _pt(e){return e.touches&&e.touches.length?e.touches[0]:e.changedTouches
 
 /* ── Layer 0: Tab ── */
 let _tabIdx = 0;
-const _tabPanels  = document.querySelector('.tab-panels');
-const _tabCount   = _tabPanels ? _tabPanels.children.length : 2;
+// .tab-panels 是 NavCore v3 设想的新容器，但从没建进 HTML；真实内容一直在 #pages 里。
+// 故此处回落绑定 #pages，让导航驱动实际存在的那个容器。
+const _tabPanels  = document.querySelector('.tab-panels') || document.getElementById('pages');
+// #pages 的宽度是「页数 × 100%」，所以位移百分比要按 100/页数 折算，
+// 一屏的像素宽也要用容器宽除以页数；若将来真加上 .tab-panels（宽 100%）则按 100 算。
+const _usePagesBox = () => !!(_tabPanels && _tabPanels.id === 'pages');
+const _tabStep  = () => _usePagesBox() ? (100 / _tabCount) : 100;
+const _tabViewW = () => !_tabPanels ? 0 : (_usePagesBox() ? _tabPanels.clientWidth / _tabCount : _tabPanels.clientWidth);
+// 只数真正的页面：#pages 里还混着 #voiceScrim 语音浮层，按 children.length 算会多出一页，
+// 切页步长就会从 1/3 变成 1/4，第三页永远划不到。
+const _tabCount   = !_tabPanels ? 2
+  : (_usePagesBox() ? (_tabPanels.querySelectorAll(':scope > .page').length || 3) : _tabPanels.children.length);
 const _tabButtons = document.querySelectorAll('.tabbar .tab');
 
 function switchTab(idx, animate){
@@ -3863,7 +3876,7 @@ function switchTab(idx, animate){
   _tabPanels.style.transition = (animate===false)
     ? 'none'
     : 'transform var(--nav-dur-in) var(--nav-ease-in)';
-  _tabPanels.style.transform = 'translateX('+(-idx*100)+'%)';
+  _tabPanels.style.transform = 'translateX('+(-idx*_tabStep())+'%)';
   _tabButtons.forEach((b,i)=>{
     const on=(i===idx);
     b.classList.toggle('on', on);
@@ -3903,11 +3916,12 @@ function go(i){
     if((_tabIdx===0&&dx>0)||(_tabIdx===_tabCount-1&&dx<0))dx*=0.3;
     e.preventDefault();
     _tabPanels.style.transition='none';
-    _tabPanels.style.transform='translateX('+(-_tabIdx*_tabPanels.clientWidth+dx)+'px)';
+    _tabPanels.style.transform='translateX('+(-_tabIdx*_tabViewW()+dx)+'px)';
   },{passive:false});
   _tabPanels.addEventListener('touchend',function(){
     if(locked||!dragging){locked=false;return;}
-    const dt=Math.max(1,Date.now()-t0),v=dx/dt,w=_tabPanels.clientWidth;
+    // 翻页阈值要按「一屏宽」算；用容器宽会变成 3 屏宽，手指得划满三屏才翻得动
+    const dt=Math.max(1,Date.now()-t0),v=dx/dt,w=_tabViewW();
     let t=_tabIdx;
     if(dx<-w*0.35||v<-0.3)t=_tabIdx+1;
     else if(dx>w*0.35||v>0.3)t=_tabIdx-1;
@@ -4194,6 +4208,26 @@ function toggleFold(btn){ const f=btn && btn.closest('.fold'); if(f) f.classList
 function quick(t){ setModeByName('chat'); $('#inp').value=t; autogrow($('#inp')); send(); }
 function setModeByName(m){ const el=[...$$('.pp-tile.mode')].find(c=>c.dataset.mode===m); if(el)setMode(el); }
 let history = [];
+// 时间格式化。原来定义在靠后的 <script> 块里，却被本块(主块)在启动时就调用
+// （pushMsg 的时间戳、时间线、记忆列表共 5 处）→ ReferenceError: fmtTs is not defined。
+// 经典 script 按顺序执行，后面的块还没跑，函数就还不存在。2026-08-17 搬到调用方所在的主块。
+function fmtTs(ms) {
+  const now = Date.now();
+  const diff = now - ms;
+  const date = new Date(ms);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const pad = n => String(n).padStart(2, '0');
+  const hm = pad(date.getHours()) + ':' + pad(date.getMinutes());
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+  if (date >= today) return '今天 ' + hm;
+  if (date >= yesterday) return '昨天 ' + hm;
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + hm;
+}
+
 function pushMsg(role, text, meta, speakable){
   const wrap=$('#msgs'); wrap.style.display='flex'; $('#welcome').style.display='none';
   const m=document.createElement('div'); m.className='msg '+(role==='me'?'me':'her');
@@ -5479,7 +5513,9 @@ function typeInto(bubble, text, done){
 /* ============ 启动 ============ */
 (function boot(){
   // 最先设分页数（哪怕后面出错，布局也不会错位/漏页）
-  try{ $('#pages').style.setProperty('--pages', PAGES); }catch(e){}
+  // PAGES 这个常量全页从未定义过，原来这行必抛 ReferenceError 被 catch 吞掉，--pages 从来没设上
+  // （靠 CSS 里 var(--pages,3) 的默认值侥幸没错位）。改成按真实页数算，页数一变也不会错。
+  try{ const _n=document.querySelectorAll('#pages > .page').length||3; $('#pages').style.setProperty('--pages', _n); }catch(e){}
   // —— 模式无关的 UI 初始化 ——
   try{ applyTheme(store.get('theme') || 'dark'); }catch(e){}  // 深林夜为默认（黑绿意识体），可在设置切浅色
   try{ setGreeting(); }catch(e){}
@@ -6484,22 +6520,6 @@ function uiPrompt(msg, placeholder) {
   });
 }
 
-function fmtTs(ms) {
-  const now = Date.now();
-  const diff = now - ms;
-  const date = new Date(ms);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const pad = n => String(n).padStart(2, '0');
-  const hm = pad(date.getHours()) + ':' + pad(date.getMinutes());
-  if (diff < 60000) return '刚刚';
-  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-  if (date >= today) return '今天 ' + hm;
-  if (date >= yesterday) return '昨天 ' + hm;
-  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + hm;
-}
 
 async function fillCheckpoints() {
   try {
