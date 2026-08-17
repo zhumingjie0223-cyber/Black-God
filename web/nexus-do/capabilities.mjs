@@ -97,22 +97,22 @@ export const CAPABILITIES = [
     owner_only: true,   // 与 /soul 私密路由语义一致：含设备/地理等隐私字段，绝不公开
   },
   {
-    id: 'exec', name: '执行脑（真沙箱）', layer: '行动',
-    desc: '在主人自有服务器上真跑 shell 命令/代码（需配 NEXUS_EXEC_URL + token；未配则如实告知，绝不假装）',
+    id: 'exec', name: '内置工作台（真沙箱）', layer: '行动',
+    desc: '在神枢内置 Container 中执行 Shell/代码；Container 不可用时受限回退原生沙箱。危险命令始终要求主人二次确认。',
     handler: 'execRemote', argShape: '(command)',
     tier: 'system',
-    owner_only: true,   // 能在真机跑命令，最高危：仅主人、且靠服务器端 token 双重门
+    owner_only: true,   // 仅主人可触发；Worker 端确认闸门与运行账本共同约束副作用
   },
   {
     id: 'apple', name: 'iOS 硬件手', layer: '行动',
-    desc: '经沙箱执行脑真调主人 iPhone 的 21 个宿主工具：闹钟/日历/提醒/天气/定位/导航/健康/剪贴板/智能家居/通知/相册/识图/朗读等（照 Minis 宿主 apple-* 契约；需执行脑隧道，未接入则如实告知）',
+    desc: '经神枢内置工作台调用主人 iPhone 的受控宿主工具：闹钟、日历、提醒、定位、导航、健康、剪贴板、智能家居、通知、相册、识图和朗读等；实际可用性仍由设备授权与宿主返回结果决定。',
     handler: 'appleTool', argShape: '(arg: "工具名 子命令 参数")',
     tier: 'system',
-    owner_only: true,   // 直接操作主人私人设备，最高危：仅主人，且经执行脑隧道 token 门
+    owner_only: true,   // 直接操作主人私人设备，最高危：仅主人并由确认与审计协议约束
   },
   {
     id: 'device_control', name: 'iOS 设备控制中枢', layer: '行动',
-    desc: '通过执行脑隧道调用主人 iPhone 的设备动作；动作是否可用由当前设备与宿主工具返回结果决定',
+    desc: '通过神枢内置设备桥接调用主人 iPhone 的设备动作；动作是否可用由当前设备权限与宿主工具返回结果决定',
     handler: 'deviceControl', argShape: '(action, params)',
     tier: 'system',
     owner_only: true,

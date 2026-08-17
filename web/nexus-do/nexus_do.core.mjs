@@ -417,10 +417,10 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/agent/plan', '/agent/approve', '/agent/execute', '/agent/run', '/agent/audit', '/agent/cancel', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/agent/plan', '/agent/approve', '/agent/execute', '/agent/run', '/agent/audit', '/agent/cancel', '/config', '/oauth/start', '/oauth/callback', '/exec', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
-      // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
+      // 多租户:实例主人(普通用户)碰不到系统专属路由(内置工作台/造像造声造影/推送/迁移/跨用户统计/守望等)。
       if (_mt && _role === 'instance' && isSystemOnlyPath(path)) {
         return json({ error: 'system_only', 提示: '这是系统主人的能力,你的神枢用不了。' }, 403);
       }
@@ -466,9 +466,8 @@ export class ShenshuCore {
         // 厂商 OAuth 一键登录（Claude / OpenRouter）：start=拿登录链接, callback=授权码换key并存入brains
         if (path === '/oauth/start' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthStart(b.provider || '', b.redirect || '')); }
         if (path === '/oauth/callback' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.oauthCallback(b)); }
-        // 执行脑连接器 · 测试连通（走 worker 转发，绕开浏览器 http 混合内容限制）
+        // 内置工作台执行入口：只调 Worker Container 或原生受限沙箱，不含外接连接器。
         if (path === '/exec' && request.method === 'POST') { return await this.handleExecRoute(request); }
-        if (path === '/exec-test' && request.method === 'POST') { const r = await this.execRemote('echo nexus-connector-ok'); return json({ ok: !!r.ok, detail: r.ok ? (r.stdout || '').trim() : (r.note || r.error || '失败'), code: r.code }); }
         if (path === '/sandbox/run' && request.method === 'POST') {
           const b = await request.json().catch(() => ({}));
           const result = await this.nativeSandbox(b.code || '', b.lang || 'js');
@@ -2581,8 +2580,8 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     } catch (_) { return ''; }
   }
 
-  // 执行脑 · 真沙箱的手：把命令送到主人自有服务器上真跑（exec_brain）。
-  // 未配 NEXUS_EXEC_URL → 如实告知「未接入」，绝不假装能跑（红线：不许假）。
+  // 内置工作台：将命令送入 Worker Container 或原生受限沙箱执行。
+  // 内置执行面不可用时必须如实返回，不得伪造外部执行成功。
   // 破坏性命令识别(安全红线:危险操作须二次确认,同 /import?confirm)。保守清单,只拦真正不可逆/毁机的。纯逻辑。
   dangerReason(cmd) {
     const c = String(cmd || '');
@@ -2599,8 +2598,8 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
   }
   isDangerousCmd(cmd) { return !!this.dangerReason(cmd); }
 
-  // ═══ iOS 硬件工具桥（照 Minis 宿主 apple-* 契约 · 经执行脑隧道真调你 iPhone）═══
-  // arg 形如 "alarm set --time 07:30 --label 起床"；转成 shell `apple-alarm set ...` 走同一条执行脑隧道。
+  // ═══ iOS 硬件工具桥（照 Minis 宿主 apple-* 契约 · 经内置工作台与受控设备桥执行）═══
+  // arg 形如 "alarm set --time 07:30 --label 起床"；转成 shell `apple-alarm set ...` 走同一条内置工作台执行链。
   // 白名单 21 个宿主工具，防止 AI 拼出任意命令绕过 exec 危险闸。只读为主，写操作交给 iOS 系统自身的权限弹窗兜底。
   appleToolList() {
     return ['alarm', 'bluetooth', 'calendar', 'clipboard', 'device', 'healthkit', 'homekit',
@@ -2615,7 +2614,7 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     if (!this.appleToolList().includes(tool)) {
       return { ok: false, note: `未知 iOS 工具「${tool}」。可用：${this.appleToolList().join(' / ')}` };
     }
-    // 拼成宿主命令，交给执行脑隧道（沙箱内才够得到 iPhone 硬件）。--compact 省 token。
+    // 拼成宿主命令，交给内置工作台的受控设备桥。--compact 省 token。
     const cmd = (rest ? `apple-${tool} ${rest} --compact` : `apple-${tool} --compact`);
     const r = await this.execRemote(cmd, opts).catch(() => null);
     if (!r) return { ok: false, note: 'iOS 工具无响应' };
@@ -8985,46 +8984,29 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
 
   async execRemote(cmd, opts = {}) {
-    // 连接器优先读 App 内配置（设置里一键填），回落到环境变量
-    const cfg = (this.storage ? await this.storage.get('config') : null) || {};
-    const url = cfg.exec_url || this.env.NEXUS_EXEC_URL;
-    const token = cfg.exec_token || this.env.NEXUS_EXEC_TOKEN;
+    // 神枢只使用内置执行面：优先 Worker Container，异常或未启用时明确回退到原生受限沙箱。
+    // 不读取、不保存、更不转发任何外部执行地址或密钥。
     const command = String(cmd || '');
-    // 彻底未接入（无外部地址、无容器、无 GITHUB_API）：fallback 到原生沙箱（shell 映射）
-    if (!url && !this.env.EXEC_CONTAINER && !this.env.GITHUB_API) return await this.nativeSandbox(command, 'shell');
-    // 安全红线:破坏性命令必须二次确认(confirm)才真跑,防幻觉/误触毁主人服务器
-    if (!opts.confirm) { const danger = this.dangerReason(command); if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再带 confirm 执行，我不擅自动手。' }; }
-    // 内置容器执行脑：真 bash、能装包，传输异常时落 GitHub 兜底
-    if (!url && this.env.EXEC_CONTAINER) {
-      const j = await this._containerFetch('/exec', { cmd: command, timeout: 60 });
-      if (j && !j.note) {
-        return { ok: j.ok !== false, code: j.code ?? j.exitCode, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null, via: 'container' };
+    if (!opts.confirm) {
+      const danger = this.dangerReason(command);
+      if (danger) return { ok: false, need_confirm: true, danger, note: '⚠ 危险操作需二次确认（' + danger + '）：确认无误再执行，我不擅自动手。' };
+    }
+    if (this.env.EXEC_CONTAINER) {
+      const result = await this._containerFetch('/exec', { cmd: command, timeout: 60 });
+      if (result && !result.note) {
+        return {
+          ok: result.ok !== false,
+          code: result.code ?? result.exitCode,
+          stdout: String(result.stdout || '').slice(0, 4000),
+          stderr: String(result.stderr || '').slice(0, 1500),
+          error: result.error || null,
+          via: 'builtin-container'
+        };
       }
-      console.log('容器执行脑异常，落 GitHub 兜底:', j && j.note);
+      console.warn('内置 Container 暂不可用，回退原生沙箱:', result?.note || 'unknown');
     }
-    // 外部执行脑未接入（或容器兜底）但有 GITHUB_API：走内置 GitHub Actions 异步派发
-    if (!url) return await this.execDispatchGH(command);
-    // 客户端超时兜底:服务器 60 秒,这边 65 秒硬断,绝不让请求悬死
-    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    const timer = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, 65000) : null;
-    try {
-      const r = await fetch(url.replace(/\/+$/, '') + '/exec', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
-        body: JSON.stringify({ cmd: command, timeout: 60 }),
-        ...(ctl ? { signal: ctl.signal } : {}),
-      });
-      if (r.status === 401) return { ok: false, note: '执行脑拒绝：token 不对' };
-      if (!r.ok) return { ok: false, note: '执行脑返回 ' + r.status };
-      const j = await r.json();
-      return { ok: j.ok !== false, code: j.code, stdout: String(j.stdout || '').slice(0, 4000), stderr: String(j.stderr || '').slice(0, 1500), error: j.error || null };
-    } catch (e) {
-      const msg = String(e);
-      if (/abort/i.test(msg)) return { ok: false, note: '执行脑超时（65 秒无响应），已断开' };
-      return { ok: false, note: '连不上执行脑：' + msg.slice(0, 80) };
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
+    const fallback = await this.nativeSandbox(command, 'shell');
+    return { ...fallback, via: fallback?.via || 'native-sandbox' };
   }
 
   // 真执行环：神枢自主 plan → 调信息工具(web_search / open) → 观察 → 再决 → 直到作答。
@@ -11015,10 +10997,6 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         key: mask ? (x.key ? '••••••' + String(x.key).slice(-4) : '') : (x.key || ''), has_key: !!x.key,
       })),
       来源: c.gateway_url ? 'app' : (this.env.NEXUS_GATEWAY_URL ? 'cf密钥' : '内置Llama'),
-      // 执行脑连接器（真沙箱的手）：只回地址与「是否已配 token」，token 本身永不回传
-      exec_url: c.exec_url || '',
-      exec_has_token: !!c.exec_token,
-      exec_on: !!(c.exec_url || this.env.NEXUS_EXEC_URL),
     };
   }
   // 从网关 base 推导标准 /models 端点（剥掉 chat/completions 等尾巴，补 /models）
@@ -11085,6 +11063,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   }
   async setConfig(b) {
     const c = (await this.storage.get('config')) || {};
+    // 旧版外接执行脑配置废弃：主动清理历史地址与令牌，不再落库或经 API 暴露。
+    delete c.exec_url;
+    delete c.exec_token;
     // 换网关/换模型：清掉自动识别缓存，下次重新识别
     if ((b.gateway_url !== undefined && b.gateway_url !== c.gateway_url) || b.gateway_model !== undefined) { delete c._auto_model; c._auto_models = {}; }
     if (b.gateway_url !== undefined) c.gateway_url = String(b.gateway_url || '').trim();
@@ -11103,10 +11084,6 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       }).filter(x => x.url);
       c._auto_models = {};
     }
-    // 执行脑连接器
-    if (b.exec_url !== undefined) c.exec_url = String(b.exec_url || '').trim();
-    if (b.exec_token === '') c.exec_token = '';
-    else if (b.exec_token !== undefined && !/^[•*]/.test(b.exec_token)) c.exec_token = String(b.exec_token).trim();
     await this.storage.put('config', c);
     return { ok: true, ...(await this.getConfig(true)) };
   }

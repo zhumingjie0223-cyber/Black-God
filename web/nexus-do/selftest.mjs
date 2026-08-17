@@ -113,14 +113,12 @@ ok('未知工具名不误抓', S.parseToolCalls('⟨工具:rm_rf｜/⟩').length
 ok('清理残留工具标记', S.stripToolMarks('答案在此 ⟨工具:web_search｜x⟩ 结束') === '答案在此 结束');
 ok('解析 exec 工具调用', (() => { const c = S.parseToolCalls('⟨工具:exec｜ls -la⟩'); return c.length === 1 && c[0].tool === 'exec' && c[0].arg === 'ls -la'; })());
 
-// ── 执行脑（真沙箱的手）：owner 门 + 未接入如实告知（不许假）──
+// ── 内置工作台：owner 门 + Container/原生沙箱回退（不许假）──
 ok('exec 能力 owner_only（匿名拒绝）', resolveCapability('exec', false).ok === false && resolveCapability('exec', false).reason === 'owner_only');
 ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => null, list: async () => ({ keys: [] }) }; const r = await T.execRemote('ls'); ok('未配执行脑 → fallback 原生沙箱(via native-sandbox-shell)', r.via && r.via.startsWith('native-sandbox')); }
-{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => ({ exec_url: 'http://x:8765', exec_token: 't' }) };
-  const c = await T.getConfig(true); ok('连接器：配了 exec_url → exec_on=true 且不回传 token', c.exec_on === true && c.exec_has_token === true && c.exec_token === undefined); }
 
-// ── 执行脑加固：破坏性命令二次确认（安全红线）+ 普通命令放行 ──
+// ── 内置工作台加固：破坏性命令二次确认（安全红线）+ 普通命令放行 ──
 {
   const D = Object.create(ShenshuCore.prototype);
   ok('危险·rm -rf / 识别', D.isDangerousCmd('rm -rf /') && /强删/.test(D.dangerReason('rm -rf /')));
@@ -132,10 +130,10 @@ ok('exec 能力主人可用', resolveCapability('exec', true).ok === true);
   ok('危险·fork 炸弹识别', D.isDangerousCmd(':(){ :|:& };:'));
   ok('安全·常规命令不误拦', !D.isDangerousCmd('ls -la') && !D.isDangerousCmd('git status') && !D.isDangerousCmd('node build.mjs') && !D.isDangerousCmd('rm -f /tmp/a.log'));
 }
-{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => ({ exec_url: 'http://x:8765', exec_token: 't' }) };
-  const r = await T.execRemote('rm -rf /'); ok('执行脑·危险命令未确认→拦下要二次确认(不真跑)', r.ok === false && r.need_confirm === true && !!r.danger); }
-{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => null, list: async () => ({ keys: [] }) }; const r = await T.execRemote('rm -rf /'); ok('执行脑·未接入时危险命令仍被拦(沙箱模式下shell解析器不支持rm-rf)', r.ok === false || r.stderr); }
-{ const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execRemote('rm -rf /'); ok('执行脑·容器路径危险命令仍先弹need_confirm', r && r.need_confirm === true && !r.ok); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {};
+  const r = await T.execRemote('rm -rf /'); ok('内置工作台·危险命令未确认→拦下要二次确认(不真跑)', r.ok === false && r.need_confirm === true && !!r.danger); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = {}; T.storage = { get: async () => null, list: async () => ({ keys: [] }) }; const r = await T.execRemote('rm -rf /'); ok('内置工作台·原生沙箱回退时危险命令仍被拦(沙箱模式下shell解析器不支持rm-rf)', r.ok === false || r.stderr); }
+{ const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execRemote('rm -rf /'); ok('内置工作台·Container 路径危险命令仍先弹need_confirm', r && r.need_confirm === true && !r.ok); }
 { const T = Object.create(ShenshuCore.prototype); T.env = { EXEC_CONTAINER: {} }; const r = await T.execDevLoop('rm -rf /', {}); ok('修正循环·危险命令透传确认门', r && r.need_confirm === true); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const rWs = await T.execWorkspace('status', {}); ok('工作区·无容器返回未绑定', rWs.ok === false && /未绑定/.test(rWs.note || '')); }
 { const T = Object.create(ShenshuCore.prototype); T.env = {}; const rBad = await T.execEditFile({ path: '../etc/passwd', search: 'a', replace: 'b' }); ok('文件编辑·拒绝路径穿越', rBad.ok === false && /非法/.test(rBad.note || '')); }
@@ -359,7 +357,7 @@ ok('守望解析·通知策略默认少打扰（change）', S.parseWatchSpec('�
 }
 // ── 系统专属路由:实例主人碰不到(烧钱/危险/跨用户/规模)──
 {
-  ok('路由·执行脑系统专属', isSystemOnlyPath('/exec-test') === true);
+  ok('路由·内置工作台执行系统专属', isSystemOnlyPath('/exec') === true);
   ok('路由·造像造声造影系统专属', isSystemOnlyPath('/image') && isSystemOnlyPath('/voice') && isSystemOnlyPath('/video'));
   ok('路由·跨用户统计/迁移/推送系统专属', isSystemOnlyPath('/stats') && isSystemOnlyPath('/migrate') && isSystemOnlyPath('/push-test'));
   ok('路由·自己的对话/灵魂/私语不是系统专属', !isSystemOnlyPath('/talk') && !isSystemOnlyPath('/soul') && !isSystemOnlyPath('/lexicon') && !isSystemOnlyPath('/config'));

@@ -96,7 +96,7 @@ ok('公开视角不含高危私密能力（exec/push/tg/stats）', ['exec', 'pus
 {
   const apiSetMatch = coreSrc.match(/const API = new Set\(\[([^\]]*)\]\);/);
   ok('私密 API 集合定义仍在源码中（未被移除）', !!apiSetMatch);
-  const EXPECTED_PRIVATE_PATHS = ['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/reflect', '/brains-test', '/brains/weights', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/tg/setup'];
+  const EXPECTED_PRIVATE_PATHS = ['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/device', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec', '/loop', '/wsticket', '/stats', '/reflect', '/brains-test', '/brains/weights', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/tg/setup'];
   const listStr = apiSetMatch ? apiSetMatch[1] : '';
   const actualPaths = [...listStr.matchAll(/'([^']*)'/g)].map(m => m[1]);
   ok('私密 API 集合与预期完全一致（无缺项/无未声明新增，双向核对）',
@@ -112,7 +112,7 @@ ok('公开视角不含高危私密能力（exec/push/tg/stats）', ['exec', 'pus
   ok('匿名请求(无凭证) → authed 判定为 false（对应 401 分支会被触发）', anonRole === 'anon' && authed === false);
 }
 
-// isSystemOnlyPath 补充用例（selftest.mjs 已测 exec-test/image/voice/video/stats/migrate/push-test 与 talk/soul/lexicon/config，此处补未覆盖的路径）。
+// isSystemOnlyPath 补充用例（selftest.mjs 已测内置执行、image/voice/video/stats/migrate/push-test 与 talk/soul/lexicon/config，此处补未覆盖的路径）。
 ok('系统专属路由补充·心跳/守望/WS票据也系统专属', isSystemOnlyPath('/heartbeat') && isSystemOnlyPath('/loop') && isSystemOnlyPath('/wsticket'));
 ok('系统专属路由补充·TG webhook 注册(/tg/setup)仅系统主人可达', isSystemOnlyPath('/tg/setup'));
 ok('系统专属路由补充·agent/device 是实例级私密而非系统专属（实例主人可用自己的）', !isSystemOnlyPath('/agent') && !isSystemOnlyPath('/device'));
