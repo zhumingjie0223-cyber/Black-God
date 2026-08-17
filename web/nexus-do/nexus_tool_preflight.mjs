@@ -42,7 +42,7 @@ function validateFileEdit(params, errors) {
   const path = requiredString(params, 'path', errors, { max: 1024 });
   if (path && !safePath(path)) errors.push({ field: 'path', code: 'path_traversal_or_invalid' });
   const oldString = requiredString(params, 'old_string', errors, { max: 100_000, allowEmpty: true });
-  // OpenMinis 语义：new_string 为空字符串表示删除，必须允许；但 null/缺失必须拒绝。
+  // 神枢文件编辑契约：new_string 为空字符串表示删除，必须允许；但 null/缺失必须拒绝。
   if (typeof params.new_string !== 'string') errors.push({ field: 'new_string', code: 'string_required_allow_empty_for_delete' });
   else if (params.new_string.length > 100_000) errors.push({ field: 'new_string', code: 'too_long', max: 100_000 });
   return { ...params, path, old_string: oldString, new_string: typeof params.new_string === 'string' ? params.new_string : '' };

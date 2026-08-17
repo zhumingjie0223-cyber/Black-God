@@ -1,6 +1,6 @@
 // 神枢 · 规范化 Agent 回合内核
 //
-// 设计来源：OpenMinis 的 agentHistory / UI messages 分离、工具调用—结果配对、
+// 神枢协议语义：Agent history / UI messages 分离、工具调用—结果配对、
 // 中断回合清理与有界并发执行。这里保存的是 provider-neutral 的规范历史；
 // UI 只消费 ShenshuCore 的 stream，二者绝不互相当作唯一事实源。
 
