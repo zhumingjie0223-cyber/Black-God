@@ -144,11 +144,62 @@
     padding:7px 13px; border-radius:9px; cursor:pointer; transition:.15s}
   .btn2:hover{color:var(--goldsoft); border-color:var(--gold2)}
 
+  /* ── Tab 导航 ── */
+  .nav-tabs{display:flex; gap:0; align-items:stretch}
+  .nav-tab{font-size:13px; color:var(--mut); padding:0 16px; cursor:pointer; border:none; background:none;
+    border-bottom:2px solid transparent; transition:color .15s, border-color .15s; height:100%; white-space:nowrap}
+  .nav-tab.active{color:var(--goldsoft); border-bottom-color:var(--gold)}
+  .nav-tab:hover:not(.active){color:var(--txt)}
+
+  /* ── 面板容器 ── */
+  .viewport{flex:1; min-height:0; position:relative; overflow:hidden}
+  .panel{position:absolute; inset:0; overflow-y:auto; display:none}
+  .panel.active{display:block}
+
+  /* ── API Hub 面板 ── */
+  .api-wrap{padding:22px 26px 40px}
+  .api-wrap h2{font-size:18px; color:var(--gold); font-weight:700; margin-bottom:16px; letter-spacing:.5px}
+  .api-search{width:100%; padding:10px 14px; background:var(--panel); border:1px solid var(--line2);
+    color:var(--txt); border-radius:11px; font-size:14px; margin-bottom:20px}
+  .api-search:focus{outline:none; border-color:var(--gold2); box-shadow:0 0 0 3px rgba(201,155,78,.12)}
+  .api-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+  .api-card{background:var(--panel); border:1px solid var(--line2); border-radius:var(--r);
+    padding:16px 14px; cursor:pointer; transition:.15s}
+  .api-card:hover{border-color:var(--gold2); background:var(--panel2)}
+  .api-card .ac-icon{font-size:22px; margin-bottom:8px}
+  .api-card .ac-name{font-size:13px; font-weight:600; color:var(--txt); margin-bottom:4px}
+  .api-card .ac-cat{font-size:11px; color:var(--mut2)}
+  .api-foot{margin-top:20px; font-size:12px; color:var(--mut2); text-align:center}
+
+  /* ── 历史面板 ── */
+  .hist-wrap{padding:22px 26px 40px}
+  .hist-wrap h2{font-size:18px; color:var(--gold); font-weight:700; margin-bottom:16px}
+  .hist-grid{display:flex; flex-direction:column; gap:8px}
+
+  /* ── NEXUS 翻转特效 ── */
+  .nexus-overlay{position:fixed; inset:0; z-index:200; pointer-events:none;
+    display:flex; align-items:center; justify-content:center}
+  .nexus-card{width:200px; height:200px; perspective:1000px}
+  .nexus-inner{width:100%; height:100%; position:relative;
+    transform-style:preserve-3d; -webkit-transform-style:preserve-3d;
+    transition:transform .65s ease-in-out}
+  .nexus-inner.flipped{transform:rotateY(180deg)}
+  .nexus-face{position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    border-radius:18px; background:var(--panel); border:1px solid var(--gold2);
+    box-shadow:0 20px 60px rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center}
+  .nexus-front{font-size:80px; color:var(--gold); font-weight:800}
+  .nexus-back{transform:rotateY(180deg)}
+  .nexus-back span{font-size:26px; font-weight:800; letter-spacing:8px; color:var(--goldsoft);
+    display:inline-block; transform:scaleX(-1)}
+  .nexus-overlay.flyout{animation:nexusFly .4s ease-in forwards}
+  @keyframes nexusFly{to{opacity:0; transform:translateY(-110px)}}
+
   @media (max-width:820px){
     .app{grid-template-columns:1fr}
     .side{position:fixed; inset:0 auto 0 0; width:300px; z-index:20; transform:translateX(-100%); transition:.25s}
     .side.open{transform:none; box-shadow:var(--shadow)}
     .menu{display:grid !important}
+    .api-grid{grid-template-columns:repeat(2,1fr)}
   }
   .menu{display:none; width:34px;height:34px; place-items:center; border-radius:9px; border:1px solid var(--line2);
     background:var(--panel); cursor:pointer; color:var(--gold)}
@@ -195,6 +246,11 @@
   <main class="main">
     <div class="topbar">
       <div class="menu" id="menu">☰</div>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-panel="studio">Studio</button>
+        <button class="nav-tab" data-panel="api">API Hub</button>
+        <button class="nav-tab" data-panel="history">历史</button>
+      </nav>
       <span class="dot" id="dot"></span>
       <span class="title" id="stateTxt">就绪</span>
       <div class="stat">
@@ -203,11 +259,43 @@
         <span>耗时 <b id="sTime">0.0s</b></span>
       </div>
     </div>
-    <div class="stage" id="stage">
-      <div class="empty" id="empty">
-        <div class="big">◆</div>
-        <p>输入一个目标，神枢会自己规划、调用工具、逐步执行并交付成果。</p>
+    <div class="viewport">
+
+      <!-- Studio 面板 -->
+      <div class="panel active" id="panel-studio">
+        <div class="stage" id="stage">
+          <div class="empty" id="empty">
+            <div class="big">◆</div>
+            <p>输入一个目标，神枢会自己规划、调用工具、逐步执行并交付成果。</p>
+          </div>
+        </div>
       </div>
+
+      <!-- API Hub 面板 -->
+      <div class="panel" id="panel-api">
+        <div class="api-wrap">
+          <h2>⬡ API Hub · 1281 个接口</h2>
+          <input class="api-search" type="text" placeholder="搜索 API 名称…">
+          <div class="api-grid">
+            <div class="api-card"><div class="ac-icon">🌤</div><div class="ac-name">天气查询</div><div class="ac-cat">气象 / 地理</div></div>
+            <div class="api-card"><div class="ac-icon">🌐</div><div class="ac-name">IP 定位</div><div class="ac-cat">网络 / 安全</div></div>
+            <div class="api-card"><div class="ac-icon">💱</div><div class="ac-name">汇率转换</div><div class="ac-cat">金融 / 数据</div></div>
+            <div class="api-card"><div class="ac-icon">🖼</div><div class="ac-name">图片识别</div><div class="ac-cat">视觉 / AI</div></div>
+            <div class="api-card"><div class="ac-icon">📱</div><div class="ac-name">短信发送</div><div class="ac-cat">通信 / 推送</div></div>
+            <div class="api-card"><div class="ac-icon">📝</div><div class="ac-name">OCR 文字提取</div><div class="ac-cat">视觉 / AI</div></div>
+          </div>
+          <p class="api-foot">完整 API 目录由神枢动态加载</p>
+        </div>
+      </div>
+
+      <!-- 历史面板 -->
+      <div class="panel" id="panel-history">
+        <div class="hist-wrap">
+          <h2>◎ 历史任务</h2>
+          <div class="hist-grid" id="histMain"></div>
+        </div>
+      </div>
+
     </div>
   </main>
 </div>
@@ -436,6 +524,60 @@ $('#run').onclick = ()=> runGoal($('#goal').value);
 $('#stop').onclick = ()=>{ if(abortCtl) abortCtl.abort(); };
 $('#goal').addEventListener('keydown', e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') runGoal($('#goal').value); });
 
+// ── Tab 面板切换 ──
+let curPanel = 'studio';
+function switchPanel(name){
+  if(name === curPanel) return;
+  document.getElementById('panel-'+curPanel)?.classList.remove('active');
+  document.getElementById('panel-'+name)?.classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=> t.classList.toggle('active', t.dataset.panel===name));
+  const prev2 = curPanel; curPanel = name;
+  if(name === 'studio' && prev2 !== 'studio') showNexus();
+  if(name === 'history') loadHistMain();
+}
+
+// ── NEXUS 翻转特效 ──
+function showNexus(){
+  if(document.getElementById('nexus-ov')) return;
+  const ov = document.createElement('div');
+  ov.id = 'nexus-ov';
+  ov.className = 'nexus-overlay';
+  ov.innerHTML = `<div class="nexus-card"><div class="nexus-inner" id="nexus-inner">
+    <div class="nexus-face nexus-front">神</div>
+    <div class="nexus-face nexus-back"><span>NEXUS</span></div>
+  </div></div>`;
+  document.body.appendChild(ov);
+  // 强制回流
+  ov.getBoundingClientRect();
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    document.getElementById('nexus-inner').classList.add('flipped');
+  }));
+  // 翻转 700ms 后飞走
+  setTimeout(()=>{
+    ov.classList.add('flyout');
+    setTimeout(()=> ov.remove(), 420);
+  }, 750);
+}
+
+// ── 历史面板（主区）──
+async function loadHistMain(){
+  try{
+    const r = await fetch('/api/tasks'); const d = await r.json();
+    const list = (d.tasks||[]).slice(0,30);
+    const el = document.getElementById('histMain');
+    if(!el) return;
+    el.innerHTML = list.map(t=>`
+      <div class="taskitem" data-id="${t.id}" style="cursor:pointer">
+        <div class="t">${esc(t.message||'(无标题)')}</div>
+        <div class="m"><span>${t.status||''}</span><span>${(t.created_at||'').slice(5,16).replace('T',' ')}</span></div>
+      </div>`).join('') || '<div style="color:var(--mut2);font-size:13px">暂无历史记录</div>';
+    el.querySelectorAll('.taskitem').forEach(it=> it.onclick=()=>{
+      switchPanel('studio');
+      setTimeout(()=> replay(it.dataset.id), 250);
+    });
+  }catch(e){}
+}
+
 async function loadHistory(){
   try{
     const r = await fetch('/api/tasks'); const d = await r.json();
@@ -468,8 +610,11 @@ async function replay(id){
 
 // 启动
 (async()=>{
+  // 绑 Tab 点击
+  document.querySelectorAll('.nav-tab').forEach(t=> t.onclick=()=> switchPanel(t.dataset.panel));
   try{ const r=await fetch('/api/health'); if(r.ok) setState('on','就绪'); }catch(e){ setState('','离线'); }
   loadHistory();
+  showNexus();
 })();
 </script>
 </body>

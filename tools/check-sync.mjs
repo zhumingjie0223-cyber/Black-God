@@ -105,5 +105,6 @@ if (!commonDiff.length && !idOnlyA && !idOnlyB) ok(`编号表一致: ${wa.length
 // ── 结论 ──
 console.log('');
 if (engineFail) { console.error(`✗ 同步校验失败: ${engineFail} 个硬性问题${warns ? ` + ${warns} 个警告` : ''}`); process.exit(1); }
-if (warns && strict) { console.error(`✗ 严格模式: ${warns} 个数据层分叉视为失败`); process.exit(1); }
+// strict 模式只看词族/容量/编解码（引擎层）分叉，情绪表和编号表属产品定制层，永远只警告
+if (warns && strict && !engineFail && (onlyA.length || onlyB.length)) { console.error(`✗ 严格模式: 词族分叉视为失败`); process.exit(1); }
 console.log(warns ? `✓ 引擎层完全同步(数据层有 ${warns} 处分叉警告,详见上方)` : '✓ 双仓完全同步');

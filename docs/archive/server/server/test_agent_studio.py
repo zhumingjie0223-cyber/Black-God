@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent))
+sys.path.insert(0, str(ROOT.parent / "tools"))
 
 # ── 1) 启动 Mock LLM 网关 ──
 import mock_gateway  # noqa: E402

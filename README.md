@@ -46,7 +46,7 @@
 规划(plan) → 逐步执行(tool_call / tool_result / thought) → 交付(deliverable) → 完成(done)
 ```
 
-- **工作台 UI**：`web/nexus-do/studio.html`（黑金单文件 SPA，内核 `/studio` 直达）
+- **工作台 UI**：已于 2026-08-09 收口归档（页面存 `docs/archive/ui-收口-2026-08-09/`）——主界面 `web/nexus-do/index.html` 是唯一 UI 入口，今后只做更新不再多副本
 - **流式端点**：`POST /api/agent/stream`（SSE 逐事件推流，前端实时渲染计划清单与执行时间线）
 - **真 token 流式**：模型回复逐字流出（`token` 事件），交付物边生成边显示（上游不支持流式自动回退）
 - **可下载产物**：`write_deliverable` 工具把成果写成文件（`report.md` 等），`artifact` 事件 + `GET /api/artifact/<id>/<file>` 直接下载
