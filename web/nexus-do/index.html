@@ -509,19 +509,8 @@ button,input,textarea{font-family:inherit;color:inherit}
  * 于是这条规则把整个应用内容永久隐藏 —— 页面除了顶栏和底栏就是一片黑，谁都看不见。
  * 迁移没做完就不能拆旧的：规则删除，下方 NavCore 改为直接驱动现存的 #pages。2026-08-17。 */
 
-/* ── Tab 主导航 ── */
-.tab-panels {
-  display: flex;
-  width: calc(var(--nav-tab-count, 2) * 100%);
-  height: 100%;
-  will-change: transform;
-  touch-action: pan-y;
-  transition: transform var(--nav-dur-in) var(--nav-ease-in);
-}
-.tab-panels[data-anim="out"] {
-  transition: transform var(--nav-dur-out) var(--nav-ease-out);
-}
-.tab-panels.no-anim { transition: none; }
+/* 注：NavCore v3 设想的 .tab-panels 新容器从没建进 HTML，这套样式是孤儿，已于 2026-08-17 删除。
+   导航直接驱动现存的 #pager > #pages。要重做迁移就把 HTML 一并补齐，别再只留样式。 */
 .tab-panel {
   width: calc(100% / var(--nav-tab-count, 2));
   height: 100%;
@@ -1744,9 +1733,6 @@ body::before{
 /* ══ Upgrade Layer v2 ══ */
 /* ===== Tab 滑动过渡 ===== */
 .tabs-container{overflow:hidden;position:relative;width:100%}
-.tab-panels{display:flex;width:100%;will-change:transform;
-  transition:transform 300ms var(--ease-spring)}
-.tab-panels>.tab-panel{flex:0 0 100%;width:100%;min-width:100%}
 
 /* ===== 3D 品牌字 ===== */
 .brand-3d,.nexus-3d{
@@ -3855,11 +3841,11 @@ function _pt(e){return e.touches&&e.touches.length?e.touches[0]:e.changedTouches
 
 /* ── Layer 0: Tab ── */
 let _tabIdx = 0;
-// .tab-panels 是 NavCore v3 设想的新容器，但从没建进 HTML；真实内容一直在 #pages 里。
-// 故此处回落绑定 #pages，让导航驱动实际存在的那个容器。
-const _tabPanels  = document.querySelector('.tab-panels') || document.getElementById('pages');
+// 真实内容一直装在 #pager > #pages 里（NavCore v3 设想的 .tab-panels 从没建进 HTML，
+// 那套孤儿样式已删）。导航直接驱动 #pages。
+const _tabPanels  = document.getElementById('pages');
 // #pages 的宽度是「页数 × 100%」，所以位移百分比要按 100/页数 折算，
-// 一屏的像素宽也要用容器宽除以页数；若将来真加上 .tab-panels（宽 100%）则按 100 算。
+// 一屏的像素宽也要用容器宽除以页数。
 const _usePagesBox = () => !!(_tabPanels && _tabPanels.id === 'pages');
 const _tabStep  = () => _usePagesBox() ? (100 / _tabCount) : 100;
 const _tabViewW = () => !_tabPanels ? 0 : (_usePagesBox() ? _tabPanels.clientWidth / _tabCount : _tabPanels.clientWidth);

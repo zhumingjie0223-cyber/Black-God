@@ -81,5 +81,24 @@ for (const b of blocks) {
     missing.size ? `未定义：${[...missing].join('、')}\n   → 这些按钮点了会报 ReferenceError，等于死按钮` : '');
 }
 
+// ④ 主内容容器必须真的可见：本页三个页面装在 #pager > #pages 里，
+// 若有 CSS 规则把它们 display:none 掉（NavCore v3 就干过，且新容器 .tab-panels 从没建进 HTML），
+// 整个应用主体对所有人永久不可见——顶栏底栏还在，中间一片黑，极难察觉。
+{
+  // 先剥掉注释再查：说明性注释里往往会引用这条规则的原文（本文件的修复注释就是），
+  // 不剥会把注释当成真规则误报。
+  const htmlNoComments = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const hideRule = /\.(?:pager|pages)\s*(?:,[^{]*)?\{[^}]*display\s*:\s*none/.test(htmlNoComments);
+  ok('主内容容器 #pager/#pages 未被 CSS 隐藏', !hideRule,
+    hideRule ? '发现把 .pager/.pages 设为 display:none 的规则\n   → 三个页面会整体不可见，页面只剩顶栏和底栏' : '');
+
+  // 新容器若只有 CSS/JS 而没有 HTML 元素，说明迁移做了一半，正是上面那条规则的由来
+  const cssHasTabPanels = /\.tab-panels\s*[{,]/.test(htmlNoComments);
+  const domHasTabPanels = /class="[^"]*\btab-panels\b/.test(htmlNoComments);
+  ok('不存在「只有样式没有元素」的半拉子容器', !(cssHasTabPanels && !domHasTabPanels),
+    (cssHasTabPanels && !domHasTabPanels)
+      ? '.tab-panels 有 CSS 却没有对应 HTML 元素 —— 迁移只做了一半\n   → 要么补齐 HTML，要么把这套样式/脚本删干净，别留半拉子' : '');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
