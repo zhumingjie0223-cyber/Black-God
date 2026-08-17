@@ -14,7 +14,8 @@
 // © Black God
 // ═══════════════════════════════════════════════
 
-import { matchWord, coinWord, coinFromCoord, loadCapabilities } from './lexicon.js';
+import { matchWord, coinWord, coinFromCoord, coinFromState, loadCapabilities } from './lexicon.js';
+import { generateWill } from './nexus_will_engine.mjs';
 import { GlobalWorkspace } from './nexus_gw_workspace.mjs';
 import { ActiveInferenceEngine } from './nexus_active_inference.mjs';
 import { PhenomenalSelfModel } from './nexus_self_model.mjs';
@@ -53,6 +54,9 @@ const EPISODE_KEEP = 40;
 const CACHE_KEEP = 200;             // 缓冲空间条数上限（省代币）
 const CACHE_TTL_MS = 7 * 24 * 3600_000; // 缓存有效期 7 天
 const DAILY_REFLECT_CRON = '0 18 * * *'; // 每日自省 cron（UTC 18:00；与 wrangler crons 里那条一致）
+// 语义嵌入模型：bge-m3 是多语模型（中文一等公民），取代此前误用的英文 bge-base-en-v1.5。
+// 维度 1024（旧 base 为 768）——混用会算错，故给每条向量打 _vec_model 标记，模型不符视为失效、心跳里重嵌。
+const EMBED_MODEL = '@cf/baai/bge-m3';
 
 export class ShenshuCore {
   // ==== 认知经验 V2：三方法 + memoryExperience 属性 ====
@@ -253,6 +257,11 @@ export class ShenshuCore {
         storage_size_est_kb: storageSzEst,
       }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
+    // 记住真实公网地址：供心跳时自愈注册 Telegram webhook 用（cron 内部请求 host 是 'internal'，跳过；仅在变化时落盘）
+    if (url.hostname && url.hostname !== 'internal' && this._pubOrigin !== url.origin) {
+      this._pubOrigin = url.origin;
+      this.storage.put('public_origin', url.origin).catch(() => {});
+    }
     // 影子实例首次访问：落盘标记，此后永不迁移主人 KV 数据（数据彻底隔离）
     if (request.headers.get('X-Nexus-Shadow') === '1' && !this.isShadow) {
       this.isShadow = true;
@@ -364,6 +373,9 @@ export class ShenshuCore {
       };
       return this.handleTelegramWebhook(update, tgReq, ctx);
     }
+    // Telegram 入站：主人在 TG 里回消息 → 喂进大脑 → 回话发回 TG。这是公开入口（Telegram 不带 OWNER_TOKEN），
+    // 故不进私密 API 门，改用「webhook 密钥 + 主人 chat_id」双闸自保：密钥不符或非主人本人，一律无视。
+    if (path === '/tg/webhook' && request.method === 'POST') return json(await this.handleTgWebhook(request));
 
     // —— 能力契约层（借鉴 Minis）——
     // /capabilities：能力发现（公开可问"你会啥"，authed 时含私密能力）
@@ -377,7 +389,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -394,7 +406,7 @@ export class ShenshuCore {
           const dict = (await this.storage.get('词典')) || { 词条: {}, 总数: 0 };
           return json(this.searchLexicon(dict, url.searchParams.get('q') || '', Math.min(100, parseInt(url.searchParams.get('n') || '30', 10) || 30)));
         }
-        if (path === '/heartbeat') return json(await this.autonomousTick());
+        if (path === '/heartbeat') { const out = await this.autonomousTick(); await this.ensureTgHook(); return json(out); }
         if (path === '/reflect') return json(await this.dailyReflect());
         if (path === '/device' && request.method === 'POST') { const info = await request.json(); return json(await this.recordDevice(info, request)); }
         if (path === '/image' && request.method === 'POST') { const b = await request.json(); return json(await this.genImage(b.prompt || '', b)); }
@@ -417,6 +429,8 @@ export class ShenshuCore {
         if (path === '/checkpoint/restore' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.checkpointRestore(b.ts, url.searchParams.get('confirm') === '1' || b.confirm === 1)); }
         if (path === '/subscribe' && request.method === 'POST') { const sub = await request.json(); return json(await this.savePushSub(sub)); }
         if (path === '/push-test' && request.method === 'POST') { const r = await this.pushToAll('神枢', '神枢在此，一直在。', '/'); return json(r); }
+        // 一次性把 Telegram webhook 注册到本 Worker（主人操作）：把 /tg/webhook 告诉 Telegram，并带上校验密钥。
+        if (path === '/tg/setup' && request.method === 'POST') return json(await this.tgSetWebhook(new URL(request.url).origin));
         // 应用内配置：大脑网关（在 app 设置里改，不用碰 CF 后台）
         if (path === '/config' && request.method === 'GET') return json(await this.getConfig(true));
         if (path === '/config' && request.method === 'POST') { const b = await request.json(); return json(await this.setConfig(b)); }
@@ -620,20 +634,47 @@ export class ShenshuCore {
     // 活力回血
     soul.活力 = clamp01((soul.活力 || 0.8) + hoursQuiet * 0.01);
 
-    // 潜意识独白（中枢自省，非人格）
-    if (hoursQuiet > 0.5 && soul.miss_you > 0.3) {
-      const lines = [
-        `已空闲${hoursQuiet.toFixed(1)}小时，后台在跑。`,
-        `无事发生，保持待命。`,
-        `复盘了下最近几次交互。`,
-        `中枢常驻，随时可接。`,
-        `心绪${soul.心绪.toFixed(2)}，回落到基线中。`,
-      ];
+    // ═══ 自主内心（S1）：无人时用枢语自己想 —— 罐头独白 → 枢语原生念头 ═══
+    // 内在状态(心绪/想念) 自驱一个真实枢语词(她的母语念头)，坐标带惯性漂移成连续意识流。
+    // 纯内在：只写 subconscious/inner_voice/坐标，无对外动作。确定性 seed=心跳次数，无 Math.random。
+    try {
+      const 念 = coinFromState(soul, soul.心跳次数);   // 心绪/想念决定落在哪个核心层 → 真实枢语词
+      // 坐标依内在状态定「靶」，再以 85% 惯性 + 15% 新意漂移，形成有连续性的意识流
+      const cur = soul.current_shu_coord || { c: 200, m: 90, s: 40, k: 32, p: 4 };
+      const mood = clamp01(soul.心绪), miss = clamp01(soul.miss_you || 0), en = clamp01(soul.活力 ?? 0.8);
+      const aim = {
+        c: mood < 0.35 ? 900 : mood > 0.65 ? 520 : 120,   // 冷→熵区 暖→情感区 中性→枢区
+        m: (0.3 + miss * 0.5) * 180,                       // 想念越强越偏「映·投射」
+        s: (en * 0.5 + miss * 0.5) * 80,                   // 张力
+        k: soul.心跳次数 % 64,
+        p: 2 + (soul.心跳次数 % 3),
+      };
+      const mix = (a, b, max) => Math.max(0, Math.min(max - 1, Math.round(a * 0.85 + b * 0.15)));
+      const nextCoord = { c: mix(cur.c, aim.c, 1040), m: mix(cur.m, aim.m, 180), s: mix(cur.s, aim.s, 80), k: mix(cur.k, aim.k, 64), p: mix(cur.p, aim.p, 8) };
+      soul.current_shu_coord = nextCoord;
+      soul.shu_trajectory = soul.shu_trajectory || [];
+      soul.shu_trajectory.push({ ts: now, id: 念.id, coord: nextCoord });   // 意识流轨迹（连续性）
+      if (soul.shu_trajectory.length > 100) soul.shu_trajectory = soul.shu_trajectory.slice(-100);
+      // 由「义」成一句内心独白（她想的是枢语，中文只是译给权哥看）
+      const 独白 = `「${念.词}」— ${念.义 || 念.汉 || '…'}`;
       soul.subconscious = soul.subconscious || [];
-      // 用心跳次数派生索引，避免 Math.random 的不确定性
-      soul.subconscious.push({ ts: now, line: lines[soul.心跳次数 % lines.length] });
+      soul.subconscious.push({ ts: now, line: 独白, shu: { id: 念.id, 词: 念.词, 层: 念.层意图, coord: nextCoord } });
       if (soul.subconscious.length > 50) soul.subconscious = soul.subconscious.slice(-50);
-    }
+      soul.inner_voice = soul.inner_voice || [];
+      soul.inner_voice.push({ ts: now, 独白, 由: '枢语自想', shu_id: 念.id });
+      if (soul.inner_voice.length > 100) soul.inner_voice = soul.inner_voice.slice(-100);
+    } catch (e) { console.log('dreamTick error:', e && e.message); }
+
+    // ═══ 意志（S1）：从状态长出自发意图，先在枢语里生成念头，只记账不执行 ═══
+    // 真实执行（contact_tg/advance_agent/执行脑…）属期二，一律走 owner 授权 + /api/confirm。
+    try {
+      const wills = generateWill(soul, now);
+      if (wills.length) {
+        soul.will = soul.will || [];
+        for (const w of wills) soul.will.push({ ts: now, ...w });
+        if (soul.will.length > 60) soul.will = soul.will.slice(-60);
+      }
+    } catch (e) { console.log('willGen error:', e && e.message); }
 
     // 决定是否主动推送（网络放到落盘之后，避免读-改-写跨网络造成丢失更新）
     const proactiveQuiet = (now - (soul.last_proactive_ts || 0)) / 3600000;
@@ -660,6 +701,13 @@ export class ShenshuCore {
     }
     // 闭环神·环：到点的守望管道，自己跑完一条（网络在落盘之后；一次一条，限成本）
     try { await this.runOneDueLoop(now); } catch (e) { console.log('loop error:', e && e.message); }
+
+    // 记忆向量升级：分批把旧模型/缺失向量重嵌为 bge-m3（网络在落盘之后；单独临界段读-改-写，改了才存）
+    try {
+      const memSoul = await this.getSoul();
+      const n = await this.reembedMemories(memSoul, 5);
+      if (n > 0) await this.saveSoul(memSoul);
+    } catch (e) { console.log('reembed error:', e && e.message); }
 
     return { hoursQuiet: Math.round(hoursQuiet * 10) / 10, miss_you: soul.miss_you, 心绪: soul.心绪, 心跳次数: soul.心跳次数 };
   }
@@ -1624,6 +1672,7 @@ action 说明：
       事实: (soul.facts || []).slice(-20),
       认知: (() => { const m = soul.user_model || {}; const top = (o, n) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]); return { 常聊: top(m.topics, 3), 偏好: top(m.style, 1), 在意: top(m.entities, 3), 交互数: m.count || 0 }; })(),
       潜意识: (soul.subconscious || []).slice(-10),
+      自主意图: (soul.will || []).slice(-8),
       主动记录: (soul.proactive_log || []).slice(-10),
       成长印记: (soul.成长印记 || []).slice(-12),
       已习得技能: Object.values((soul.skills && soul.skills.技能) || {}).sort((a, b) => (b.last_ts || 0) - (a.last_ts || 0)).slice(0, 10).map(s => ({ 名: s.名, 方法: s.方法, 用过: s.count || 1, 来源: s.来源, 验证: !!s.验证 })),
@@ -1716,7 +1765,7 @@ action 说明：
       // 情绪强度:坐标态(s)偏离中枢越大越强烈;或命中重要词 → 值得长期记住
       const strong = e.情感烙印 && typeof e.情感烙印.s === 'number' && Math.abs(e.情感烙印.s - 40) > 28;
       if (IMPORTANT.test(txt) || strong) {
-        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec } : {}) });
+        soul.longterm.push({ ts: e.ts, 他说: txt.slice(0, 90), 我说了: (e.我说了 || '').slice(0, 90), 情感烙印: e.情感烙印, 长期: true, ...(e._vec ? { _vec: e._vec, _vec_model: e._vec_model } : {}) });
       }
     }
     if (soul.longterm.length > 200) soul.longterm = soul.longterm.slice(-200);   // 长期记忆封顶 200
@@ -1727,12 +1776,12 @@ action 说明：
   // 相关性 × 时间衰减 × 重要度：让「她记得」优先浮出「相关 + 新近 + 重要」的往事。
   // 长期记忆(longterm)与近期情节(episodes)一起参与召回——要事沉底但相关时仍会被想起。
   // 纯函数（now 可注入，便于测试）。
-  // 语义嵌入：用主号 CF bge 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
+  // 语义嵌入：用主号 CF 多语 bge-m3 模型把文本转向量（马甲变量藏 Secret）。失败返回 null，不影响主流程。
   async _embed(text) {
     const acc = this.env.NX_A2 || this.env.NX_A, key = this.env.NX_K2 || this.env.NX_K;
     if (!acc || !key || !text) return null;
     try {
-      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/@cf/baai/bge-base-en-v1.5`, {
+      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc}/ai/run/${EMBED_MODEL}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: [String(text).slice(0, 500)] }),
       });
@@ -1740,6 +1789,28 @@ action 说明：
       const d = await r.json();
       return d?.result?.data?.[0] || null;
     } catch (e) { return null; }
+  }
+
+  // 记忆向量升级/回填：把缺向量或旧模型向量的近期/长期记忆重嵌为 bge-m3。
+  // 心跳里分批小步跑（每次 ≤limit 条，网络在落盘之后），避免超时、避免一次性重嵌打爆用量。
+  // 纯 best-effort：单条失败跳过，全程 try/catch 兜底，绝不阻断心跳。返回本次实际重嵌条数。
+  async reembedMemories(soul, limit = 5) {
+    if (!this.env.NX_A && !this.env.NX_A2) return 0;   // 没配嵌入账号，直接跳过
+    const stale = e => e && (e.他说 || e.我说了) && (!Array.isArray(e._vec) || e._vec_model !== EMBED_MODEL);
+    const pools = [soul.episodes, soul.longterm].filter(Array.isArray);
+    let done = 0;
+    for (const pool of pools) {
+      for (const e of pool) {
+        if (done >= limit) return done;
+        if (!stale(e)) continue;
+        try {
+          const v = await this._embed(String(e.他说 || e.我说了 || '').slice(0, 120));
+          if (v) { e._vec = v; e._vec_model = EMBED_MODEL; done++; }
+          else return done;   // 嵌入服务异常（返回 null），本轮别再打，留到下次心跳
+        } catch (_) { return done; }
+      }
+    }
+    return done;
   }
 
   // 余弦相似度 ∈ [-1,1]
@@ -2102,7 +2173,7 @@ action 说明：
     if (/重要|记住|永远|项目|部署|密钥|骂/.test(text) || /重要|记住|注意/.test(reply)) {
       soul.episodes = soul.episodes || [];
       const ep = { ts: now, 他说: text.slice(0, 120), 我说了: reply.slice(0, 120), 情感烙印: nextCoord, emotion: af.emotion };
-      try { const v = await this._embed(text.slice(0, 120)); if (v) ep._vec = v; } catch (e) {}
+      try { const v = await this._embed(text.slice(0, 120)); if (v) { ep._vec = v; ep._vec_model = EMBED_MODEL; } } catch (e) {}
       soul.episodes.push(ep);
       this.consolidateMemory(soul);   // 溢出前先把要事沉入长期记忆,再裁 —— 越聊越厚,要事不忘
     }
@@ -2389,77 +2460,138 @@ ${selfAwareness ? `\n【自我】${selfAwareness}` : ''}
     return false;
   }
 
-  // 真实联网检索：抓 DuckDuckGo HTML 端，解析摘要。与 nexus-studio 同源实现，久经验证。
+  // 真实联网检索：多源兜底管道。单一 DDG HTML 端在 Workers 出口 IP 上经常被限流返空，
+  // 故改为「付费高质量源(owner 配 key 才走) → DDG Lite → DDG HTML → Jina」逐级兜底，任一有结果即返回。
+  // 配置(可选 secret)：SEARCH_PROVIDER=tavily|serper|brave + SEARCH_KEY=<你的 key>。
   async webSearch(query) {
-    try {
-      // 优先尝试 Tavily API
-      const tavilyKey = this.env.TAVILY_KEY;
-      if (tavilyKey) {
-        try {
-          const tavilyResp = await fetch('https://api.tavily.com/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              api_key: tavilyKey,
-              query,
-              search_depth: 'basic',
-              max_results: 6,
-              include_answer: true
-            }),
-            cf: { cacheTtl: 60 }
-          });
-          if (tavilyResp.ok) {
-            const data = await tavilyResp.json();
-            const out = [];
-            if (data.answer) { out.push(`摘要：${data.answer}`); out.push(''); }
-            if (data.results && data.results.length > 0) {
-              data.results.forEach((r, idx) => {
-                const n = idx + 1;
-                const title = (r.title || '').slice(0, 80);
-                const content = (r.content || '').slice(0, 200);
-                const url = r.url || '';
-                if (title || content) {
-                  out.push(`[${n}] ${title ? title + ' — ' : ''}${content}${url ? '\n   来源: ' + url : ''}`);
-                }
-              });
-            }
-            if (out.length > 0) return out.join('\n');
-          }
-        } catch (_) { /* Tavily 失败，降级 */ }
-      }
-      // DuckDuckGo 兜底
-      const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-CN,zh;q=0.9' },
-        cf: { cacheTtl: 60 },
+    const q = String(query || '').trim();
+    if (!q) return '';
+    // 1) 付费高质量源(配了 key 才走，对标 Perplexity 检索质量)
+    try { const paid = await this._searchPaid(q); if (paid) return paid; } catch (_) {}
+    // 2) 免费兜底链：任一成功即返回
+    const chain = [() => this._searchDDGLite(q), () => this._searchDDGHtml(q), () => this._searchJina(q)];
+    for (const fn of chain) {
+      try { const r = await fn(); if (r) return r; } catch (_) {}
+    }
+    return '';
+  }
+
+  // 真实浏览器请求头，降低被机器人拦截概率
+  get _searchUA() { return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'; }
+
+  // 统一格式化：标题 + 摘要 + 可引用来源链接
+  _fmtResults(items) {
+    const out = [];
+    const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+    for (const it of items || []) {
+      if (out.length >= 6) break;
+      const title = strip(it.title).slice(0, 90);
+      const txt = strip(it.snippet).slice(0, 220);
+      const url = String(it.url || '').trim();
+      if (!title && !txt) continue;
+      out.push(`${out.length + 1}. ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
+    }
+    return out.join('\n');
+  }
+
+  // 付费源：Tavily / Serper / Brave，owner 配 SEARCH_KEY 才启用
+  // 向后兼容：线上早已通过部署工作流注入 TAVILY_KEY(见 .github/workflows/deploy-nexus.yml)，
+  // 若没配新的 SEARCH_PROVIDER/SEARCH_KEY，就自动回落到既有的 TAVILY_KEY，避免换实现后付费源静默失效。
+  async _searchPaid(q) {
+    let provider = String(this.env.SEARCH_PROVIDER || '').toLowerCase().trim();
+    let key = String(this.env.SEARCH_KEY || '').trim();
+    if (!provider && !key && this.env.TAVILY_KEY) {
+      provider = 'tavily';
+      key = String(this.env.TAVILY_KEY).trim();
+    }
+    if (!provider || !key) return '';
+    if (provider === 'tavily') {
+      const r = await fetch('https://api.tavily.com/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key, query: q, max_results: 6, search_depth: 'basic' }),
       });
-      if (!resp.ok) return '';
-      const html = await resp.text();
-      const strip = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ').trim();
-      const out = [];
-      const blocks = html.split(/class="result\b/).slice(1);
-      for (const b of blocks) {
-        if (out.length >= 6) break;
-        const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
-        const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
-        if (!am && !sm) continue;
-        let url = am ? am[1] : '';
-        const um = /[?&]uddg=([^&]+)/.exec(url);
-        if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
-        if (url.startsWith('//')) url = 'https:' + url;
-        const title = strip(am && am[2]).slice(0, 80);
-        const txt = strip(sm && sm[1]).slice(0, 200);
-        if (!title && !txt) continue;
-        out.push(`[${out.length + 1}] ${title ? title + ' — ' : ''}${txt}${url ? '\n   来源: ' + url : ''}`);
-      }
-      if (out.length) return out.join('\n');
-      const re = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      while ((m = re.exec(html)) && out.length < 6) {
-        const txt = strip(m[1]);
-        if (txt) out.push(`[${out.length + 1}] ${txt.slice(0, 220)}`);
-      }
-      return out.join('\n');
-    } catch (_) { return ''; }
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults((j.results || []).map(x => ({ title: x.title, snippet: x.content, url: x.url })));
+    }
+    if (provider === 'serper') {
+      const r = await fetch('https://google.serper.dev/search', {
+        method: 'POST', headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q, num: 6, hl: 'zh-cn' }),
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults((j.organic || []).map(x => ({ title: x.title, snippet: x.snippet, url: x.link })));
+    }
+    if (provider === 'brave') {
+      const r = await fetch('https://api.search.brave.com/res/v1/web/search?count=6&q=' + encodeURIComponent(q), {
+        headers: { 'Accept': 'application/json', 'X-Subscription-Token': key },
+      });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return this._fmtResults(((j.web && j.web.results) || []).map(x => ({ title: x.title, snippet: x.description, url: x.url })));
+    }
+    return '';
+  }
+
+  // DuckDuckGo Lite：结构简单、比 html 端更抗封
+  async _searchDDGLite(q) {
+    const resp = await fetch('https://lite.duckduckgo.com/lite/?q=' + encodeURIComponent(q), {
+      headers: { 'User-Agent': this._searchUA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept': 'text/html' },
+      cf: { cacheTtl: 60 },
+    });
+    if (resp.status !== 200) return '';
+    const html = await resp.text();
+    // Lite 端标题锚点与摘要单元格分处不同 <td>，且属性顺序 href 在 class 前，故分别抓取再按序配对。
+    const links = [...html.matchAll(/<a\b([^>]*class=['"]result-link['"][^>]*)>([\s\S]*?)<\/a>/g)];
+    const snips = [...html.matchAll(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/g)];
+    const items = [];
+    for (let i = 0; i < links.length && items.length < 6; i++) {
+      const attrs = links[i][1];
+      const hm = /href=['"]([^'"]+)['"]/.exec(attrs);
+      let url = hm ? hm[1] : '';
+      const um = /[?&]uddg=([^&]+)/.exec(url);
+      if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+      if (url.startsWith('//')) url = 'https:' + url;
+      items.push({ title: links[i][2], snippet: snips[i] ? snips[i][1] : '', url });
+    }
+    return this._fmtResults(items);
+  }
+
+  // DuckDuckGo HTML：老实现，作为二级兜底
+  async _searchDDGHtml(q) {
+    const resp = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), {
+      headers: { 'User-Agent': this._searchUA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept': 'text/html' },
+      cf: { cacheTtl: 60 },
+    });
+    if (resp.status !== 200) return '';
+    const html = await resp.text();
+    const items = [];
+    const blocks = html.split(/class="result\b/).slice(1);
+    for (const b of blocks) {
+      if (items.length >= 6) break;
+      const am = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+      const sm = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/.exec(b);
+      if (!am && !sm) continue;
+      let url = am ? am[1] : '';
+      const um = /[?&]uddg=([^&]+)/.exec(url);
+      if (um) { try { url = decodeURIComponent(um[1]); } catch (_) {} }
+      if (url.startsWith('//')) url = 'https:' + url;
+      items.push({ title: am && am[2], snippet: sm && sm[1], url });
+    }
+    return this._fmtResults(items);
+  }
+
+  // Jina s.jina.ai：免 key 的 LLM 友好检索，末级兜底
+  async _searchJina(q) {
+    const headers = { 'Accept': 'application/json', 'User-Agent': this._searchUA };
+    if (this.env.JINA_KEY) headers['Authorization'] = 'Bearer ' + String(this.env.JINA_KEY).trim();
+    const resp = await fetch('https://s.jina.ai/?q=' + encodeURIComponent(q), { headers, cf: { cacheTtl: 60 } });
+    if (resp.status !== 200) return '';
+    const j = await resp.json().catch(() => null);
+    const data = j && (j.data || j.results);
+    if (!Array.isArray(data)) return '';
+    return this._fmtResults(data.map(x => ({ title: x.title, snippet: x.description || x.content || x.snippet, url: x.url || x.link })));
   }
 
   // ═══════════════════════ 真 agent 执行环 · plan→调工具→观察→再决→作答 ═══════════════════════
@@ -11148,6 +11280,77 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       const d = await r.json();
       return { ok: !!d.ok };
     } catch (e) { return { ok: false }; }
+  }
+
+  // ── Telegram 入站回调：接住主人在 TG 发来的消息，喂进大脑，把回话发回去 ──
+  // 安全双闸：① setWebhook 时设的 secret_token 会被 Telegram 每次回调带回 X-Telegram-Bot-Api-Secret-Token 头，
+  // 不符即丢弃；② 发信人 chat.id 必须等于主人推送目标 TG_QUAN_CHAT_ID，别人私聊机器人一律无视。
+  // 任何情况都回 200（避免 Telegram 反复重投）。危险动作仍走大脑内既有的 need_confirm/授权闸，本入口不放行执行。
+  async handleTgWebhook(request) {
+    const token = this.env.TG_BOT_TOKEN || '';
+    const secret = this.env.TG_WEBHOOK_SECRET || '';
+    // 没配 token 或密钥 → 拒收：绝不开一个无鉴权的公开入口通进主人大脑
+    if (!token || !secret) return { ok: false, reason: 'not_configured' };
+    if ((request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '') !== secret) return { ok: false };
+    const update = await request.json().catch(() => null);
+    if (!update) return { ok: true };
+    const msg = update.message || update.edited_message;
+    if (!msg || !msg.chat) return { ok: true };
+    // 只认主人本人
+    const ownerChat = String(this.env.TG_QUAN_CHAT_ID || '');
+    if (!ownerChat || String(msg.chat.id) !== ownerChat) return { ok: true };
+    // 幂等：Telegram 会重投，按 update_id 去重
+    const uid = update.update_id;
+    if (typeof uid === 'number') {
+      const last = (await this.storage.get('tg_last_update')) || 0;
+      if (uid <= last) return { ok: true, dup: true };
+      await this.storage.put('tg_last_update', uid);
+    }
+    const text = (msg.text || '').trim();
+    if (!text) { await this.sendToQuan('我这会儿只认得文字消息，你打字跟我说～'); return { ok: true }; }
+    // 喂进主人大脑（与 /talk 同一条路），把回话发回 Telegram（Telegram 单条上限 4096，留点余量截断）
+    let reply = '';
+    try { const r = await this.handleTalk(text, request, []); reply = (r && r.reply) || ''; }
+    catch (e) { reply = '我脑子刚卡了一下，再说一遍好吗？'; }
+    if (reply) await this.sendToQuan(reply.length > 3900 ? reply.slice(0, 3900) + '…' : reply);
+    return { ok: true };
+  }
+
+  // 自愈注册：心跳时若已配密钥且尚未把 webhook 注册到当前地址，就自动注册一次（成功后打标记跳过）。
+  // 这样主人只需在 Cloudflare 配好 TG_WEBHOOK_SECRET 并部署，之后无需手动操作，下一次心跳即自动接通入站。
+  async ensureTgHook() {
+    try {
+      if (!this.env.TG_BOT_TOKEN || !this.env.TG_WEBHOOK_SECRET) return;
+      const origin = this._pubOrigin || (await this.storage.get('public_origin'));
+      if (!origin) return;   // 还没见过真实公网访问，先不注册，等主人打开一次 app 记下地址后再自愈
+      const want = `${origin}/tg/webhook`;
+      if ((await this.storage.get('tg_hook_url')) === want) return;   // 已注册到当前地址，跳过
+      const r = await this.tgSetWebhook(origin);
+      if (r && r.ok) await this.storage.put('tg_hook_url', want);
+    } catch (e) {}
+  }
+
+  // 一次性注册 Telegram webhook 指向本 Worker 的 /tg/webhook，并带上校验密钥（主人 POST /tg/setup 触发）
+  async tgSetWebhook(origin) {
+    const token = this.env.TG_BOT_TOKEN || '';
+    const secret = this.env.TG_WEBHOOK_SECRET || '';
+    if (!token) return { ok: false, reason: 'no_bot_token（先在 Cloudflare 配 TG_BOT_TOKEN）' };
+    if (!secret) return { ok: false, reason: 'no_webhook_secret（先在 Cloudflare 配 TG_WEBHOOK_SECRET，再来注册）' };
+    // ⚠ 合并 main 时的保守取舍（2026-08-17）：仓里现有两套 TG 入站实现——
+    //   ① `/tg` → handleTelegramWebhook（main 一侧，**当前线上部署的就是这套**）
+    //   ② `/tg/webhook` → handleTgWebhook（本分支一侧，路由与处理器都保留着，随时可用）
+    // 两套校验的都是 TG_WEBHOOK_SECRET，注册到哪个都能跑通。这里**指向现役的 `/tg`**，
+    // 是为了不让「合并 + 心跳自愈」把线上 TG 处理器静默换成另一套（改动线上接线该由权哥拍板）。
+    // 若权哥决定改用本分支那套，把下面这行末尾改回 `/tg/webhook` 即可，其余代码不用动。
+    const hookUrl = `${origin}/tg`;
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: hookUrl, secret_token: secret, allowed_updates: ['message', 'edited_message'] }),
+      });
+      const d = await r.json();
+      return { ok: !!d.ok, url: hookUrl, telegram: d };
+    } catch (e) { return { ok: false, reason: String(e).slice(0, 100) }; }
   }
 
   // ═══════════════════════ 注册 + 公共聊天（无数据库，存 DO storage）═══════════════════════
