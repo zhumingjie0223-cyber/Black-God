@@ -67,11 +67,27 @@ node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释�
 
 ## 设计系统铁律(现状:石墨暗流·玉绿)
 
-**现状(2026-07-17 无头浏览器逐屏核实,如实描述,不许骗)**:主线 UI 实际用的是
-「**石墨暗流 · 玉绿**」色系,**不是**深海·潮光青。`web/nexus-do/index.html` 是自包含单文件
-(构建时整页注入 Worker),CSS 令牌**内联在页内**(`:root` / `:root[data-theme="dark"|"light"]`):
-主强调是**玉绿**(`--cy-hi:#3DDC84`、`--cy-1:#2FB96B`、`--chrome-grad` 绿渐变、`--live:#2FB96B`),
+**现状(2026-08-17 直接从 main 的 `index.html` 抓取实际令牌值复核,如实描述,不许骗)**:
+主线 UI 实际用的是「**石墨暗流 · 玉绿**」色系,**不是**深海·潮光青。
+`web/nexus-do/index.html` 是自包含单文件(构建时整页注入 Worker),
+CSS 令牌**内联在页内**(`:root` / `:root[data-theme="dark"|"light"]`)。
+
+主强调**玉绿**,当前实际值(以页内为准,本表若与代码不符一律以代码为准):
+
+| 令牌 | 实际值 |
+|---|---|
+| `--cy-hi` | `#4FE096`(最亮,高光) |
+| `--cy-1` / `--cy-3` | `#3BC77E` |
+| `--cy-2` | `#41CC84` |
+| `--cy-4` | `#8FE3AE`(最浅) |
+| `--live` | `#3BC77E`(在线态) |
+| `--chrome-grad` | 绿渐变 |
+
 冷石墨骨 + 素银字,深浅双主题。登录门有一圈潮光青 `rgba(79,196,217)` 光晕是历史残留,非主色。
+
+> 📌 **2026-08-17 修正记录**:本节此前写的 `--cy-hi:#3DDC84`、`--cy-1:#2FB96B`、`--live:#2FB96B`
+> **三个值全是错的**(实际为 `#4FE096` / `#3BC77E` / `#3BC77E`)。铁律文档落后于实现,已按代码订正。
+> 改色值时请同步更新本表,别让铁律再骗人。
 
 > ⚠️ **别再误判**:仓里存在 `docs/design/DESIGN_SYSTEM_V3.md`(「深海·潮光」潮光青 #4FC4D9)——
 > 那是一份**未被采用的备选设计方向蓝图**(源自从未合并的 UI 重设计 PR #29),**不是当前实现**。
@@ -82,4 +98,8 @@ node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释�
   动效只用 transform/opacity。
 - 改 `web/nexus-do/index.html` 后必须重新构建(`node build.mjs`,页面是构建时整体注入 Worker 的),
   并跑 `node tools/sync-ui.mjs --check` 校验双副本同步。
-- `/api/confirm` 危险操作二次确认是安全红线,任何重构不得移除。
+- **危险操作二次确认是安全红线,任何重构不得移除。** 注意实现里**没有** `/api/confirm` 这个字面路由
+  (旧措辞易误导),真正的闸门是这几处(2026-08-17 对着 `nexus_do.core.mjs` 核实):
+  - `/import`、`/checkpoint/restore` 必须带 `?confirm=1`(覆盖记忆/人格前自动备份,可回滚);
+  - 执行脑 `execRemote` 的 `need_confirm` 透传闸(危险命令未确认一律拦下,`execDevLoop`/`execAgentTask` 均不绕过);
+  - 对话里的 `__exec_confirm__:` 前缀二次确认通道(带 confirm 重跑,不走 AI)。
