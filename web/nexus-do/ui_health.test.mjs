@@ -110,9 +110,12 @@ for (const b of blocks) {
     const lines = b.code.split('\n');
     for (let i = 0; i < lines.length; i++) {
       // 只查顶层（行首无缩进）的 const/let/var 赋值，函数体内的是运行时取用，不受此限
-      const m = /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*document\.getElementById\(\s*['"]([^'"]+)['"]/.exec(lines[i]);
+      // 覆盖三种写法：getElementById('x') / $('#x') / querySelector('#x')
+      const m = /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:document\.getElementById\(\s*['"]([\w-]+)['"]|\$\(\s*['"]#([\w-]+)['"]|document\.querySelector\(\s*['"]#([\w-]+)['"])/.exec(lines[i]);
       if (!m) continue;
-      const elemId = m[1];
+      // 已写兜底的（如 `$('#x') || 现场创建`）不算隐患，那正是推荐写法
+      if (lines[i].includes('||')) continue;
+      const elemId = m[1] || m[2] || m[3];
       const idPos = html.indexOf(`id="${elemId}"`);
       const linePos = html.split('\n').slice(0, b.line + i - 1).join('\n').length;
       if (idPos === -1) bad.push(`${elemId}（页面里没有这个元素）`);
