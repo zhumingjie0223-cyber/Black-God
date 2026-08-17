@@ -11330,9 +11330,11 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   async ensureTgHook() {
     try {
       if (!this.env.TG_BOT_TOKEN || !this.env.TG_WEBHOOK_SECRET) return;
-      const origin = this._pubOrigin || (await this.storage.get('public_origin'));
-      if (!origin) return;   // 还没见过真实公网访问，先不注册，等主人打开一次 app 记下地址后再自愈
-      const want = `${origin}/tg/webhook`;
+      // 门牌以 PUBLIC_URL 为准：自定义域可能被改指到别的服务（Telegram 回调会被对方 405 弹回、
+      // 入站全断），"最近一次公网访问的来路"不可信，只有配置里写死的本 Worker 地址可信。
+      const origin = (this.env.PUBLIC_URL || '').replace(/\/+$/, '') || this._pubOrigin || (await this.storage.get('public_origin'));
+      if (!origin) return;   // 既没配 PUBLIC_URL 也没见过真实公网访问，先不注册
+      const want = `${origin}/tg`;   // 与 tgSetWebhook 实际注册的路径对齐（此前写 /tg/webhook 永不命中，导致心跳次次白跑注册）
       if ((await this.storage.get('tg_hook_url')) === want) return;   // 已注册到当前地址，跳过
       const r = await this.tgSetWebhook(origin);
       if (r && r.ok) await this.storage.put('tg_hook_url', want);
@@ -11351,7 +11353,9 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     // 两套校验的都是 TG_WEBHOOK_SECRET，注册到哪个都能跑通。这里**指向现役的 `/tg`**，
     // 是为了不让「合并 + 心跳自愈」把线上 TG 处理器静默换成另一套（改动线上接线该由权哥拍板）。
     // 若权哥决定改用本分支那套，把下面这行末尾改回 `/tg/webhook` 即可，其余代码不用动。
-    const hookUrl = `${origin}/tg`;
+    // 门牌优先取 PUBLIC_URL：/tg/setup 若从被劫走的自定义域发起，request.origin 是错门牌，不能信。
+    const base = (this.env.PUBLIC_URL || '').replace(/\/+$/, '') || origin;
+    const hookUrl = `${base}/tg`;
     try {
       const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

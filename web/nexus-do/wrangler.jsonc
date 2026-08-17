@@ -46,7 +46,11 @@
 
   // —— 环境变量（公开值，随代码部署）——
   "vars": {
-    "IMAGE_MODEL": "@cf/leonardo/phoenix-1.0"
+    "IMAGE_MODEL": "@cf/leonardo/phoenix-1.0",
+    // 本 Worker 的权威公网门牌：Telegram 回调等对外注册一律以此为准。
+    // 自定义域可能被改指到别的服务（2026-08-17 实锤 aquan.lufei.uk 已指向旧 nexus-core，
+    // TG 入站被 405 弹回导致全断），故不拿"最近访问来路"当门牌。
+    "PUBLIC_URL": "https://nexus-do.jjiebbay.workers.dev"
   },
 
   // —— KV：旧记忆迁移源（首启一次性迁移到 DO storage）——
