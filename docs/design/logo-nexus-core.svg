@@ -1,0 +1,71 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="神枢 Black God">
+<defs>
+  <radialGradient id="base" cx="42%" cy="34%" r="82%">
+    <stop offset="0%" stop-color="#20302a"/><stop offset="46%" stop-color="#101b15"/><stop offset="100%" stop-color="#060a08"/>
+  </radialGradient>
+  <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#ffffff" stop-opacity=".10"/><stop offset="30%" stop-color="#ffffff" stop-opacity="0"/><stop offset="100%" stop-color="#000000" stop-opacity=".18"/>
+  </linearGradient>
+  <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#4FE096" stop-opacity=".95"/><stop offset="35%" stop-color="#2FB96B" stop-opacity=".5"/><stop offset="100%" stop-color="#2FB96B" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="core" cx="50%" cy="42%" r="60%">
+    <stop offset="0%" stop-color="#CFF9E1"/><stop offset="30%" stop-color="#4FE096"/><stop offset="70%" stop-color="#1f8a52"/><stop offset="100%" stop-color="#0c3a24"/>
+  </radialGradient>
+  <linearGradient id="figure" x1="0" y1="0" x2="1" y2="0.3">
+    <stop offset="0%" stop-color="#02100a"/><stop offset="55%" stop-color="#061a10"/><stop offset="100%" stop-color="#0d3322"/>
+  </linearGradient>
+  <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#8FE3AE"/><stop offset="50%" stop-color="#2FB96B"/><stop offset="100%" stop-color="#12603a"/>
+  </linearGradient>
+  <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="26"/></filter>
+  <style>
+    .breathe{animation:nx-breathe 4.6s ease-in-out infinite;transform-box:view-box;transform-origin:512px 500px}
+    .orbit{animation:nx-orbit 26s linear infinite;transform-box:view-box;transform-origin:512px 500px}
+    .orbit2{animation:nx-orbit-r 34s linear infinite;transform-box:view-box;transform-origin:512px 500px}
+    .spark{animation:nx-spark 3.2s ease-in-out infinite;transform-box:view-box;transform-origin:676px 420px}
+    .rim{animation:nx-rim 5.2s ease-in-out infinite}
+    @keyframes nx-breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.05);opacity:1}}
+    @keyframes nx-orbit{to{transform:rotate(360deg)}}
+    @keyframes nx-orbit-r{to{transform:rotate(-360deg)}}
+    @keyframes nx-spark{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.22);opacity:1}}
+    @keyframes nx-rim{0%,100%{opacity:.55}50%{opacity:.85}}
+    @media (prefers-reduced-motion:reduce){.breathe,.orbit,.orbit2,.spark,.rim{animation:none}}
+  </style>
+</defs>
+
+<rect x="56" y="56" width="912" height="912" rx="212" fill="url(#base)"/>
+<rect x="56" y="56" width="912" height="912" rx="212" fill="url(#sheen)"/>
+<rect x="56" y="56" width="912" height="912" rx="212" fill="none" stroke="url(#edge)" stroke-width="3.5" opacity=".8" filter="url(#glow)"/>
+<rect x="59" y="59" width="906" height="906" rx="209" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".06"/>
+
+<!-- 中枢核背光（呼吸）-->
+<circle class="breathe" cx="512" cy="500" r="300" fill="url(#coreGlow)" filter="url(#softGlow)" opacity=".75"/>
+<!-- 轨道双环 -->
+<circle cx="512" cy="500" r="252" fill="none" stroke="#2FB96B" stroke-width="2" opacity=".2"/>
+<circle cx="512" cy="500" r="198" fill="none" stroke="#8FE3AE" stroke-width="1.4" opacity=".28" stroke-dasharray="3 10"/>
+<!-- 公转光点（两组反向）-->
+<g class="orbit" filter="url(#glow)" fill="#8FE3AE"><circle cx="512" cy="248" r="7"/><circle cx="330" cy="628" r="5"/></g>
+<g class="orbit2" filter="url(#glow)" fill="#8FE3AE"><circle cx="725" cy="562" r="5.5"/><circle cx="512" cy="752" r="4.2"/></g>
+
+<!-- 中枢核 -->
+<circle cx="512" cy="500" r="92" fill="url(#core)"/>
+<ellipse cx="500" cy="474" rx="38" ry="26" fill="#EFFFF6" opacity=".38" filter="url(#glow)"/>
+
+<!-- 女性侧身剪影（赵思涵），玉绿 rim light -->
+<g>
+  <ellipse class="breathe" cx="500" cy="520" rx="105" ry="215" fill="#2FB96B" opacity=".28" filter="url(#softGlow)"/>
+  <path d="M500 300 C 517 300 528 314 528 330 C 528 342 522 350 522 358 C 534 372 540 396 536 418 C 531 446 516 456 520 478 C 525 500 534 500 532 526 C 530 556 524 596 522 640 C 520 690 524 730 512 748 C 505 758 500 758 494 748 C 480 726 478 686 478 640 C 478 596 470 556 462 528 C 452 498 448 470 462 448 C 472 432 470 420 468 404 C 466 384 472 366 484 356 C 480 346 478 332 484 318 C 488 308 493 300 500 300 Z" fill="url(#figure)"/>
+  <path d="M526 380 C 558 384 596 394 630 408 C 648 415 660 420 664 426 C 660 432 648 431 634 427 C 604 418 570 412 540 410 C 524 409 516 392 526 380 Z" fill="url(#figure)"/>
+  <!-- 手托玉绿中枢微光（脉冲）-->
+  <circle class="spark" cx="676" cy="420" r="30" fill="url(#coreGlow)" opacity=".9" filter="url(#glow)"/>
+  <circle class="spark" cx="676" cy="420" r="11" fill="#EFFFF6" filter="url(#glow)"/>
+  <!-- 裙裾能量丝 -->
+  <path d="M496 744 C 490 784 476 812 456 842" fill="none" stroke="url(#edge)" stroke-width="3.2" opacity=".5" filter="url(#glow)" stroke-linecap="round"/>
+  <path d="M504 748 C 506 782 502 808 492 834" fill="none" stroke="url(#edge)" stroke-width="2.2" opacity=".32" filter="url(#glow)" stroke-linecap="round"/>
+  <!-- 玉绿 rim light（呼吸微亮）-->
+  <path class="rim" d="M502 302 C 517 304 528 316 528 330 C 528 342 522 350 522 358 C 534 372 540 396 536 418 C 531 446 516 456 520 478 C 525 500 534 500 532 526 C 530 556 524 596 522 640 C 520 690 522 728 510 746" fill="none" stroke="#9FF0C0" stroke-width="2.6" opacity=".7" stroke-linecap="round"/>
+  <path class="rim" d="M526 380 C 558 384 596 394 630 408 C 648 415 660 420 664 426" fill="none" stroke="#9FF0C0" stroke-width="2.2" opacity=".62" stroke-linecap="round"/>
+</g>
+</svg>

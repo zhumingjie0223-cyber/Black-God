@@ -62,6 +62,7 @@ export const SYSTEM_ONLY_PATHS = new Set([
   '/exec-test', '/migrate', '/push-test', '/stats',
   '/image', '/voice', '/video',
   '/heartbeat', '/loop', '/wsticket',
+  '/tg/setup',
 ]);
 
 // 该路由是否为系统专属(仅系统主人可达)
