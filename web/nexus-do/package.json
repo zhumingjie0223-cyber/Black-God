@@ -6,6 +6,6 @@
   "scripts": {
     "build": "node build.mjs",
     "pretest": "npm run build",
-    "test": "node selftest.mjs"
+    "test": "node selftest.mjs && node ui_health.test.mjs && node --test *.test.mjs"
   }
 }

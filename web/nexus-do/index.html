@@ -5393,6 +5393,36 @@ async function enablePush(){
     toast('订阅没成'); return false;
   }catch(e){ toast('推送开启失败'); return false; }
 }
+// ── 推送设置页的四个按钮 ──
+// 「推送通知」这一整页此前是死的：设置行与页内三个按钮调的是 loadPushInfo / subscribePush /
+// testPush / unsubscribePush，而全页**从未定义过这四个函数**，点了只报 ReferenceError。
+// 后端 /subscribe、/push-test 与前端 enablePush() 都是现成的，纯粹是名字没接上。2026-08-17 接通。
+async function loadPushInfo(){
+  const el=$('#pushStatus'); if(!el) return;
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){ el.textContent='这台设备不支持推送'; return; }
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    const perm=(window.Notification&&Notification.permission)||'default';
+    el.textContent = sub ? ('已订阅 · 通知权限：'+perm) : ('未订阅 · 通知权限：'+perm);
+  }catch(e){ el.textContent='状态读取失败'; }
+}
+async function subscribePush(){ const okk=await enablePush(); await loadPushInfo(); if(okk) toast('订阅成功'); }
+async function testPush(){
+  try{
+    const r=await Nexus._fetch('/push-test',{method:'POST',headers:Nexus.hdr()});
+    const j=r&&r.ok?await r.json():null;
+    toast(j&&j.ok!==false ? '测试推送已发出' : '发送失败');
+  }catch(e){ toast('发送失败'); }
+}
+async function unsubscribePush(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub) await sub.unsubscribe();
+    store.set('push_on',''); setPushUI(false); await loadPushInfo(); toast('已取消订阅');
+  }catch(e){ toast('取消失败'); }
+}
 function setPushUI(on){ const sw=$('#pushSw'); if(sw) sw.classList.toggle('on', on); const l=$('#pushLabel'); if(l) l.textContent = on?'已开启 · 后台也能收到消息':'关'; }
 function togglePush(){ const on=$('#pushSw').classList.contains('on'); if(on){ store.set('push_on',''); setPushUI(false); toast('已关（订阅仍在，可再开）'); } else enablePush(); }
 
