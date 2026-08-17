@@ -5,8 +5,10 @@ build:
 
 test: build
 	cd web/nexus-do && node selftest.mjs
-	cd shuyu && npm test
-	python3 tools/test_suite.py
+	node --test shuyu/tests/*.test.mjs
+	cd shuyu && python3 -m unittest discover -s tests
+	node tools/sync-ui.mjs --check
+	node tools/check-sync.mjs
 
 check-sync:
 	node tools/check-sync.mjs
