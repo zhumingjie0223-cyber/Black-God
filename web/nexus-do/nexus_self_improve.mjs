@@ -1,5 +1,4 @@
-import * as Caps from './capabilities.mjs';
-const CapabilityGrowth = Caps.CapabilityGrowth ?? Caps.default;
+import { CapabilityGrowth } from './capabilities.mjs';
 
 export class SelfImprove {
   constructor(opts = {}) {

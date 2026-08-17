@@ -8,6 +8,8 @@
 // © 阿权 / 路飞
 // ═══════════════════════════════════════════════
 
+import { riskForCapability, requiresApprovalForRisk } from './nexus_agent_protocol.mjs';
+
 // 每个能力是一条声明。handler 必须是 ShenshuCore 上真实存在的 async 方法名。
 export const CAPABILITIES = [
   {
@@ -129,9 +131,10 @@ export const CAPABILITIES = [
 export function describeCapabilities(ownerCtx = false) {
   return CAPABILITIES
     .filter((c) => ownerCtx || !c.owner_only)
-    .map(({ id, name, layer, desc, argShape, owner_only }) => ({
-      id, name, layer, desc, argShape, owner_only,
-    }));
+    .map(({ id, name, layer, desc, argShape, owner_only }) => {
+      const risk = riskForCapability(id);
+      return { id, name, layer, desc, argShape, owner_only, risk, approval_required: requiresApprovalForRisk(risk) };
+    });
 }
 
 // —— 供 STABLE_SYSTEM_PREFIX 动态注入：把能力清单变成她"自认能力"的一句话 ——

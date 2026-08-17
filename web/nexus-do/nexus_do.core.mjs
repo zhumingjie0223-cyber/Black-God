@@ -417,7 +417,7 @@ export class ShenshuCore {
     if (path === '/cache-stats') return json({ action: 'cache', data: await this.cacheStats() });
 
     // —— 私密 API（仅主人可用：配了 OWNER_TOKEN 就强制鉴权）——
-    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
+    const API = new Set(['/talk', '/soul', '/soul/continuity', '/inner', '/lexicon', '/heartbeat', '/reflect', '/device', '/device/control', '/image', '/voice', '/video', '/migrate', '/export', '/import', '/checkpoint', '/checkpoint/list', '/checkpoint/restore', '/brains-test', '/brains/weights', '/whoami', '/subscribe', '/push-test', '/agent', '/agent/plan', '/agent/approve', '/agent/execute', '/agent/run', '/agent/audit', '/agent/cancel', '/config', '/oauth/start', '/oauth/callback', '/exec-test', '/loop', '/wsticket', '/stats', '/hijack/collect', '/hijack/script', '/hijack/list', '/redteam', '/sandbox/run', '/msg/delete', '/mem/compress', '/evict', '/tg/setup']);
     if (API.has(path)) {
       if (!authed) return json({ error: 'unauthorized', 提示: '这是主人的私密空间。请在请求头带 Authorization: Bearer <OWNER_TOKEN>，或 ?k=<token>。' }, 401);
       // 多租户:实例主人(普通用户)碰不到系统专属路由(执行脑/造像造声造影/推送/迁移/跨用户统计/守望等)。
@@ -510,6 +510,13 @@ export class ShenshuCore {
         if (path === '/device/control' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.deviceControl(b.action || '', b)); }
         // iOS 快捷指令联动：她判断意图 → 返回可执行动作（跨 App）
         if (path === '/agent' && request.method === 'POST') { const b = await request.json(); return json(await this.handleAgent(b.text || '', b.context || {})); }
+        // 枢语原生 Agent 账本：计划与真实副作用分离。高风险能力必须先领取、再确认、后执行。
+        if (path === '/agent/plan' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentPlan(b, _role)); }
+        if (path === '/agent/approve' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentApprove(b)); }
+        if (path === '/agent/execute' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentExecute(b, _role, request)); }
+        if (path === '/agent/cancel' && request.method === 'POST') { const b = await request.json().catch(() => ({})); return json(await this.agentLedgerRequest('/cancel', 'POST', b)); }
+        if (path === '/agent/run' && request.method === 'GET') return json(await this.agentLedgerRequest('/run?runId=' + encodeURIComponent(url.searchParams.get('runId') || ''), 'GET'));
+        if (path === '/agent/audit' && request.method === 'GET') return json(await this.agentLedgerRequest('/audit?runId=' + encodeURIComponent(url.searchParams.get('runId') || ''), 'GET'));
         // WebSocket 一次性短期票据：前端拿 Bearer 头换票，再用 ?t= 连 WS（令牌不进 URL）
         if (path === '/wsticket' && request.method === 'POST') return json(await this.issueWsTicket(request));
         // 注册统计：只有主人能看「多少人注册在用」
@@ -1087,140 +1094,6 @@ action 说明：
 }
 
 
-async visualAgentLoop(goal, startUrl, opts = {}) {
-  const maxSteps = opts.maxSteps || 8;
-  const soul = opts.soul || '';
-  const transcript = [];
-  let currentUrl = startUrl;
-  let lastText = '';
-  let lastScreenshot = null;
-  let finalResult = null;
-
-  const SYS = `你是神枢视觉 Agent（Vision Agent），通过截图和页面文字观察网页并操作。
-每轮你会收到：任务目标、当前 URL、页面截图（如有）、页面文字摘要。
-你必须只输出一个 JSON 对象，不要 markdown 代码块，不要任何解释：
-{"action":"click|type|scroll|navigate|extract|done","args":{},"reason":"简短说明"}
-action 说明：
-- click: args={"selector":"CSS选择器"} 点击元素
-- type: args={"selector":"CSS选择器","value":"输入内容"} 输入文字
-- scroll: args={"direction":"down|up"} 滚动页面
-- navigate: args={"url":"完整URL"} 跳转新页面
-- extract: args={} 提取当前页面文字作为观察
-- done: args={"result":"最终答案"} 任务完成
-规则：优先用页面文字里出现的真实元素；连续两步无变化时换策略；目标达成立即 done。`;
-
-  const parseBrain = (raw) => {
-    if (!raw) return null;
-    let s = String(raw).trim();
-    const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) s = fence[1].trim();
-    const start = s.indexOf('{'), end = s.lastIndexOf('}');
-    if (start === -1 || end === -1) return null;
-    try { return JSON.parse(s.slice(start, end + 1)); } catch { return null; }
-  };
-
-  const observe = async (url, actions) => {
-    const payload = { url, screenshot: true, timeout: opts.timeout || 30000 };
-    if (actions && actions.length) payload.actions = actions;
-    let r = await this.execBrowse(payload);
-    if (!r || !r.ok) {
-      const p2 = { url, screenshot: false, timeout: opts.timeout || 30000 };
-      if (actions && actions.length) p2.actions = actions;
-      r = await this.execBrowse(p2);
-    }
-    return r || { ok: false, text: '', url, screenshot: null };
-  };
-
-  const first = await observe(currentUrl, null);
-  if (!first.ok && !first.text) {
-    return { ok: false, error: 'initial navigation failed', result: null, transcript, steps: 0 };
-  }
-  currentUrl = first.url || currentUrl;
-  lastText = (first.text || '').slice(0, 6000);
-  lastScreenshot = first.screenshot || null;
-
-  for (let step = 1; step <= maxSteps; step++) {
-    const hasShot = !!lastScreenshot;
-    const observePrompt = [
-      `任务目标：${goal}`,
-      `当前步数：${step}/${maxSteps}`,
-      `当前 URL：${currentUrl}`,
-      hasShot ? `[截图已附，前200字符] ${String(lastScreenshot).slice(0, 200)}` : `[无截图，仅文字观察]`,
-      `页面文字摘要：\n${lastText || '(空页面)'}`,
-      transcript.length ? `历史操作：\n${transcript.map(t => `#${t.step} ${t.action}(${JSON.stringify(t.args)}) ok=${t.ok}`).join('\n')}` : '',
-      `请输出下一步动作 JSON。`
-    ].filter(Boolean).join('\n\n');
-
-    let decision = null;
-    try {
-      const brainRaw = await this.callBrain(SYS, observePrompt, soul);
-      decision = parseBrain(typeof brainRaw === 'string' ? brainRaw : (brainRaw?.text || brainRaw?.content || JSON.stringify(brainRaw)));
-    } catch (e) {
-      transcript.push({ step, action: 'brain_error', args: {}, ok: false, before_text: lastText.slice(0, 200), after_text: '', error: String(e?.message || e) });
-      break;
-    }
-    if (!decision || !decision.action) {
-      transcript.push({ step, action: 'parse_error', args: {}, ok: false, before_text: lastText.slice(0, 200), after_text: '' });
-      continue;
-    }
-
-    const { action, args = {}, reason = '' } = decision;
-    const beforeText = lastText;
-
-    if (action === 'done') {
-      finalResult = args.result || lastText.slice(0, 2000);
-      transcript.push({ step, action, args, ok: true, reason, before_text: beforeText.slice(0, 200), after_text: '' });
-      return { ok: true, result: finalResult, transcript, steps: step };
-    }
-
-    let execRes = null;
-    let stepOk = false;
-    try {
-      if (action === 'navigate') {
-        currentUrl = args.url || currentUrl;
-        execRes = await observe(currentUrl, null);
-      } else if (action === 'click') {
-        execRes = await observe(currentUrl, [{ type: 'click', selector: args.selector }]);
-      } else if (action === 'type') {
-        execRes = await observe(currentUrl, [{ type: 'type', selector: args.selector, value: args.value }]);
-      } else if (action === 'scroll') {
-        execRes = await observe(currentUrl, [{ type: 'scroll', direction: args.direction || 'down' }]);
-      } else if (action === 'extract') {
-        execRes = await observe(currentUrl, null);
-      } else {
-        transcript.push({ step, action, args, ok: false, reason, before_text: beforeText.slice(0, 200), after_text: '', error: 'unknown action' });
-        continue;
-      }
-      stepOk = !!(execRes && execRes.ok && (!execRes.actionErrors || execRes.actionErrors.length === 0));
-    } catch (e) {
-      execRes = { ok: false, text: lastText, error: String(e?.message || e) };
-    }
-
-    const afterText = ((execRes && execRes.text) || '').slice(0, 6000);
-    if (execRes) {
-      currentUrl = execRes.url || currentUrl;
-      lastText = afterText || lastText;
-      lastScreenshot = execRes.screenshot || null;
-    }
-
-    transcript.push({
-      step, action, args, ok: stepOk, reason,
-      changed: afterText !== beforeText,
-      before_text: beforeText.slice(0, 200),
-      after_text: afterText.slice(0, 200),
-      ...(execRes?.actionErrors?.length ? { actionErrors: execRes.actionErrors } : {}),
-      ...(execRes?.error ? { error: execRes.error } : {})
-    });
-  }
-
-  return {
-    ok: true,
-    result: finalResult || lastText.slice(0, 2000) || null,
-    partial: !finalResult,
-    transcript,
-    steps: transcript.length
-  };
-}
 
   // git 工作区操作：ensure/status/pull/push，token 服务端拼接绝不入参
   async execWorkspace(action, payload = {}) {
@@ -11023,6 +10896,90 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       return { action: 'invoke', data: { id: cap.id, name: cap.name, result: out } };
     } catch (e) {
       return { action: 'error', data: { reason: String(e).slice(0, 120), id: cap.id } };
+    }
+  }
+
+  // ═══════════════════════ 枢语 Agent 账本 ═══════════════════════
+  // 每个 ShenshuCore DO 对应一个独立 AgentStateMachineDO：系统、影子和多租户实例绝不串 run。
+  agentLedgerStub() {
+    if (!this.env?.AGENT_STATE_MACHINE) return null;
+    const coreId = this.state?.id?.toString?.() || (this.isShadow ? 'shadow' : 'system');
+    return this.env.AGENT_STATE_MACHINE.get(this.env.AGENT_STATE_MACHINE.idFromName('nexus-agent-ledger:' + coreId));
+  }
+
+  async agentLedgerRequest(path, method = 'GET', body = null) {
+    const stub = this.agentLedgerStub();
+    if (!stub) return { ok: false, error: 'agent_state_machine_unavailable' };
+    const init = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body !== null && method !== 'GET') init.body = JSON.stringify(body);
+    try {
+      const response = await stub.fetch('https://agent-ledger' + path, init);
+      const data = await response.json().catch(() => ({ error: 'agent_ledger_invalid_response' }));
+      return { ...data, _http_status: response.status };
+    } catch (e) {
+      return { ok: false, error: 'agent_ledger_unreachable', detail: String(e?.message || e).slice(0, 160) };
+    }
+  }
+
+  async agentPlan(body = {}, role = 'system') {
+    const capability = String(body.capability || body.id || '').trim();
+    const idempotencyKey = String(body.idempotencyKey || body.requestId || '').trim();
+    // 新协议不为调用方猜测幂等键：重放安全必须由发起者的稳定请求 ID 提供。
+    if (!idempotencyKey || idempotencyKey.length > 160) return { ok: false, error: 'idempotency_key_required' };
+    const resolved = resolveCapability(capability, { role });
+    if (!resolved.ok) return { ok: false, error: resolved.reason || 'capability_denied', capability };
+    const soul = await this.getSoul().catch(() => ({}));
+    const coordinate = soul?.current_shu_coord || null;
+    const response = await this.agentLedgerRequest('/plan', 'POST', {
+      capability,
+      params: body.params && typeof body.params === 'object' && !Array.isArray(body.params) ? body.params : {},
+      role,
+      coordinate,
+      idempotencyKey,
+    });
+    if (response.ok && response.run) {
+      try { this.recordCognitiveOutcome({ capability: 'agent_plan', ok: true, coord: coordinate, text: capability, reply: response.run.phase, score: 0.8 }); } catch (_) {}
+    }
+    return response;
+  }
+
+  async agentApprove(body = {}) {
+    if (!body.runId || !body.approvalToken) return { ok: false, error: 'run_id_and_approval_token_required' };
+    return this.agentLedgerRequest('/approve', 'POST', { runId: body.runId, approvalToken: body.approvalToken });
+  }
+
+  async agentExecute(body = {}, role = 'system', request = null) {
+    if (!body.runId) return { ok: false, error: 'run_id_required' };
+    const claim = await this.agentLedgerRequest('/claim', 'POST', { runId: body.runId });
+    if (!claim.ok || !claim.run || !claim.leaseToken) return claim;
+    const run = claim.run;
+    const resolved = resolveCapability(run.capability, { role });
+    if (!resolved.ok) {
+      const denied = await this.agentLedgerRequest('/complete', 'POST', { runId: run.runId, leaseToken: claim.leaseToken, ok: false, result: { error: resolved.reason || 'capability_denied' } });
+      return { ok: false, error: resolved.reason || 'capability_denied', run: denied.run || run };
+    }
+    try {
+      // 旧 handler 仍保留自身危险操作检查；协议确认成功后才附加 confirm=true。
+      const params = { ...(run.params || {}) };
+      if (run.approvalRequired) params.confirm = true;
+      const result = await this.invokeCapability(run.capability, params, { role }, request);
+      const ok = result?.action !== 'error';
+      const completed = await this.agentLedgerRequest('/complete', 'POST', {
+        runId: run.runId,
+        leaseToken: claim.leaseToken,
+        ok,
+        result,
+      });
+      try { this.recordCognitiveOutcome({ capability: 'agent_execute', ok, coord: run.coordinate || null, text: run.capability, reply: ok ? '执行完成' : '执行失败', score: ok ? 1 : 0.2 }); } catch (_) {}
+      return { ok, result, run: completed.run || run, ledger: completed };
+    } catch (e) {
+      const failed = await this.agentLedgerRequest('/complete', 'POST', {
+        runId: run.runId,
+        leaseToken: claim.leaseToken,
+        ok: false,
+        result: { error: String(e?.message || e).slice(0, 180) },
+      });
+      return { ok: false, error: 'agent_execution_failed', run: failed.run || run };
     }
   }
 

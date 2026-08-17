@@ -15,7 +15,13 @@
   // 不含 membership 读权限）也能直接部署，避免 CI 报 “/memberships … 9106 认证失败”。
   "account_id": "142c76e0039e279886c89257b6fddbc7",
 
-  "observability": { "enabled": true },
+  // Agent run 会跨主 Worker 与 AgentStateMachineDO；日志保留完整，追踪只采样 5%，
+  // 以保留故障证据且避免高频对话放大追踪体量。正式发布前仍需主人确认。
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05, "persist": true }
+  },
 
   // —— Durable Object：全球唯一的神枢，SQLite 后端 ——
   "durable_objects": {
@@ -36,7 +42,7 @@
     {
       "class_name": "ExecContainer",
       "image": "./container/Dockerfile",
-      "instance_type": "dev",
+      "instance_type": "lite",
       "max_instances": 1
     }
   ],

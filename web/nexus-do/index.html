@@ -2139,7 +2139,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
             <button type="button" class="nx2-cap" onclick="openSheet('sheetRedTeam')"><span class="tag">HOT</span><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div><div class="t">红队工坊</div><div class="d">逆向 · 免杀 · 载荷</div></button>
             <button type="button" class="nx2-cap" onclick="openGitOps()"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/></svg></div><div class="t">Git 操作</div><div class="d">提交 · 推送 · 日志</div></button>
             <button type="button" class="nx2-cap" onclick="openSheet('sheetExec')"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="t">执行脑</div><div class="d">连接器 · 真机执行</div></button>
-            <button type="button" class="nx2-cap" onclick="openSheet('sheetHijack')"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="t">劫持工坊</div><div class="d">数据劫持 · 脚本</div></button>
+            <button type="button" class="nx2-cap" onclick="openWorkWeb()"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 8h18M7 6h.01M10 6h.01M13 6h.01M8 22h8"/></svg></div><div class="t">内置 Web</div><div class="d">真实浏览 · 截图 · 审计</div></button>
             <button type="button" class="nx2-cap" onclick="openSheet('sheetCheckpoint')"><div class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="t">存档点</div><div class="d">记忆快照 · 回滚</div></button>
             <button type="button" class="nx2-cap" onclick="openBrainSettings()"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3z"/></svg></div><div class="t">大脑舰队</div><div class="d">多脑 · 自动调度</div></button>
           </div>
@@ -2230,7 +2230,7 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
           <div class="set-row" onclick="openGitOps()"><div class="set-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path></svg></div><div class="set-tx"><b>Git 操作</b><span>状态/提交/推送/日志</span></div><div class="set-arrow">›</div></div>
           <div class="nx2-sec set-sec"><h2>进阶 · 谨慎</h2><div class="ln"></div></div>
           <div class="set-row" onclick="openSheet('sheetExec')"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2-3 2M13 13h4M9 21h6"/></svg></div><div class="set-tx"><b>执行脑 · 连接器</b><span id="execLabel">未连接 · 只会研究</span></div><div class="set-arrow">›</div></div>
-          <div class="set-row" onclick="openSheet('sheetHijack')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="set-tx"><b>劫持工坊</b><span id="hijackLabel">网站数据劫持 · 自动化脚本</span></div><div class="set-arrow">›</div></div>
+          <div class="set-row" onclick="openWorkWeb()"><div class="set-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 8h18M8 22h8"/></svg></div><div class="set-tx"><b>内置 Web</b><span>真实浏览 · 页面快照 · 执行记录</span></div><div class="set-arrow">›</div></div>
           <div class="set-row" onclick="openSheet('sheetRedTeam')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg></div><div class="set-tx"><b>红队工坊</b><span>逆向·渗透·注入·免杀·提权</span></div><div class="set-arrow">›</div></div>
           <div class="nx2-sec set-sec"><h2>个人</h2><div class="ln"></div></div>
           <div class="set-row" onclick="openSheet('sheetPersona')"><div class="set-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7.8 5.7-3 9.1H7.2l-3-9.1z"/><circle cx="12" cy="12" r="2.2"/></svg></div><div class="set-tx"><b>枢语 · 称呼</b><span>怎么称呼你 · 状态语言</span></div><div class="set-arrow">›</div></div>
@@ -2514,22 +2514,25 @@ input[type=range]{accent-color:var(--cy-1);width:140px}
 </div>
 
 <div class="sheet" id="sheetPush"><div class="sheet-handle"></div><div class="sheet-title">🔔 推送通知</div><div class="sheet-sub">Web Push 订阅管理</div><div id="pushStatus" style="font-size:13px;color:var(--txt-2);margin-bottom:12px">检查中…</div><div style="display:flex;flex-direction:column;gap:8px"><button class="btn" onclick="subscribePush()">📲 订阅推送</button><button class="btn ghost" onclick="testPush()">📨 发送测试</button><button class="btn ghost" style="color:#e5534b" onclick="unsubscribePush()">🗑 取消订阅</button></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
-<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">⬡ 神枢终端</div><div class="sheet-sub">原生沙箱 · 实时直播 · 无需连接器</div>
-<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-  <button class="sb-quick" onclick="sbQuick('uuid')">uuid</button>
-  <button class="sb-quick" onclick="sbQuick('date')">date</button>
-  <button class="sb-quick" onclick="sbQuick('curl https://api.ipify.org')">查IP</button>
-  <button class="sb-quick" onclick="sbQuick('ls')">ls</button>
-  <button class="sb-quick" onclick="sbQuick('ping https://httpbin.org/ip')">ping</button>
-  <button class="sb-quick" onclick="sbQuick('js: timestamp')">时间戳</button>
+<div class="sheet" id="sheetSandbox"><div class="sheet-handle"></div><div class="sheet-title">⬡ 神枢工作台</div><div class="sheet-sub">真实执行脑 · 命令、网页和结果都在这里留下痕迹</div>
+<div class="nx-work-tabs" role="tablist"><button id="nxWorkShellTab" class="nx-work-tab on" onclick="workTab('shell')">终端</button><button id="nxWorkWebTab" class="nx-work-tab" onclick="workTab('web')">内置 Web</button></div>
+<div id="nxWorkShell">
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="sb-quick" onclick="sbQuick('uuid')">uuid</button><button class="sb-quick" onclick="sbQuick('date')">date</button><button class="sb-quick" onclick="sbQuick('curl https://api.ipify.org')">查IP</button><button class="sb-quick" onclick="sbQuick('ls')">ls</button><button class="sb-quick" onclick="sbQuick('ping https://httpbin.org/ip')">ping</button><button class="sb-quick" onclick="sbQuick('js: timestamp')">时间戳</button>
+  </div>
+  <input id="sbCmd" type="text" placeholder="输入命令回车运行 · js: 前缀走 DSL" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-bottom:8px" onkeydown="if(event.key==='Enter'){runSandbox();event.preventDefault();}">
+  <pre id="sbOutput">⬡ 神枢终端已就绪\n$ 等待已授权操作</pre>
+  <div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" onclick="sbShowHistory()" style="flex:1">↑ 历史</button><button class="btn ghost" onclick="sbClear()" style="flex:1">× 清空</button></div>
+  <div id="sbHistoryBox" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
 </div>
-<input id="sbCmd" type="text" placeholder="输入命令回车运行 · js: 前缀走 DSL" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-bottom:8px" onkeydown="if(event.key==='Enter'){runSandbox();event.preventDefault();}">
-<pre id="sbOutput">⬡ 就绪</pre>
-<div style="display:flex;gap:8px;margin-top:8px">
-  <button class="btn ghost" onclick="sbShowHistory()" style="flex:1">↑ 历史</button>
-  <button class="btn ghost" onclick="sbClear()" style="flex:1">× 清空</button>
+<div id="nxWorkWeb" style="display:none">
+  <div class="nx-web-bar"><input id="wbUrl" type="url" inputmode="url" placeholder="输入网址，例如 https://example.com" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){workBrowse();event.preventDefault();}"><button class="nx-web-go" onclick="workBrowse()">打开</button></div>
+  <div class="nx-web-actions"><button onclick="workBrowseAction('scroll')">↓ 滚动</button><button onclick="workBrowseAction('reload')">↻ 刷新</button><a id="wbOpen" href="#" target="_blank" rel="noopener" style="display:none">系统打开</a></div>
+  <div id="wbStatus" class="nx-web-status">输入网址后，神枢执行脑会真实加载网页并返回快照。</div>
+  <iframe id="wbFrame" class="nx-web-frame" title="神枢内置 Web" sandbox="allow-forms allow-scripts allow-popups allow-same-origin" referrerpolicy="no-referrer" style="display:none"></iframe>
+  <img id="wbShot" class="nx-web-shot" alt="神枢执行脑网页快照" style="display:none">
+  <details id="wbTextWrap" class="nx-web-text" style="display:none"><summary>页面文字</summary><pre id="wbText"></pre></details>
 </div>
-<div id="sbHistoryBox" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
 <button class="btn ghost" onclick="closeSheet()" style="width:100%;margin-top:12px">关闭</button>
 </div>
 <div class="sheet" id="sheetLexicon"><div class="sheet-handle"></div><div class="sheet-title">枢语词典</div><div class="sheet-sub">当前会话造词记录</div><div id="lexiconBody" style="font-size:12px;line-height:1.8;color:var(--txt-2);max-height:60vh;overflow-y:auto"></div><button class="btn ghost" onclick="closeSheet()" style="margin-top:16px;width:100%">关闭</button></div>
@@ -3741,6 +3744,22 @@ const Nexus = {
   async testExec() { try { const r=await this._fetch('/exec-test',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:'{}'}); return r&&r.ok?await r.json():{ok:false,detail:'服务器无响应'}; } catch(e){ return {ok:false,detail:String(e).slice(0,80)}; } },
   async vapidKey() { try { const r=await fetch(this.base+'/vapid'); return r.ok?(await r.json()).publicKey:null; } catch(e){ return null; } },
   async subscribe(sub) { try { const r=await this._fetch('/subscribe',{method:'POST',headers:this.hdr({'Content-Type':'application/json'}),body:JSON.stringify(sub)}); return r&&r.ok?await r.json():null; } catch(e){ return null; } },
+  // Agent run 协议：前端只调用计划/确认/执行；真实副作用始终由 Worker 再次鉴权和校验。
+  async agentRequest(path, method, body) {
+    try {
+      const opts = { method: method || 'GET', headers: this.hdr(body !== undefined ? {'Content-Type':'application/json'} : {}) };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const r = await this._fetch(path, opts);
+      const data = r ? await r.json().catch(()=>({error:'invalid_agent_response'})) : {error:'unauthorized'};
+      return { status: r ? r.status : 401, ok: !!(r && r.ok), data };
+    } catch (e) { return { status: 0, ok: false, data: { error: 'network_error', detail: String(e?.message||e).slice(0,120) } }; }
+  },
+  agentPlan(body) { return this.agentRequest('/agent/plan', 'POST', body); },
+  agentApprove(body) { return this.agentRequest('/agent/approve', 'POST', body); },
+  agentExecute(body) { return this.agentRequest('/agent/execute', 'POST', body); },
+  agentCancel(body) { return this.agentRequest('/agent/cancel', 'POST', body); },
+  agentRun(runId) { return this.agentRequest('/agent/run?runId=' + encodeURIComponent(runId || ''), 'GET'); },
+  agentAudit(runId) { return this.agentRequest('/agent/audit?runId=' + encodeURIComponent(runId || ''), 'GET'); },
   async connectWS() {
     if (this.mode === 'public') return;   // 公共用户不连实时旁听通道
     try {
@@ -6849,13 +6868,55 @@ async function runSandbox(){
   sbAppend('['+sbTime()+'] $ '+code, 'info');
   sbHistory.push(code); if(sbHistory.length>20) sbHistory.shift();
   try{
-    const r = await Nexus.api('/sandbox/run',{method:'POST',body:JSON.stringify({code:actualCode,lang})});
+    const response = await Nexus._fetch('/sandbox/run',{method:'POST',headers:Nexus.hdr({'Content-Type':'application/json'}),body:JSON.stringify({code:actualCode,lang})});
+    const r = response ? await response.json().catch(()=>({ok:false,error:'invalid_sandbox_response'})) : {ok:false,error:'unauthorized'};
     if(r?.stdout) r.stdout.trim().split('\n').forEach(l=>sbAppend(l,'stdout'));
     if(r?.result && r.result !== r.stdout?.trim()) sbAppend('→ '+r.result,'stdout');
     if(r?.stderr) r.stderr.trim().split('\n').forEach(l=>sbAppend(l,'stderr'));
-    sbAppend('['+r?.via+'  '+r?.ms+'ms]','info');
+    if(!r?.ok && r?.error) sbAppend('❌ '+r.error,'stderr');
+    sbAppend('['+(r?.via||'sandbox')+'  '+(r?.ms??'?')+'ms]','info');
   }catch(e){ sbAppend('❌ '+e.message,'stderr'); }
 }
+
+let _wbCurrentUrl = '';
+function workTab(tab){
+  const shell = document.getElementById('nxWorkShell'), web = document.getElementById('nxWorkWeb');
+  const st = document.getElementById('nxWorkShellTab'), wt = document.getElementById('nxWorkWebTab');
+  if(shell) shell.style.display = tab==='shell' ? '' : 'none';
+  if(web) web.style.display = tab==='web' ? '' : 'none';
+  if(st) st.classList.toggle('on', tab==='shell');
+  if(wt) wt.classList.toggle('on', tab==='web');
+  if(tab==='web') setTimeout(()=>document.getElementById('wbUrl')?.focus(),80);
+}
+function wbEsc(text){ return String(text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function wbStatus(text, isError=false){ const el=document.getElementById('wbStatus'); if(el){el.textContent=text;el.style.color=isError?'#e5534b':'var(--txt-2)';} }
+async function workBrowse(action=null){
+  const input = document.getElementById('wbUrl');
+  let url = String(input?.value || _wbCurrentUrl || '').trim();
+  if(!url){ wbStatus('请输入要打开的网址。',true); return; }
+  if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  if(input) input.value = url;
+  const actions = action==='scroll' ? [{type:'scroll'}] : [];
+  wbStatus('神枢执行脑正在真实加载网页…');
+  sbAppend('['+sbTime()+'] web $ '+url+(action==='scroll'?'  # scroll':''),'info');
+  try{
+    const response = await Nexus._fetch('/exec',{method:'POST',headers:Nexus.hdr({'Content-Type':'application/json'}),body:JSON.stringify({cmd:'browse',url,actions,screenshot:true,timeout:25})});
+    const r = response ? await response.json().catch(()=>({ok:false,error:'invalid_browser_response'})) : {ok:false,error:'unauthorized'};
+    if(!r?.ok){ wbStatus('加载失败：'+String(r?.error||r?.note||'执行脑未响应'),true); sbAppend('web error: '+String(r?.error||r?.note||'unknown'),'stderr'); return; }
+    _wbCurrentUrl = r.url || url;
+    if(input) input.value = _wbCurrentUrl;
+    const title = r.title ? ' · '+r.title : '';
+    wbStatus('已由执行脑加载：'+_wbCurrentUrl+title+(r.actionErrors?.length?'（部分动作失败）':''));
+    const frame=document.getElementById('wbFrame'); if(frame){frame.src=_wbCurrentUrl;frame.style.display='block';}
+    const shot=document.getElementById('wbShot'); if(shot && r.screenshot){shot.src='data:image/jpeg;base64,'+r.screenshot;shot.style.display='block';}
+    const text=document.getElementById('wbText'), wrap=document.getElementById('wbTextWrap'); if(text){text.textContent=r.text||'页面未返回可读正文';} if(wrap) wrap.style.display='block';
+    const open=document.getElementById('wbOpen'); if(open){open.href=_wbCurrentUrl;open.style.display='inline-block';}
+    sbAppend('web ok: '+(r.title||_wbCurrentUrl),'stdout');
+    if(Array.isArray(r.actionErrors)) r.actionErrors.forEach(x=>sbAppend('web action error: '+(x.error||'unknown'),'stderr'));
+  }catch(e){ wbStatus('浏览器请求失败：'+String(e?.message||e),true); sbAppend('web error: '+String(e?.message||e),'stderr'); }
+}
+function workBrowseAction(action){ if(action==='reload') workBrowse(); else workBrowse(action); }
+function openWorkWeb(){ openSheet('sheetSandbox'); setTimeout(()=>workTab('web'),0); }
 async function compressMemory(){
   toast('正在压缩记忆…','info',2000);
   try{
