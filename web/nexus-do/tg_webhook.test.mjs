@@ -89,7 +89,7 @@ const upd = (id, chatId, text) => ({ update_id: id, message: { chat: { id: chatI
   S.tgSetWebhook = async (origin) => { setCalls++; return { ok: origin === 'https://shen.example.com' }; };
   await S.ensureTgHook();
   await S.ensureTgHook();
-  ok('有公网地址 → 只注册一次（第二次跳过）', setCalls === 1 && store.get('tg_hook_url') === 'https://shen.example.com/tg/webhook');
+  ok('有公网地址 → 只注册一次（第二次跳过）', setCalls === 1 && store.get('tg_hook_url') === 'https://shen.example.com/tg');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
