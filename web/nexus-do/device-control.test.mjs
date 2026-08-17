@@ -35,7 +35,8 @@ test('device_control 对主人透传 action 与完整参数', async () => {
   const result = await core.invokeCapability('device_control', params, true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].action, 'clipboard_write');
-  assert.equal(calls[0].params, params);
+  // 预检会返回安全归一化后的参数副本；验证值完整透传，而不将对象引用身份当成协议契约。
+  assert.deepEqual(calls[0].params, params);
   assert.equal(result.action, 'invoke');
   assert.equal(result.data.id, 'device_control');
   assert.deepEqual(result.data.result, { ok: true, action: 'clipboard_write', text: '神枢在此' });
