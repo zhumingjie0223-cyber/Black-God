@@ -79,7 +79,7 @@ const U = p => `http://127.0.0.1:${port}${p}`;
   const r1 = await inst.callBrain('你是神枢', '你好', { 心绪: 0.6 }, { tier: 'heavy' });
   ok('auto 闭环:留空模型也能成功回复', r1 && r1.reply === '在呢，权哥。');
   ok('auto 闭环:自动识别取第一个真实模型 sihan-max（不再硬传 auto）', chatModelSeen === 'sihan-max');
-  ok('auto 闭环:识别结果已缓存 _auto_model', store.get('config')._auto_model === 'sihan-max');
+  ok('auto 闭环:识别结果已缓存 _auto_models[url]', (store.get('config')._auto_models || {})[U('/v1')] === 'sihan-max');
   const hitsBefore = modelsHits;
   const r2 = await inst.callBrain('你是神枢', '再说句', { 心绪: 0.6 }, { tier: 'heavy' });
   ok('auto 闭环:二次调用命中缓存不重复联网识别', r2 && r2.reply === '在呢，权哥。' && modelsHits === hitsBefore);

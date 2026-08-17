@@ -99,6 +99,63 @@ async function handleExec(body) {
   });
 }
 
+// ═══ SSE 流式执行：实时输出每一行 ═══
+async function handleExecStream(body, res) {
+  const { command, timeout = 60 } = body;
+  if (!command) {
+    res.writeHead(400, { 'Content-Type': 'text/event-stream' });
+    res.end('data: {"error":"command required"}\n\n');
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+
+  const send = (type, data) => {
+    res.write(`data: ${JSON.stringify({ type, data, ts: Date.now() })}\n\n`);
+  };
+
+  send('start', { command });
+
+  const child = spawn('/bin/sh', ['-c', command], { detached: true });
+  let killed = false;
+
+  const timer = setTimeout(() => {
+    killed = true;
+    send('timeout', { msg: `超时 ${timeout}s，强制终止` });
+    killProcessGroup(child.pid);
+  }, timeout * 1000);
+
+  child.stdout.on('data', (d) => {
+    d.toString().split('\n').filter(l => l).forEach(line => send('stdout', line));
+  });
+
+  child.stderr.on('data', (d) => {
+    d.toString().split('\n').filter(l => l).forEach(line => send('stderr', line));
+  });
+
+  child.on('close', (code) => {
+    clearTimeout(timer);
+    send('done', { exitCode: killed ? null : code, killed });
+    res.end();
+  });
+
+  child.on('error', (err) => {
+    clearTimeout(timer);
+    send('error', { msg: err.message });
+    res.end();
+  });
+
+  res.on('close', () => {
+    clearTimeout(timer);
+    if (!killed) killProcessGroup(child.pid);
+  });
+}
+
 async function handleEdit(body) {
   const { path, search, replace } = body;
   if (!path || !search || replace === undefined) {
@@ -361,6 +418,9 @@ const server = createServer(async (req, res) => {
     let result;
     if (req.url === '/exec') {
       result = await handleExec(body);
+    } else if (req.url === '/exec/stream') {
+      await handleExecStream(body, res);
+      return;
     } else if (req.url === '/edit') {
       result = await handleEdit(body);
     } else if (req.url === '/read') {
