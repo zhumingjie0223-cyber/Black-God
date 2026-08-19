@@ -2,6 +2,35 @@
 
 本项目重要变更记录。日期用绝对日期(UTC)。
 
+## 2026-08-19 — 私人版收尾打磨(前端诚实故障态 + 停 iOS 白烧构建)
+
+**状态盘点结论:代码零故障,全套约 393 条测试实跑全绿**(selftest 235 / 单测 116 /
+枢语 JS 33 / Python 9 / build ✓ / check-sync ✓),分支与 main 完全对齐。剩余"工业化"
+分叉在"上线给谁用"这个先决判断上,权哥拍板走**私人版收尾打磨**。本次落地三项:
+
+### 前端(P1:别再静默假装在线)
+- 后端挂掉时 `getSoul/getInner/talk` 会 `catch→Demo` 兜底,旧状态灯只有"在线/演示/连接中"
+  三态,**缺独立故障态**:主人分不清"我没配后端(演示)"和"配了后端但此刻挂了(故障)",
+  且多个 `setLive` 调用点传 `wsReady||Demo.on`,Demo 兜底一置位就把状态撑成假"在线"。
+- 修:新增 `Nexus.fault`,在共享 `_fetch` 里集中记录(fetch 抛错→`offline` 连不上 /
+  5xx→`error` 后端异常 / 正常响应→清空);`setLive` **故障态压过演示/在线**,以 `wsReady`
+  为真在线唯一凭据。状态灯加 `.dot.err`(红·连不上)/`.dot.warn`(琥珀·后端异常),沿用页内
+  `--err`/`--warn` 令牌不硬编码,脉冲只用 opacity。内容层 Demo 兜底保留(页面不崩)。
+- 回归测试:`ui_health.test.mjs` 加第⑦关,结构性锁死上述三处,防以后改回静默假在线。
+
+### CI(P2:停 iOS 白烧构建)
+- `build.yml` 触发器去掉 `push: main`、只留 `workflow_dispatch`:unsigned IPA 无签名无法分发,
+  不再每次 push 都白跑 macOS 构建烧 Actions 额度。保留按需手动 Run 能力,未删工作流可回退。
+  native 取舍(补齐签名 or 砍掉)仍待权哥拍板。
+
+### 文档
+- `LAUNCH_CHECKLIST.md`:回填上述两项 + 「错误信息收敛」按复核结论销案(真实公开泄露面已被
+  最外层 owner-gate catch 与路由级 `OWNER_TOKEN` 封住,不值得在核心大文件散点动刀)。
+
+### 测试
+- 改动后复跑:build ✓、selftest 235/235、单测 116/116(含 ui_health 新第⑦关)、
+  sync-ui 双副本一致、check-sync 引擎全同步、枢语 JS 33 + Python 9 全绿。零回退。
+
 ## 2026-08-17 — 项目状态复核 + 文档收口(里子文档不许骗)
 
 **代码零故障，问题全在文档层**：本次全量体检 301 条测试(selftest 236 + 单测 65)、

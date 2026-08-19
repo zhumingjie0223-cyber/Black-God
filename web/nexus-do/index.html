@@ -377,6 +377,9 @@ button,input,textarea{font-family:inherit;color:inherit}
 .top-status:active{transform:scale(.95)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--text-3);transition:.3s;flex-shrink:0}
 .dot.live{background:var(--live);box-shadow:0 0 8px var(--live-glow);animation:pulse 2s infinite}
+/* 故障态:配了后端却连不上(err 红)/后端报错(warn 琥珀),不再用"演示/在线"糊弄主人 */
+.dot.err{background:var(--err);box-shadow:0 0 8px color-mix(in srgb,var(--err) 60%,transparent);animation:pulse 1.4s infinite}
+.dot.warn{background:var(--warn);box-shadow:0 0 8px color-mix(in srgb,var(--warn) 60%,transparent);animation:pulse 1.4s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* —— 角标胶囊（主人·在线统计 / 公共·我的 API）——
@@ -3686,6 +3689,7 @@ const Nexus = {
   mode: store.get('owner_token') ? 'owner' : (store.get('reg_uid') && store.get('reg_nick') ? 'public' : 'none'),
   uid: store.get('reg_uid') || '',
   ws: null, wsReady: false, reconnectT: null, pollT: null, backoff: 1000, _ping: null,
+  fault: null,   // 连接故障态:null=无故障 | 'offline'=fetch 抛错连不上 | 'error'=后端 5xx。仅 _fetch 成功或 wsReady 真时清除
   mt: false,   // 多租户开关(从 /health 读):开→注册用户有自己的实例
   async loadHealth(){ try{ const r=await fetch(this.base+'/health'); if(r&&r.ok){ const d=await r.json(); this.mt=!!d.multitenant; } }catch(e){} },
   hdr(extra) { const h = Object.assign({}, extra||{}); if (this.token) h['Authorization'] = 'Bearer ' + this.token; if (this.uid) h['X-Nexus-Uid'] = this.uid; return h; },
@@ -3694,9 +3698,16 @@ const Nexus = {
   async stats() { try { const r = await this._fetch('/stats', { headers: this.hdr() }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async testBrains() { try { const r = await this._fetch('/brains-test', { method:'POST', headers: this.hdr({'Content-Type':'application/json'}), body:'{}' }); return r && r.ok ? await r.json() : null; } catch(e){ return null; } },
   async _fetch(path, opts) {
-    const r = await fetch(this.base + path, opts);
-    if (r.status === 401) { onUnauthorized(); return null; }
-    return r;
+    try {
+      const r = await fetch(this.base + path, opts);
+      // 能收到响应=网络可达:5xx 记后端异常,其余(含 4xx)清故障
+      this.fault = r.status >= 500 ? 'error' : null;
+      if (r.status === 401) { onUnauthorized(); return null; }
+      return r;
+    } catch (e) {
+      this.fault = 'offline';   // fetch 抛错=网络层连不上;抛回给调用方,保持其 catch→Demo 兜底不变
+      throw e;
+    }
   },
   async api(path, body) {
     try {
@@ -3839,10 +3850,21 @@ function flashSummon(name){ if(!name) return; toast('神枢动用了 · '+name);
 /* —— 连接状态 —— */
 function setLive(on) {
   if ($('#agentIsland') && $('#agentIsland').classList.contains('busy')) return; // 忙时不覆盖状态岛
-  if (Demo.on && !on) { $('#liveDot').classList.remove('live'); $('#liveText').textContent = '演示'; return; }
-  $('#liveDot').classList.toggle('live', on);
-  $('#liveText').textContent = on ? '在线' : '连接中';
-  const island = $('#agentIsland');
+  const dot = $('#liveDot'), txt = $('#liveText'), island = $('#agentIsland');
+  if (Nexus.wsReady) Nexus.fault = null;   // ws 通 = 铁证在线,清故障
+  // 故障态优先:配了后端却连不上/报错时,别用"演示/在线"糊弄主人(传入的 on 可能被 Demo 兜底撑成 true)
+  if (!Nexus.wsReady && Nexus.fault) {
+    dot.classList.remove('live');
+    dot.classList.toggle('err', Nexus.fault === 'offline');
+    dot.classList.toggle('warn', Nexus.fault !== 'offline');
+    txt.textContent = Nexus.fault === 'offline' ? '连不上' : '后端异常';
+    if (island) { island.classList.remove('connected'); island.classList.add('offline'); }
+    return;
+  }
+  dot.classList.remove('err', 'warn');
+  if (Demo.on && !on) { dot.classList.remove('live'); txt.textContent = '演示'; return; }
+  dot.classList.toggle('live', on);
+  txt.textContent = on ? '在线' : '连接中';
   if (island) {
     island.classList.toggle('connected', !!on);
     island.classList.toggle('offline', !on);
@@ -5904,6 +5926,8 @@ function bootOwner(){
 
   .send--sending,
   .dot.live,
+  .dot.err,
+  .dot.warn,
   .status-dot.live { animation: none !important; }
 
   .glow-pulse {

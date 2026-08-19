@@ -153,5 +153,26 @@ for (const b of blocks) {
     idClash.length ? `撞名：${[...new Set(idClash)].join('、')}\n   → 元素会被挂成 window.<id>，把同名函数顶掉` : '');
 }
 
+// ⑦ 诚实故障态不得被改回"静默假在线"
+// 由来：2026-08-19 收口 P1「前端别再静默假装在线」。后端挂了时 getSoul/getInner/talk
+// 会 catch→Demo 兜底,若状态灯仍显"在线/演示",主人分不清"我没配后端"和"我的后端挂了"。
+// 修法:_fetch 集中记 Nexus.fault(抛错=offline连不上 / 5xx=error后端异常),setLive 里
+// 故障态压过演示/在线。这三处任一被删,静默假在线就会复活,故在此结构性锁死。
+{
+  const htmlNC = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+  ok('Nexus 连接层声明了 fault 故障字段',
+    /\bfault\s*:\s*null\b/.test(htmlNC),
+    'Nexus 里找不到 fault:null —— 故障态跟踪被移除,后端挂了会静默假装在线');
+  ok('_fetch 在 fetch 抛错时把 fault 记为 offline',
+    /catch\s*\([^)]*\)\s*\{[^}]*fault\s*=\s*['"]offline['"]/.test(htmlNC),
+    '_fetch 的 catch 未记 fault=offline —— 网络连不上时状态灯不会亮故障');
+  ok('setLive 以 Nexus.fault 判定故障态(压过演示/在线)',
+    /function\s+setLive[\s\S]{0,600}Nexus\.fault/.test(htmlNC),
+    'setLive 未读 Nexus.fault —— 故障时会被 Demo 兜底撑成"在线",糊弄主人');
+  ok('故障态点样式 .dot.err / .dot.warn 都在',
+    /\.dot\.err\s*\{/.test(htmlNC) && /\.dot\.warn\s*\{/.test(htmlNC),
+    '缺 .dot.err / .dot.warn 样式 —— 故障态点无颜色,主人看不见真实故障');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
