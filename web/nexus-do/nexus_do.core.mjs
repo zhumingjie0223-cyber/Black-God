@@ -9526,7 +9526,7 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       res.model = model;
       const locked = brain.provider || cfg._provider[brain.url] || '';
       const guess = locked || this.brainProvider(brain.url, model);
-      const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
+      const dialects = locked ? [locked] : [guess, ...['openai', 'openai-responses', 'anthropic', 'gemini'].filter(p => p !== guess)];
       for (const provider of dialects) {
         try {
           const call = (withT) => { const req = this.buildBrainReq(provider, brain.url, brain.key, model, '你是神枢', '嗨', { maxTokens: 16, ...(withT ? { temperature: 0.7 } : {}) }); return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) }); };
@@ -9696,6 +9696,11 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           const body = String(r.text || r.error || '');
           diagStatus = r.status || 0; diagBody = body;   // 反思:留证供自诊断
           if (r.error === 'aborted') { lastErr = `${tag}：请求已取消`; break; }
+          if (r.error === 'invalid_json') {
+            lastErr = `${tag}：响应不是合法 JSON`;
+            if (!locked && provider !== dialects[dialects.length - 1]) continue;
+            break;
+          }
           if (r.error === 'timeout') {
             lastErr = `${tag}：请求超时(${Math.round(callTimeoutMs / 1000)}s)`;
             if (!locked && provider !== dialects[dialects.length - 1]) continue;
@@ -11607,11 +11612,11 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
     // 游客路径同样自适应格式:锁定过就直连;否则试会的方言,通了返回并回传检测到的方言供缓存。
     const locked = providerHint || '';
     const guess = locked || this.brainProvider(base, model);
-    const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
+    const dialects = locked ? [locked] : [guess, ...['openai', 'openai-responses', 'anthropic', 'gemini'].filter(p => p !== guess)];
     let lastErr = '连不上', lastDetail = '';
     for (const provider of dialects) {
       const send = (withT) => {
-        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500 });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
+        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500, apiMode: provider === 'openai-responses' ? 'responses' : 'chat' });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
         return executeProviderJSONRequest({ request: req, timeoutMs, retries });
       };
       let r = await send(true);
@@ -11624,6 +11629,11 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         return { ok: false, err: '空回复' };
       }
       const body = String(r.text || r.error || '');
+      if (r.error === 'invalid_json') {
+        lastErr = '响应不是合法 JSON';
+        if (!locked && provider !== dialects[dialects.length - 1]) continue;
+        return { ok: false, err: lastErr };
+      }
       if (r.error === 'timeout') {
         lastErr = `网关响应超时(${Math.round(timeoutMs / 1000)}s)`;
         if (!locked && provider !== dialects[dialects.length - 1]) continue;

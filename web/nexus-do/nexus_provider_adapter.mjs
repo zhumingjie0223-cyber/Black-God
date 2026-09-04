@@ -27,7 +27,7 @@ const asNonNegInt = (value, fallback = 0) => {
 const parseRetryAfterMs = (value) => {
   const raw = asText(value || '', 80).trim();
   if (!raw) return null;
-  if (/^\d+$/.test(raw)) return Math.max(0, Number(raw) * 1000);
+  if (/^\d+(?:\.\d+)?$/.test(raw)) return Math.max(0, Math.round(Number(raw) * 1000));
   const at = Date.parse(raw);
   return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
 };
@@ -243,13 +243,20 @@ export async function executeProviderJSONRequest({
       });
       const text = await res.text().catch(() => '');
       let data = null;
-      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      let parseError = null;
+      try { data = text ? JSON.parse(text) : null; } catch (error) { data = null; parseError = error; }
       const usage = extractProviderUsage(request.provider, data);
-      if (res.ok) return { ok: true, status: res.status, data, text, usage, attempts: attempt + 1 };
+      if (res.ok) {
+        const noContent = res.status === 204 || res.status === 205;
+        if (!noContent && text.trim() && data == null && parseError) {
+          return { ok: false, status: res.status, error: 'invalid_json', data: null, text, usage, attempts: attempt + 1 };
+        }
+        return { ok: true, status: res.status, data, text, usage, attempts: attempt + 1 };
+      }
       const canRetry = attempt < maxRetries && shouldRetryStatus(res.status);
       if (!canRetry) return { ok: false, status: res.status, data, text, usage, attempts: attempt + 1 };
       const retryAfter = parseRetryAfterMs(res.headers?.get?.('retry-after'));
-      const delay = Math.min(retryMaxMs, retryAfter ?? (retryBaseMs * Math.pow(2, attempt)));
+      const delay = retryAfter ?? Math.min(retryMaxMs, retryBaseMs * Math.pow(2, attempt));
       await sleep(delay, signal);
     } catch (error) {
       if (signal?.aborted) return { ok: false, error: 'aborted', attempts: attempt + 1 };

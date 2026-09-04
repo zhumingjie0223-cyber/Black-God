@@ -92,6 +92,39 @@ test('统一执行器会按 Retry-After 进行有界重试，并返回尝试次�
   assert.equal(out.usage.total_tokens, 8);
 });
 
+test('Retry-After 非零时优先遵循服务端等待，不受本地 retryMaxMs 截断', async () => {
+  let hits = 0;
+  const fetchImpl = async () => {
+    hits += 1;
+    if (hits === 1) return new Response(JSON.stringify({ error: 'busy' }), { status: 429, headers: { 'retry-after': '1' } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+  };
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const t0 = Date.now();
+  const out = await executeProviderJSONRequest({ request: req, fetchImpl, retries: 1, retryMaxMs: 10 });
+  const elapsed = Date.now() - t0;
+  assert.equal(out.ok, true);
+  assert.equal(out.attempts, 2);
+  assert.equal(hits, 2);
+  assert.ok(elapsed >= 900);
+});
+
+test('Retry-After 支持小数秒', async () => {
+  let hits = 0;
+  const fetchImpl = async () => {
+    hits += 1;
+    if (hits === 1) return new Response(JSON.stringify({ error: 'busy' }), { status: 429, headers: { 'retry-after': '0.5' } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+  };
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const t0 = Date.now();
+  const out = await executeProviderJSONRequest({ request: req, fetchImpl, retries: 1, retryMaxMs: 10 });
+  const elapsed = Date.now() - t0;
+  assert.equal(out.ok, true);
+  assert.equal(out.attempts, 2);
+  assert.ok(elapsed >= 450);
+});
+
 test('统一执行器超时会返回 timeout，不会静默回退', async () => {
   const fetchImpl = async (_url, init) => new Promise((resolve, reject) => {
     init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
@@ -101,6 +134,23 @@ test('统一执行器超时会返回 timeout，不会静默回退', async () => 
   assert.equal(out.ok, false);
   assert.equal(out.error, 'timeout');
   assert.equal(out.attempts, 1);
+});
+
+test('统一执行器遇到 2xx 非 JSON 响应会显式报错', async () => {
+  const fetchImpl = async () => new Response('<html>gateway error</html>', { status: 200, headers: { 'content-type': 'text/html' } });
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const out = await executeProviderJSONRequest({ request: req, fetchImpl, timeoutMs: 1000 });
+  assert.equal(out.ok, false);
+  assert.equal(out.error, 'invalid_json');
+  assert.equal(out.status, 200);
+});
+
+test('204/205 无内容响应视为成功，不误报协议错误', async () => {
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const out204 = await executeProviderJSONRequest({ request: req, fetchImpl: async () => new Response(null, { status: 204 }) });
+  const out205 = await executeProviderJSONRequest({ request: req, fetchImpl: async () => new Response(null, { status: 205 }) });
+  assert.equal(out204.ok, true);
+  assert.equal(out205.ok, true);
 });
 
 test('用量提取兼容 OpenAI/Anthropic/Gemini 字段', () => {
