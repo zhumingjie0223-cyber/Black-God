@@ -126,6 +126,10 @@ def _layer_of(core_lat):
 
 def decode(n):
     """编号 → 枢语词（O(1) 寻址）。汉译纯中文，词形有韵律。"""
+    # 必须先挡非整数：nan/小数过不了下面的区间比较（与 nan 比大小恒为 False），
+    # 会一路穿到 CORES[c] 抛出看不懂的 TypeError。bool 也不算合法编号。
+    if isinstance(n, bool) or not isinstance(n, int):
+        raise TypeError("编号必须是整数")
     if n<0 or n>=CAP: raise ValueError(f"编号越界 0..{CAP-1}")
     nn=n
     p = nn % NP; nn//=NP
@@ -154,12 +158,23 @@ def decode_full(n):
     d=decode(n); d2={"id":n}; d2.update(d); return d2
 
 def encode(word):
-    """枢语词 → 编号（反向寻址）。"""
+    """枢语词 → 编号（反向寻址）。
+
+    单射铁律：encode 必须是 decode 的严格逆。凡 decode 产不出的写法一律判非法（返回 -1），
+    否则畸形词会被映射到一个合法编号，跨仓语义就此错位。
+    """
     try:
         head, ph = word.rsplit("·",1)
         parts = head.split("-")
+        # 词形只有 3 段（空标轴）或 4 段（带标轴）两种，其余一律非法
+        if len(parts) < 3 or len(parts) > 4:
+            return -1
         clat = parts[0]; mlat=parts[1]; slat=parts[2]
         klat = parts[3] if len(parts)>3 else ""
+        # 空标轴只能用 3 段词形表达；"核-映-态-·相" 这种显式空标段 decode 永远产不出，
+        # 放行的话它会和 3 段词形撞同一个编号（与 lexicon.js 同规则）
+        if len(parts) > 3 and klat == "":
+            return -1
         ci=[i for i,x in enumerate(CORES) if x[0]==clat][0]
         mi=[i for i,x in enumerate(MANIS) if x[0]==mlat][0]
         si=[i for i,x in enumerate(STATS) if x[0]==slat][0]

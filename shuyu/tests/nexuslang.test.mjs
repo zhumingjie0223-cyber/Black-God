@@ -122,3 +122,90 @@ test('无 do 时 actions 为空数组（向后兼容）', () => {
   assert.deepEqual(r.actions, []);
   assert.deepEqual(compile(r).act, []);
 });
+
+// ══════════════════════════════════════════════════════════════
+// 解释器补充覆盖（2026-09 补）：grow 分级/分类、become 中文字段名、
+// feel 强度覆盖、do 参数切分边界、畸形枢语不崩
+// ══════════════════════════════════════════════════════════════
+
+test('grow: 深度三档与分类识别', () => {
+  const deep = interpret('grow: 学到 "凌晨=他想我的时候", 深度: 刻进, 亲密', {});
+  assert.equal(deep.growth.learned, '凌晨=他想我的时候');
+  assert.equal(deep.growth.depth, 'deep');
+  assert.equal(deep.growth.category, 'intimacy');
+
+  const mid = interpret('grow: 学到 "他不爱解释", 记住, 模式', {});
+  assert.equal(mid.growth.depth, 'medium');
+  assert.equal(mid.growth.category, 'pattern');
+
+  // 已知瑕疵：默认档是中文「浅记」，另两档却是英文 deep/medium，中英混用。
+  // nexus_will_engine.mjs 消费的是 'deep'，改默认值会让历史灵魂记忆里的
+  // 「浅记」与新数据对不上，故先钉住现状、上报后再决定统一成哪套。
+  const shallow = interpret('grow: 学到 "他今天喝了咖啡"', {});
+  assert.equal(shallow.growth.depth, '浅记');
+  assert.equal(shallow.growth.category, 'general');
+});
+
+test('become: 中文字段名映射到英文灵魂字段', () => {
+  const r = interpret('become: 心绪+0.3, 亲密度+0.1, 口吻→软, 语速→慢', { mood: 0.2, intimacy: 0.5 });
+  assert.equal(r.stateChange.mood, 0.5);
+  assert.ok(Math.abs(r.stateChange.intimacy - 0.6) < 1e-9);
+  assert.equal(r.stateChange.tone, '软');
+  assert.equal(r.stateChange.speed, '慢');
+});
+
+test('become: 变更立即生效，同段枢语里后面的 say 读到的是新口吻', () => {
+  const r = interpret('become: 口吻→软\nsay "老公我在呢"', { tone: '冷' });
+  assert.equal(r.response.tone, '软', 'say 必须读到 become 刚改的口吻，不能滞后一轮');
+});
+
+test('feel: 显式强度覆盖词表默认强度', () => {
+  const r = interpret('feel "他说想我" → 暖, 强度0.9', {});
+  assert.equal(r.perception.emotion, '暖');
+  assert.equal(r.perception.intensity, 0.9, '显式强度应盖掉词表里 暖=0.5');
+  assert.equal(r.perception.instinct, '靠近');
+});
+
+test('feel: 没有箭头时退回中性默认值', () => {
+  const r = interpret('feel "随便说点什么"', {});
+  assert.equal(r.perception.input, '随便说点什么');
+  assert.equal(r.perception.emotion, '平');
+  assert.equal(r.perception.intensity, 0.5);
+});
+
+test('do: 无参原语（如 10 元代码的「静」）不带括号也能解析', () => {
+  const r = interpret('do: 静', {});
+  assert.deepEqual(r.actions, [{ tool: '静', args: [], expect: null, raw: 'do: 静' }]);
+});
+
+test('do: 参数内的逗号不被当作参数分隔符', () => {
+  const r = interpret('do: note("买牛奶, 顺便买鸡蛋", "20:00")', {});
+  assert.deepEqual(r.actions[0].args, ['买牛奶, 顺便买鸡蛋', '20:00']);
+});
+
+test('do: 空参数括号产出空参数表', () => {
+  const r = interpret('do: sync() → 成', {});
+  assert.equal(r.actions[0].tool, 'sync');
+  assert.deepEqual(r.actions[0].args, []);
+  assert.equal(r.actions[0].expect, '成');
+});
+
+test('畸形枢语不崩: 空文本/纯注释/未知关键字都安全返回', () => {
+  for (const code of ['', '   ', '-- 只有注释\n-- 还是注释', 'unknown: 什么鬼', '\n\n\n']) {
+    const r = interpret(code, {});
+    assert.ok(r && typeof r === 'object', `「${code}」不该崩`);
+    assert.deepEqual(r.actions, [], '未识别内容不该产出动作');
+    assert.equal(r.perception, null);
+  }
+});
+
+test('applyToSoul: 唤醒计数递增且记下最后一次感知', () => {
+  const soul = { awakenings: 7 };
+  const r = interpret('feel "他回来了" → 暖', soul);
+  applyToSoul(r, soul);
+  assert.equal(soul.awakenings, 8);
+  assert.equal(soul.lastInput, '他回来了');
+  assert.equal(soul.lastEmotion, '暖');
+  assert.equal(soul.instinct, '靠近');
+  assert.ok(soul.lastAwake > 0);
+});

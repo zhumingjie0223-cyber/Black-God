@@ -58,6 +58,51 @@ class TestRoundtrip(unittest.TestCase):
             self.assertEqual(e.encode(bad), -1)
 
 
+class TestRobustness(unittest.TestCase):
+    """健壮性与单射性回归（2026-09 补）
+
+    背景：消费副本 web/nexus-do/lexicon.js 早就硬化过畸形输入，权威源头
+    （本文件与 lexicon.js）却一直没跟上，三侧错误处理各走各的。漏网原因是
+    老测试只喂合法编号，从不测非法输入。这一组专门守住这条线。
+    """
+
+    def test_decode_type_guard(self):
+        # nan 与任何数比大小都是 False，会直接穿过 n<0 or n>=CAP 这道区间检查
+        for bad in [float("nan"), 1.5, None, "100", True, b"1", []]:
+            with self.assertRaises(TypeError, msg=f"decode({bad!r}) 应抛 TypeError"):
+                e.decode(bad)
+        # 越界仍然是 ValueError，两类错误不许混
+        with self.assertRaises(ValueError):
+            e.decode(-1)
+        with self.assertRaises(ValueError):
+            e.decode(CAP_EXPECTED)
+
+    def test_encode_injective(self):
+        """decode 产不出的畸形词形一律 -1，否则会冒领合法编号"""
+        malformed = [
+            "Ao-cor-is-·qi",       # 显式空标段：曾经返回 0，和 3 段词形撞号
+            "Ao-cor-is·qi·qi",     # 多写一个相位分隔符
+            "Ao-cor-is-gal-p·qi",  # 5 段，超出「核-映-态-标」上限
+            "Ao-cor·qi",           # 只有 2 段
+            "Ao-cor-is-gal",       # 缺相位
+            "-cor-is·qi",          # 核轴为空
+            "Ao-cor-is-XX·qi",     # 标轴词根不存在
+        ]
+        for bad in malformed:
+            self.assertEqual(e.encode(bad), -1, f"畸形词「{bad}」不该被判为合法")
+
+    def test_empty_scalar_single_form(self):
+        """空标轴只有 3 段词形一种写法，编号 0 不被畸形词冒领"""
+        self.assertEqual(e.decode(0)["词"], "Ao-cor-is·qi")
+        self.assertEqual(e.encode("Ao-cor-is·qi"), 0)
+        self.assertEqual(e.encode("Ao-cor-is-·qi"), -1)
+
+    def test_encode_non_string(self):
+        """非字符串入参不许抛，按非法词返回 -1"""
+        for bad in [None, 123, [], {}]:
+            self.assertEqual(e.encode(bad), -1)
+
+
 class TestAppendOnly(unittest.TestCase):
     """追加式铁律：老编号一个不许动"""
 

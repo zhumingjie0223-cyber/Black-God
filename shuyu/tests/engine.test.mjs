@@ -123,3 +123,100 @@ print(json.dumps([e.decode_full(i) for i in ids], ensure_ascii=False))
     assert.equal(p.义, js.义, `编号 ${id} 语义分叉: py=${p.义} js=${js.义}`);
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// 健壮性与单射性回归（2026-09 补）
+//
+// 背景：消费副本 web/nexus-do/lexicon.js 早就硬化过畸形输入，权威源头
+// shuyu/lexicon.js 与 shuyu_engine.py 却一直没跟上，三侧错误处理各走各的。
+// 漏网原因是老测试和 check-sync 都只喂**合法**编号，从不测非法输入。
+// 这一节专门守住这条线，别再让副本领先源头。
+// ══════════════════════════════════════════════════════════════
+
+test('decode 入参守卫: 非整数必须抛 TypeError，不许穿到轴数组抛看不懂的错', () => {
+  // NaN 与任何数比大小都是 false，会直接穿过 n<0||n>=CAPACITY 这道区间检查
+  for (const bad of [NaN, 1.5, undefined, null, '100', true, {}, Infinity]) {
+    assert.throws(() => engine.decode(bad), TypeError, `decode(${String(bad)}) 应抛 TypeError`);
+  }
+  // 越界仍然是 RangeError，两类错误不许混
+  assert.throws(() => engine.decode(-1), RangeError);
+  assert.throws(() => engine.decode(CAP_EXPECTED), RangeError);
+});
+
+test('encode 单射: decode 产不出的畸形词形一律返回 -1', () => {
+  const malformed = [
+    'Ao-cor-is-·qi',        // 显式空标段：会和 3 段词形 Ao-cor-is·qi 撞同一个编号
+    'Ao-cor-is·qi·qi',      // 多写一个相位分隔符
+    'Ao-cor-is-gal-p·qi',   // 5 段，超出「核-映-态-标」上限
+    'Ao-cor·qi',            // 只有 2 段
+    'Ao-cor-is-gal',        // 缺相位
+    '-cor-is·qi',           // 核轴为空
+    'Ao-cor-is-XX·qi',      // 标轴词根不存在
+  ];
+  for (const bad of malformed) {
+    assert.equal(engine.encode(bad), -1, `畸形词「${bad}」不该被判为合法`);
+  }
+});
+
+test('encode 单射: 空标轴只有 3 段词形一种写法（编号 0 不被畸形词冒领）', () => {
+  assert.equal(engine.decode(0).词, 'Ao-cor-is·qi');
+  assert.equal(engine.encode('Ao-cor-is·qi'), 0);
+  // 曾经的 bug：下面这个畸形词也返回 0，两个不同字符串映射到同一编号，破坏单射
+  assert.equal(engine.encode('Ao-cor-is-·qi'), -1);
+});
+
+test('encode 单射: 大批量采样中，不同编号的词形互不重复', () => {
+  const seen = new Map();
+  for (const id of lcg(20260905, 2000)) {
+    const w = engine.decode(id).词;
+    if (seen.has(w)) assert.equal(seen.get(w), id, `词形「${w}」被编号 ${seen.get(w)} 与 ${id} 共用`);
+    seen.set(w, id);
+  }
+  assert.ok(seen.size > 1900, '采样去重后数量异常，疑似大面积词形碰撞');
+});
+
+test('matchWord: 词包只有 vocab 没有 word_ids 时不许崩，编号降级为 null', () => {
+  // 老实现直接 LEXICON.caps.word_ids[...]，词包缺这个可选字段就抛 TypeError
+  assert.equal(engine.loadCapabilities({ vocab: { 锚点: { 测试: ['坍缩'] } } }), true);
+  const hit = engine.matchWord('执行坍缩', 'cap');
+  assert.ok(hit, '应能匹配到能力词');
+  assert.equal(hit.word, '坍缩');
+  assert.equal(hit.id, null, '缺 word_ids 时编号应为 null 而非抛错');
+  engine.loadCapabilities(data); // 还原全量词包，免得污染后续用例
+});
+
+test('matchWord: 空输入与未注入能力包时安全返回 null', () => {
+  assert.equal(engine.matchWord('', 'feel'), null);
+  assert.equal(engine.matchWord(null, 'cap'), null);
+  assert.equal(engine.matchWord('这段话里没有任何情绪词', 'feel'), null);
+});
+
+test('autoCoin 已知限制: 哈希是 uint32，高位 44% 语义空间永不可达（钉住现状待拍板）', () => {
+  // 不是"应该这样"，是"现在就是这样"。改哈希会让历史种子造出的词全部变掉，
+  // 破坏「同种子同词」的可复现契约，故先钉住并上报，不静默改。
+  const UINT32 = 2 ** 32;
+  assert.ok(UINT32 < CAP_EXPECTED, '前提：uint32 上限确实小于语义空间容量');
+  let max = 0;
+  for (let i = 0; i < 5000; i++) max = Math.max(max, engine.autoCoin('种子' + i).id);
+  assert.ok(max < UINT32, `autoCoin 当前实现不可能越过 ${UINT32}，实测最大 ${max}`);
+  // 可复现契约本身必须成立
+  assert.deepEqual(engine.autoCoin('神枢'), engine.autoCoin('神枢'));
+});
+
+test('跨实现同构: JS 与 Python 对畸形词必须给出同一判定', () => {
+  const words = [
+    'Ao-cor-is·qi', 'Ao-cor-is-gal·qi', 'Logxi-fncp-sta9-flxh·ying',  // 合法
+    'Ao-cor-is-·qi', 'Ao-cor-is·qi·qi', 'Ao-cor-is-gal-p·qi',          // 畸形
+    'Ao-cor·qi', 'Ao-cor-is-gal', '-cor-is·qi', 'Ao-cor-is-XX·qi',
+    '', '不是词', 'Zzz-cor-is·qi',
+  ];
+  const py = JSON.parse(execFileSync('python3', ['-c', `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(ROOT)})
+import shuyu_engine as e
+print(json.dumps([e.encode(w) for w in json.loads(sys.argv[1])]))
+`, JSON.stringify(words)], { encoding: 'utf8' }));
+  words.forEach((w, i) => {
+    assert.equal(engine.encode(w), py[i], `「${w}」判定分叉: js=${engine.encode(w)} py=${py[i]}`);
+  });
+});

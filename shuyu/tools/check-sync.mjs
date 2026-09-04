@@ -70,6 +70,38 @@ for (const id of ids) {
 if (!diverged) ok(`编解码行为一致: 采样 ${ids.size} 个编号(覆盖全部 ${NC} 个核心行)全通过`);
 else fail(`共 ${diverged} 个采样编号分叉`);
 
+// ── 畸形输入行为校验(硬) ──
+// 2026-09 教训:上面只喂合法编号做往返,于是两侧「错误处理」怎么分叉都测不出来。
+// 实测发现消费副本早已硬化 encode/decode,源头却还是老实现,分叉长期没人发现。
+// 单射性是跨仓语义对齐的地基:同一个畸形词一侧判合法、另一侧判非法,语义就错位了。
+const MALFORMED = [
+  'Ao-cor-is-·qi',        // 显式空标段:会和 3 段词形撞同一个编号
+  'Ao-cor-is·qi·qi',      // 多写一个相位分隔符
+  'Ao-cor-is-gal-p·qi',   // 5 段,超出「核-映-态-标」上限
+  'Ao-cor·qi',            // 只有 2 段
+  'Ao-cor-is-gal',        // 缺相位
+  '-cor-is·qi',           // 核轴为空
+  'Ao-cor-is-XX·qi',      // 标轴词根不存在
+  '', '不是词', 'Zzz-cor-is·qi',
+];
+let badDiverged = 0, badAccepted = 0;
+for (const w of MALFORMED) {
+  const ra = A.encode(w), rb = B.encode(w);
+  if (ra !== rb) { if (badDiverged < 5) fail(`畸形词「${w}」判定分叉: 本仓=${ra} 对方=${rb}`); badDiverged++; }
+  else if (ra !== -1) { if (badAccepted < 5) fail(`畸形词「${w}」被两侧同时误判为合法编号 ${ra}(破坏 encode 单射)`); badAccepted++; }
+}
+if (!badDiverged && !badAccepted) ok(`畸形输入判定一致: ${MALFORMED.length} 个非法词形两侧均正确拒绝`);
+
+// decode 的入参守卫也必须同步:非整数要抛错,不能一侧抛一侧返回垃圾词
+let guardDiverged = 0;
+for (const bad of [NaN, 1.5, undefined, null, '100', true, -1, cap]) {
+  const probe = (ENG) => { try { ENG.decode(bad); return 'ACCEPTED'; } catch { return 'THREW'; } };
+  const ra = probe(A), rb = probe(B);
+  if (ra !== rb) { fail(`decode(${String(bad)}) 守卫分叉: 本仓=${ra} 对方=${rb}`); guardDiverged++; }
+  else if (ra === 'ACCEPTED') { fail(`decode(${String(bad)}) 两侧都放行了非法入参`); guardDiverged++; }
+}
+if (!guardDiverged) ok('decode 入参守卫一致: 非整数与越界值两侧均拒绝');
+
 // ── 数据层校验(软) ──
 const DA = (await import(pathToFileURL(self.data))).default;
 const DB = (await import(pathToFileURL(peer.data))).default;

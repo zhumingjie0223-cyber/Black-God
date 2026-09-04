@@ -208,10 +208,12 @@ export function matchWord(text, layer){
   }
   // 能力词匹配
   if(_CAP_FLAT){
+    // word_ids 是可选字段（有的词包只带 vocab），缺了只是查不到编号，不该整个匹配崩掉
+    const ids = (LEXICON.caps && LEXICON.caps.word_ids) || null;
     for(const it of _CAP_FLAT){
       if(text.includes(it.word)){
         return { word:it.word, layer:it.layer, cat:it.cat,
-                 id:(LEXICON.caps.word_ids[it.word] ?? null) };
+                 id:(ids ? (ids[it.word] ?? null) : null) };
       }
     }
   }

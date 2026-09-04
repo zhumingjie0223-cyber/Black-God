@@ -15,7 +15,23 @@ import { ShuyuBridge } from './nexus_shuyu_bridge.mjs';
 import { preflightToolCall } from './nexus_tool_preflight.mjs';
 
 const PHASE = Object.freeze({ IDLE: 'IDLE', DISPATCHING: 'DISPATCHING', WAITING_FOR_INPUT: 'WAITING_FOR_INPUT' });
-const LEASE_TTL_MS = Number.isFinite(Number(globalThis?.process?.env?.AGENT_LEASE_TTL_MS)) && Number(globalThis?.process?.env?.AGENT_LEASE_TTL_MS) >= 1000 ? Number(globalThis?.process?.env?.AGENT_LEASE_TTL_MS) : 30_000;
+const DEFAULT_LEASE_TTL_MS = 30_000;
+const MIN_LEASE_TTL_MS = 1_000;
+
+// 租约时长解析：优先取 DO 拿到的 env 绑定（Workers 里唯一可靠的配置来源），
+// 其次退到 process.env（本地 node 跑测试用），最后用默认 30s。
+// 注意：不能在模块顶层读 env——模块求值发生在 isolate 启动时，那会儿没有绑定，
+// 之前写成模块级常量读 process.env，等于 wrangler 里配了 AGENT_LEASE_TTL_MS 也不生效。
+// 下限 1s：防止配成 0/负数/非数导致租约一发出就过期，任务被无限重排队。
+export function resolveLeaseTtlMs(env) {
+  const raw = env?.AGENT_LEASE_TTL_MS ?? globalThis?.process?.env?.AGENT_LEASE_TTL_MS;
+  // 空串/null 是「没配」，不是「配成 0」——Number('') 和 Number(null) 都等于 0，
+  // 不先挡掉就会被下面的下限钳成 1s，把未配置误当成极短租约。
+  if (raw === null || raw === undefined || String(raw).trim() === '') return DEFAULT_LEASE_TTL_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_LEASE_TTL_MS;
+  return Math.max(MIN_LEASE_TTL_MS, Math.floor(n));
+}
 const ALARM_INTERVAL_MS = 5_000;
 const RUN_PREFIX = 'agent_run:';
 const EFFECT_PREFIX = 'agent_effect:';
@@ -26,6 +42,7 @@ export class AgentStateMachineDO {
     this.env = env;
     this.storage = state.storage;
     this.ALARM_INTERVAL = ALARM_INTERVAL_MS;
+    this.LEASE_TTL_MS = resolveLeaseTtlMs(env);
     this.protocol = new NexusAgentProtocol();
     this.shuyu = new ShuyuBridge();
   }
@@ -256,7 +273,7 @@ export class AgentStateMachineDO {
     if (queue.length === 0) { await this._setPhase(PHASE.IDLE); return this._json({ error: 'queue_empty', phase: PHASE.IDLE }, 404); }
     const item = queue.shift();
     await this._setQueue(queue);
-    const newLease = { token: this._newToken(), itemId: item.id, task: item.task, acquiredAt: Date.now(), expiry: Date.now() + LEASE_TTL_MS };
+    const newLease = { token: this._newToken(), itemId: item.id, task: item.task, acquiredAt: Date.now(), expiry: Date.now() + this.LEASE_TTL_MS };
     await this._setLease(newLease);
     await this._setPhase(PHASE.DISPATCHING);
     await this._ensureAlarm();
