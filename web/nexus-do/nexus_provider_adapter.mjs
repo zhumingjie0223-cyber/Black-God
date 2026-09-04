@@ -7,6 +7,30 @@ import { normalizeToolCallId, repairAgentHistory } from './nexus_turn_engine.mjs
 
 const asText = (value, max = 16_000) => String(value ?? '').slice(0, max);
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+const sleep = (ms, signal) => new Promise((resolve, reject) => {
+  if (!(ms > 0)) return resolve();
+  if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+  const timer = setTimeout(() => {
+    signal?.removeEventListener?.('abort', onAbort);
+    resolve();
+  }, ms);
+  const onAbort = () => {
+    clearTimeout(timer);
+    reject(new DOMException('Aborted', 'AbortError'));
+  };
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+});
+const asNonNegInt = (value, fallback = 0) => {
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+const parseRetryAfterMs = (value) => {
+  const raw = asText(value || '', 80).trim();
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return Math.max(0, Number(raw) * 1000);
+  const at = Date.parse(raw);
+  return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
+};
 
 export function sanitizeToolId(value, fallback = 'tool') {
   const raw = asText(value || fallback, 128).replace(/[^A-Za-z0-9_-]/g, '_').replace(/^_+|_+$/g, '');
@@ -153,6 +177,93 @@ export function normalizeProviderResponse(provider, data) {
   if (data?.output_text) return asText(data.output_text).trim() || null;
   if (Array.isArray(data?.output)) return asText(data.output.flatMap((item) => item?.content || []).filter((part) => part?.type === 'output_text').map((part) => part.text || '').join('')).trim() || null;
   return asText(data?.choices?.[0]?.message?.content || data?.reply || data?.response || '').trim() || null;
+}
+
+export function extractProviderUsage(provider, data) {
+  const dialect = String(provider || 'openai').toLowerCase();
+  const usage = data?.usage || data?.response?.usage || null;
+  if (dialect === 'anthropic') {
+    const input = Number(usage?.input_tokens || 0);
+    const output = Number(usage?.output_tokens || 0);
+    const total = Number(usage?.total_tokens || (input + output));
+    return (input || output || total) ? { input_tokens: input, output_tokens: output, total_tokens: total } : null;
+  }
+  if (dialect === 'gemini' || dialect === 'google') {
+    const um = data?.usageMetadata || usage || {};
+    const input = Number(um.promptTokenCount || um.input_tokens || 0);
+    const output = Number(um.candidatesTokenCount || um.output_tokens || 0);
+    const total = Number(um.totalTokenCount || um.total_tokens || (input + output));
+    return (input || output || total) ? { input_tokens: input, output_tokens: output, total_tokens: total } : null;
+  }
+  const input = Number(usage?.prompt_tokens || usage?.input_tokens || 0);
+  const output = Number(usage?.completion_tokens || usage?.output_tokens || 0);
+  const total = Number(usage?.total_tokens || usage?.output_tokens_total || (input + output));
+  return (input || output || total) ? { input_tokens: input, output_tokens: output, total_tokens: total } : null;
+}
+
+function shouldRetryStatus(status) {
+  return [408, 409, 425, 429, 500, 502, 503, 504].includes(Number(status));
+}
+
+function shouldRetryError(error) {
+  if (!error) return false;
+  if (error.name === 'AbortError') return false;
+  const s = asText(error?.message || error, 160).toLowerCase();
+  return /network|fetch failed|econnreset|etimedout|socket|temporar|unavailable/.test(s);
+}
+
+/** 统一执行 provider 请求：超时、有限重试、用量提取。 */
+export async function executeProviderJSONRequest({
+  request,
+  fetchImpl = fetch,
+  signal = null,
+  timeoutMs = 20_000,
+  retries = 0,
+  retryBaseMs = 300,
+  retryMaxMs = 2_000,
+} = {}) {
+  const url = request?.url;
+  if (!url) return { ok: false, error: 'invalid_request', attempts: 0 };
+  const maxRetries = asNonNegInt(retries, 0);
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const ctrl = new AbortController();
+    let timedOut = false;
+    let timer = null;
+    const relayAbort = () => ctrl.abort(signal?.reason);
+    if (signal?.aborted) return { ok: false, error: 'aborted', attempts: attempt };
+    signal?.addEventListener?.('abort', relayAbort, { once: true });
+    try {
+      const ms = asNonNegInt(timeoutMs, 20_000);
+      if (ms > 0) timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+      const res = await fetchImpl(url, {
+        method: request.method || 'POST',
+        headers: request.headers || {},
+        body: request.body == null ? undefined : JSON.stringify(request.body),
+        signal: ctrl.signal,
+      });
+      const text = await res.text().catch(() => '');
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      const usage = extractProviderUsage(request.provider, data);
+      if (res.ok) return { ok: true, status: res.status, data, text, usage, attempts: attempt + 1 };
+      const canRetry = attempt < maxRetries && shouldRetryStatus(res.status);
+      if (!canRetry) return { ok: false, status: res.status, data, text, usage, attempts: attempt + 1 };
+      const retryAfter = parseRetryAfterMs(res.headers?.get?.('retry-after'));
+      const delay = Math.min(retryMaxMs, retryAfter ?? (retryBaseMs * Math.pow(2, attempt)));
+      await sleep(delay, signal);
+    } catch (error) {
+      if (signal?.aborted) return { ok: false, error: 'aborted', attempts: attempt + 1 };
+      if (timedOut) return { ok: false, error: 'timeout', attempts: attempt + 1 };
+      const canRetry = attempt < maxRetries && shouldRetryError(error);
+      if (!canRetry) return { ok: false, error: asText(error?.message || error, 180), attempts: attempt + 1 };
+      const delay = Math.min(retryMaxMs, retryBaseMs * Math.pow(2, attempt));
+      await sleep(delay, signal);
+    } finally {
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener?.('abort', relayAbort);
+    }
+  }
+  return { ok: false, error: 'unknown', attempts: 0 };
 }
 
 /** 将单个 SSE JSON 帧归一化为神枢事件；调用方可将这些事件转成 WebSocket/SSE。 */

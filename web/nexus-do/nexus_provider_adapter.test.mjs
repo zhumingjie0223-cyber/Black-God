@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   ReasoningEcho,
   buildProviderRequest,
+  executeProviderJSONRequest,
+  extractProviderUsage,
   finalizeToolCalls,
   historyToAnthropic,
   historyToOpenAIChat,
@@ -74,4 +76,35 @@ test('推理回声按 Provider 隔离，Responses SSE 仅对非空完成状态�
   assert.equal(echo.forProvider('gemini').length, 0);
   assert.equal(normalizeSSEFrame('openai', { choices: [{ delta: {}, finish_reason: '' }] }).some((event) => event.type === 'done'), false);
   assert.equal(normalizeSSEFrame('openai', { choices: [{ delta: {}, finish_reason: 'stop' }] }).at(-1).finish_reason, 'stop');
+});
+
+test('统一执行器会按 Retry-After 进行有界重试，并返回尝试次数', async () => {
+  let hits = 0;
+  const fetchImpl = async () => {
+    hits += 1;
+    if (hits === 1) return new Response(JSON.stringify({ error: 'busy' }), { status: 429, headers: { 'retry-after': '0' } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }], usage: { prompt_tokens: 3, completion_tokens: 5, total_tokens: 8 } }), { status: 200 });
+  };
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const out = await executeProviderJSONRequest({ request: req, fetchImpl, retries: 1, timeoutMs: 1000 });
+  assert.equal(out.ok, true);
+  assert.equal(out.attempts, 2);
+  assert.equal(out.usage.total_tokens, 8);
+});
+
+test('统一执行器超时会返回 timeout，不会静默回退', async () => {
+  const fetchImpl = async (_url, init) => new Promise((resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+  });
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const out = await executeProviderJSONRequest({ request: req, fetchImpl, timeoutMs: 20, retries: 1 });
+  assert.equal(out.ok, false);
+  assert.equal(out.error, 'timeout');
+  assert.equal(out.attempts, 1);
+});
+
+test('用量提取兼容 OpenAI/Anthropic/Gemini 字段', () => {
+  assert.deepEqual(extractProviderUsage('openai', { usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 } }), { input_tokens: 1, output_tokens: 2, total_tokens: 3 });
+  assert.deepEqual(extractProviderUsage('anthropic', { usage: { input_tokens: 4, output_tokens: 6 } }), { input_tokens: 4, output_tokens: 6, total_tokens: 10 });
+  assert.deepEqual(extractProviderUsage('gemini', { usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 8, totalTokenCount: 15 } }), { input_tokens: 7, output_tokens: 8, total_tokens: 15 });
 });

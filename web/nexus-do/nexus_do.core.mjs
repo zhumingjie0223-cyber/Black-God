@@ -25,7 +25,7 @@ import { ShuyuBridge } from './nexus_shuyu_bridge.mjs';
 import { SelfImprove } from './nexus_self_improve.mjs';
 import { ExperienceMemory } from './memory/experience_memory.mjs';
 import { NexusTurnEngine, compactAgentHistory, repairAgentHistory } from './nexus_turn_engine.mjs';
-import { buildProviderRequest, normalizeProviderResponse } from './nexus_provider_adapter.mjs';
+import { buildProviderRequest, normalizeProviderResponse, executeProviderJSONRequest } from './nexus_provider_adapter.mjs';
 import { preflightToolCall } from './nexus_tool_preflight.mjs';
 import { NexusSQLiteStore } from './nexus_sqlite_store.mjs';
 import { describeCapabilities, capabilitySelfDescription, resolveCapability, CapabilityGrowth } from './capabilities.mjs';
@@ -9625,6 +9625,8 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   async callBrain(system, userMsg, soul, opts = {}) {
     const temperature = (typeof opts.temperature === 'number') ? opts.temperature : 0.85;
     const tier = opts.tier === 'light' ? 'light' : 'heavy';   // 默认 heavy，保守不牺牲质量
+    const callTimeoutMs = Math.max(8_000, Math.min(60_000, Number(opts.timeoutMs) || (tier === 'heavy' ? 35_000 : 22_000)));
+    const callRetries = Math.max(0, Math.min(2, Number.isFinite(Number(opts.retries)) ? Number(opts.retries) : 1));
     // 多租户实例主人:只准用他自己实例里配的网关,绝不回退到系统(权哥)的 env 网关/CF AI。
     const instanceMode = !!opts.instanceMode;
     const idMode = instanceMode ? 'public' : 'owner';   // 身份归一：主人=赵思涵，其余=神枢
@@ -9670,36 +9672,39 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         const guess = locked || this.brainProvider(brain.url, model);
         const dialects = locked ? [locked] : [guess, ...['openai', 'openai-responses', 'anthropic', 'gemini'].filter(p => p !== guess)];
         for (const provider of dialects) {
-          try {
-            const send = (withT) => {
-              const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500, history: canonicalHistory, apiMode: provider === 'openai-responses' ? 'responses' : 'chat' });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
-              return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) });
-            };
-            let r = await send(true);
-            if (!r.ok && r.status === 400) r = await send(false);   // 推理模型只接受 temperature=1 → 去掉重试
-            if (r.ok) {
-              const d = await r.json().catch(() => null);
-              const text = this.parseBrainText(provider, d);
-              if (text && text.trim() && !this.isRefusal(text)) {
-                if (cfg._provider[brain.url] !== provider) { cfg._provider[brain.url] = provider; cacheDirty = true; }   // 锁定这家的方言
-                const _brainKey = (brain.url||'') + '#' + (brain.model||'');
-                const _hh = cfg._health[_brainKey]; if (!_hh || _hh.fails) { cfg._health[_brainKey] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
-                if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
-                try { await this.updateBrainWeight(brain.url, true, Date.now() - _t0); } catch (e) {}   // MACE:成功加分
-                return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier, provider };
-              }
-              // 连通但解析空:可能方言选错(解析路径不对)→ 未锁定则试下一种方言
-              lastErr = `${tag}：回了空/被挡`; diagBody = '回了空/被挡';
-              if (!locked && provider !== dialects[dialects.length - 1]) continue;
-              break;
+          const send = (withT) => {
+            const req = this.buildBrainReq(provider, brain.url, brain.key, model, system, userMsg, { temperature: withT ? temperature : undefined, maxTokens: 1500, history: canonicalHistory, apiMode: provider === 'openai-responses' ? 'responses' : 'chat' });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
+            return executeProviderJSONRequest({ request: req, timeoutMs: callTimeoutMs, retries: callRetries, signal: opts.signal || null });
+          };
+          let r = await send(true);
+          if (!r.ok && r.status === 400) r = await send(false);   // 推理模型只接受 temperature=1 → 去掉重试
+          if (r.ok) {
+            const text = this.parseBrainText(provider, r.data);
+            if (text && text.trim() && !this.isRefusal(text)) {
+              if (cfg._provider[brain.url] !== provider) { cfg._provider[brain.url] = provider; cacheDirty = true; }   // 锁定这家的方言
+              const _brainKey = (brain.url||'') + '#' + (brain.model||'');
+              const _hh = cfg._health[_brainKey]; if (!_hh || _hh.fails) { cfg._health[_brainKey] = { fails: 0, ts: Date.now() }; cacheDirty = true; }   // 自愈:成功即健康清零
+              if (cacheDirty) { try { await this.storage.put('config', cfg); } catch (e) {} }
+              try { await this.updateBrainWeight(brain.url, true, Date.now() - _t0); } catch (e) {}   // MACE:成功加分
+              return { reply: this.normalizeIdentity(text.trim(), idMode), model, tier, provider, usage: r.usage || null, attempts: r.attempts || 1 };
             }
-            const body = await r.text().catch(() => '');
-            diagStatus = r.status; diagBody = body;   // 反思:留证供自诊断
-            // 404/400 视为"格式可能不对":未锁定则换方言再试;其它(401/403/429/5xx)是真错,不乱换方言
-            if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = `${tag}·${provider} HTTP ${r.status}`; continue; }
-            lastErr = `${tag} 报错 HTTP ${r.status}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 100) : ''}`;
+            // 连通但解析空:可能方言选错(解析路径不对)→ 未锁定则试下一种方言
+            lastErr = `${tag}：回了空/被挡`; diagBody = '回了空/被挡';
+            if (!locked && provider !== dialects[dialects.length - 1]) continue;
             break;
-          } catch (e) { lastErr = `连不上 ${tag}：` + String(e && e.message || e).slice(0, 60); diagBody = String(e && e.message || e); break; }
+          }
+          const body = String(r.text || r.error || '');
+          diagStatus = r.status || 0; diagBody = body;   // 反思:留证供自诊断
+          if (r.error === 'aborted') { lastErr = `${tag}：请求已取消`; break; }
+          if (r.error === 'timeout') {
+            lastErr = `${tag}：请求超时(${Math.round(callTimeoutMs / 1000)}s)`;
+            if (!locked && provider !== dialects[dialects.length - 1]) continue;
+            break;
+          }
+          // 404/400 视为"格式可能不对":未锁定则换方言再试;其它(401/403/429/5xx)是真错,不乱换方言
+          if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = `${tag}·${provider} HTTP ${r.status}`; continue; }
+          lastErr = `${tag} 报错 ${r.status ? ('HTTP ' + r.status) : '请求失败'}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 100) : ''}`;
+          break;
         }
         // 反思自检:这条(所有方言)都没成 → 记健康(连败计数+自诊断),下次自动降级绕开;成功会清零(自愈)
         const _brainKey2 = (brain.url||'') + '#' + (brain.model||'');
@@ -11597,41 +11602,38 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
   // 带超时（20s）：用户填的第三方网关卡住不回时，别把请求一起拖死，给清晰的超时提示。
   async callGateway(base, key, model, system, userMsg, providerHint) {
     if (!base) return { ok: false, err: '没填网关地址' };
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 20_000);
+    const timeoutMs = 20_000;
+    const retries = 1;
     // 游客路径同样自适应格式:锁定过就直连;否则试会的方言,通了返回并回传检测到的方言供缓存。
     const locked = providerHint || '';
     const guess = locked || this.brainProvider(base, model);
     const dialects = locked ? [locked] : [guess, ...['openai', 'anthropic'].filter(p => p !== guess)];
-    try {
-      let lastErr = '连不上', lastDetail = '';
-      for (const provider of dialects) {
-        const send = (withT) => {
-          const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500 });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
-          return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: ac.signal });
-        };
-        let r = await send(true);
-        if (!r.ok && r.status === 400) r = await send(false);   // 推理模型只接受 temperature=1 → 去掉重试
-        if (r.ok) {
-          const d = await r.json().catch(() => null);
-          const text = this.parseBrainText(provider, d);
-          if (text && text.trim()) return { ok: true, reply: this.normalizeIdentity(text.trim(), 'public'), model: model || 'gateway', provider };
-          lastErr = '空回复';
-          if (!locked && provider !== dialects[dialects.length - 1]) continue;
-          return { ok: false, err: '空回复' };
-        }
-        const body = await r.text().catch(() => '');
-        // 格式可能不对(404/400)且未锁定 → 换方言;真错(401/429/5xx)直接如实报
-        if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = 'HTTP ' + r.status; lastDetail = body.replace(/\s+/g, ' ').slice(0, 140); continue; }
-        return { ok: false, err: 'HTTP ' + r.status, detail: body.replace(/\s+/g, ' ').slice(0, 140) };
+    let lastErr = '连不上', lastDetail = '';
+    for (const provider of dialects) {
+      const send = (withT) => {
+        const req = this.buildBrainReq(provider, base, key, model || 'auto', system, userMsg, { temperature: withT ? 0.85 : undefined, maxTokens: 1500 });   // 推理模型(kimi-k2.6/o1)留 reasoning 预算
+        return executeProviderJSONRequest({ request: req, timeoutMs, retries });
+      };
+      let r = await send(true);
+      if (!r.ok && r.status === 400) r = await send(false);   // 推理模型只接受 temperature=1 → 去掉重试
+      if (r.ok) {
+        const text = this.parseBrainText(provider, r.data);
+        if (text && text.trim()) return { ok: true, reply: this.normalizeIdentity(text.trim(), 'public'), model: model || 'gateway', provider, usage: r.usage || null, attempts: r.attempts || 1 };
+        lastErr = '空回复';
+        if (!locked && provider !== dialects[dialects.length - 1]) continue;
+        return { ok: false, err: '空回复' };
       }
-      return { ok: false, err: lastErr, detail: lastDetail };
-    } catch (e) {
-      if (e && e.name === 'AbortError') return { ok: false, err: '网关响应超时(20s)' };
-      return { ok: false, err: String(e && e.message || e).slice(0, 80) };
-    } finally {
-      clearTimeout(timer);
+      const body = String(r.text || r.error || '');
+      if (r.error === 'timeout') {
+        lastErr = `网关响应超时(${Math.round(timeoutMs / 1000)}s)`;
+        if (!locked && provider !== dialects[dialects.length - 1]) continue;
+        return { ok: false, err: lastErr };
+      }
+      // 格式可能不对(404/400)且未锁定 → 换方言;真错(401/429/5xx)直接如实报
+      if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = 'HTTP ' + r.status; lastDetail = body.replace(/\s+/g, ' ').slice(0, 140); continue; }
+      return { ok: false, err: r.status ? ('HTTP ' + r.status) : '请求失败', detail: body.replace(/\s+/g, ' ').slice(0, 140) };
     }
+    return { ok: false, err: lastErr, detail: lastDetail };
   }
 
   PUBLIC_SYSTEM_PREFIX(shu) {
