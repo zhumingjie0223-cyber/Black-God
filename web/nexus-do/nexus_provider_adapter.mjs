@@ -217,3 +217,128 @@ export function finalizeToolCalls(deltas, finishReason) {
   });
   return { complete: true, finish_reason: finish, tool_calls };
 }
+
+// ============================================================
+// 流式 tool_calls 聚合器 (by opus-4-8 · 2026-09-05)
+// 修复：OpenAI Chat delta 必须按 index 拼接，不能覆盖
+// ============================================================
+
+const clampInt = (value, fallback, min = 1) => {
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) && n >= min ? n : fallback;
+};
+
+export class StreamingToolCallAggregator {
+  constructor() {
+    this.byIndex = new Map();
+    this.order = [];
+    this.text = '';
+    this.finishReason = null;
+  }
+
+  _slot(index) {
+    if (!this.byIndex.has(index)) {
+      this.byIndex.set(index, { id: null, name: '', argText: '' });
+      this.order.push(index);
+    }
+    return this.byIndex.get(index);
+  }
+
+  ingestOpenAIChatChunk(chunk) {
+    const choice = chunk?.choices?.[0];
+    if (!choice) return;
+    const delta = choice.delta || {};
+    if (typeof delta.content === 'string') this.text += delta.content;
+    if (choice.finish_reason) this.finishReason = choice.finish_reason;
+    for (const tc of delta.tool_calls || []) {
+      const index = Number.isInteger(tc.index) ? tc.index : this.order.length;
+      const slot = this._slot(index);
+      if (tc.id) slot.id = tc.id;
+      if (tc.function?.name) slot.name = tc.function.name;
+      if (typeof tc.function?.arguments === 'string') slot.argText += tc.function.arguments; // 拼接不覆盖
+    }
+  }
+
+  ingestOpenAIResponsesEvent(evt) {
+    const type = evt?.type;
+    if (type === 'response.output_text.delta' && typeof evt.delta === 'string') {
+      this.text += evt.delta;
+    } else if (type === 'response.output_item.added' && evt.item?.type === 'function_call') {
+      const index = Number.isInteger(evt.output_index) ? evt.output_index : this.order.length;
+      const slot = this._slot(index);
+      slot.id = evt.item.call_id || evt.item.id || slot.id;
+      slot.name = evt.item.name || slot.name;
+    } else if (type === 'response.function_call_arguments.delta') {
+      const index = Number.isInteger(evt.output_index) ? evt.output_index : this.order.length - 1;
+      const slot = this._slot(index < 0 ? 0 : index);
+      if (typeof evt.delta === 'string') slot.argText += evt.delta;
+    } else if (type === 'response.completed' || type === 'response.incomplete') {
+      this.finishReason = evt.response?.status || this.finishReason;
+    }
+  }
+
+  ingestAnthropicEvent(evt) {
+    const type = evt?.type;
+    if (type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
+      const slot = this._slot(evt.index);
+      slot.id = evt.content_block.id || slot.id;
+      slot.name = evt.content_block.name || slot.name;
+    } else if (type === 'content_block_delta') {
+      const slot = this.byIndex.get(evt.index);
+      if (evt.delta?.type === 'input_json_delta' && slot) {
+        slot.argText += evt.delta.partial_json || '';
+      } else if (evt.delta?.type === 'text_delta') {
+        this.text += evt.delta.text || '';
+      }
+    } else if (type === 'message_delta' && evt.delta?.stop_reason) {
+      this.finishReason = evt.delta.stop_reason;
+    }
+  }
+
+  ingestGeminiChunk(chunk) {
+    const cand = chunk?.candidates?.[0];
+    if (!cand) return;
+    if (cand.finishReason) this.finishReason = cand.finishReason;
+    let index = this.order.length;
+    for (const part of cand.content?.parts || []) {
+      if (typeof part.text === 'string') this.text += part.text;
+      if (part.functionCall) {
+        const slot = this._slot(index++);
+        slot.name = part.functionCall.name || slot.name;
+        slot.argText = JSON.stringify(part.functionCall.args || {});
+      }
+    }
+  }
+
+  finalize() {
+    const tool_calls = this.order.map((index, i) => {
+      const slot = this.byIndex.get(index);
+      let args = {};
+      let parseError = null;
+      const raw = slot.argText.trim();
+      if (raw) {
+        try { args = JSON.parse(raw); }
+        catch (err) { parseError = String(err?.message || err); }
+      }
+      return {
+        id: normalizeToolCallId(slot.id) || sanitizeToolId(slot.id || `call_${i}`),
+        name: sanitizeToolId(slot.name, 'tool'),
+        arguments: args,
+        ...(parseError ? { _raw_arguments: slot.argText, _parse_error: parseError } : {}),
+      };
+    });
+    return { content: this.text || null, tool_calls, finish_reason: nonEmptyFinishReason(this.finishReason) };
+  }
+}
+
+/** SSE data: 行解析器，跳过注释和 [DONE] */
+export function* parseSSELines(buffer) {
+  for (const line of String(buffer).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(':')) continue;
+    if (!trimmed.startsWith('data:')) continue;
+    const payload = trimmed.slice(5).trim();
+    if (payload === '[DONE]') return;
+    try { yield JSON.parse(payload); } catch { /* 跳过不完整分片 */ }
+  }
+}

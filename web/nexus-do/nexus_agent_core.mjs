@@ -15,7 +15,7 @@ import { ShuyuBridge } from './nexus_shuyu_bridge.mjs';
 import { preflightToolCall } from './nexus_tool_preflight.mjs';
 
 const PHASE = Object.freeze({ IDLE: 'IDLE', DISPATCHING: 'DISPATCHING', WAITING_FOR_INPUT: 'WAITING_FOR_INPUT' });
-const LEASE_TTL_MS = 30_000;
+const LEASE_TTL_MS = Number.isFinite(Number(globalThis?.process?.env?.AGENT_LEASE_TTL_MS)) && Number(globalThis?.process?.env?.AGENT_LEASE_TTL_MS) >= 1000 ? Number(globalThis?.process?.env?.AGENT_LEASE_TTL_MS) : 30_000;
 const ALARM_INTERVAL_MS = 5_000;
 const RUN_PREFIX = 'agent_run:';
 const EFFECT_PREFIX = 'agent_effect:';
