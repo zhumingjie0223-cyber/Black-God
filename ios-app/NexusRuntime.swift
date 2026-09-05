@@ -82,11 +82,31 @@ final class NexusRuntime: ObservableObject {
         append(.status(verdict.passed ? "结果验证通过" : "结果验证失败：\(verdict.reason)"))
     }
 
+    func approveAndExecute(_ call: NexusToolCall) async {
+        approvalQueue.approve(call.id)
+        await execute(call)
+    }
+
+    func reject(_ call: NexusToolCall) {
+        approvalQueue.reject(call.id)
+        runState = .failed("用户拒绝工具调用：\(call.name)")
+        append(.status("已拒绝：\(call.name)"))
+    }
+
     func cancel() {
         activeTask?.cancel()
         activeTask = nil
         runState = .cancelled
         append(.status("任务已取消"))
+    }
+
+    func restoreCheckpoint() {
+        guard let checkpoint = checkpointStore.load() else { return }
+        currentPlan = checkpoint.plan
+        observations = checkpoint.observations
+        verdicts = checkpoint.verdicts
+        runState = .paused
+        append(.status("已恢复任务检查点"))
     }
 
     func reset() {
