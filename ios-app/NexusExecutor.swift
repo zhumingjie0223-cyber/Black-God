@@ -1,19 +1,7 @@
 // ios-app/NexusExecutor.swift
 import Foundation
 
-// MARK: - Tool 协议与记录
-
-protocol NexusTool {
-    var name: String { get }
-    var usage: String { get }
-    func run(arguments: String) async throws -> String
-}
-
-struct NexusToolCall: Equatable {
-    let name: String
-    let arguments: String
-    let raw: String
-}
+// MARK: - 工具调用记录与错误
 
 struct NexusToolTrace {
     let stepID: NexusTaskStep.ID
@@ -33,37 +21,6 @@ enum NexusToolError: LocalizedError {
         case .unknownTool(let name): return "未知工具：\(name)"
         case .invalidArguments(let detail): return "参数无效：\(detail)"
         }
-    }
-}
-
-// MARK: - 工具注册表
-
-final class NexusToolRegistry {
-    private var tools: [String: NexusTool] = [:]
-
-    init(tools: [NexusTool] = []) {
-        for tool in tools { register(tool) }
-    }
-
-    func register(_ tool: NexusTool) {
-        tools[tool.name.lowercased()] = tool
-    }
-
-    func tool(named name: String) -> NexusTool? {
-        tools[name.lowercased()]
-    }
-
-    var isEmpty: Bool { tools.isEmpty }
-
-    var manifest: String {
-        tools.values
-            .sorted { $0.name < $1.name }
-            .map { "- \($0.name)：\($0.usage)" }
-            .joined(separator: "\n")
-    }
-
-    static func defaultRegistry() -> NexusToolRegistry {
-        NexusToolRegistry(tools: [NexusClockTool(), NexusCalculatorTool()])
     }
 }
 
@@ -103,56 +60,12 @@ struct NexusCalculatorTool: NexusTool {
     }
 }
 
-// MARK: - 工具调用解析
-
-enum NexusToolCallParser {
-    /// 支持两种格式：
-    /// 1. `TOOL: name | arguments`
-    /// 2. `{"tool":"name","arguments":"..."}`（arguments 可为字符串或对象）
-    static func parse(_ output: String) -> [NexusToolCall] {
-        var calls: [NexusToolCall] = []
-        for rawLine in output.components(separatedBy: .newlines) {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if let call = parseLinePrefix(line) {
-                calls.append(call)
-            } else if let call = parseJSON(line) {
-                calls.append(call)
-            }
-        }
-        return calls
-    }
-
-    private static func parseLinePrefix(_ line: String) -> NexusToolCall? {
-        let prefixes = ["TOOL:", "tool:", "工具:", "工具："]
-        for prefix in prefixes where line.hasPrefix(prefix) {
-            let body = line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
-            guard !body.isEmpty else { return nil }
-            let parts = body.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
-            let name = parts[0].trimmingCharacters(in: .whitespaces)
-            let args = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
-            guard !name.isEmpty else { return nil }
-            return NexusToolCall(name: name, arguments: args, raw: line)
-        }
-        return nil
-    }
-
-    private static func parseJSON(_ line: String) -> NexusToolCall? {
-        guard line.hasPrefix("{"), line.hasSuffix("}"),
-              let data = line.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let name = obj["tool"] as? String, !name.isEmpty else { return nil }
-        var args = ""
-        if let s = obj["arguments"] as? String {
-            args = s
-        } else if let s = obj["args"] as? String {
-            args = s
-        } else if let any = obj["arguments"] ?? obj["args"],
-                  let d = try? JSONSerialization.data(withJSONObject: any),
-                  let s = String(data: d, encoding: .utf8) {
-            args = s
-        }
-        return NexusToolCall(name: name, arguments: args, raw: line)
-    }
+/// 本文件内使用的默认工具注册表构造函数（避免与外部定义冲突）
+private func nexusExecutorDefaultToolRegistry() -> NexusToolRegistry {
+    let registry = NexusToolRegistry()
+    registry.register(NexusClockTool())
+    registry.register(NexusCalculatorTool())
+    return registry
 }
 
 // MARK: - 执行器
@@ -177,7 +90,7 @@ final class NexusExecutor {
         planner: NexusPlanning = BasicNexusPlanner(),
         verifier: NexusVerifying = BasicNexusVerifier(),
         model: @escaping ModelCall = { try await NexusModelBridge.complete($0) },
-        tools: NexusToolRegistry = .defaultRegistry(),
+        tools: NexusToolRegistry = nexusExecutorDefaultToolRegistry(),
         maxToolRounds: Int = 4,
         onEvent: ((String) -> Void)? = nil
     ) {
