@@ -31,12 +31,11 @@
 
 | 路径 | 说明 |
 |---|---|
-| `assets/logo/brand_logo.png` | 品牌 Logo（与 `ios-app/AppIcon.png` 同一张图） |
-| `assets/sihan/` | 旧人物「思涵」形象素材；品牌已去人物化、iOS 代码零引用，**去留待权哥拍板** |
-| `android/` | 旧 Android TWA 上架材料，指向已删除的网页版域名；**去留待权哥拍板** |
+| `assets/logo/brand_logo.png` | 品牌 Logo（与 `ios-app/AppIcon.png` 同一张图）；`assets/` 下现在只有这一个文件 |
 
-> 2026-09-05 已归档（零引用）：`web/`（旧 PWA 静态壳：sw.js/manifest/图标，调用已删的 `/api/push/*`）、
-> `skills/`（依赖不存在的服务器路径、含红队内容）、`ui-spec/`（旧人物化 UI 方案 + 与本项目无关的设计参考）。
+> 2026-09-05 已归档进 `docs/archive/nexus-do后端时代-2026-09-05/`（零引用）：`web/`（旧 PWA 静态壳，调用已删的 `/api/push/*`）、
+> `skills/`（依赖不存在的服务器路径、含红队内容）、`ui-spec/`（旧人物化 UI 方案）、`android/`（TWA 材料，指向已删网页版域名）、
+> `assets/sihan/`（旧人物「思涵」素材，品牌已去人物化）。
 
 ## 文档（全部在 docs/ 下，唯一索引 `docs/README.md`）
 

@@ -25,7 +25,7 @@
 
 | 子目录 | 内容 |
 |---|---|
-| `nexus-do后端时代-2026-09-05/` | 后端删除时整体归档：`plan/`（全部旧计划与上线清单）、`architecture/`（Worker 架构与代码结构文档）、`product/`（旧 VPS/Worker 口径的"唯一真相"、数据总表、验收报告、Google Play 文案）、`上架/`（TWA/部署说明）、`shenshu/`、`web/`（旧 PWA 静态壳）、`skills/`、`ui-spec/`、`tools/`（旧推送脚本）、`env.example` |
+| `nexus-do后端时代-2026-09-05/` | 后端删除时整体归档：`plan/`（全部旧计划与上线清单）、`architecture/`（Worker 架构与代码结构文档）、`product/`（旧 VPS/Worker 口径的"唯一真相"、数据总表、验收报告、Google Play 文案）、`上架/`（TWA/部署说明）、`shenshu/`、`web/`（旧 PWA 静态壳）、`skills/`、`ui-spec/`、`tools/`（旧推送脚本）、`android/`（TWA 材料）、`assets-sihan/`（旧人物素材）、`env.example` |
 | `server/` | 更早的 Python 服务端源码 |
 | `handover/` `retrospective/` `planning/` | 交接、复盘、旧规划 |
 | `ui-收口-2026-08-09/` 等 | 下线页面与孤儿脚本 |

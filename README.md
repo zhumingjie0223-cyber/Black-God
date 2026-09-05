@@ -83,10 +83,7 @@ cd ios-app && xcodegen generate && open BlackGod888.xcodeproj
 black-god/
 ├── ios-app/                  ← ★ iOS 原生 App（当前主体：纯客户端 / Agent 闭环 / AppStore 上架材料与自动化）
 ├── shuyu/                    ← ★ 枢语引擎权威源（JS + Python 双实现 + 词根表 + 测试）
-├── assets/                   ← 品牌资产
-│   ├── logo/brand_logo.png   ← 神字 Logo
-│   └── sihan/                ← 旧人物形象素材（品牌已去人物化，去留待定）
-├── android/                  ← 旧 Android TWA 上架材料（指向已删网页版，去留待定）
+├── assets/logo/brand_logo.png ← 品牌 Logo（唯一品牌资产）
 ├── docs/                     ← 项目文档，索引见 docs/README.md
 │   ├── product/ spec/        ← 现行：产品唯一真相、ASI 差距审计、核心哲学、设计纲领
 │   ├── architecture/ design/ api/ ← 通用参考
@@ -98,7 +95,8 @@ black-god/
 
 > **当前主体是 `ios-app/`（iOS 纯客户端）与 `shuyu/`（枢语引擎）。** 原部署主体 `web/nexus-do/` 后端已于
 > 2026-09-05 删除；同日把后端时代的规划/架构/部署文档与零引用的 `web/`（旧 PWA 静态壳）、`skills/`、`ui-spec/`、
-> `tools/` 整体搬进 `docs/archive/nexus-do后端时代-2026-09-05/`（只搬不删，git 历史完整）。
+> `tools/`、`android/`（TWA 材料）、`assets/sihan/`（旧人物素材）整体搬进 `docs/archive/nexus-do后端时代-2026-09-05/`
+> （只搬不删，git 历史完整）。
 
 ---
 
