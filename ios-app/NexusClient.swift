@@ -67,8 +67,7 @@ enum NexusError: LocalizedError {
 actor NexusClient {
     static let shared = NexusClient()
 
-    private let defaultModel = "claude-opus-5"
-    private let nativeModel = NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-5", displayName: "Claude Opus 5", isHidden: false)
+    private let defaultModel = NexusModelCatalog.defaultModelID
 
     // MARK: 流式对话
 
@@ -165,12 +164,6 @@ actor NexusClient {
     // MARK: 可用模型列表
 
     func availableModels() -> [String] {
-        [
-            "claude-opus-5",
-            "claude-fable-5-1",
-            "claude-opus-4-8",
-            "claude-sonnet-4-6",
-            "claude-haiku-4-5-20251001",
-        ]
+        NexusModelCatalog.entries.map { $0.modelID }
     }
 }

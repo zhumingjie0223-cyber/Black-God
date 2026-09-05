@@ -37,7 +37,7 @@ final class ChatViewModel: ObservableObject {
         lastError = nil
         statusHint = "正在规划任务…"
 
-        let selectedModel = modelRegistry.selected.modelID
+        let selectedModel = NexusKeychain.shared.selectedModel
         let memoryContext = memories
         let startedAt = Date()
 
