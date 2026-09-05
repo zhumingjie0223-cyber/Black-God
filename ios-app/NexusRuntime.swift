@@ -12,6 +12,7 @@ final class NexusRuntime: ObservableObject {
     private let planner: NexusPlanning = BasicNexusPlanner()
     private let verifier: NexusVerifying = BasicNexusVerifier()
     private var executionLoop = NexusExecutionLoop()
+    private var activeTask: Task<Void, Never>?
     private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
@@ -54,6 +55,8 @@ final class NexusRuntime: ObservableObject {
     }
 
     func cancel() {
+        activeTask?.cancel()
+        activeTask = nil
         runState = .cancelled
         append(.status("任务已取消"))
     }

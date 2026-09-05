@@ -42,6 +42,7 @@ struct NexusExecutionLoop {
         registry.register(EchoTool())
         registry.register(NexusReadFileTool())
         registry.register(NexusWriteFileTool())
+        registry.register(NexusShellTool())
     }
     mutating func run(_ call: NexusToolCall) async -> NexusToolResult { await registry.execute(call) }
 }
