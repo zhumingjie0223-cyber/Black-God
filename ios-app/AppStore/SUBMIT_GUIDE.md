@@ -8,6 +8,7 @@
 ```
 ios-app/AppStore/
 ├── SUBMIT_GUIDE.md            ← 本文档
+├── asc.py                     ← App Store Connect API 工具：一条命令推送全部商店文案（见「快速通道」）
 ├── screenshots.html           ← 5 张 App Store 截图源文件（HTML+CSS，石墨暗流·玉绿）
 ├── screenshots_guide.md       ← 截图导出 PNG 操作指南
 ├── export_screenshots.mjs     ← 截图一键导出脚本（Playwright）
@@ -36,6 +37,40 @@ ios-app/AppStore/
 | 开发语言 | 简体中文，另附英文本地化 |
 
 ---
+
+## 快速通道：权哥 3 步手工 + agent 1 条命令（推荐）
+
+下面第 3～5 步的"填表"（Bundle ID 注册、中英文名称/副标题/描述/关键词/推广文本/隐私与支持链接）
+已由 `asc.py` 自动化。**账号密码和二次验证码不要给任何人**，正确做法是给一把权限受限的 API 密钥。
+
+**权哥要做的 3 件事（只有账号持有人能点）：**
+
+1. **生成 API 密钥**：appstoreconnect.apple.com → 用户和访问 → **集成** → App Store Connect API →
+   ＋ 生成密钥，名称随意，权限选 **App Manager**（不要 Admin）。记下页面上的 **Issuer ID**、这把钥匙的
+   **Key ID**，并下载 `.p8` 文件（**只能下载一次**，自己也留一份）。
+2. **把密钥放进 Secrets**（不要贴聊天）：Cursor 面板 → Cloud Agents → Secrets，新建三条：
+   `ASC_ISSUER_ID`、`ASC_KEY_ID`、`ASC_PRIVATE_KEY`（把 `.p8` 文件全文粘进去，含 BEGIN/END 两行）。
+3. **在网页新建 App 记录**（API 不开放这一步，约 1 分钟）：我的 App → ＋ → 新建 App，
+   平台 iOS，名称 `神枢 Black God`，主要语言 简体中文，套装 ID 选 `com.blackgod.nexus`
+   （若下拉里没有，先让 agent 跑 `register-bundle-id`，刷新即出现），SKU `blackgod-nexus-ios`。
+
+**然后 agent 这边：**
+
+```bash
+cd ios-app/AppStore
+python3 asc.py validate               # 本地字数校验（不联网、不需要凭据）
+python3 asc.py check                  # 验证密钥、查 Bundle ID / App 记录
+python3 asc.py register-bundle-id     # Bundle ID 没注册就注册（已注册会跳过）
+python3 asc.py push-metadata --dry-run   # 先看将要发什么
+python3 asc.py push-metadata             # 真推：名称/副标题/隐私链接 + 描述/关键词/推广文本/支持链接，中英两套
+```
+
+推完后**仍需在网页手工**（API 不开放或需要人判断）：截图上传、类别、年龄分级问卷、App 隐私问卷、
+定价与销售范围、选择构建版本、审核备注。按下方第 4/6/7 步做即可，文案部分可跳过。
+
+> 出包（Archive → 上传）仍必须在 macOS 上完成：本机 Xcode 按第 2 步，或用仓库根 `codemagic.yaml`
+> 在 Codemagic 云端 Mac 自动签名并直传 TestFlight（需在 Codemagic 后台添加名为
+> `BLACKGOD_APP_STORE_CONNECT` 的 App Store Connect 集成，用同一把 API 密钥即可）。
 
 ## 1. 上架前准备（一次性）
 
