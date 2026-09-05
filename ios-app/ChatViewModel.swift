@@ -10,6 +10,8 @@ final class ChatViewModel: ObservableObject {
     @Published var isTyping = false
     @Published var lastError: String?
     @Published private(set) var runtime = NexusRuntime()
+    private let agentLoop = NexusAgentLoop()
+    private var handledToolCalls = Set<UUID>()
 
     var apiKeyConfigured: Bool { NexusKeychain.shared.hasAPIKey }
     var currentMood: String { runtime.runState == .idle ? "就绪" : "运行中" }
@@ -38,6 +40,10 @@ final class ChatViewModel: ObservableObject {
                         }
                         reply += delta
                         self.runtime.append(.text(delta))
+                        for call in self.agentLoop.calls(in: reply) where !self.handledToolCalls.contains(call.id) {
+                            self.handledToolCalls.insert(call.id)
+                            await self.runtime.execute(call)
+                        }
 
                     }
                 },
