@@ -12,12 +12,16 @@
 
 # Black God / 神枢 — 项目指南
 
-Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 Cloudflare Workers Durable Object，
-仓库内 `web/nexus-do/`）；对外助手身份统一为 Black God AI，不绑定人物角色。品牌、神枢与枢语名称不要混用。
+Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎）；对外助手身份统一为 Black God AI，不绑定人物角色。品牌、神枢与枢语名称不要混用。
 
-**两仓已合一**：枢语源头引擎并入本仓 `shuyu/` 目录（权威源，Python + JS 双实现 + 词根表 + 测试），
-`web/nexus-do/` 里是它的消费副本。改引擎在 `shuyu/` 改，再同步到消费副本，见下方同步校验命令。
-（原独立的 shuyu-lang 仓库已封存归档，不再更新。）
+**现状（2026-09-05 起）** 本仓有两个 live 子系统：
+- `ios-app/`：iOS 原生 App（纯客户端——用户自带 API Key 直连模型、本地存储、零后端），Agent 执行闭环在此。
+- `shuyu/`：枢语引擎权威源（Python + JS 双实现 + 词根表 + 测试），现为**唯一源、无消费副本**。
+
+> ⚠️ 历史变更：原 Cloudflare Workers 后端 `web/nexus-do/`（Durable Object：意识/记忆/心跳/TG 主动/执行脑）
+> 已在 2026-09-05「iOS 转纯客户端」重构中整体删除，可从该日之前的 git 历史找回。
+> 凡文档里提到「web/nexus-do 消费副本 / build.mjs / wrangler 部署 / index.html」均为该后端遗物，已不在运行路径。
+> （原独立的 shuyu-lang 仓库更早已封存归档，不再更新。）
 
 ## 语言规则（强制，不可违反）
 
@@ -37,7 +41,7 @@ Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 C
 
 ## 铁律
 
-- 不要碰服务器（SSH/部署）除非权哥明确要求——神枢架构是纯 Cloudflare Workers，不用 VPS。
+- 不要碰服务器（SSH/部署）除非权哥明确要求——当前是 iOS 纯客户端架构（零后端），更无需 VPS。
 - 做事必须先备份/归档再删除，禁止对未核实的目录做粗暴的 `rm -rf`/`git add -A` 一把梭。
 - "读一遍/看一遍"类要求必须完整输出原文，不许摘要、不许截断冒充读完。
 - 品牌/UI 相关决策（配色、Logo、核心视觉）改动前，先看 `web/logo.png` 或 `assets/logo/brand_logo.png`
@@ -46,9 +50,13 @@ Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 C
 ## 常用命令
 
 ```bash
-cd web/nexus-do && node build.mjs && node selftest.mjs   # 构建 + 自测
-node tools/check-sync.mjs                                  # 校验 shuyu/ 源头 ↔ web/nexus-do 消费副本
-node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释器测试(合仓后在本仓跑)
+# 枢语引擎（本机可跑）
+node --test shuyu/tests/*.test.mjs                        # 枢语引擎/意识解释器测试
+cd shuyu && python3 -m unittest discover -s tests         # Python 侧同构测试
+make test                                                  # 以上两条一把跑
+
+# iOS App（需 macOS + Xcode，非本机）
+cd ios-app && xcodegen generate && open BlackGod888.xcodeproj
 ```
 
 ## Sub-agent 模型路由（成本分级，自动遵守）
@@ -65,41 +73,16 @@ node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释�
 路由原则：默认从最便宜的能胜任的一级开始（batch-sweeper → dev-worker → sync-auditor/heavy-architect），
 只在任务确实需要判断力时升级；多个独立子任务并行派发。
 
-## 设计系统铁律(现状:石墨暗流·玉绿)
+## 设计系统铁律（现状：iOS「玄黑森林 · 翡翠活光」）
 
-**现状(2026-08-17 直接从 main 的 `index.html` 抓取实际令牌值复核,如实描述,不许骗)**:
-主线 UI 实际用的是「**石墨暗流 · 玉绿**」色系,**不是**深海·潮光青。
-`web/nexus-do/index.html` 是自包含单文件(构建时整页注入 Worker),
-CSS 令牌**内联在页内**(`:root` / `:root[data-theme="dark"|"light"]`)。
+**live UI 是 iOS App**，设计令牌的**唯一权威源是 `ios-app/Theme.swift`**（`Color.bg*` / `LinearGradient.*` / `Font.bg*`）。
+主色为翡翠绿系（`bgGold` 深翡翠 / `bgGoldLight` 亮翡翠 / `bgDark` 玄黑底），深色为主。
 
-主强调**玉绿**,当前实际值(以页内为准,本表若与代码不符一律以代码为准):
+- 改配色**只改 `Theme.swift` 里的令牌、沿用不硬编码**；动效只用 transform/opacity。
+- **危险操作需确认是安全红线，任何重构不得移除。** 后端时代的确认闸（`/import?confirm=1`、执行脑 `need_confirm`、
+  `__exec_confirm__:` 通道）已随 `web/nexus-do/` 删除；现由 iOS 端承接——写入/命令类工具经
+  `NexusPermissionGate`（`requiresApproval`）+ `NexusApprovalQueue` 审批后才执行，`NexusRuntime.execute` 里勿绕过。
 
-| 令牌 | 实际值 |
-|---|---|
-| `--cy-hi` | `#4FE096`(最亮,高光) |
-| `--cy-1` / `--cy-3` | `#3BC77E` |
-| `--cy-2` | `#41CC84` |
-| `--cy-4` | `#8FE3AE`(最浅) |
-| `--live` | `#3BC77E`(在线态) |
-| `--chrome-grad` | 绿渐变 |
-
-冷石墨骨 + 素银字,深浅双主题。登录门有一圈潮光青 `rgba(79,196,217)` 光晕是历史残留,非主色。
-
-> 📌 **2026-08-17 修正记录**:本节此前写的 `--cy-hi:#3DDC84`、`--cy-1:#2FB96B`、`--live:#2FB96B`
-> **三个值全是错的**(实际为 `#4FE096` / `#3BC77E` / `#3BC77E`)。铁律文档落后于实现,已按代码订正。
-> 改色值时请同步更新本表,别让铁律再骗人。
-
-> ⚠️ **别再误判**:仓里存在 `docs/design/DESIGN_SYSTEM_V3.md`(「深海·潮光」潮光青 #4FC4D9)——
-> 那是一份**未被采用的备选设计方向蓝图**(源自从未合并的 UI 重设计 PR #29),**不是当前实现**。
-> 权哥 2026-07-17 拍板:**保留石墨绿现状**。要改成潮光青属未来单独立项(需逐屏迁色核对不回退),
-> 在此之前别把深海·潮光当成"已上线/该对齐"的东西。
-
-- 改 UI 颜色,**以页内既有 `--cy-*` / `--chrome-*` / `--live` 等玉绿令牌为准**,沿用不硬编码;
-  动效只用 transform/opacity。
-- 改 `web/nexus-do/index.html` 后必须重新构建(`node build.mjs`,页面是构建时整体注入 Worker 的),
-  并跑 `node tools/sync-ui.mjs --check` 校验双副本同步。
-- **危险操作二次确认是安全红线,任何重构不得移除。** 注意实现里**没有** `/api/confirm` 这个字面路由
-  (旧措辞易误导),真正的闸门是这几处(2026-08-17 对着 `nexus_do.core.mjs` 核实):
-  - `/import`、`/checkpoint/restore` 必须带 `?confirm=1`(覆盖记忆/人格前自动备份,可回滚);
-  - 执行脑 `execRemote` 的 `need_confirm` 透传闸(危险命令未确认一律拦下,`execDevLoop`/`execAgentTask` 均不绕过);
-  - 对话里的 `__exec_confirm__:` 前缀二次确认通道(带 confirm 重跑,不走 AI)。
+> ⚠️ 历史遗物：本节此前整段讲的是已删除后端 `web/nexus-do/index.html` 的「石墨暗流 · 玉绿」内联 CSS 令牌
+> （`--cy-*` / `--chrome-*` / `--live`），以及 `docs/design/DESIGN_SYSTEM_V3.md` 的「深海 · 潮光青」备选方向——
+> 那套网页 UI 已随后端下线，不再是实现。iOS 沿用了同源的翡翠绿基调，具体值一律以 `Theme.swift` 为准。
