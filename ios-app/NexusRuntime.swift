@@ -16,6 +16,7 @@ final class NexusRuntime: ObservableObject {
     private let recovery = NexusRecoveryController()
     private let autonomy = NexusAutonomyController()
     private let permissionGate = NexusPermissionGate.standard
+    private let approvalQueue = NexusApprovalQueue()
     private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
@@ -43,7 +44,9 @@ final class NexusRuntime: ObservableObject {
             append(.status("已跳过重复工具调用"))
             return
         }
-        guard case .success = permissionGate.authorize(call, approved: false) else {
+        let approved = approvalQueue.decision(for: call.id) ?? false
+        guard case .success = permissionGate.authorize(call, approved: approved) else {
+            approvalQueue.enqueue(call)
             runState = .waitingForInput
             append(.status("工具调用等待批准：\(call.name)"))
             return
