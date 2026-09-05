@@ -5,19 +5,36 @@ import Foundation
 final class NexusRuntime: ObservableObject {
     @Published private(set) var runState: NexusRunState = .idle
     @Published private(set) var events: [NexusRunEvent] = []
+    @Published private(set) var currentPlan: NexusTaskPlan?
+    private(set) var observations: [NexusObservation] = []
+    private(set) var verdicts: [NexusVerdict] = []
 
+    private let planner: NexusPlanning = BasicNexusPlanner()
+    private let verifier: NexusVerifying = BasicNexusVerifier()
     private(set) var sessionID = UUID()
 
     func begin(prompt: String) {
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         runState = .planning
+        currentPlan = planner.makePlan(for: text)
+        observations.removeAll()
+        verdicts.removeAll()
         append(.planned(prompt: text))
+        append(.status("计划已生成：\(currentPlan?.steps.count ?? 0) 步"))
     }
 
     func append(_ event: NexusRunEvent) {
         events.append(event)
         if events.count > 500 { events.removeFirst(events.count - 500) }
+    }
+
+    func observe(output: String) {
+        guard let step = currentPlan?.steps.first(where: { $0.status == .running || $0.status == .pending }) else { return }
+        observations.append(NexusObservation(stepID: step.id, output: output, timestamp: Date()))
+        let verdict = verifier.verify(goal: currentPlan?.goal ?? "", output: output)
+        verdicts.append(verdict)
+        append(.status(verdict.passed ? "结果验证通过" : "结果验证失败：\(verdict.reason)"))
     }
 
     func cancel() {
@@ -28,6 +45,9 @@ final class NexusRuntime: ObservableObject {
     func reset() {
         sessionID = UUID()
         events.removeAll()
+        currentPlan = nil
+        observations.removeAll()
+        verdicts.removeAll()
         runState = .idle
     }
 }

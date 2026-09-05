@@ -43,6 +43,7 @@ final class ChatViewModel: ObservableObject {
                 onComplete: {
                     Task { @MainActor in
                         self.isTyping = false
+                        self.runtime.observe(output: reply)
                         self.runtime.append(.completed)
                     }
                 },
