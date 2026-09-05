@@ -10,13 +10,13 @@
 | ① | 主对话界面 | 直连 Claude，逐字实时回复 | Straight to Claude. Streamed word by word. |
 | ② | API Key 配置 | 自带 API Key，零后端 · 零中转 | Bring your own key. No servers of ours. |
 | ③ | 多模型选择 | 多模型自由切换，费用自己掌控 | Switch between Claude models in one tap. |
-| ④ | 本地历史记录 | 对话记录只留在你的 iPhone | Your history lives only on your device. |
-| ⑤ | 隐私安全 | Keychain 加密，无账号 · 无埋点 | Encrypted by iOS Keychain. No tracking. |
+| ④ | 神枢状态 | 对话记录只留在你的 iPhone | Your history lives only on your device. |
+| ⑤ | 本地优先设置 | Keychain 加密，无账号 · 无埋点 | Encrypted by iOS Keychain. No tracking. |
 
 设计规格：
 - 画布 393×852 CSS 像素 = iPhone 6.7″ 逻辑尺寸；与 App Store 6.7″ 规格 1290×2796 **同比例**，放大 3.28 倍即精确对齐。
-- 色系：石墨暗流 · 玉绿。主色 `#3FA57A`，高光 `#4FE096`，背景 `#0E1114`。
-- 每张 = 顶部品牌行 + 序号 + 中文大标题（衬线银字，关键词玉绿）+ 英文副标 + 钛金属边 iPhone 样机（灵动岛、侧键、屏幕反光），样机下沿出血裁切，是 App Store 常见构图。
+- 色系：玄黑森林 · 翡翠活光。主色 `#3FA57A`，高光 `#4FE096`，背景 `#0B120E`。
+- 每张 = 顶部品牌行 + 序号 + 中文大标题（衬线银字，关键词翡翠活光）+ 英文副标 + 钛金属边 iPhone 样机（灵动岛、侧键、屏幕反光），样机下沿出血裁切，是 App Store 常见构图。
 - 字体走系统栈（苹方 / Noto Sans CJK / 宋体 / Noto Serif CJK），不依赖网络。**建议在 macOS 上导出**，苹方与宋体渲染最接近 iOS 真机。
 
 ---
@@ -78,7 +78,7 @@ Safari 没有「节点截图」，可以走整页导出再裁：
 
 ## 5. 改文案 / 改内容
 
-- 标语：编辑对应 `<section>` 里 `<header class="copy">` 的 `<h2>`（中文，`<em>` 包住的词变玉绿）和 `<p class="en">`（英文）。
+- 标语：编辑对应 `<section>` 里 `<header class="copy">` 的 `<h2>`（中文，`<em>` 包住的词变翡翠活光）和 `<p class="en">`（英文）。
 - 手机内界面：每个 `<div class="app">` 就是一屏 393×852 的 HTML，直接改文字即可；内容底部尽量不超过 App 坐标 **y ≈ 750**（样机下沿在此被画布裁掉）。
 - 配色：只改 `:root` 里的 `--jade / --jade-hi / --bg` 等令牌，不要在组件里硬编码颜色。
 - 改完在浏览器里刷新预览，再跑一遍方法一导出。

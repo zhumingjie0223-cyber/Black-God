@@ -10,30 +10,30 @@
   · 自包含单文件，无任何外链依赖（字体走系统栈，图标为内联 SVG）
   · 5 张截图并排，每张 393×852 CSS 像素（iPhone 6.7″ 逻辑尺寸）
   · 以设备像素比 3 导出即得 1290×2796 PNG（App Store 6.7″ 规格）
-  · 色系：石墨暗流 · 玉绿（主色 #3FA57A，背景 #0E1114）
+  · 色系：玄黑森林 · 翡翠活光（主色 #3FA57A，背景 #0B120E）
   · 导出方法见同目录 screenshots_guide.md
   · 地址加 ?export 可隐藏顶部工具条、去掉间距，便于整页/逐张截图
 -->
 <style>
 /* ═══════════════════════════════════════════════
-   0. 设计令牌 · 石墨暗流 · 玉绿
+   0. 设计令牌 · 玄黑森林 · 翡翠活光
    ═══════════════════════════════════════════════ */
 :root{
-  --bg:#0E1114;
-  --bg-2:#12161A;
-  --surface:#161B20;
-  --surface-2:#1C2227;
-  --surface-3:#242B32;
+  --bg:#0B120E;
+  --bg-2:#101A14;
+  --surface:#142119;
+  --surface-2:#1A2A20;
+  --surface-3:#22362A;
   --line:rgba(255,255,255,.075);
   --line-2:rgba(255,255,255,.14);
 
   --jade:#3FA57A;        /* 主色 */
   --jade-hi:#4FE096;     /* 高光 */
   --jade-2:#3BC77E;
-  --jade-4:#8FE3AE;      /* 最浅 */
-  --jade-deep:#2B7A5A;
-  --jade-ink:#07110C;    /* 玉绿底上的深色文字 */
-  --jade-glow:rgba(63,165,122,.38);
+  --jade-4:#A6E8BE;      /* 最浅 */
+  --jade-deep:#28583F;
+  --jade-ink:#07130C;    /* 翡翠活光底上的深色文字 */
+  --jade-glow:rgba(63,165,122,.30);
 
   --text:#E9EDF0;
   --text-2:#A2ABB3;
@@ -169,7 +169,7 @@ h2 em{
   height:calc(852px * var(--s) + var(--bezel) * 2);
   padding:var(--bezel);
   border-radius:calc(58px * var(--s) + var(--bezel));
-  background:linear-gradient(160deg,#3D444B 0%,#1E2429 35%,#12161A 65%,#2B3238 100%);
+  background:linear-gradient(160deg,#3D444B 0%,#1E2429 35%,#101A14 65%,#2B3238 100%);
   box-shadow:
     0 0 0 1px rgba(255,255,255,.18),
     inset 0 0 0 1px rgba(0,0,0,.6),
@@ -201,7 +201,7 @@ h2 em{
   position:absolute;left:0;top:0;width:393px;height:852px;
   transform:scale(var(--s));transform-origin:0 0;
   font-family:var(--font-sans);color:var(--text);
-  background:linear-gradient(180deg,#13181C 0%,#0E1114 100%);
+  background:linear-gradient(180deg,#13181C 0%,#0B120E 100%);
   overflow:hidden;
 }
 .island{
@@ -394,7 +394,7 @@ h2 em{
 .bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:6px}.bars i:nth-child(3){height:8px}.bars i:nth-child(4){height:10px}
 
 /* ═══════════════════════════════════════════════
-   7. 截图 ④ · 本地历史记录
+   7. 截图 ④ · 神枢状态
    ═══════════════════════════════════════════════ */
 .search{
   margin:14px 16px 0;height:40px;border-radius:12px;display:flex;align-items:center;gap:8px;padding:0 12px;
@@ -433,7 +433,7 @@ h2 em{
 .hist-foot{margin:16px 28px 0;text-align:center;font:400 12px/1.6 var(--font-sans);color:var(--text-3)}
 
 /* ═══════════════════════════════════════════════
-   8. 截图 ⑤ · 隐私安全
+   8. 截图 ⑤ · 本地优先设置
    ═══════════════════════════════════════════════ */
 .shield-hero{position:relative;height:140px;display:grid;place-items:center;margin-top:0}
 .ring{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);border:1px solid rgba(79,224,150,.18)}
@@ -540,7 +540,7 @@ h2 em{
   <header class="copy">
     <div class="brand"><i>神</i>神枢 · Black God</div>
     <div class="kicker">01 · 对话 Chat</div>
-    <h2>直连 Claude<br><em>逐字</em>实时回复</h2>
+    <h2>神枢对话<br><em>即时</em>响应</h2>
     <p class="en">Straight to Claude. Streamed word by word,<br>no relay in between.</p>
   </header>
 
@@ -588,7 +588,7 @@ h2 em{
   <header class="copy">
     <div class="brand"><i>神</i>神枢 · Black God</div>
     <div class="kicker">02 · 密钥 API Key</div>
-    <h2>自带 API Key<br><em>零后端</em> · 零中转</h2>
+    <h2>你的密钥<br><em>本地保存</em></h2>
     <p class="en">Bring your own key. Requests go from your<br>iPhone straight to Anthropic — no servers of ours.</p>
   </header>
 
@@ -662,8 +662,8 @@ h2 em{
   <header class="copy">
     <div class="brand"><i>神</i>神枢 · Black God</div>
     <div class="kicker">03 · 模型 Models</div>
-    <h2>多模型<em>自由切换</em><br>费用自己掌控</h2>
-    <p class="en">Switch between Claude models in one tap.<br>You only pay your own API bill.</p>
+    <h2>选择你的<br><em>模型与能力</em></h2>
+    <p class="en">Choose the model for the moment.<br>You only pay your own API bill.</p>
   </header>
 
   <div class="phone">
@@ -730,14 +730,14 @@ h2 em{
   </div>
 </section>
 
-<!-- ═══════════════════════ ④ 本地历史记录 ═══════════════════════ -->
-<section class="shot" id="shot-4" data-title="本地历史记录">
+<!-- ═══════════════════════ ④ 神枢状态 ═══════════════════════ -->
+<section class="shot" id="shot-4" data-title="神枢状态">
   <div class="glow"></div><div class="glow b"></div>
   <div class="mark">记</div>
   <header class="copy">
     <div class="brand"><i>神</i>神枢 · Black God</div>
     <div class="kicker">04 · 历史 History</div>
-    <h2>对话记录<br>只留在<em>你的 iPhone</em></h2>
+    <h2>神枢状态<br><em>始终在线</em></h2>
     <p class="en">Your history lives only on your device.<br>Never uploaded, never synced, never analyzed.</p>
   </header>
 
@@ -813,14 +813,14 @@ h2 em{
   </div>
 </section>
 
-<!-- ═══════════════════════ ⑤ 隐私安全 ═══════════════════════ -->
-<section class="shot" id="shot-5" data-title="隐私安全">
+<!-- ═══════════════════════ ⑤ 本地优先设置 ═══════════════════════ -->
+<section class="shot" id="shot-5" data-title="本地优先设置">
   <div class="glow"></div><div class="glow b"></div>
   <div class="mark">私</div>
   <header class="copy">
     <div class="brand"><i>神</i>神枢 · Black God</div>
     <div class="kicker">05 · 隐私 Privacy</div>
-    <h2><em>Keychain</em> 加密<br>无账号 · 无埋点</h2>
+    <h2><em>神枢设置<br><em>本地优先</em></h2>
     <p class="en">Encrypted by iOS Keychain. No account,<br>no tracking, no ads — wipe everything in one tap.</p>
   </header>
 

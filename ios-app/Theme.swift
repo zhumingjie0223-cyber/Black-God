@@ -1,19 +1,19 @@
 //
-//  Theme.swift — 黑金暗黑主题 · 17 Pro Max适配
+//  Theme.swift — 玄黑森林·翡翠活光主题 · 统一设计令牌
 //
 
 import SwiftUI
 
 extension Color {
-    static let bgGold = Color(red: 0.79, green: 0.66, blue: 0.30)
-    static let bgGoldLight = Color(red: 0.92, green: 0.82, blue: 0.55)
-    static let bgDark = Color(red: 0.04, green: 0.04, blue: 0.06)
-    static let bgCard = Color(red: 0.09, green: 0.09, blue: 0.12)
-    static let bgCardLight = Color(red: 0.14, green: 0.14, blue: 0.18)
-    static let bgPurple = Color(red: 0.55, green: 0.35, blue: 0.85)
-    static let bgCyan = Color(red: 0.30, green: 0.80, blue: 0.90)
-    static let bgTextPrimary = Color(red: 0.95, green: 0.95, blue: 0.97)
-    static let bgTextSecondary = Color(red: 0.60, green: 0.60, blue: 0.66)
+    static let bgGold = Color(red: 0.25, green: 0.48, blue: 0.35)
+    static let bgGoldLight = Color(red: 0.31, green: 0.78, blue: 0.48)
+    static let bgDark = Color(red: 0.043, green: 0.082, blue: 0.055)
+    static let bgCard = Color(red: 0.078, green: 0.129, blue: 0.098)
+    static let bgCardLight = Color(red: 0.118, green: 0.188, blue: 0.141)
+    static let bgPurple = Color(red: 0.38, green: 0.30, blue: 0.48)
+    static let bgCyan = Color(red: 0.42, green: 0.69, blue: 0.64)
+    static let bgTextPrimary = Color(red: 0.91, green: 0.96, blue: 0.92)
+    static let bgTextSecondary = Color(red: 0.61, green: 0.70, blue: 0.64)
 }
 
 extension LinearGradient {
