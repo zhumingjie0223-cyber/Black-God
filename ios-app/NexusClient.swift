@@ -83,15 +83,8 @@ actor NexusClient {
 
         let selectedModel = model ?? defaultModel
         let entry = selectedModel == nativeModel.modelID ? nativeModel : NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: selectedModel, displayName: selectedModel, isHidden: false)
-        let body = AnthropicRequest(
-            model: entry.modelID,
-            maxTokens: 4096,
-            stream: true,
-            messages: messages.map { AnthropicMessage(role: $0.role, content: $0.content) }
-        )
-
-        guard let url = AnthropicProviderAdapter().endpoint(for: entry),
-              let bodyData = try? JSONEncoder().encode(body) else {
+        guard let url = NexusProviderRequestBuilder.adapter(for: entry).endpoint(for: entry),
+              let bodyData = try? NexusProviderRequestBuilder.body(model: entry, messages: messages) else {
             onError(NexusError.invalidResponse)
             return
         }
@@ -99,7 +92,7 @@ actor NexusClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = bodyData
-        for (name, value) in AnthropicProviderAdapter().headers(for: entry, apiKey: apiKey) {
+        for (name, value) in NexusProviderRequestBuilder.adapter(for: entry).headers(for: entry, apiKey: apiKey) {
             request.setValue(value, forHTTPHeaderField: name)
         }
 
