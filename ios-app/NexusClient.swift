@@ -99,6 +99,7 @@ actor NexusClient {
             request.setValue(value, forHTTPHeaderField: name)
         }
 
+        let assembler = NexusToolCallAssembler()
         do {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
 
@@ -121,6 +122,15 @@ actor NexusClient {
                 if let json = data.data(using: .utf8),
                    let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any] {
                     if entry.providerType == .openAICompatible,
+                       let choices = obj["choices"] as? [[String: Any]],
+                       let delta = choices.first?["delta"] as? [String: Any],
+                       let calls = delta["tool_calls"] as? [[String: Any]],
+                       let first = calls.first,
+                       let function = first["function"] as? [String: Any] {
+                        let id = (first["id"] as? String) ?? UUID().uuidString
+                        let call = assembler.append(id: id, name: function["name"] as? String, arguments: function["arguments"] as? String)
+                        if let call { onToolCall(call) }
+                    } else if entry.providerType == .openAICompatible,
                        let toolCall = NexusNativeToolEventParser.parseOpenAI(obj) {
                         onToolCall(toolCall)
                     } else if entry.providerType == .anthropic,
