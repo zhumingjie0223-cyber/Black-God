@@ -36,6 +36,11 @@ npx wrangler secret put NEXUS_GATEWAY_KEY
 npx wrangler secret put NEXUS_GATEWAY_MODEL # 如 claude-opus-4-8 / fable-5
 ```
 
+网关配置约束（OpenAI 兼容同样适用）：
+- `NEXUS_GATEWAY_URL` 只填 `http/https` 地址，支持填到 `/v1` 或完整 `/v1/chat/completions`，系统会自动规范化。
+- URL 不要带 `?key=...` 这类查询参数；密钥统一放 `NEXUS_GATEWAY_KEY`（或应用内 key 字段），避免泄漏。
+- 模型可留空/`auto` 触发一次模型探测；若上游不支持 `/models`，请手填具体模型名。
+
 ## 三、绑定资源（wrangler.jsonc 已配好）
 
 - **Durable Object** `SHENSHU` → 类 `ShenshuCore`（SQLite 后端，全球唯一的她）

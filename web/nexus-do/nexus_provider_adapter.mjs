@@ -239,7 +239,8 @@ export async function executeProviderJSONRequest({
       const res = await fetchImpl(url, {
         method: request.method || 'POST',
         headers: request.headers || {},
-        body: request.body == null ? undefined : JSON.stringify(request.body),
+        // body 允许传已序列化字符串（GET 探测无 body；调用方也可能自己 stringify 过）
+        body: request.body == null ? undefined : (typeof request.body === 'string' ? request.body : JSON.stringify(request.body)),
         signal: ctrl.signal,
       });
       const text = await res.text().catch(() => '');
@@ -450,14 +451,38 @@ export class StreamingToolCallAggregator {
   }
 }
 
-/** SSE data: 行解析器，跳过注释和 [DONE] */
-export function* parseSSELines(buffer) {
-  for (const line of String(buffer).split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith(':')) continue;
-    if (!trimmed.startsWith('data:')) continue;
-    const payload = trimmed.slice(5).trim();
-    if (payload === '[DONE]') return;
-    try { yield JSON.parse(payload); } catch { /* 跳过不完整分片 */ }
+/** SSE data 解析器：支持分块输入、多行 data、CRLF 与 [DONE]，可用 state.carry 跨 chunk 拼接。 */
+export function* parseSSELines(buffer, state = null) {
+  const st = state && typeof state === 'object' ? state : {};
+  let chunk = (st.carry || '') + String(buffer || '');
+  st.done = !!st.done;
+  const takeEvent = () => {
+    const unixIdx = chunk.indexOf('\n\n');
+    const winIdx = chunk.indexOf('\r\n\r\n');
+    if (unixIdx < 0 && winIdx < 0) return null;
+    const useUnix = unixIdx >= 0 && (winIdx < 0 || unixIdx < winIdx);
+    const idx = useUnix ? unixIdx : winIdx;
+    const sepLen = useUnix ? 2 : 4;
+    const event = chunk.slice(0, idx);
+    chunk = chunk.slice(idx + sepLen);
+    return event;
+  };
+  while (!st.done) {
+    const rawEvent = takeEvent();
+    if (rawEvent === null) break;
+    const payloadLines = [];
+    for (const rawLine of rawEvent.split(/\r?\n/)) {
+      const line = rawLine.trimEnd();
+      if (!line || line.startsWith(':')) continue;
+      if (!line.startsWith('data:')) continue;
+      payloadLines.push(line.slice(5).trimStart());
+    }
+    if (!payloadLines.length) continue;
+    const payload = payloadLines.join('\n').trim();
+    if (!payload) continue;
+    if (payload === '[DONE]') { st.done = true; break; }
+    try { yield JSON.parse(payload); }
+    catch (_) { yield { type: 'sse_invalid_json', raw: payload.slice(0, 500) }; }
   }
+  st.carry = chunk;
 }

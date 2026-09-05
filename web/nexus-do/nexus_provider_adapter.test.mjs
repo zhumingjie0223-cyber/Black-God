@@ -10,6 +10,7 @@ import {
   historyToOpenAIChat,
   historyToOpenAIResponses,
   normalizeSSEFrame,
+  parseSSELines,
   sanitizeToolId,
 } from './nexus_provider_adapter.mjs';
 
@@ -175,4 +176,25 @@ test('退避等待期间收到取消信号：返回 aborted 而不是抛异常',
   assert.equal(out.error, 'aborted');
   assert.equal(hits, 1);
   assert.ok(Date.now() - t0 < 2000, '不应等满 Retry-After 的 5 秒');
+});
+
+test('SSE 行解析支持分块、多行 data 和 [DONE] 终止', () => {
+  const state = {};
+  const out = [];
+  const chunks = [
+    'data: {"type":"response.output_text.delta","delta":"你',
+    '好"}\n\ndata: {"type":"response.output_text.delta","delta":"，',
+    '权哥"}\n\ndata: [DONE]\n\n',
+  ];
+  for (const c of chunks) out.push(...parseSSELines(c, state));
+  assert.equal(out.length, 2);
+  assert.equal(out[0].delta, '你好');
+  assert.equal(out[1].delta, '，权哥');
+  assert.equal(state.done, true);
+});
+
+test('SSE 行解析遇到无效 JSON 会显式产出错误帧', () => {
+  const frames = [...parseSSELines('data: {"ok":1}\n\ndata: {bad json}\n\n')];
+  assert.equal(frames[0].ok, 1);
+  assert.equal(frames[1].type, 'sse_invalid_json');
 });
