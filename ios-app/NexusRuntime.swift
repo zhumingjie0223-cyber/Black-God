@@ -15,6 +15,7 @@ final class NexusRuntime: ObservableObject {
     private var activeTask: Task<Void, Never>?
     private let recovery = NexusRecoveryController()
     private let autonomy = NexusAutonomyController()
+    private let permissionGate = NexusPermissionGate.standard
     private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
@@ -40,6 +41,11 @@ final class NexusRuntime: ObservableObject {
     func execute(_ call: NexusToolCall) async {
         guard autonomy.shouldExecute(call) else {
             append(.status("已跳过重复工具调用"))
+            return
+        }
+        guard case .success = permissionGate.authorize(call, approved: false) else {
+            runState = .waitingForInput
+            append(.status("工具调用等待批准：\(call.name)"))
             return
         }
         runState = .runningTool(name: call.name)
