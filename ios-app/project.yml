@@ -21,9 +21,9 @@ settings:
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: ""
-    # CI 无签名构建；本机发布时在 Xcode 里改为自动签名即可
-    CODE_SIGNING_ALLOWED: NO
-    CODE_SIGN_IDENTITY: ""
+    # Codemagic / Xcode 自动签名；无凭据时可通过命令行覆盖为 NO 做验证构建
+    CODE_SIGNING_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Distribution"
     SWIFT_EMIT_LOC_STRINGS: YES
 
 targets:

@@ -1,0 +1,41 @@
+workflows:
+  ios-release:
+    name: 神枢 iOS App Store Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: BLACKGOD_APP_STORE_CONNECT
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.blackgod.nexus
+      vars:
+        XCODE_WORKSPACE: ios-app/BlackGod888.xcodeproj
+        XCODE_SCHEME: BlackGod888
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: cd ios-app && xcodegen generate
+      - name: Resolve signing
+        script: xcode-project use-profiles
+      - name: Build archive
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
+      email:
+        recipients:
+          - "$CM_NOTIFY_EMAIL"
+        notify:
+          success: true
+          failure: true
