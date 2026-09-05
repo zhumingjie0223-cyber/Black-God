@@ -76,13 +76,12 @@ actor NexusClient {
         onComplete: @escaping () -> Void,
         onError: @escaping (Error) -> Void
     ) async {
-        guard let apiKey = NexusKeychain.shared.apiKey, !apiKey.isEmpty else {
+        let selectedModel = model ?? defaultModel
+        let entry = selectedModel == nativeModel.modelID ? nativeModel : NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: selectedModel, displayName: selectedModel, isHidden: false)
+        guard let apiKey = NexusKeychain.shared.key(for: entry.providerID), !apiKey.isEmpty else {
             onError(NexusError.missingAPIKey)
             return
         }
-
-        let selectedModel = model ?? defaultModel
-        let entry = selectedModel == nativeModel.modelID ? nativeModel : NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: selectedModel, displayName: selectedModel, isHidden: false)
         guard let url = NexusProviderRequestBuilder.adapter(for: entry).endpoint(for: entry),
               let bodyData = try? NexusProviderRequestBuilder.body(model: entry, messages: messages) else {
             onError(NexusError.invalidResponse)

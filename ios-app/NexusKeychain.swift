@@ -11,6 +11,15 @@ final class NexusKeychain {
     private let apiKeyAccount = "anthropic_api_key"
     private let modelAccount = "selected_model"
 
+    func key(for providerID: String) -> String? {
+        load(account: "provider_api_key_\(providerID)") ?? (providerID == "anthropic" ? apiKey : nil)
+    }
+
+    func setKey(_ value: String?, for providerID: String) {
+        let account = "provider_api_key_\(providerID)"
+        if let value, !value.isEmpty { save(value, account: account) } else { delete(account: account) }
+    }
+
     // MARK: API Key
 
     var apiKey: String? {
