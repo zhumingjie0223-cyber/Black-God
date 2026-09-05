@@ -41,7 +41,13 @@ final class NexusModelRegistry: ObservableObject {
 
     init() {
         let native = NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-5", displayName: "Claude Opus 5", isHidden: false)
-        models = [native]
+        models = [
+            native,
+            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-fable-5", displayName: "Claude Fable 5", isHidden: false),
+            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-fable-5-1", displayName: "Claude Fable 5.1", isHidden: false),
+            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-4-8", displayName: "Claude Opus 4.8", isHidden: false),
+            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-sonnet-4-6", displayName: "Claude Sonnet 4.6", isHidden: false)
+        ]
         selectedID = native.id
     }
 
