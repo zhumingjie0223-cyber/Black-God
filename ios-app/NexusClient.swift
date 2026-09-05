@@ -64,8 +64,8 @@ enum NexusError: LocalizedError {
 actor NexusClient {
     static let shared = NexusClient()
 
-    private let baseURL = "https://api.anthropic.com/v1/messages"
     private let defaultModel = "claude-opus-5"
+    private let nativeModel = NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-5", displayName: "Claude Opus 5", isHidden: false)
 
     // MARK: 流式对话
 
@@ -81,14 +81,16 @@ actor NexusClient {
             return
         }
 
+        let selectedModel = model ?? defaultModel
+        let entry = selectedModel == nativeModel.modelID ? nativeModel : NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: selectedModel, displayName: selectedModel, isHidden: false)
         let body = AnthropicRequest(
-            model: model ?? defaultModel,
+            model: entry.modelID,
             maxTokens: 4096,
             stream: true,
             messages: messages.map { AnthropicMessage(role: $0.role, content: $0.content) }
         )
 
-        guard let url = URL(string: baseURL),
+        guard let url = AnthropicProviderAdapter().endpoint(for: entry),
               let bodyData = try? JSONEncoder().encode(body) else {
             onError(NexusError.invalidResponse)
             return
@@ -97,9 +99,9 @@ actor NexusClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = bodyData
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        for (name, value) in AnthropicProviderAdapter().headers(for: entry, apiKey: apiKey) {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
 
         do {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
