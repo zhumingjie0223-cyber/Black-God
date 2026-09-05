@@ -1,5 +1,18 @@
 import Foundation
 
+enum NexusPermissionError: LocalizedError {
+    case toolNotRegistered(String)
+    case requiresApproval(String)
+    case pathNotAllowed(String)
+    var errorDescription: String? {
+        switch self {
+        case .toolNotRegistered(let n): return "工具未注册：\(n)"
+        case .requiresApproval(let n): return "工具需要用户批准：\(n)"
+        case .pathNotAllowed(let p): return "路径不在允许范围：\(p)"
+        }
+    }
+}
+
 enum NexusToolRisk: String, Codable { case readOnly, workspaceWrite, externalCommand, network, destructive }
 
 struct NexusToolPolicy: Codable {
@@ -19,12 +32,12 @@ struct NexusPermissionGate {
         "shell": NexusToolPolicy(name: "shell", risk: .externalCommand, requiresApproval: true, allowedPaths: [])
     ])
 
-    func authorize(_ call: NexusToolCall, approved: Bool = false) -> Result<Void, String> {
-        guard let policy = policies[call.name] else { return .failure("工具未注册：\(call.name)") }
-        if policy.requiresApproval && !approved { return .failure("工具需要用户批准：\(call.name)") }
+    func authorize(_ call: NexusToolCall, approved: Bool = false) -> Result<Void, NexusPermissionError> {
+        guard let policy = policies[call.name] else { return .failure(.toolNotRegistered(call.name)) }
+        if policy.requiresApproval && !approved { return .failure(.requiresApproval(call.name)) }
         if let path = call.arguments["path"], !policy.allowedPaths.isEmpty,
            !policy.allowedPaths.contains(where: { path.hasPrefix($0) }) {
-            return .failure("路径不在允许范围：\(path)")
+            return .failure(.pathNotAllowed(path))
         }
         return .success(())
     }

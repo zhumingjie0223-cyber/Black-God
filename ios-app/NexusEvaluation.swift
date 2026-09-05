@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 struct NexusEvaluationRecord: Codable, Identifiable {
     let id: UUID

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 enum NexusProviderType: String, Codable { case anthropic, openAICompatible }
 

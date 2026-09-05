@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// Black God AI 的任务运行时：协调意图、模型、工具和实时事件。
 @MainActor

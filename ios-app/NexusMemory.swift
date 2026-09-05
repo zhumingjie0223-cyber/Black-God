@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 struct NexusMemoryItem: Codable, Identifiable, Equatable {
     let id: UUID
