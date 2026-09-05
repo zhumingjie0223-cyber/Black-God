@@ -7,6 +7,7 @@ final class NexusRuntime: ObservableObject {
     @Published private(set) var events: [NexusRunEvent] = []
     @Published private(set) var metrics = NexusRunMetrics()
     @Published private(set) var currentPlan: NexusTaskPlan?
+    @Published private(set) var pendingApprovals: [NexusToolCall] = []
     private(set) var observations: [NexusObservation] = []
     private(set) var verdicts: [NexusVerdict] = []
 
@@ -46,8 +47,10 @@ final class NexusRuntime: ObservableObject {
             return
         }
         let approved = approvalQueue.decision(for: call.id) ?? false
+        if approved { metrics.approvals += 1 }
         guard case .success = permissionGate.authorize(call, approved: approved) else {
             approvalQueue.enqueue(call)
+            pendingApprovals = approvalQueue.pending
             runState = .waitingForInput
             append(.status("工具调用等待批准：\(call.name)"))
             return
@@ -88,11 +91,14 @@ final class NexusRuntime: ObservableObject {
 
     func approveAndExecute(_ call: NexusToolCall) async {
         approvalQueue.approve(call.id)
+        pendingApprovals = approvalQueue.pending
         await execute(call)
     }
 
     func reject(_ call: NexusToolCall) {
         approvalQueue.reject(call.id)
+        pendingApprovals = approvalQueue.pending
+        metrics.rejections += 1
         runState = .failed("用户拒绝工具调用：\(call.name)")
         append(.status("已拒绝：\(call.name)"))
     }
