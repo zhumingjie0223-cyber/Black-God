@@ -7,6 +7,8 @@ final class NexusRuntime: ObservableObject {
     @Published private(set) var events: [NexusRunEvent] = []
     @Published private(set) var metrics = NexusRunMetrics()
     @Published private(set) var currentPlan: NexusTaskPlan?
+    private(set) var taskContract: NexusTaskContract?
+    private let terminationPolicy = NexusTerminationPolicy()
     @Published private(set) var pendingApprovals: [NexusToolCall] = []
     private(set) var observations: [NexusObservation] = []
     private(set) var verdicts: [NexusVerdict] = []
@@ -30,6 +32,7 @@ final class NexusRuntime: ObservableObject {
         guard !text.isEmpty else { return }
         runState = .planning
         currentPlan = planner.makePlan(for: text)
+        taskContract = NexusTaskContract(goal: text)
         observations.removeAll()
         verdicts.removeAll()
         append(.planned(prompt: text))
@@ -86,6 +89,8 @@ final class NexusRuntime: ObservableObject {
         if let plan = currentPlan {
             checkpointStore.save(NexusCheckpoint(plan: plan, observations: observations, verdicts: verdicts, savedAt: Date()))
         }
+        let decision = terminationPolicy.decide(contract: taskContract ?? NexusTaskContract(goal: ""), output: output, round: observations.count, verified: verdict.passed)
+        append(.status(decision.reason))
         append(.status(verdict.passed ? "结果验证通过" : "结果验证失败：\(verdict.reason)"))
     }
 
