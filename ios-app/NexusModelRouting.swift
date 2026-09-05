@@ -41,20 +41,16 @@ final class NexusModelRegistry: ObservableObject {
     @Published var selectedID: String
 
     init() {
-        let native = NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-5", displayName: "Claude Opus 5", isHidden: false)
-        var list = [
-            native,
-            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-fable-5", displayName: "Claude Fable 5", isHidden: false),
-            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-fable-5-1", displayName: "Claude Fable 5.1", isHidden: false),
-            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-4-8", displayName: "Claude Opus 4.8", isHidden: false),
-            NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-sonnet-4-6", displayName: "Claude Sonnet 4.6", isHidden: false)
-        ]
-        list.append(contentsOf: NexusExternalModels.all)
-        models = list
-        selectedID = native.id
+        models = NexusModelCatalog.entries
+        let saved = NexusKeychain.shared.selectedModel
+        selectedID = models.first(where: { $0.modelID == saved })?.id ?? models[0].id
     }
 
     var selected: NexusModelEntry { models.first(where: { $0.id == selectedID }) ?? models[0] }
     func register(_ model: NexusModelEntry) { if !models.contains(where: { $0.id == model.id }) { models.append(model) } }
-    func select(_ id: String) { if models.contains(where: { $0.id == id }) { selectedID = id } }
+    func select(_ id: String) {
+        guard let entry = models.first(where: { $0.id == id }) else { return }
+        selectedID = id
+        NexusKeychain.shared.selectedModel = entry.modelID
+    }
 }

@@ -21,7 +21,12 @@ final class NexusEvaluationStore: ObservableObject {
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         url = base.appendingPathComponent("nexus-evaluations.json")
         load()
+        NotificationCenter.default.addObserver(forName: .nexusDataWiped, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.clear() }
+        }
     }
+
+    func clear() { records = []; try? FileManager.default.removeItem(at: url) }
 
     func record(task: String, success: Bool, recovered: Bool, verified: Bool, latency: TimeInterval) {
         records.append(NexusEvaluationRecord(id: UUID(), task: task, success: success, recovered: recovered, verified: verified, latency: latency, createdAt: Date()))

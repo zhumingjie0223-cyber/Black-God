@@ -37,7 +37,7 @@ final class ChatViewModel: ObservableObject {
         lastError = nil
         statusHint = "正在规划任务…"
 
-        let selectedModel = modelRegistry.selected.modelID
+        let selectedModel = NexusKeychain.shared.selectedModel
         let memoryContext = memories
         let startedAt = Date()
 
@@ -128,5 +128,19 @@ final class ChatViewModel: ObservableObject {
         isTyping = false
         statusHint = nil
         runtime.cancel()
+    }
+
+    init() {
+        NotificationCenter.default.addObserver(forName: .nexusDataWiped, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.resetAfterWipe() }
+        }
+    }
+
+    /// 「清除全部数据」之后把会话恢复到首次启动状态（记忆/评估存储各自监听同一通知清空）
+    func resetAfterWipe() {
+        cancel()
+        handledToolCalls.removeAll()
+        lastError = nil
+        messages = [ChatMessage(role: "assistant", content: "神枢已就绪。请在设置中填写 API Key 开始对话。")]
     }
 }

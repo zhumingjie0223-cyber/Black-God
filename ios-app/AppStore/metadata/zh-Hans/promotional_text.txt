@@ -1,1 +1,1 @@
-自带 Anthropic API Key，直连 Claude 模型。无账号、无订阅、无服务器中转，对话记录只留在你的 iPhone 上。首个版本现已上线。
+自带 API Key，直连 Claude / GPT / DeepSeek / Grok 官方接口。无账号、无订阅、无服务器中转，数据只留在你的 iPhone 上。会规划、会执行、会自查的本地 AI 助手。

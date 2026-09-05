@@ -90,7 +90,7 @@ open BlackGod888.xcodeproj
 
 1. **截屏**：至少上传 6.7 英寸（iPhone 15 Pro Max / 16 Pro Max）尺寸 1290×2796 的截图 3~10 张。
    **成品已备好**：`screenshots.html` 里有 5 张带营销标语的精修图（主对话 → API Key 配置 →
-   多模型选择 → 本地历史记录 → 隐私安全），按 `screenshots_guide.md` 一键导出 PNG 后直接上传，
+   多模型选择 → 神枢监测 → 隐私安全），按 `screenshots_guide.md` 一键导出 PNG 后直接上传，
    不必再用模拟器裸截。（6.5 英寸尺寸 Apple 可自动缩放复用 6.7 英寸的，不用单独做。）
 2. **推广文本** ← `metadata/zh-Hans/promotional_text.txt`
 3. **描述** ← `metadata/zh-Hans/description.txt`

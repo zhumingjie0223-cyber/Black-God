@@ -1,4 +1,4 @@
-// APIConfigView.swift — API Key 配置界面
+// APIConfigView.swift — API Key 配置界面（多服务商，Key 按服务商分别存 Keychain）
 
 import SwiftUI
 
@@ -8,12 +8,11 @@ struct APIConfigView: View {
     @State private var saved = false
     @State private var showKey = false
 
-    private let models = [
-        "claude-opus-5", "claude-fable-5", "claude-fable-5-1",
-        "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
-        "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
-        "gpt-5", "deepseek-reasoner", "grok-4"
-    ]
+    private let entries = NexusModelCatalog.entries
+
+    private var provider: NexusProviderInfo {
+        NexusModelCatalog.provider(for: NexusModelCatalog.entry(for: selectedModel).providerID)
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,11 +20,11 @@ struct APIConfigView: View {
                 Section {
                     HStack {
                         if showKey {
-                            TextField("sk-ant-api03-...", text: $apiKey)
+                            TextField(keyPlaceholder, text: $apiKey)
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
                         } else {
-                            SecureField("sk-ant-api03-...", text: $apiKey)
+                            SecureField(keyPlaceholder, text: $apiKey)
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
                         }
@@ -37,16 +36,16 @@ struct APIConfigView: View {
                         }
                     }
                 } header: {
-                    Text("Anthropic API Key")
+                    Text("\(provider.displayName) API Key")
                 } footer: {
-                    Text("Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com")
+                    Text("Key 仅存储在本机 Keychain，按服务商分别保存，不上传任何服务器。\n获取 Key：\(provider.keyHint)")
                         .font(.caption)
                 }
 
                 Section("模型") {
                     Picker("选择模型", selection: $selectedModel) {
-                        ForEach(models, id: \.self) { model in
-                            Text(model).tag(model)
+                        ForEach(entries) { entry in
+                            Text(entry.displayName).tag(entry.modelID)
                         }
                     }
                     .pickerStyle(.menu)
@@ -54,12 +53,7 @@ struct APIConfigView: View {
 
                 Section {
                     Button {
-                        NexusKeychain.shared.apiKey = apiKey.trimmingCharacters(in: .whitespaces)
-                        NexusKeychain.shared.selectedModel = selectedModel
-                        saved = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            saved = false
-                        }
+                        save()
                     } label: {
                         HStack {
                             Spacer()
@@ -72,9 +66,23 @@ struct APIConfigView: View {
                 }
             }
             .navigationTitle("API 配置")
-            .onAppear {
-                apiKey = NexusKeychain.shared.apiKey ?? ""
-            }
+            .onAppear { loadKey() }
+            .onChange(of: selectedModel) { _, _ in loadKey() }
         }
+    }
+
+    private var keyPlaceholder: String {
+        provider.type == .anthropic ? "sk-ant-api03-..." : "sk-..."
+    }
+
+    private func loadKey() {
+        apiKey = NexusKeychain.shared.key(for: provider.id) ?? ""
+    }
+
+    private func save() {
+        NexusKeychain.shared.setKey(apiKey.trimmingCharacters(in: .whitespaces), for: provider.id)
+        NexusKeychain.shared.selectedModel = selectedModel
+        saved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
     }
 }

@@ -1,31 +1,36 @@
-Black God Nexus is a pure client-side AI chat assistant. Bring your own Anthropic API key, and the app talks to the model directly — no middleman servers, no accounts, and every conversation stays on your iPhone.
+Black God Nexus is a pure client-side AI assistant. Bring your own API key from a model provider, and the app talks to that provider's official API directly — no middleman servers, no accounts, and all data stays on your iPhone.
 
 ZERO BACKEND, DIRECT TO THE MODEL
-• Enter your own Anthropic API key and start chatting with Claude models right away
-• Requests go straight from your device to Anthropic's official API — never through our servers
+• Enter your own API key and use models from Anthropic (Claude), OpenAI (GPT), DeepSeek, or xAI (Grok)
+• Requests go straight from your device to the provider you chose — never through our servers
 • Streaming responses appear word by word in real time
-• Switch models freely; usage is billed to your own API account, and the app itself has no subscription
+• Keys are stored per provider and you can switch freely; usage is billed to your own API account, and the app itself has no subscription
+
+MORE THAN CHAT: PLANS, EXECUTES, VERIFIES
+• Complex tasks are broken into steps, executed and verified one by one, and re-planned automatically on failure
+• Built-in tool bus: clock, calculator, local file read/write; any write or command-type action requires your approval first
+• The Monitor tab shows task success, verification and recovery rates — all computed on-device
 
 PRIVACY FIRST, LOCAL STORAGE
-• Your API key is encrypted in the iOS Keychain and readable only on this device
-• Chat history is stored locally — never uploaded, synced, or analyzed
+• Your API keys are encrypted in the iOS Keychain and readable only on this device
+• Memory, run records and tool outputs are stored locally — never uploaded, synced, or analyzed
 • No account, no sign-up, no tracking, no ads
-• Wipe all data at any time with a single tap in Settings
+• Wipe all data with a single tap on the Me tab
 
 BUILT FOR IPHONE
-• Immersive dark theme with gold accents, easy on the eyes
+• Immersive dark theme with emerald accents, easy on the eyes
 • Native SwiftUI with smooth animations and haptic feedback
 • Shortcuts and Siri support — start a conversation hands-free
 • Fully localized in English and Simplified Chinese, following your system language
 
 WHO IT'S FOR
-• Developers and creators who already have an Anthropic API key and want the model in their pocket
+• Developers and creators who already have a provider API key and want the model in their pocket
 • Privacy-conscious users who don't want their conversations routed through any third party
-• Anyone looking for a clean AI chat tool with no ads and no subscription
+• Anyone looking for a clean AI tool with no ads and no subscription
 
 PLEASE NOTE
-• An Anthropic API key from console.anthropic.com is required to use this app
-• Model usage is billed directly by Anthropic to your API account, independent of this app
-• Black God Nexus is an independent third-party client and is not affiliated with Anthropic
+• An API key from your chosen provider (e.g. console.anthropic.com, platform.openai.com) is required to use this app
+• Model usage is billed directly by that provider to your API account, independent of this app
+• Black God Nexus is an independent third-party client and is not affiliated with Anthropic, OpenAI, DeepSeek, or xAI
 
-Nexus — AI conversations that truly belong to you.
+Nexus — AI that truly belongs to you.

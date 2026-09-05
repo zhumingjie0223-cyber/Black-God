@@ -8,6 +8,7 @@ struct ChatView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = ChatViewModel()
     @State private var input = ""
+    @State private var showConfig = false
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -28,6 +29,7 @@ struct ChatView: View {
             inputBar
         }
         .padding(.top, 50)
+        .sheet(isPresented: $showConfig) { APIConfigView().environmentObject(appState) }
     }
 
     var chatHeader: some View {
@@ -44,18 +46,16 @@ struct ChatView: View {
                 }
             }
             Spacer()
-            Button { appState.haptic() } label: {
-                Image(systemName: "phone.fill").font(.system(size: 18)).foregroundStyle(Color.bgGold)
+            Button { appState.haptic(); showConfig = true } label: {
+                Image(systemName: "gearshape.fill").font(.system(size: 18)).foregroundStyle(Color.bgGold)
             }
+            .accessibilityLabel("API 配置")
         }
         .padding(.horizontal, 16).padding(.bottom, 12).background(Color.bgDark.opacity(0.95))
     }
 
     var inputBar: some View {
         HStack(spacing: 10) {
-            Button { appState.haptic() } label: {
-                Image(systemName: "mic.fill").font(.system(size: 20)).foregroundStyle(Color.bgGold)
-            }
             TextField("跟Black God AI说点什么…", text: $input, axis: .vertical)
                 .focused($inputFocused).font(.bgBody()).foregroundStyle(Color.bgTextPrimary).lineLimit(1...4)
                 .padding(.horizontal, 16).padding(.vertical, 10)

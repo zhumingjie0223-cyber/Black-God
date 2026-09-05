@@ -13,7 +13,6 @@ struct RootView: View {
                 switch appState.currentTab {
                 case .chat: ChatView()
                 case .tools: ToolsView()
-                case .media: MediaView()
                 case .monitor: MonitorView()
                 case .me: MeView()
                 }

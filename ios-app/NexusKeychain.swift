@@ -43,6 +43,15 @@ final class NexusKeychain {
         return !key.isEmpty
     }
 
+    /// 抹掉本 App 在钥匙串里的全部条目（所有服务商 Key + 选中模型）。按 service 整体删，不逐个 account 枚举。
+    func wipeAll() {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
     // MARK: Keychain 操作
 
     private func save(_ value: String, account: String) {

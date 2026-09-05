@@ -21,7 +21,12 @@ final class NexusMemoryStore: ObservableObject {
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         url = base.appendingPathComponent("nexus-memory.json")
         load()
+        NotificationCenter.default.addObserver(forName: .nexusDataWiped, object: nil, queue: .main) { [weak self] _ in
+            self?.clear()
+        }
     }
+
+    func clear() { items = []; try? FileManager.default.removeItem(at: url) }
 
     func remember(_ text: String, kind: String = "episodic", source: String = "runtime", confidence: Double = 0.8, expiresAt: Date? = nil) {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
