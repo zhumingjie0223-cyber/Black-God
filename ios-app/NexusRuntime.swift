@@ -118,6 +118,7 @@ final class NexusRuntime: ObservableObject {
     func restoreCheckpoint() {
         guard let checkpoint = checkpointStore.load() else { return }
         currentPlan = checkpoint.plan
+        taskContract = NexusTaskContract(goal: checkpoint.plan.goal)
         observations = checkpoint.observations
         verdicts = checkpoint.verdicts
         runState = .paused
