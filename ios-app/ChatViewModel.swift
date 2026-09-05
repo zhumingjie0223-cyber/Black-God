@@ -12,6 +12,7 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var runtime = NexusRuntime()
     private let agentLoop = NexusAgentLoop()
     private var handledToolCalls = Set<UUID>()
+    @Published var modelRegistry = NexusModelRegistry()
 
     var apiKeyConfigured: Bool { NexusKeychain.shared.hasAPIKey }
     var currentMood: String { runtime.runState == .idle ? "就绪" : "运行中" }
@@ -31,6 +32,7 @@ final class ChatViewModel: ObservableObject {
         Task {
             await NexusClient.shared.streamChat(
                 messages: history,
+                model: self.modelRegistry.selected.modelID,
                 onDelta: { delta in
                     Task { @MainActor in
                         if reply.isEmpty {
