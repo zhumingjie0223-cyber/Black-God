@@ -52,6 +52,13 @@ final class ChatViewModel: ObservableObject {
 
                     }
                 },
+                onToolCall: { call in
+                    Task { @MainActor in
+                        guard !self.handledToolCalls.contains(call.id) else { return }
+                        self.handledToolCalls.insert(call.id)
+                        await self.runtime.execute(call)
+                    }
+                },
                 onComplete: {
                     Task { @MainActor in
                         let calls = self.agentLoop.calls(in: reply).filter { !self.handledToolCalls.contains($0.id) }

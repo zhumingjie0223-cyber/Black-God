@@ -74,6 +74,7 @@ actor NexusClient {
         messages: [ChatMessage],
         model: String? = nil,
         onDelta: @escaping (String) -> Void,
+        onToolCall: @escaping (NexusToolCall) -> Void = { _ in },
         onComplete: @escaping () -> Void,
         onError: @escaping (Error) -> Void
     ) async {
@@ -119,10 +120,10 @@ actor NexusClient {
                    let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any] {
                     if entry.providerType == .openAICompatible,
                        let toolCall = NexusNativeToolEventParser.parseOpenAI(obj) {
-                        onDelta("```json\\n{\\\"id\\\":\\\"\(toolCall.id.uuidString)\\\",\\\"name\\\":\\\"\(toolCall.name)\\\",\\\"arguments\\\":{}}\\n```")
+                        onToolCall(toolCall)
                     } else if entry.providerType == .anthropic,
                               let toolCall = NexusNativeToolEventParser.parse(obj) {
-                        onDelta("```json\\n{\\\"id\\\":\\\"\(toolCall.id.uuidString)\\\",\\\"name\\\":\\\"\(toolCall.name)\\\",\\\"arguments\\\":{}}\\n```")
+                        onToolCall(toolCall)
                     } else if entry.providerType == .openAICompatible,
                        let choices = obj["choices"] as? [[String: Any]],
                        let delta = choices.first?["delta"] as? [String: Any],
