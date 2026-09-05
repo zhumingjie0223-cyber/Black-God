@@ -1,0 +1,1 @@
+Bring your own Anthropic API key and chat with Claude directly. No account, no subscription, no relay servers. Your conversations never leave your iPhone.

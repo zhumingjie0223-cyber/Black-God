@@ -2,9 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>com.apple.security.application-groups</key>
-    <array>
-        <string>group.com.blackgod888.nexus</string>
-    </array>
+    <!-- 纯客户端架构，无需 App Groups / 网络扩展等特殊能力。
+         原 group.com.blackgod888.nexus 仅供已移除的 VPN 扩展使用，随其一并去掉，
+         避免未注册的 App Group 导致自动签名失败。 -->
 </dict>
 </plist>

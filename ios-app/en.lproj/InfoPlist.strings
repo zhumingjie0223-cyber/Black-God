@@ -1,0 +1,4 @@
+/* InfoPlist.strings — English: home-screen name and permission prompts */
+"CFBundleDisplayName" = "Nexus";
+"NSMicrophoneUsageDescription" = "The microphone is used for voice input.";
+"NSPhotoLibraryAddUsageDescription" = "Used to save generated images to your photo library.";

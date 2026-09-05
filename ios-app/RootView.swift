@@ -37,8 +37,9 @@ struct CustomTabBar: View {
                     VStack(spacing: 4) {
                         Image(systemName: tab.icon).font(.system(size: 22, weight: .medium))
                             .symbolEffect(.bounce, value: appState.currentTab == tab)
-                        Text(tab.title).font(.system(size: 10, weight: .medium))
+                        Text(tab.titleKey).font(.system(size: 10, weight: .medium))
                     }
+                    .accessibilityLabel(tab.title)
                     .foregroundStyle(appState.currentTab == tab ? AnyShapeStyle(LinearGradient.goldGradient) : AnyShapeStyle(Color.bgTextSecondary))
                     .frame(maxWidth: .infinity)
                 }

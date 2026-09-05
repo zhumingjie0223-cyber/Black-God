@@ -46,10 +46,10 @@ enum NexusError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingAPIKey: return "请先在设置中填写 Anthropic API Key"
-        case .invalidResponse: return "服务器返回格式异常"
+        case .missingAPIKey: return L10n.tr("error.missing_api_key")
+        case .invalidResponse: return L10n.tr("error.invalid_response")
         case .apiError(let msg): return msg
-        case .networkError(let e): return e.localizedDescription
+        case .networkError(let e): return L10n.tr("error.network", e.localizedDescription)
         }
     }
 }

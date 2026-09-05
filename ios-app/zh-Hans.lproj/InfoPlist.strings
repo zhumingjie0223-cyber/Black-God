@@ -1,0 +1,4 @@
+/* InfoPlist.strings — 简体中文：桌面显示名与系统权限说明 */
+"CFBundleDisplayName" = "神枢";
+"NSMicrophoneUsageDescription" = "语音输入需要使用麦克风。";
+"NSPhotoLibraryAddUsageDescription" = "用于把生成的图片保存到相册。";

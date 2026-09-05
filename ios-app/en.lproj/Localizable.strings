@@ -1,0 +1,69 @@
+/*
+  Localizable.strings — English
+  Black God Nexus
+
+  Keys mirror zh-Hans.lproj/Localizable.strings one-to-one.
+  Every key added there must be added here as well.
+*/
+
+/* ===== Bottom tabs ===== */
+"tab.chat" = "Chat";
+"tab.tools" = "Tools";
+"tab.media" = "Create";
+"tab.monitor" = "Monitor";
+"tab.me" = "Me";
+
+/* ===== Chat ===== */
+"chat.title" = "Nexus";
+"chat.input.placeholder" = "Say something to Nexus…";
+"chat.send" = "Send";
+"chat.typing" = "Typing…";
+
+/* ===== API configuration ===== */
+"api.title" = "API Settings";
+"api.key.section" = "Anthropic API Key";
+"api.key.footer" = "Your key is stored only in the on-device Keychain and never uploaded anywhere.\nGet a key at console.anthropic.com";
+"api.model.section" = "Model";
+"api.model.picker" = "Choose Model";
+"api.save" = "Save";
+"api.saved" = "Saved";
+"api.show_key" = "Show Key";
+"api.hide_key" = "Hide Key";
+
+/* ===== Me ===== */
+"me.connection" = "Nexus Connection";
+"me.connection.value" = "Direct · Keychain";
+"me.voice" = "Voice";
+"me.persona" = "Persona";
+"me.privacy" = "Privacy";
+"me.privacy.value" = "Local First";
+"me.footer" = "Black God Nexus · v%@\nClient-only · Direct to model · Local storage";
+
+/* ===== Errors ===== */
+"error.missing_api_key" = "Please enter your Anthropic API Key in Settings first";
+"error.invalid_response" = "Unexpected response format from server";
+"error.network" = "Network error: %@";
+
+/* ===== Common ===== */
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.delete" = "Delete";
+"common.clear_all" = "Clear All Data";
+"common.done" = "Done";
+
+/* ===== Legacy literal keys (existing views still use Chinese literals as keys) ===== */
+"赵思涵" = "Nexus";
+"跟思涵说点什么…" = "Say something to Nexus…";
+"API 配置" = "API Settings";
+"Anthropic API Key" = "Anthropic API Key";
+"Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com" = "Your key is stored only in the on-device Keychain and never uploaded anywhere.\nGet a key at console.anthropic.com";
+"模型" = "Model";
+"选择模型" = "Choose Model";
+"保存" = "Save";
+"已保存" = "Saved";
+"神枢连接" = "Nexus Connection";
+"语音音色" = "Voice";
+"人格模式" = "Persona";
+"隐私保护" = "Privacy";
+"本地优先" = "Local First";
+"神枢" = "Nexus";

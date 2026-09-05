@@ -1,0 +1,72 @@
+/*
+  Localizable.strings — 简体中文（开发语言）
+  神枢 Black God
+
+  规则：
+  1. key 用英文点分路径（如 tab.chat），不要直接用中文做 key。
+  2. 新增词条必须同时在 en.lproj/Localizable.strings 里补英文。
+  3. 其它 View 里仍在用中文字面量的 Text(...)，也以字面量为 key 收录在
+     「兼容字面量」区，这样不改代码就能得到英文翻译；后续逐步迁移到点分 key。
+*/
+
+/* ===== 底部 Tab ===== */
+"tab.chat" = "思涵";
+"tab.tools" = "工具";
+"tab.media" = "创作";
+"tab.monitor" = "监测";
+"tab.me" = "我的";
+
+/* ===== 对话页 ===== */
+"chat.title" = "赵思涵";
+"chat.input.placeholder" = "跟思涵说点什么…";
+"chat.send" = "发送";
+"chat.typing" = "正在输入…";
+
+/* ===== API 配置 ===== */
+"api.title" = "API 配置";
+"api.key.section" = "Anthropic API Key";
+"api.key.footer" = "Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com";
+"api.model.section" = "模型";
+"api.model.picker" = "选择模型";
+"api.save" = "保存";
+"api.saved" = "已保存";
+"api.show_key" = "显示 Key";
+"api.hide_key" = "隐藏 Key";
+
+/* ===== 我的页 ===== */
+"me.connection" = "神枢连接";
+"me.connection.value" = "直连 · Keychain";
+"me.voice" = "语音音色";
+"me.persona" = "人格模式";
+"me.privacy" = "隐私保护";
+"me.privacy.value" = "本地优先";
+"me.footer" = "神枢 Black God · v%@\n纯客户端 · 直连模型 · 本地存储";
+
+/* ===== 错误提示 ===== */
+"error.missing_api_key" = "请先在设置中填写 Anthropic API Key";
+"error.invalid_response" = "服务器返回格式异常";
+"error.network" = "网络连接失败：%@";
+
+/* ===== 通用 ===== */
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.delete" = "删除";
+"common.clear_all" = "清除全部数据";
+"common.done" = "完成";
+
+/* ===== 兼容字面量（现有 View 直接用中文做 key，暂不改代码） ===== */
+"赵思涵" = "赵思涵";
+"跟思涵说点什么…" = "跟思涵说点什么…";
+"API 配置" = "API 配置";
+"Anthropic API Key" = "Anthropic API Key";
+"Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com" = "Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com";
+"模型" = "模型";
+"选择模型" = "选择模型";
+"保存" = "保存";
+"已保存" = "已保存";
+"神枢连接" = "神枢连接";
+"语音音色" = "语音音色";
+"人格模式" = "人格模式";
+"隐私保护" = "隐私保护";
+"本地优先" = "本地优先";
+"神枢" = "神枢";
