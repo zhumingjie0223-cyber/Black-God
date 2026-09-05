@@ -44,7 +44,7 @@ Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎）；对�
 - 不要碰服务器（SSH/部署）除非权哥明确要求——当前是 iOS 纯客户端架构（零后端），更无需 VPS。
 - 做事必须先备份/归档再删除，禁止对未核实的目录做粗暴的 `rm -rf`/`git add -A` 一把梭。
 - "读一遍/看一遍"类要求必须完整输出原文，不许摘要、不许截断冒充读完。
-- 品牌/UI 相关决策（配色、Logo、核心视觉）改动前，先看 `web/logo.png` 或 `assets/logo/brand_logo.png`
+- 品牌/UI 相关决策（配色、Logo、核心视觉）改动前，先看 `assets/logo/brand_logo.png`（与 `ios-app/AppIcon.png` 同一张）
   现有品牌资产，新方案要能让现有 Logo 直接放上去浑然一体，不要另起炉灶。
 
 ## 常用命令

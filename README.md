@@ -81,45 +81,37 @@ cd ios-app && xcodegen generate && open BlackGod888.xcodeproj
 
 ```
 black-god/
-├── assets/                   ← 品牌与形象资产
-│   ├── logo/brand_logo.png   ← 神字 Logo（黑金浮雕）
-│   └── sihan/                ← 思涵形象（头像/全身/介绍视频）
-├── web/                      ← 旧网页壳静态资产遗留（sw.js/manifest/图标；后端已删，现为孤立文件）
-├── ui-spec/                  ← UI 设计规格
-│   ├── UI_V2_SPEC.md         ← 配色/动态/字体规范
-│   └── design_reference_10sets.html  ← 10 套高端设计参考
-├── docs/                     ← 项目文档
-│   ├── README.md             ← docs 目录导航（先看这个）
-│   ├── INDEX.md              ← 逐文件清单
-│   ├── architecture/         ← 架构文档
-│   ├── spec/                 ← 设计纲领与释义
-│   ├── plan/                 ← 规划与上线清单
-│   ├── product/              ← 产品定位与对外材料
-│   ├── done/                 ← 已完成任务归档
-│   └── archive/              ← 历史归档（旧 server/ 内核、收口下线的页面等）
+├── ios-app/                  ← ★ iOS 原生 App（当前主体：纯客户端 / Agent 闭环 / AppStore 上架材料与自动化）
 ├── shuyu/                    ← ★ 枢语引擎权威源（JS + Python 双实现 + 词根表 + 测试）
-├── ios-app/                  ← ★ iOS 原生 App（当前主体：纯客户端 / Agent 闭环 / AppStore 上架材料）
-├── android/                  ← Android TWA 上架材料
-├── skills/                   ← 技能定义
-└── tools/                    ← 推送辅助脚本
+├── assets/                   ← 品牌资产
+│   ├── logo/brand_logo.png   ← 神字 Logo
+│   └── sihan/                ← 旧人物形象素材（品牌已去人物化，去留待定）
+├── android/                  ← 旧 Android TWA 上架材料（指向已删网页版，去留待定）
+├── docs/                     ← 项目文档，索引见 docs/README.md
+│   ├── product/ spec/        ← 现行：产品唯一真相、ASI 差距审计、核心哲学、设计纲领
+│   ├── architecture/ design/ api/ ← 通用参考
+│   ├── done/                 ← 已完成任务归档
+│   └── archive/              ← 历史归档（含 nexus-do后端时代-2026-09-05/ 整体归档）
+├── codemagic.yaml            ← iOS 签名 + TestFlight 云端流水线
+└── Makefile                  ← make test = 枢语 Node + Python 测试
 ```
 
 > **当前主体是 `ios-app/`（iOS 纯客户端）与 `shuyu/`（枢语引擎）。** 原部署主体 `web/nexus-do/` 后端已于
-> 2026-09-05 删除；`web/` 下仅剩旧静态壳资产（见 `web/DEPRECATED_LEGACY_UI.md`）。早期 Python 服务端
-> `server/` 等已归档进 `docs/archive/`，均不在运行路径上。
+> 2026-09-05 删除；同日把后端时代的规划/架构/部署文档与零引用的 `web/`（旧 PWA 静态壳）、`skills/`、`ui-spec/`、
+> `tools/` 整体搬进 `docs/archive/nexus-do后端时代-2026-09-05/`（只搬不删，git 历史完整）。
 
 ---
 
 ## 核心文档
 
 - 📄 [docs/README.md](docs/README.md) — **文档总导航（从这里进）**
-- 📄 [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) — 系统架构
+- 📄 [docs/product/BLACK_GOD_NEXUS_CANONICAL.md](docs/product/BLACK_GOD_NEXUS_CANONICAL.md) — 产品唯一真相定义
+- 📄 [docs/product/ASI_GAP_AUDIT.md](docs/product/ASI_GAP_AUDIT.md) — ASI 差距审计（按当前 iOS 客户端盘点）
 - 📄 [docs/spec/CORE_PHILOSOPHY.md](docs/spec/CORE_PHILOSOPHY.md) — 核心哲学
 - 📄 [docs/spec/DESIGN_CHARTER_v2.md](docs/spec/DESIGN_CHARTER_v2.md) — 设计纲领 v2
-- 📄 [docs/plan/OPTIMIZATION_DESIGN.md](docs/plan/OPTIMIZATION_DESIGN.md) — 优化设计
-- 📄 [docs/plan/LAUNCH_CHECKLIST.md](docs/plan/LAUNCH_CHECKLIST.md) — 上线就绪清单
-- 📄 [docs/plan/神枢私人版强化方案-整理-2026-07-29.md](docs/plan/神枢私人版强化方案-整理-2026-07-29.md) — 六轴强化方案（待施工）
+- 📄 [ios-app/AppStore/SUBMIT_GUIDE.md](ios-app/AppStore/SUBMIT_GUIDE.md) — iOS 上架指南
 - 📄 [CHANGELOG.md](CHANGELOG.md) — 变更日志
+- 📄 [docs/archive/nexus-do后端时代-2026-09-05/](docs/archive/nexus-do后端时代-2026-09-05/) — 后端时代全部规划/架构/部署文档（历史归档）
 - 📄 [docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md](docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md) — 完整交接档案（历史归档）
 - 📄 [docs/archive/retrospective/PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md](docs/archive/retrospective/PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md) — 回溯与升级（历史归档）
 

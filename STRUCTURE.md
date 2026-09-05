@@ -21,30 +21,32 @@
 |---|---|
 | `make test` | 枢语 Node + Python 全部测试（本机可跑） |
 | `cd ios-app && xcodegen generate && open BlackGod888.xcodeproj` | 生成并打开 iOS 工程（需 macOS + Xcode） |
-| `tools/push_to_github.sh` | 推送辅助脚本 |
+| `codemagic.yaml` | iOS 签名 + TestFlight 云端流水线 |
 
-> 原 `tools/check-sync.mjs` / `tools/sync-ui.mjs`（源头↔nexus-do 消费副本 / 主界面↔构建产物 双副本校验）
-> 已随后端删除；双实现一致性现由 `shuyu/tests/engine.test.mjs` 的跨实现用例守护。
+> 原 `tools/`（`check-sync.mjs` / `sync-ui.mjs` / `push_to_github.sh`）已整体移除或归档：前两者是 nexus-do 消费副本校验，
+> 随后端删除；后者硬编码旧服务器路径且 `git add .` 一把梭，归档进 `docs/archive/nexus-do后端时代-2026-09-05/tools/`。
+> 双实现一致性现由 `shuyu/tests/engine.test.mjs` 的跨实现用例守护。
 
 ## 其它资产
 
 | 路径 | 说明 |
 |---|---|
-| `web/`（静态资产） | 旧网页壳遗留的 `sw.js` / `manifest.json` / 图标 / `theme.css`；原由已删除的 nexus-do Worker 托管，现为孤立静态文件（取舍待权哥拍板，暂不动） |
-| `android/` | Android TWA 上架材料 |
-| `assets/` | 品牌资产（`logo/brand_logo.png` 神字 Logo 等） |
-| `ui-spec/` | UI 设计规格 |
-| `skills/` | 技能定义 |
+| `assets/logo/brand_logo.png` | 品牌 Logo（与 `ios-app/AppIcon.png` 同一张图） |
+| `assets/sihan/` | 旧人物「思涵」形象素材；品牌已去人物化、iOS 代码零引用，**去留待权哥拍板** |
+| `android/` | 旧 Android TWA 上架材料，指向已删除的网页版域名；**去留待权哥拍板** |
 
-## 文档（全部在 docs/ 下，入口 `docs/README.md`）
+> 2026-09-05 已归档（零引用）：`web/`（旧 PWA 静态壳：sw.js/manifest/图标，调用已删的 `/api/push/*`）、
+> `skills/`（依赖不存在的服务器路径、含红队内容）、`ui-spec/`（旧人物化 UI 方案 + 与本项目无关的设计参考）。
+
+## 文档（全部在 docs/ 下，唯一索引 `docs/README.md`）
 
 | 路径 | 说明 |
 |---|---|
-| `docs/plan/` | 规划与上线清单 |
-| `docs/architecture/` `docs/spec/` | 架构与设计纲领 |
-| `docs/product/` | 产品定位与对外材料（含 `ASI_GAP_AUDIT.md`） |
+| `docs/product/` | 现行：`BLACK_GOD_NEXUS_CANONICAL.md`（产品唯一真相）、`ASI_GAP_AUDIT.md`、项目介绍等 |
+| `docs/spec/` | 现行：核心哲学、设计纲领 |
+| `docs/architecture/` `docs/design/` `docs/api/` | 通用参考（Agent 内核理论、自主意识方案、API 镜像；`DESIGN_SYSTEM_V3.md` 是未采用的备选方向） |
 | `docs/done/` | 已完成任务归档（TODO/PROGRESS 完工后进这里） |
-| `docs/archive/` | 历史归档（旧 Python server、收口下线页面、孤儿脚本等） |
+| `docs/archive/` | 历史归档；`nexus-do后端时代-2026-09-05/` 下是后端删除时整体搬入的旧计划/架构/部署/上架文档与遗留目录 |
 
 ## CI（`.github/workflows/`，共 2 条）
 
