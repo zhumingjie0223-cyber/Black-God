@@ -15,7 +15,12 @@ struct NexusShellTool: NexusTool {
         process.standardError = err
         do {
             try process.run()
-            process.waitUntilExit()
+            let timeout = Double(call.arguments["timeout"] ?? "30") ?? 30
+            let deadline = Date().addingTimeInterval(min(max(timeout, 1), 120))
+            while process.isRunning && Date() < deadline {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            if process.isRunning { process.terminate(); return NexusToolResult(callID: call.id, output: "命令超时并已终止", succeeded: false) }
             let stdout = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             let stderr = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             let result = (stdout + (stderr.isEmpty ? "" : "\n" + stderr)).trimmingCharacters(in: .whitespacesAndNewlines)

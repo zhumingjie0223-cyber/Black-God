@@ -22,6 +22,11 @@ struct ChatMessage: Identifiable, Codable {
 struct AnthropicMessage: Codable {
     let role: String
     let content: String
+
+    init(role: String, content: String) {
+        self.role = role
+        self.content = content
+    }
 }
 
 struct AnthropicRequest: Codable {
@@ -133,6 +138,10 @@ actor NexusClient {
         } catch {
             onError(NexusError.networkError(error))
         }
+    }
+
+    func toolResultMessage(_ result: NexusToolResult) -> ChatMessage {
+        ChatMessage(role: "user", content: "[tool_result:\(result.callID)]\n\(result.output)")
     }
 
     // MARK: 可用模型列表
