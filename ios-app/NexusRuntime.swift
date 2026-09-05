@@ -12,6 +12,7 @@ final class NexusRuntime: ObservableObject {
     private let planner: NexusPlanning = BasicNexusPlanner()
     private let verifier: NexusVerifying = BasicNexusVerifier()
     private var executionLoop = NexusExecutionLoop()
+    private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
     func begin(prompt: String) {

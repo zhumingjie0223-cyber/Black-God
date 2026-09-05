@@ -38,6 +38,10 @@ struct EchoTool: NexusTool {
 struct NexusExecutionLoop {
     private var registry: NexusToolRegistry
     init(registry: NexusToolRegistry = NexusToolRegistry()) { self.registry = registry }
-    mutating func installDefaults() { registry.register(EchoTool()) }
+    mutating func installDefaults() {
+        registry.register(EchoTool())
+        registry.register(NexusReadFileTool())
+        registry.register(NexusWriteFileTool())
+    }
     mutating func run(_ call: NexusToolCall) async -> NexusToolResult { await registry.execute(call) }
 }
