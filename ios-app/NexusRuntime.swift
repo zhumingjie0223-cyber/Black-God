@@ -5,6 +5,7 @@ import Foundation
 final class NexusRuntime: ObservableObject {
     @Published private(set) var runState: NexusRunState = .idle
     @Published private(set) var events: [NexusRunEvent] = []
+    @Published private(set) var metrics = NexusRunMetrics()
     @Published private(set) var currentPlan: NexusTaskPlan?
     private(set) var observations: [NexusObservation] = []
     private(set) var verdicts: [NexusVerdict] = []
@@ -52,6 +53,7 @@ final class NexusRuntime: ObservableObject {
             return
         }
         runState = .runningTool(name: call.name)
+        metrics.toolCalls += 1
         append(.toolStarted(name: call.name, input: call.arguments.description))
         var loop = executionLoop
         var result = await loop.run(call)
@@ -62,9 +64,11 @@ final class NexusRuntime: ObservableObject {
         }
         append(.toolOutput(result.output))
         autonomy.record(call, succeeded: result.succeeded)
+        if result.succeeded { metrics.successfulToolCalls += 1 } else { metrics.failedToolCalls += 1 }
         observe(output: result.output)
         if !result.succeeded && autonomy.canReplan() {
             runState = .planning
+            metrics.replans += 1
             append(.status("验证失败，允许重新规划"))
         } else {
             runState = result.succeeded ? .streaming : .failed(result.output)
