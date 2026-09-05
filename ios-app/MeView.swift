@@ -8,6 +8,10 @@ struct MeView: View {
     @EnvironmentObject var appState: AppState
     @State private var showNexusConnection = false
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -21,7 +25,7 @@ struct MeView: View {
                         .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
                     HStack(spacing: 8) {
                         Label("神枢", systemImage: "infinity")
-                        Label("888专属", systemImage: "crown.fill")
+                        Label("纯客户端", systemImage: "lock.fill")
                     }
                     .font(.system(size: 12)).foregroundStyle(Color.bgGold)
                 }
@@ -29,17 +33,15 @@ struct MeView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
                 VStack(spacing: 0) {
                     Button { appState.haptic(); showNexusConnection = true } label: {
-                        SettingRow(icon: "shield.lefthalf.filled", title: "神枢连接", value: "Cloudflare · Keychain", color: .bgGold)
+                        SettingRow(icon: "key.fill", title: "API 配置", value: "直连模型 · Keychain", color: .bgGold)
                     }
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "waveform", title: "语音音色", value: "灵光·甜美", color: .bgPurple)
-                    Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "heart.fill", title: "助手模式", value: "神枢", color: .pink)
+                    SettingRow(icon: "gearshape.2.fill", title: "工作模式", value: "本地 Agent 闭环", color: .bgCyan)
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "本地优先", color: .green)
                 }
                 .bgCard().padding(.horizontal, 16)
-                Text("Black God 888 · v1.0\nBlack God AI私人专属版 · 神枢")
+                Text("神枢 Black God · v\(appVersion)\n纯客户端 · 直连模型 · 本地存储")
                     .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                     .multilineTextAlignment(.center).padding(.top, 8)
             }

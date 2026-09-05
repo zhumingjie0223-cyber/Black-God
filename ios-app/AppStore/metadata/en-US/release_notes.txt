@@ -1,0 +1,6 @@
+What's new in v1.1.0:
+• New execution loop: give it a goal and the assistant plans steps, calls tools, executes step by step, verifies the result, and retries within budget when a check fails.
+• Multi-provider direct connect: Anthropic, OpenAI, DeepSeek, and xAI (Grok); each provider's API key is encrypted separately in the on-device Keychain.
+• Built-in read-only tools: clock, calculator and more run locally; tools that write require your confirmation first.
+• On-device capability monitor: task success rate, verification rate and recovery rate, stored only on your device.
+• UI and privacy polish: streamlined to Chat, Capabilities, Monitor and Me; removed unused permissions for a smaller privacy footprint.

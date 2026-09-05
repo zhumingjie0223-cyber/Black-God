@@ -58,14 +58,13 @@ class AppState: ObservableObject {
 // MARK: - 底部 Tab
 
 enum AppTab: Int, CaseIterable {
-    case chat = 0, tools, media, monitor, me
+    case chat = 0, tools, monitor, me
 
     /// 本地化 key，供 SwiftUI `Text(LocalizedStringKey)` 直接使用
     var titleKey: LocalizedStringKey {
         switch self {
         case .chat: return "tab.chat"
         case .tools: return "tab.tools"
-        case .media: return "tab.media"
         case .monitor: return "tab.monitor"
         case .me: return "tab.me"
         }
@@ -76,7 +75,6 @@ enum AppTab: Int, CaseIterable {
         switch self {
         case .chat: return L10n.tr("tab.chat")
         case .tools: return L10n.tr("tab.tools")
-        case .media: return L10n.tr("tab.media")
         case .monitor: return L10n.tr("tab.monitor")
         case .me: return L10n.tr("tab.me")
         }
@@ -84,8 +82,8 @@ enum AppTab: Int, CaseIterable {
 
     var icon: String {
         switch self {
-        case .chat: return "message.fill"; case .tools: return "terminal.fill"
-        case .media: return "wand.and.stars"; case .monitor: return "waveform.path.ecg"
+        case .chat: return "message.fill"; case .tools: return "wrench.and.screwdriver.fill"
+        case .monitor: return "waveform.path.ecg"
         case .me: return "person.fill"
         }
     }
