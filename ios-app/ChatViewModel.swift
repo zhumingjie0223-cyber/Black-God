@@ -40,6 +40,7 @@ final class ChatViewModel: ObservableObject {
                         self.runtime.append(.text(delta))
                         for call in NexusToolCallParser.extract(from: reply) {
                             self.runtime.append(.toolStarted(name: call.name, input: call.arguments.description))
+                            await self.runtime.execute(call)
                         }
                     }
                 },

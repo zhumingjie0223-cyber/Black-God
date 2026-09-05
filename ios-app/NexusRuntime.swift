@@ -34,6 +34,17 @@ final class NexusRuntime: ObservableObject {
         if events.count > 500 { events.removeFirst(events.count - 500) }
     }
 
+    func execute(_ call: NexusToolCall) async {
+        runState = .runningTool(name: call.name)
+        append(.toolStarted(name: call.name, input: call.arguments.description))
+        var loop = executionLoop
+        let result = await loop.run(call)
+        executionLoop = loop
+        append(.toolOutput(result.output))
+        observe(output: result.output)
+        runState = result.succeeded ? .streaming : .failed(result.output)
+    }
+
     func observe(output: String) {
         guard let step = currentPlan?.steps.first(where: { $0.status == .running || $0.status == .pending }) else { return }
         observations.append(NexusObservation(stepID: step.id, output: output, timestamp: Date()))
