@@ -14,6 +14,7 @@ final class NexusRuntime: ObservableObject {
     private var executionLoop = NexusExecutionLoop()
     private var activeTask: Task<Void, Never>?
     private let recovery = NexusRecoveryController()
+    private let autonomy = NexusAutonomyController()
     private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
@@ -37,6 +38,10 @@ final class NexusRuntime: ObservableObject {
     }
 
     func execute(_ call: NexusToolCall) async {
+        guard autonomy.shouldExecute(call) else {
+            append(.status("已跳过重复工具调用"))
+            return
+        }
         runState = .runningTool(name: call.name)
         append(.toolStarted(name: call.name, input: call.arguments.description))
         var loop = executionLoop
@@ -47,8 +52,14 @@ final class NexusRuntime: ObservableObject {
             result = await loop.run(call)
         }
         append(.toolOutput(result.output))
+        autonomy.record(call, succeeded: result.succeeded)
         observe(output: result.output)
-        runState = result.succeeded ? .streaming : .failed(result.output)
+        if !result.succeeded && autonomy.canReplan() {
+            runState = .planning
+            append(.status("验证失败，允许重新规划"))
+        } else {
+            runState = result.succeeded ? .streaming : .failed(result.output)
+        }
     }
 
     func observe(output: String) {
@@ -56,6 +67,9 @@ final class NexusRuntime: ObservableObject {
         observations.append(NexusObservation(stepID: step.id, output: output, timestamp: Date()))
         let verdict = verifier.verify(goal: currentPlan?.goal ?? "", output: output)
         verdicts.append(verdict)
+        if let plan = currentPlan {
+            checkpointStore.save(NexusCheckpoint(plan: plan, observations: observations, verdicts: verdicts, savedAt: Date()))
+        }
         append(.status(verdict.passed ? "结果验证通过" : "结果验证失败：\(verdict.reason)"))
     }
 
