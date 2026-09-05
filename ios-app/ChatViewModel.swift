@@ -40,15 +40,16 @@ final class ChatViewModel: ObservableObject {
                         }
                         reply += delta
                         self.runtime.append(.text(delta))
-                        for call in self.agentLoop.calls(in: reply) where !self.handledToolCalls.contains(call.id) {
-                            self.handledToolCalls.insert(call.id)
-                            await self.runtime.execute(call)
-                        }
 
                     }
                 },
                 onComplete: {
                     Task { @MainActor in
+                        let calls = self.agentLoop.calls(in: reply).filter { !self.handledToolCalls.contains($0.id) }
+                        for call in calls {
+                            self.handledToolCalls.insert(call.id)
+                            await self.runtime.execute(call)
+                        }
                         self.isTyping = false
                         self.runtime.observe(output: reply)
                         self.runtime.append(.completed)
