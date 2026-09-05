@@ -115,14 +115,18 @@ actor NexusClient {
                 guard data != "[DONE]" else { break }
 
                 if let json = data.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
-                   let type_ = obj["type"] as? String {
-
-                    if type_ == "content_block_delta",
-                       let delta = obj["delta"] as? [String: Any],
-                       let text = delta["text"] as? String {
+                   let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any] {
+                    if entry.providerType == .openAICompatible,
+                       let choices = obj["choices"] as? [[String: Any]],
+                       let delta = choices.first?["delta"] as? [String: Any],
+                       let text = delta["content"] as? String {
                         onDelta(text)
-                    } else if type_ == "message_stop" {
+                    } else if let type_ = obj["type"] as? String,
+                              type_ == "content_block_delta",
+                              let delta = obj["delta"] as? [String: Any],
+                              let text = delta["text"] as? String {
+                        onDelta(text)
+                    } else if obj["type"] as? String == "message_stop" {
                         break
                     }
                 }
