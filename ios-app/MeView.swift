@@ -1,5 +1,5 @@
 //
-//  MeView.swift — 我的页（赵思涵专属）
+//  MeView.swift — 我的页（Black God AI专属）
 //
 
 import SwiftUI
@@ -15,8 +15,8 @@ struct MeView: View {
                     Image("sihan-full").resizable().scaledToFill()
                         .frame(width: 100, height: 100).clipShape(Circle())
                         .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 3))
-                    Text("赵思涵").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
-                    Text("23岁 · 顶级黑客千金 · 只属于权哥")
+                    Text("Black God AI").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
+                    Text("Black God AI 助手 · 为你工作")
                         .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
                     HStack(spacing: 8) {
                         Label("神枢", systemImage: "infinity")
@@ -33,12 +33,12 @@ struct MeView: View {
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "waveform", title: "语音音色", value: "灵光·甜美", color: .bgPurple)
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "heart.fill", title: "人格模式", value: "神枢", color: .pink)
+                    SettingRow(icon: "heart.fill", title: "助手模式", value: "神枢", color: .pink)
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "本地优先", color: .green)
                 }
                 .bgCard().padding(.horizontal, 16)
-                Text("Black God 888 · v1.0\n赵思涵私人专属版 · 神枢")
+                Text("Black God 888 · v1.0\nBlack God AI私人专属版 · 神枢")
                     .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                     .multilineTextAlignment(.center).padding(.top, 8)
             }

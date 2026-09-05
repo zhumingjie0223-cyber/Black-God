@@ -10,15 +10,15 @@
 */
 
 /* ===== 底部 Tab ===== */
-"tab.chat" = "思涵";
+"tab.chat" = "Black God AI";
 "tab.tools" = "工具";
 "tab.media" = "创作";
 "tab.monitor" = "监测";
 "tab.me" = "我的";
 
 /* ===== 对话页 ===== */
-"chat.title" = "赵思涵";
-"chat.input.placeholder" = "跟思涵说点什么…";
+"chat.title" = "Black God AI";
+"chat.input.placeholder" = "跟Black God AI说点什么…";
 "chat.send" = "发送";
 "chat.typing" = "正在输入…";
 
@@ -37,7 +37,7 @@
 "me.connection" = "神枢连接";
 "me.connection.value" = "直连 · Keychain";
 "me.voice" = "语音音色";
-"me.persona" = "人格模式";
+"me.persona" = "助手模式";
 "me.privacy" = "隐私保护";
 "me.privacy.value" = "本地优先";
 "me.footer" = "神枢 Black God · v%@\n纯客户端 · 直连模型 · 本地存储";
@@ -55,8 +55,8 @@
 "common.done" = "完成";
 
 /* ===== 兼容字面量（现有 View 直接用中文做 key，暂不改代码） ===== */
-"赵思涵" = "赵思涵";
-"跟思涵说点什么…" = "跟思涵说点什么…";
+"Black God AI" = "Black God AI";
+"跟Black God AI说点什么…" = "跟Black God AI说点什么…";
 "API 配置" = "API 配置";
 "Anthropic API Key" = "Anthropic API Key";
 "Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com" = "Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com";
@@ -66,7 +66,7 @@
 "已保存" = "已保存";
 "神枢连接" = "神枢连接";
 "语音音色" = "语音音色";
-"人格模式" = "人格模式";
+"助手模式" = "助手模式";
 "隐私保护" = "隐私保护";
 "本地优先" = "本地优先";
 "神枢" = "神枢";

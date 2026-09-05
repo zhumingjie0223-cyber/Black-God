@@ -52,8 +52,8 @@
 "common.done" = "Done";
 
 /* ===== Legacy literal keys (existing views still use Chinese literals as keys) ===== */
-"赵思涵" = "Nexus";
-"跟思涵说点什么…" = "Say something to Nexus…";
+"Black God AI" = "Nexus";
+"跟Black God AI说点什么…" = "Say something to Nexus…";
 "API 配置" = "API Settings";
 "Anthropic API Key" = "Anthropic API Key";
 "Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com" = "Your key is stored only in the on-device Keychain and never uploaded anywhere.\nGet a key at console.anthropic.com";
@@ -63,7 +63,7 @@
 "已保存" = "Saved";
 "神枢连接" = "Nexus Connection";
 "语音音色" = "Voice";
-"人格模式" = "Persona";
+"助手模式" = "Persona";
 "隐私保护" = "Privacy";
 "本地优先" = "Local First";
 "神枢" = "Nexus";

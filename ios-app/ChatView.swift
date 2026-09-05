@@ -1,5 +1,5 @@
 //
-//  ChatView.swift — 赵思涵对话界面
+//  ChatView.swift — Black God AI对话界面
 //
 
 import SwiftUI
@@ -43,7 +43,7 @@ struct ChatView: View {
                 .frame(width: 44, height: 44).clipShape(Circle())
                 .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 2))
             VStack(alignment: .leading, spacing: 2) {
-                Text("赵思涵").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
+                Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
                 HStack(spacing: 4) {
                     Circle().fill(Color.green).frame(width: 6, height: 6)
                     Text(vm.currentMood).font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
@@ -62,7 +62,7 @@ struct ChatView: View {
             Button { appState.haptic() } label: {
                 Image(systemName: "mic.fill").font(.system(size: 20)).foregroundStyle(Color.bgGold)
             }
-            TextField("跟思涵说点什么…", text: $input, axis: .vertical)
+            TextField("跟Black God AI说点什么…", text: $input, axis: .vertical)
                 .focused($inputFocused).font(.bgBody()).foregroundStyle(Color.bgTextPrimary).lineLimit(1...4)
                 .padding(.horizontal, 16).padding(.vertical, 10)
                 .background(RoundedRectangle(cornerRadius: 22).fill(Color.bgCardLight))

@@ -67,7 +67,7 @@ struct MonitorView: View {
                             Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
                             Text("已从神枢读取运行状态").font(.bgBody()).foregroundStyle(Color.bgTextPrimary)
                         }
-                        Text("灵魂版本 \(stats.soulVersion ?? 0) · \(model.refreshedAt?.formatted(date: .omitted, time: .standard) ?? "刚刚") 更新")
+                        Text("引擎版本 \(stats.soulVersion ?? 0) · \(model.refreshedAt?.formatted(date: .omitted, time: .standard) ?? "刚刚") 更新")
                             .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading).padding(16).bgCard().padding(.horizontal, 16)

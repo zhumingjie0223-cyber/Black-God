@@ -51,8 +51,8 @@ struct MediaView: View {
     var placeholder: String {
         switch selectedMode {
         case 0: return "一个冷白皮黑长直的美女…"
-        case 1: return "赵思涵转身回眸的动态镜头…"
-        default: return "权哥，今晚想听我说什么～"
+        case 1: return "Black God AI转身回眸的动态镜头…"
+        default: return "用户，今晚想听我说什么～"
         }
     }
 }
