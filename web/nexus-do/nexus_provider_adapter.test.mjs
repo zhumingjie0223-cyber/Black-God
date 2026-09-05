@@ -158,3 +158,21 @@ test('用量提取兼容 OpenAI/Anthropic/Gemini 字段', () => {
   assert.deepEqual(extractProviderUsage('anthropic', { usage: { input_tokens: 4, output_tokens: 6 } }), { input_tokens: 4, output_tokens: 6, total_tokens: 10 });
   assert.deepEqual(extractProviderUsage('gemini', { usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 8, totalTokenCount: 15 } }), { input_tokens: 7, output_tokens: 8, total_tokens: 15 });
 });
+
+test('退避等待期间收到取消信号：返回 aborted 而不是抛异常', async () => {
+  let hits = 0;
+  const ac = new AbortController();
+  const fetchImpl = async () => {
+    hits += 1;
+    // 第一次 503 触发退避；退避期间调用方取消
+    setTimeout(() => ac.abort(), 20);
+    return new Response(JSON.stringify({ error: 'down' }), { status: 503, headers: { 'retry-after': '5' } });
+  };
+  const req = buildProviderRequest({ provider: 'openai', base: 'https://example.test/v1', key: 'k', model: 'm', userInput: 'hi' });
+  const t0 = Date.now();
+  const out = await executeProviderJSONRequest({ request: req, fetchImpl, retries: 2, signal: ac.signal });
+  assert.equal(out.ok, false);
+  assert.equal(out.error, 'aborted');
+  assert.equal(hits, 1);
+  assert.ok(Date.now() - t0 < 2000, '不应等满 Retry-After 的 5 秒');
+});

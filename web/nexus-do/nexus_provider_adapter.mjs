@@ -7,16 +7,17 @@ import { normalizeToolCallId, repairAgentHistory } from './nexus_turn_engine.mjs
 
 const asText = (value, max = 16_000) => String(value ?? '').slice(0, max);
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
-const sleep = (ms, signal) => new Promise((resolve, reject) => {
-  if (!(ms > 0)) return resolve();
-  if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+// 退避等待：取消信号到来时提前结束（resolve 而非 reject），由调用方循环开头统一判定 aborted，
+// 避免在 catch 分支里的 await 抛出未捕获异常。
+const sleep = (ms, signal) => new Promise((resolve) => {
+  if (!(ms > 0) || signal?.aborted) return resolve();
   const timer = setTimeout(() => {
     signal?.removeEventListener?.('abort', onAbort);
     resolve();
   }, ms);
   const onAbort = () => {
     clearTimeout(timer);
-    reject(new DOMException('Aborted', 'AbortError'));
+    resolve();
   };
   signal?.addEventListener?.('abort', onAbort, { once: true });
 });

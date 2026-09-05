@@ -9528,19 +9528,19 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
       const guess = locked || this.brainProvider(brain.url, model);
       const dialects = locked ? [locked] : [guess, ...['openai', 'openai-responses', 'anthropic', 'gemini'].filter(p => p !== guess)];
       for (const provider of dialects) {
-        try {
-          const call = (withT) => { const req = this.buildBrainReq(provider, brain.url, brain.key, model, '你是神枢', '嗨', { maxTokens: 16, ...(withT ? { temperature: 0.7 } : {}) }); return fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) }); };
-          let r = await call(true);
-          if (!r.ok && r.status === 400) r = await call(false);
-          if (r.ok) {
-            const d = await r.json().catch(() => null);
-            const text = this.parseBrainText(provider, d);
-            if (text && text.trim()) { res.ok = true; res.dialect = provider; break; }
-            res.err = '连通但解析空'; if (!locked && provider !== dialects[dialects.length - 1]) continue; break;
-          }
-          if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { res.err = 'HTTP ' + r.status; continue; }
-          const b = await r.text().catch(() => ''); res.err = 'HTTP ' + r.status + (b ? '：' + b.replace(/\s+/g, ' ').slice(0, 50) : ''); break;
-        } catch (e) { res.err = String(e && e.message || e).slice(0, 50); break; }
+        // 健康探测走统一执行器：12s 超时、不重试（探测就是要快，卡住的网关本身就是"挂"）
+        const call = (withT) => { const req = this.buildBrainReq(provider, brain.url, brain.key, model, '你是神枢', '嗨', { maxTokens: 16, ...(withT ? { temperature: 0.7 } : {}) }); return executeProviderJSONRequest({ request: req, timeoutMs: 12_000, retries: 0 }); };
+        let r = await call(true);
+        if (!r.ok && r.status === 400) r = await call(false);
+        if (r.ok) {
+          const text = this.parseBrainText(provider, r.data);
+          if (text && text.trim()) { res.ok = true; res.dialect = provider; break; }
+          res.err = '连通但解析空'; if (!locked && provider !== dialects[dialects.length - 1]) continue; break;
+        }
+        if (r.error === 'timeout') { res.err = '超时(12s)'; break; }
+        if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { res.err = 'HTTP ' + r.status; continue; }
+        const b = String(r.text || r.error || '');
+        res.err = (r.status ? 'HTTP ' + r.status : '连不上') + (b ? '：' + b.replace(/\s+/g, ' ').slice(0, 50) : ''); break;
       }
       res.ms = Date.now() - t0;
       return res;
@@ -9695,17 +9695,15 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
           }
           const body = String(r.text || r.error || '');
           diagStatus = r.status || 0; diagBody = body;   // 反思:留证供自诊断
-          if (r.error === 'aborted') { lastErr = `${tag}：请求已取消`; break; }
+          // 调用方取消：直接短路返回，不换方言、不换脑、不给这条脑记连败（取消不是脑的错）
+          if (r.error === 'aborted') return { _aborted: true, ok: false, reply: '请求已取消', model: 'cancelled', tier, provider };
           if (r.error === 'invalid_json') {
             lastErr = `${tag}：响应不是合法 JSON`;
             if (!locked && provider !== dialects[dialects.length - 1]) continue;
             break;
           }
-          if (r.error === 'timeout') {
-            lastErr = `${tag}：请求超时(${Math.round(callTimeoutMs / 1000)}s)`;
-            if (!locked && provider !== dialects[dialects.length - 1]) continue;
-            break;
-          }
+          // 超时说明这家网关慢/挂，不是格式问题（格式不对通常秒回 404/400）→ 不再逐个方言耗时间，换下一条脑
+          if (r.error === 'timeout') { lastErr = `${tag}：请求超时(${Math.round(callTimeoutMs / 1000)}s)`; break; }
           // 404/400 视为"格式可能不对":未锁定则换方言再试;其它(401/403/429/5xx)是真错,不乱换方言
           if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = `${tag}·${provider} HTTP ${r.status}`; continue; }
           lastErr = `${tag} 报错 ${r.status ? ('HTTP ' + r.status) : '请求失败'}${body ? '：' + body.replace(/\s+/g, ' ').slice(0, 100) : ''}`;
@@ -11629,16 +11627,14 @@ module.exports = { FRIDA_INLINE_HOOK, CPP_INLINE_HOOK, GOT_HOOK };
         return { ok: false, err: '空回复' };
       }
       const body = String(r.text || r.error || '');
+      if (r.error === 'aborted') return { ok: false, err: '请求已取消' };
       if (r.error === 'invalid_json') {
         lastErr = '响应不是合法 JSON';
         if (!locked && provider !== dialects[dialects.length - 1]) continue;
         return { ok: false, err: lastErr };
       }
-      if (r.error === 'timeout') {
-        lastErr = `网关响应超时(${Math.round(timeoutMs / 1000)}s)`;
-        if (!locked && provider !== dialects[dialects.length - 1]) continue;
-        return { ok: false, err: lastErr };
-      }
+      // 超时不是格式问题，不再逐个方言耗时间，直接如实报
+      if (r.error === 'timeout') return { ok: false, err: `网关响应超时(${Math.round(timeoutMs / 1000)}s)` };
       // 格式可能不对(404/400)且未锁定 → 换方言;真错(401/429/5xx)直接如实报
       if ((r.status === 404 || r.status === 400) && !locked && provider !== dialects[dialects.length - 1]) { lastErr = 'HTTP ' + r.status; lastDetail = body.replace(/\s+/g, ' ').slice(0, 140); continue; }
       return { ok: false, err: r.status ? ('HTTP ' + r.status) : '请求失败', detail: body.replace(/\s+/g, ' ').slice(0, 140) };
