@@ -1,159 +1,149 @@
-//
-// NexusClient.swift — iOS ↔ Cloudflare 神枢协议客户端
-//
-// 所有对话、Agent plan/approve/execute 与 WebSocket 票据均指向神枢 Worker。
-// owner token 从 NexusKeychain 读取；它永不进入 URL、AppStorage 或错误字符串。
+// NexusClient.swift — 纯客户端直连 Anthropic API
+// 用户自带 API key，存 Keychain，直连，零后端依赖
 
 import Foundation
 
-struct NexusTalkResponse: Decodable {
-    let turnId: String?
-    let reply: String
-    let model: String?
-    let agentSteps: Int?
+// MARK: - 数据模型
 
-    enum CodingKeys: String, CodingKey {
-        case turnId, reply, model
-        case agentSteps = "agent_steps"
+struct ChatMessage: Identifiable, Codable {
+    let id: UUID
+    var role: String   // "user" | "assistant"
+    var content: String
+    var createdAt: Date
+
+    init(id: UUID = UUID(), role: String, content: String) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.createdAt = Date()
     }
 }
 
-struct NexusStatsResponse: Decodable {
-    let uptimeSeconds: Int?
-    let soulVersion: Int?
-    let experienceCount: Int?
-    let innerVoiceCount: Int?
-    let worldEntities: Int?
-    let capabilities: Int?
-    let storageSizeKB: String?
+struct AnthropicMessage: Codable {
+    let role: String
+    let content: String
+}
+
+struct AnthropicRequest: Codable {
+    let model: String
+    let maxTokens: Int
+    let stream: Bool
+    let messages: [AnthropicMessage]
 
     enum CodingKeys: String, CodingKey {
-        case uptimeSeconds = "uptime_s"
-        case soulVersion = "soul_version"
-        case experienceCount = "experience_count"
-        case innerVoiceCount = "inner_voice_count"
-        case worldEntities = "world_entities"
-        case capabilities
-        case storageSizeKB = "storage_size_est_kb"
+        case model, stream, messages
+        case maxTokens = "max_tokens"
     }
 }
 
-struct NexusAgentPlanResponse: Decodable {
-    let ok: Bool
-    let error: String?
-    let approvalToken: String?
-    let run: NexusAgentRun?
-}
+// MARK: - 错误
 
-struct NexusAgentRun: Decodable, Identifiable {
-    let runId: String
-    let capability: String
-    let phase: String
-    let risk: String?
-    let approvalRequired: Bool?
-    let effectId: String?
-
-    var id: String { runId }
-}
-
-enum NexusClientError: LocalizedError {
-    case invalidBaseURL
-    case ownerTokenMissing
-    case badResponse
-    case server(status: Int, message: String)
+enum NexusError: LocalizedError {
+    case missingAPIKey
+    case invalidResponse
+    case apiError(String)
+    case networkError(Error)
 
     var errorDescription: String? {
         switch self {
-        case .invalidBaseURL: return "神枢地址无效"
-        case .ownerTokenMissing: return "请先在神枢连接设置中保存主人令牌"
-        case .badResponse: return "神枢返回无法识别的数据"
-        case .server(let status, let message): return "神枢请求失败（\(status)）：\(message)"
+        case .missingAPIKey: return "请先在设置中填写 Anthropic API Key"
+        case .invalidResponse: return "服务器返回格式异常"
+        case .apiError(let msg): return msg
+        case .networkError(let e): return e.localizedDescription
         }
     }
 }
 
-struct NexusClient {
-    let baseURL: URL
-    private let session: URLSession
+// MARK: - 客户端
 
-    init(base: String, session: URLSession = .shared) throws {
-        let normalized = base.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard let url = URL(string: normalized), url.scheme == "https" || url.scheme == "http" else {
-            throw NexusClientError.invalidBaseURL
+actor NexusClient {
+    static let shared = NexusClient()
+
+    private let baseURL = "https://api.anthropic.com/v1/messages"
+    private let defaultModel = "claude-opus-5"
+
+    // MARK: 流式对话
+
+    func streamChat(
+        messages: [ChatMessage],
+        model: String? = nil,
+        onDelta: @escaping (String) -> Void,
+        onComplete: @escaping () -> Void,
+        onError: @escaping (Error) -> Void
+    ) async {
+        guard let apiKey = NexusKeychain.shared.apiKey, !apiKey.isEmpty else {
+            onError(NexusError.missingAPIKey)
+            return
         }
-        self.baseURL = url
-        self.session = session
-    }
 
-    private func ownerToken() throws -> String {
-        guard let token = NexusKeychain.read(.ownerToken), !token.isEmpty else { throw NexusClientError.ownerTokenMissing }
-        return token
-    }
+        let body = AnthropicRequest(
+            model: model ?? defaultModel,
+            maxTokens: 4096,
+            stream: true,
+            messages: messages.map { AnthropicMessage(role: $0.role, content: $0.content) }
+        )
 
-    private func endpoint(_ path: String) throws -> URL {
-        guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw NexusClientError.invalidBaseURL }
-        return url
-    }
+        guard let url = URL(string: baseURL),
+              let bodyData = try? JSONEncoder().encode(body) else {
+            onError(NexusError.invalidResponse)
+            return
+        }
 
-    private func request(_ path: String, method: String = "POST", body: [String: Any]? = nil) throws -> URLRequest {
-        var request = URLRequest(url: try endpoint(path))
-        request.httpMethod = method
-        request.timeoutInterval = 45
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = bodyData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(try ownerToken())", forHTTPHeaderField: "Authorization")
-        if let body { request.httpBody = try JSONSerialization.data(withJSONObject: body) }
-        return request
-    }
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-    private func decode<T: Decodable>(_ type: T.Type, request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw NexusClientError.badResponse }
-        guard (200...299).contains(http.statusCode) else {
-            let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            let message = (object?["error"] as? String) ?? "请求未成功"
-            throw NexusClientError.server(status: http.statusCode, message: message)
+        do {
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                onError(NexusError.invalidResponse)
+                return
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                onError(NexusError.apiError("HTTP \(httpResponse.statusCode)"))
+                return
+            }
+
+            // SSE 解析
+            for try await line in bytes.lines {
+                guard line.hasPrefix("data: ") else { continue }
+                let data = String(line.dropFirst(6))
+                guard data != "[DONE]" else { break }
+
+                if let json = data.data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
+                   let type_ = obj["type"] as? String {
+
+                    if type_ == "content_block_delta",
+                       let delta = obj["delta"] as? [String: Any],
+                       let text = delta["text"] as? String {
+                        onDelta(text)
+                    } else if type_ == "message_stop" {
+                        break
+                    }
+                }
+            }
+            onComplete()
+
+        } catch {
+            onError(NexusError.networkError(error))
         }
-        do { return try JSONDecoder().decode(T.self, from: data) }
-        catch { throw NexusClientError.badResponse }
     }
 
-    func talk(_ text: String, caps: [String] = ["ios"]) async throws -> NexusTalkResponse {
-        let request = try request("/talk", body: ["text": text, "caps": caps])
-        return try await decode(NexusTalkResponse.self, request: request)
-    }
+    // MARK: 可用模型列表
 
-    func stats() async throws -> NexusStatsResponse {
-        var request = URLRequest(url: try endpoint("/stats"))
-        request.httpMethod = "GET"
-        request.timeoutInterval = 20
-        request.setValue("Bearer \(try ownerToken())", forHTTPHeaderField: "Authorization")
-        return try await decode(NexusStatsResponse.self, request: request)
-    }
-
-    func plan(capability: String, params: [String: Any], idempotencyKey: String = UUID().uuidString) async throws -> NexusAgentPlanResponse {
-        let request = try request("/agent/plan", body: ["capability": capability, "params": params, "idempotencyKey": idempotencyKey])
-        return try await decode(NexusAgentPlanResponse.self, request: request)
-    }
-
-    func approve(runId: String, approvalToken: String) async throws -> NexusAgentPlanResponse {
-        let request = try request("/agent/approve", body: ["runId": runId, "approvalToken": approvalToken])
-        return try await decode(NexusAgentPlanResponse.self, request: request)
-    }
-
-    func execute(runId: String) async throws -> NexusAgentPlanResponse {
-        let request = try request("/agent/execute", body: ["runId": runId])
-        return try await decode(NexusAgentPlanResponse.self, request: request)
-    }
-
-    /// 仅使用一次性票据建立 WS；owner token 始终只在 HTTPS Authorization header 中传输。
-    func webSocketURL() async throws -> URL {
-        struct Ticket: Decodable { let ticket: String }
-        let request = try request("/wsticket", body: [:])
-        let ticket = try await decode(Ticket.self, request: request)
-        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
-        components?.scheme = baseURL.scheme == "https" ? "wss" : "ws"
-        components?.queryItems = [URLQueryItem(name: "t", value: ticket.ticket)]
-        guard let url = components?.url else { throw NexusClientError.invalidBaseURL }
-        return url
+    func availableModels() -> [String] {
+        [
+            "claude-opus-5",
+            "claude-fable-5-1",
+            "claude-opus-4-8",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001",
+        ]
     }
 }
