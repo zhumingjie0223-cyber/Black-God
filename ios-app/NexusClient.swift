@@ -146,8 +146,8 @@ actor NexusClient {
         }
     }
 
-    func toolResultMessage(_ result: NexusToolResult) -> ChatMessage {
-        ChatMessage(role: "user", content: "[tool_result:\(result.callID)]\n\(result.output)")
+    func toolResultMessage(_ result: NexusToolResult) -> NexusToolResultMessage {
+        NexusToolResultMessage(content: [NexusToolResultBlock(toolUseID: result.callID.uuidString, content: result.output, isError: !result.succeeded)])
     }
 
     // MARK: 可用模型列表
