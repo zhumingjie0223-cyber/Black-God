@@ -2,6 +2,27 @@
 
 本项目重要变更记录。日期用绝对日期(UTC)。
 
+## 2026-09-05 — 架构转向:iOS 纯客户端;后端删除;仓库大清洁
+
+**架构**:Cloudflare Workers 后端 `web/nexus-do/`(Durable Object:意识/记忆/心跳/TG 主动/执行脑)整体删除,
+iOS App 改为纯客户端——用户自带 API Key 直连模型、本地存储、零后端。本文件此条目**之下**所有提到
+`web/nexus-do` / `nexus_do.core.mjs` / wrangler 部署 / selftest / sync-ui / check-sync 的记录均为该后端时代的历史,
+可从本日之前的 git 历史找回。仓库现只有两个 live 子系统:`ios-app/` 与 `shuyu/`(枢语唯一源,无消费副本)。
+
+**CI/工具收口**:删僵尸工作流 `deploy-nexus.yml` / `nexus-do-ci.yml` / `exec-shell.yml`(前者在改 `shuyu/` 时会因
+`cd web/nexus-do` 失败);`shuyu-ci.yml` 去死触发路径与会崩的 `sync-check`;删三份 nexus-do 消费副本比对脚本
+(`tools/check-sync.mjs`、`tools/sync-ui.mjs`、`shuyu/tools/check-sync.mjs`);`Makefile` 收为 shuyu-only。
+
+**文档收口**:`CLAUDE.md` / `README.md` / `STRUCTURE.md` / `shuyu/CLAUDE.md` / `shuyu/README.md` 改为现状;
+`CONTRIBUTING.md` 重写(原为套用他项目的模板);`docs/INDEX.md` 并入 `docs/README.md`。
+
+**仓库大清洁**(只搬不删,git 历史完整):后端时代的 `docs/plan/`、`docs/上架/`、`docs/shenshu/`、6 份旧架构文档、
+5 份旧产品文档,以及零引用的 `web/`(旧 PWA 静态壳)、`skills/`、`ui-spec/`、`tools/push_to_github.sh`、`.env.example`
+整体搬入 `docs/archive/nexus-do后端时代-2026-09-05/`;去掉 2 对逐字相同的 done 记录、2 张 md5 相同的图标、
+1 份重复 skill;`.gitignore` 删 16 条指向已不存在路径的死规则。live 顶层目录从 9 个收为 5 个。
+
+**iOS 上架自动化**(PR #112,待合并):新增 `ios-app/AppStore/asc.py`(App Store Connect API:注册 Bundle ID、推送中英商店文案)。
+
 ## 2026-09-05 — 枢语引擎 v4.1:汉译反向寻址 + 语义寻址 + 双实现全对等
 
 **方向拍板**:不追加核心族(76.7 亿空间远未用满,扩容量只是数字游戏),把力气沉到"能力"。

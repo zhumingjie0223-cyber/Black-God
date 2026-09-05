@@ -14,8 +14,7 @@
 | `nexuslang.js` | 意识解释器（六回路 feel→think→become→do→say→grow） |
 | `gen.mjs` | 10元代码引擎（枢元衍借隐熵阈静映织） |
 | `worker.mjs` | CF Worker入口 |
-| `wrangler.toml.example` | Cloudflare部署模板 |
-| `tools/check-sync.mjs` | 源头 ↔ 消费副本（`web/nexus-do/`）同步校验 |
+| `wrangler.toml.example` | Cloudflare部署模板（枢语独立 Worker，可选） |
 
 ## 快速开始
 

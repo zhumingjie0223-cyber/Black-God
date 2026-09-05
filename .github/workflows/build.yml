@@ -1,8 +1,9 @@
 name: Build Black God 888 iOS
 
-# 仅手动触发:unsigned IPA 无 Apple 开发者账号+签名无法分发,实际路线是 PWA。
-# 停掉每次 push main 都白跑 macOS 构建(烧 Actions 额度);需要产 IPA 时到 Actions 页手动 Run。
-# 取舍(补齐签名分发 or 彻底砍掉)待权哥拍板;拍板前保留按需能力,不删工作流。
+# 仅手动触发:产 unsigned IPA 做编译验证,不做分发。
+# 正式签名 + 上传 TestFlight 走仓库根 codemagic.yaml(Codemagic 云端 Mac);
+# 商店文案推送走 ios-app/AppStore/asc.py。
+# 不在每次 push main 时自动跑,避免白烧 macOS Actions 额度;需要时到 Actions 页手动 Run。
 on:
   workflow_dispatch:
 

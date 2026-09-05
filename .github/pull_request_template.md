@@ -29,10 +29,10 @@
 
 描述你如何测试这些变更：
 
-- [ ] 本地测试通过
-- [ ] 浏览器测试（Chrome/Safari/Edge）
-- [ ] 移动端测试（iOS/Android）
+- [ ] 枢语：仓库根 `make test` 全绿（Node + Python）
+- [ ] iOS：Xcode 编译通过，模拟器/真机跑过改动路径
 - [ ] 已添加/更新相关测试
+- [ ] 多步骤任务的 `TODO.md` 已归档到 `docs/done/`
 
 ## 📸 截图（如适用）
 
