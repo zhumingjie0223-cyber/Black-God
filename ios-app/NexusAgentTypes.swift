@@ -60,9 +60,4 @@ struct BasicNexusPlanner: NexusPlanning {
     }
 }
 
-struct BasicNexusVerifier: NexusVerifying {
-    func verify(goal: String, output: String) -> NexusVerdict {
-        let passed = !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return NexusVerdict(passed: passed, reason: passed ? "已获得非空结果" : "结果为空", checkedAt: Date())
-    }
-}
+struct BasicNexusVerifier: NexusVerifying {}
