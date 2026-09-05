@@ -152,20 +152,3 @@ enum NexusRunEvent: Identifiable {
 
     var id: UUID { UUID() }
 }
-
-/// 枢语只暴露协议边界；具体词库和引擎可独立替换，不污染 UI。
-struct ShuyuIntent {
-    let operation: String
-    let target: String
-    let metadata: [String: String]
-}
-
-protocol ShuyuIntentParsing {
-    func parse(_ text: String) -> ShuyuIntent
-}
-
-struct BasicShuyuParser: ShuyuIntentParsing {
-    func parse(_ text: String) -> ShuyuIntent {
-        ShuyuIntent(operation: "understand", target: text, metadata: ["protocol": "shuyu"])
-    }
-}

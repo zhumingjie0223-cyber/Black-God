@@ -4,3 +4,4 @@ What's new in v1.1.0:
 • Built-in read-only tools: clock, calculator and more run locally; tools that write require your confirmation first.
 • On-device capability monitor: task success rate, verification rate and recovery rate, stored only on your device.
 • UI and privacy polish: streamlined to Chat, Capabilities, Monitor and Me; removed unused permissions for a smaller privacy footprint.
+• Clear all data in one tap: new entry on the Me tab wipes every key, memory item and run record after a confirmation.

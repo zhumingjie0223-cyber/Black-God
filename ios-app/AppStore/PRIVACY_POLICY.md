@@ -14,16 +14,22 @@
 **不收集任何数据。** 本 App 没有账号系统、没有统计埋点、没有崩溃上报 SDK、没有广告 SDK。开发者无法看到你的任何使用信息。
 
 ### 2. 数据存储在哪里
-- **Anthropic API Key**：使用 iOS 系统 Keychain 加密保存，仅本机可读，不会以任何形式离开你的设备（不包含在 iCloud 备份中）。
-- **对话记录**：保存在设备本地沙盒中，不上传、不同步、不分析。
+- **各服务商的 API Key**：使用 iOS 系统 Keychain 加密保存，仅本机可读，不会以任何形式离开你的设备（不包含在 iCloud 备份中）。
+- **记忆、运行记录、工具产物**：保存在设备本地沙盒中，不上传、不同步、不分析。当前会话只在内存中，退出即清。
 - **模型偏好等设置**：保存在设备本地。
-- 你可以在 App 内随时删除全部数据；卸载 App 也会一并清除。
+- 你可以在「我的」页点「清除全部数据」一键删除以上全部内容；卸载 App 也会一并清除。
 
 ### 3. 网络请求去了哪里
-App 只会向一个地址发起网络请求：**Anthropic 官方 API（api.anthropic.com）**。你的对话内容会随请求发送给 Anthropic 以获取模型回复，中间不经过任何我们控制的服务器。
+App 只会向**你所选模型服务商的官方 API** 发起网络请求，四选一，由你在设置中决定：
 
-Anthropic 对这些数据的处理受 Anthropic 自身的隐私政策与服务条款约束，请参阅：
-https://www.anthropic.com/privacy
+| 服务商 | 接口地址 | 其隐私政策 |
+|---|---|---|
+| Anthropic | api.anthropic.com | https://www.anthropic.com/privacy |
+| OpenAI | api.openai.com | https://openai.com/policies/privacy-policy |
+| DeepSeek | api.deepseek.com | https://platform.deepseek.com/privacy |
+| xAI | api.x.ai | https://x.ai/legal/privacy-policy |
+
+你的对话内容会随请求发送给该服务商以获取模型回复，中间不经过任何我们控制的服务器。除此之外 App 不访问任何其它网络地址。该服务商对这些数据的处理受其自身的隐私政策与服务条款约束。
 
 ### 4. 第三方 SDK
 无。本 App 不集成任何第三方 SDK。
@@ -49,16 +55,22 @@ Nexus is a pure client-side app. We run no servers and do not collect, store, or
 **None.** The app has no account system, no analytics, no crash-reporting SDK, and no advertising SDK. The developer has no visibility into how you use the app.
 
 ### 2. Where your data lives
-- **Anthropic API key**: encrypted in the iOS Keychain, readable only on this device, and never leaves it in any form (excluded from iCloud backup).
-- **Chat history**: stored in the app's local sandbox on your device — never uploaded, synced, or analyzed.
+- **Provider API keys**: encrypted in the iOS Keychain, readable only on this device, and never leave it in any form (excluded from iCloud backup).
+- **Memory, run records and tool outputs**: stored in the app's local sandbox on your device — never uploaded, synced, or analyzed. The current conversation lives in memory only and is cleared on exit.
 - **Preferences** (such as selected model): stored locally on the device.
-- You can delete all data inside the app at any time; uninstalling the app also removes everything.
+- You can delete all of the above with one tap ("Clear all data" on the Me tab); uninstalling the app also removes everything.
 
 ### 3. Where network requests go
-The app makes network requests to exactly one destination: **Anthropic's official API (api.anthropic.com)**. Your message content is sent to Anthropic to obtain model responses. No server controlled by us sits in between.
+The app only contacts **the official API of the model provider you selected** in Settings — one of the following four:
 
-Anthropic's handling of that data is governed by Anthropic's own privacy policy and terms of service:
-https://www.anthropic.com/privacy
+| Provider | Endpoint | Their privacy policy |
+|---|---|---|
+| Anthropic | api.anthropic.com | https://www.anthropic.com/privacy |
+| OpenAI | api.openai.com | https://openai.com/policies/privacy-policy |
+| DeepSeek | api.deepseek.com | https://platform.deepseek.com/privacy |
+| xAI | api.x.ai | https://x.ai/legal/privacy-policy |
+
+Your message content is sent to that provider to obtain model responses. No server controlled by us sits in between, and the app contacts no other network destination. The provider's handling of that data is governed by its own privacy policy and terms of service.
 
 ### 4. Third-party SDKs
 None. The app does not embed any third-party SDK.
