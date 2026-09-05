@@ -39,8 +39,9 @@ struct ChatView: View {
 
     var chatHeader: some View {
         HStack(spacing: 12) {
-            Image("sihan-avatar").resizable().scaledToFill()
-                .frame(width: 44, height: 44).clipShape(Circle())
+            Image(systemName: "sparkles").font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.bgGoldLight)
+                .frame(width: 44, height: 44).background(Color.bgCard).clipShape(Circle())
                 .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 2))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
