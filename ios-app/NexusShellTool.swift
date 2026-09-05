@@ -1,32 +1,15 @@
 import Foundation
 
+/// iOS 安全边界：App Store 版 App 不直接执行任意 shell 命令。
+/// `Process` / `NSTask` 在 iOS 上不存在，且审核禁止任意代码执行。
+/// 此工具保留为神枢工具总线的占位，明确返回环境限制。
 struct NexusShellTool: NexusTool {
     let name = "shell"
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
-        guard let command = call.arguments["command"], !command.isEmpty else {
-            return NexusToolResult(callID: call.id, output: "缺少 command", succeeded: false)
-        }
-        let process = Process()
-        let out = Pipe()
-        let err = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-lc", command]
-        process.standardOutput = out
-        process.standardError = err
-        do {
-            try process.run()
-            let timeout = Double(call.arguments["timeout"] ?? "30") ?? 30
-            let deadline = Date().addingTimeInterval(min(max(timeout, 1), 120))
-            while process.isRunning && Date() < deadline {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-            }
-            if process.isRunning { process.terminate(); return NexusToolResult(callID: call.id, output: "命令超时并已终止", succeeded: false) }
-            let stdout = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            let stderr = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            let result = (stdout + (stderr.isEmpty ? "" : "\n" + stderr)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return NexusToolResult(callID: call.id, output: result, succeeded: process.terminationStatus == 0)
-        } catch {
-            return NexusToolResult(callID: call.id, output: "命令执行失败：\(error.localizedDescription)", succeeded: false)
-        }
+        NexusToolResult(
+            callID: call.id,
+            output: "当前 iOS 客户端不提供 shell 执行环境。命令执行能力仅存在于服务端/开发环境。",
+            succeeded: false
+        )
     }
 }

@@ -4,13 +4,6 @@
 
 import SwiftUI
 
-struct ChatMessage: Identifiable {
-    let id = UUID()
-    let role: String
-    var content: String
-    var mood: String = "normal"
-}
-
 struct ChatView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = ChatViewModel()

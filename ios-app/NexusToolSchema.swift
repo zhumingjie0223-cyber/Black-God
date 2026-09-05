@@ -28,7 +28,7 @@ struct NexusToolCatalog {
         definition("echo", "返回文本", ["text": "要返回的文本"], ["text"]),
         definition("read_file", "读取本地文件", ["path": "文件路径"], ["path"]),
         definition("write_file", "写入本地文件，须经批准", ["path": "文件路径", "content": "文件内容"], ["path", "content"]),
-        definition("shell", "命令执行接口，须经批准并具备可用执行后端", ["command": "命令", "timeout": "秒数字符串，范围1至120"], ["command"])
+        definition("shell", "命令执行占位（iOS 客户端不可用）", ["command": "命令"], ["command"])
     ]
 
     private static func definition(_ name: String, _ description: String,
