@@ -12,7 +12,8 @@ struct MeView: View {
         ScrollView {
             VStack(spacing: 20) {
                 VStack(spacing: 14) {
-                    Image("sihan-full").resizable().scaledToFill()
+                    Image(systemName: "sparkles").font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(Color.bgGold)
                         .frame(width: 100, height: 100).clipShape(Circle())
                         .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 3))
                     Text("Black God AI").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)

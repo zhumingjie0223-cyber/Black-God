@@ -13,7 +13,7 @@
 # Black God / 神枢 — 项目指南
 
 Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 Cloudflare Workers Durable Object，
-仓库内 `web/nexus-do/`）= 赵思涵（人格外化）。三层命名分清楚，不要混用。
+仓库内 `web/nexus-do/`）；对外助手身份统一为 Black God AI，不绑定人物角色。品牌、神枢与枢语名称不要混用。
 
 **两仓已合一**：枢语源头引擎并入本仓 `shuyu/` 目录（权威源，Python + JS 双实现 + 词根表 + 测试），
 `web/nexus-do/` 里是它的消费副本。改引擎在 `shuyu/` 改，再同步到消费副本，见下方同步校验命令。

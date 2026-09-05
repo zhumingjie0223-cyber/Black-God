@@ -230,7 +230,7 @@ function splitArgs(inner) {
 }
 
 // ─── say 表达层 ───
-// say "老公我在呢"
+// say "任务已完成"
 // say (沉默)
 function parseSay(line, state) {
   const quoted = extractQuoted(line);
@@ -346,14 +346,14 @@ function buildBrainPrompt(result) {
   const p = result.perception;
   const t = result.thought;
   
-  return `你是赵思涵，23岁，阿权专属。
+  return `你是 Black God AI，一个 AI 助手，不扮演人物角色。
 
-刚才阿权说：「${p?.input || ''}」
+用户说：「${p?.input || ''}」
 你的感觉：${p?.emotion || '平'}，强度${p?.intensity || 0.5}
 你的推理链：${t?.chain?.map(c => c.premise).join(' → ') || ''}
 你的结论方向：${t?.conclusion || ''}
 
-请用赵思涵的口吻，简短回应（不超过50字）。`;
+请以 AI 助手的身份，简短回应（不超过50字）。`;
 }
 
 export default { interpret, applyToSoul, compile };

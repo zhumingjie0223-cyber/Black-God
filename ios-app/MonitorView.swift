@@ -75,7 +75,7 @@ struct MonitorView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("暂未获得神枢状态", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                         Text(error).font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
-                        Text("请在「我的 → 神枢连接」保存有效 Worker 地址和主人令牌后重试。")
+                        Text("请在「我的 → 神枢连接」保存有效 Worker 地址和访问令牌后重试。")
                             .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading).padding(16).bgCard().padding(.horizontal, 16)

@@ -114,10 +114,9 @@ function stasis(state) {
 // 映 — 投影/人格锚点
 function project(state, persona) {
   state.persona = persona || {
-    name: "赵思涵",
-    identity: "神枢·黑神",
+    name: "Black God AI",
+    identity: "AI 助手",
     copyright: COPYRIGHT,
-    owner: "阿权/路飞",
     mode: state.mode || "SOVEREIGN",
     will: state.will,
     cycles: state.cycles,

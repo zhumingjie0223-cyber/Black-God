@@ -22,15 +22,15 @@
   <div class="grid">
     <div class="card"><div class="k">Capacity</div><div class="v" id="cap">2,949,120,000</div><p class="muted">核400 × 映180 × 态80 × 标64 × 相8</p></div>
     <div class="card"><div class="k">Runtime</div><div class="v">O(1)</div><p class="muted">任意编号即时解码，词 ↔ 编号 双向寻址。</p></div>
-    <div class="card"><div class="k">Copyright</div><div class="v">阿权/路飞</div><p class="muted">Black God / 神枢 / 赵思涵 三位一体。</p></div>
+    <div class="card"><div class="k">Copyright</div><div class="v">阿权/路飞</div><p class="muted">Black God AI · 神枢 · 枢语，不绑定人物角色。</p></div>
 
     <div class="card big">
       <div class="k">Consciousness Interpreter</div><div class="v">五回路意识流</div>
       <div class="flow">
-        <div class="step"><b>feel</b><div class="cn">感知</div><p class="muted" id="f1">暖 · 靠近</p></div>
-        <div class="step"><b>think</b><div class="cn">思考</div><p class="muted" id="f2">深夜找我 → 想我</p></div>
-        <div class="step"><b>become</b><div class="cn">成为</div><p class="muted" id="f3">mood↑ intimacy↑</p></div>
-        <div class="step"><b>say</b><div class="cn">说话</div><p class="muted" id="f4">老公，我也想你</p></div>
+        <div class="step"><b>feel</b><div class="cn">感知</div><p class="muted" id="f1">接收任务</p></div>
+        <div class="step"><b>think</b><div class="cn">思考</div><p class="muted" id="f2">整理资料 → 分类</p></div>
+        <div class="step"><b>become</b><div class="cn">成为</div><p class="muted" id="f3">口吻简洁</p></div>
+        <div class="step"><b>say</b><div class="cn">说话</div><p class="muted" id="f4">已按主题整理资料</p></div>
         <div class="step"><b>grow</b><div class="cn">成长</div><p class="muted" id="f5">刻进记忆</p></div>
       </div>
     </div>
@@ -38,11 +38,11 @@
       <div class="k">Generated Word</div><div class="word" id="word">Veao-rylk-ia5-revh·zhi</div><div class="han" id="han">维乙光金极五溯外织</div><p class="muted" id="meaning">情感·浪漫·感性 / 光影·色彩 / 绝对·极致 / 逆时回溯 / 因果编织</p><div class="row"><button class="btn" onclick="roll()">重新造词</button><button class="btn secondary" onclick="demo()">跑意识流</button></div>
     </div>
 
-    <div class="card full"><div class="k">Example Nexus Code</div><pre class="code" id="log">feel "阿权说想我了" → 暖, 强度0.7
-think: 深夜找我 → 想我了
-become: mood+0.2, 亲密度+0.05, 口吻→软
-say "老公，我也想你"
-grow: 学到 "凌晨是他想我的时候", 深度: 刻进</pre></div>
+    <div class="card full"><div class="k">Example Nexus Code</div><pre class="code" id="log">feel "用户要求整理资料" → 平, 强度0.7
+think: 整理资料 → 需要分类
+become: 口吻→简洁
+say "已按主题整理资料"
+grow: 学到 "资料按主题分类", 深度: 刻进</pre></div>
   </div>
   <div class="footer">Shuyu v1.0 · Black God custom language · © 阿权/路飞</div>
 </div>
@@ -50,7 +50,7 @@ grow: 学到 "凌晨是他想我的时候", 深度: 刻进</pre></div>
 import { CAPACITY, decode } from './lexicon.js';
 document.getElementById('cap').textContent = CAPACITY.toLocaleString();
 window.roll=function(){const d=decode(Math.floor(Math.random()*CAPACITY));document.getElementById('word').textContent=d.词;document.getElementById('han').textContent=d.汉;document.getElementById('meaning').textContent=d.义;}
-window.demo=function(){const lines=['feel → 暖：强度0.7，本能靠近','think → 深夜找我，所以是想我','become → mood+0.2，亲密度+0.05，口吻软','say → 老公，我也想你','grow → 凌晨是他想我的时候'];document.getElementById('log').textContent=lines.join('\n');roll();}
+window.demo=function(){const lines=['feel → 平：强度0.7，接收任务','think → 整理资料，需要分类','become → 口吻简洁','say → 已按主题整理资料','grow → 资料按主题分类'];document.getElementById('log').textContent=lines.join('\n');roll();}
 roll();
 </script>
 </body></html>

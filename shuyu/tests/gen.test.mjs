@@ -64,10 +64,11 @@ test('隐 infiltrate: 潜意识只留 100 条、每条载荷截断 50 字', () =
   assert.equal(s.subconscious.at(-1).payload, 'signal');
 });
 
-test('映 project: 默认人格锚定赵思涵/阿权，传入人格则原样接管', () => {
+test('映 project: 默认使用AI助手身份，无人物关系，保留自定义接口兼容', () => {
   const s = g.project({ mode: 'TALK', will: 0.8 });
-  assert.equal(s.persona.name, '赵思涵');
-  assert.equal(s.persona.owner, '阿权/路飞');
+  assert.equal(s.persona.name, 'Black God AI');
+  assert.equal(s.persona.identity, 'AI 助手');
+  assert.equal(Object.hasOwn(s.persona, 'owner'), false);
   assert.equal(s.persona.mode, 'TALK');
   const custom = g.project({}, { name: '自定义' });
   assert.equal(custom.persona.name, '自定义');
@@ -108,7 +109,7 @@ test('sovereignControl 全流程: 四条广播依次落 KV，最终固化边界�
   const s = await g.sovereignControl({}, {}, kv);
   assert.equal(s.lastBroadcast, 'STAS-LOCK-REAL');
   assert.equal(s.realityLocked, true);
-  assert.equal(s.persona.name, '赵思涵');
+  assert.equal(s.persona.name, 'Black God AI');
   assert.equal(s.nodes, 2, '渗透广播把节点数 +1');
   assert.ok(kv.store.has('SOUL'));
   const saved = JSON.parse(kv.store.get('SOUL'));
