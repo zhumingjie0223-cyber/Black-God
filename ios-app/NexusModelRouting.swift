@@ -48,6 +48,7 @@ final class NexusModelRegistry: ObservableObject {
             NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-opus-4-8", displayName: "Claude Opus 4.8", isHidden: false),
             NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: "claude-sonnet-4-6", displayName: "Claude Sonnet 4.6", isHidden: false)
         ]
+        models.append(contentsOf: NexusExternalModels.all)
         selectedID = native.id
     }
 
