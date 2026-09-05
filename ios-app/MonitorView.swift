@@ -27,11 +27,11 @@ struct MonitorView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                    MetricCard(title: "任务成功率", value: model.successRate, symbol: "checkmark.circle")
-                    MetricCard(title: "验证率", value: model.verificationRate, symbol: "checkmark.shield")
-                    MetricCard(title: "恢复率", value: model.recoveryRate, symbol: "arrow.triangle.2.circlepath")
-                    MetricCard(title: "平均延迟", value: model.latencyText, symbol: "clock")
-                    MetricCard(title: "任务记录", value: "\(model.recordCount)", symbol: "list.bullet.rectangle")
+                    MetricCard(title: "任务成功率", valueText: model.successRateText, symbol: "checkmark.circle")
+                    MetricCard(title: "验证率", valueText: model.verificationRateText, symbol: "checkmark.shield")
+                    MetricCard(title: "恢复率", valueText: model.recoveryRateText, symbol: "arrow.triangle.2.circlepath")
+                    MetricCard(title: "平均延迟", valueText: model.latencyText, symbol: "clock")
+                    MetricCard(title: "任务记录", valueText: "\(model.recordCount)", symbol: "list.bullet.rectangle")
                 }
                 .padding(.horizontal, 16)
 
@@ -57,28 +57,29 @@ struct MonitorView: View {
 
 @MainActor
 final class NexusMonitorModel: ObservableObject {
-    @Published private(set) var successRate = 0.0
-    @Published private(set) var verificationRate = 0.0
-    @Published private(set) var recoveryRate = 0.0
+    @Published private(set) var successRateText = "—"
+    @Published private(set) var verificationRateText = "—"
+    @Published private(set) var recoveryRateText = "—"
     @Published private(set) var latencyText = "—"
     @Published private(set) var recordCount = 0
 
     func refresh() {
         let store = NexusEvaluationStore()
-        successRate = store.successRate
-        verificationRate = store.verificationRate
-        recoveryRate = store.recoveryRate
+        successRateText = percent(store.successRate)
+        verificationRateText = percent(store.verificationRate)
+        recoveryRateText = percent(store.recoveryRate)
         recordCount = store.records.count
         let lat = store.averageLatency
         latencyText = lat == 0 ? "—" : String(format: "%.1fs", lat)
     }
+
+    private func percent(_ v: Double) -> String { String(format: "%.0f%%", v * 100) }
 }
 
 private struct MetricCard: View {
     let title: String
-    let value: Double
+    let valueText: String
     let symbol: String
-    var valueText: String { String(format: "%.0f%%", value * 100) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {

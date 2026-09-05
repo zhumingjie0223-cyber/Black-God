@@ -99,7 +99,7 @@ actor NexusClient {
             request.setValue(value, forHTTPHeaderField: name)
         }
 
-        let assembler = NexusToolCallAssembler()
+        var assembler = NexusToolCallAssembler()
         do {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
 

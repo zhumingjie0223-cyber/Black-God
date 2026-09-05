@@ -1,11 +1,10 @@
 import Foundation
 
-@MainActor
-final class NexusToolCallAssembler {
+struct NexusToolCallAssembler {
     private var names: [String: String] = [:]
     private var arguments: [String: String] = [:]
 
-    func append(id: String, name: String?, arguments fragment: String?) -> NexusToolCall? {
+    mutating func append(id: String, name: String?, arguments fragment: String?) -> NexusToolCall? {
         if let name, !name.isEmpty { names[id] = name }
         if let fragment { arguments[id, default: ""] += fragment }
         guard let name = names[id], let raw = arguments[id],
@@ -15,5 +14,5 @@ final class NexusToolCallAssembler {
         return NexusToolCall(id: uuid, name: name, arguments: object)
     }
 
-    func reset() { names.removeAll(); arguments.removeAll() }
+    mutating func reset() { names.removeAll(); arguments.removeAll() }
 }
