@@ -13,6 +13,7 @@ final class NexusRuntime: ObservableObject {
     private let verifier: NexusVerifying = BasicNexusVerifier()
     private var executionLoop = NexusExecutionLoop()
     private var activeTask: Task<Void, Never>?
+    private let recovery = NexusRecoveryController()
     private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
@@ -39,8 +40,12 @@ final class NexusRuntime: ObservableObject {
         runState = .runningTool(name: call.name)
         append(.toolStarted(name: call.name, input: call.arguments.description))
         var loop = executionLoop
-        let result = await loop.run(call)
+        var result = await loop.run(call)
         executionLoop = loop
+        if !result.succeeded, recovery.nextAttempt(for: call.id) != nil {
+            append(.status("工具失败，正在重试"))
+            result = await loop.run(call)
+        }
         append(.toolOutput(result.output))
         observe(output: result.output)
         runState = result.succeeded ? .streaming : .failed(result.output)
