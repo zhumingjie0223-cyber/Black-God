@@ -118,6 +118,12 @@ actor NexusClient {
                 if let json = data.data(using: .utf8),
                    let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any] {
                     if entry.providerType == .openAICompatible,
+                       let toolCall = NexusNativeToolEventParser.parseOpenAI(obj) {
+                        onDelta("```json\\n{\\\"id\\\":\\\"\(toolCall.id.uuidString)\\\",\\\"name\\\":\\\"\(toolCall.name)\\\",\\\"arguments\\\":{}}\\n```")
+                    } else if entry.providerType == .anthropic,
+                              let toolCall = NexusNativeToolEventParser.parse(obj) {
+                        onDelta("```json\\n{\\\"id\\\":\\\"\(toolCall.id.uuidString)\\\",\\\"name\\\":\\\"\(toolCall.name)\\\",\\\"arguments\\\":{}}\\n```")
+                    } else if entry.providerType == .openAICompatible,
                        let choices = obj["choices"] as? [[String: Any]],
                        let delta = choices.first?["delta"] as? [String: Any],
                        let text = delta["content"] as? String {
