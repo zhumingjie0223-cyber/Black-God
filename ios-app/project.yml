@@ -35,6 +35,7 @@ targets:
       - path: .
         includes:
           - "*.swift"
+          - "**/*.swift"
       # 多语言资源：Localizable.strings / InfoPlist.strings
       - path: zh-Hans.lproj
       - path: en.lproj
