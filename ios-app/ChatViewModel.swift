@@ -12,6 +12,7 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var runtime = NexusRuntime()
     private let agentLoop = NexusAgentLoop()
     private var handledToolCalls = Set<UUID>()
+    @Published var memory = NexusMemoryStore()
     @Published var modelRegistry = NexusModelRegistry()
 
     var apiKeyConfigured: Bool { NexusKeychain.shared.hasAPIKey }
@@ -22,6 +23,9 @@ final class ChatViewModel: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         runtime.begin(prompt: trimmed)
+        let memories = memory.search(trimmed).map { "- \($0.text)" }.joined(separator: "\n")
+        if !memories.isEmpty { messages.append(ChatMessage(role: "user", content: "[relevant_memory]\n\(memories)")) }
+        memory.remember(trimmed, kind: "episodic", source: "user", confidence: 0.7)
         messages.append(ChatMessage(role: "user", content: trimmed))
         isTyping = true
         lastError = nil
@@ -54,6 +58,7 @@ final class ChatViewModel: ObservableObject {
                         }
                         self.isTyping = false
                         self.runtime.observe(output: reply)
+                        self.memory.remember(reply, kind: "result", source: "assistant", confidence: 0.6)
                         self.runtime.append(.completed)
                     }
                 },
