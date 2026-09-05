@@ -24,48 +24,112 @@ enum NexusToolError: LocalizedError {
     }
 }
 
-// MARK: - 内置工具
+// MARK: - 内置工具（只读安全，供 Executor 闭环默认装载）
 
 struct NexusClockTool: NexusTool {
     let name = "clock"
-    let usage = "获取当前日期时间。参数：可选，时区标识如 Asia/Shanghai"
+    let usage = "获取当前日期时间。参数：timezone=可选时区标识（如 Asia/Shanghai）"
 
-    func run(arguments: String) async throws -> String {
+    func execute(_ call: NexusToolCall) async -> NexusToolResult {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss zzz"
-        let tzID = arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tzID = (call.arguments["timezone"] ?? call.arguments["tz"] ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         if !tzID.isEmpty, let tz = TimeZone(identifier: tzID) {
             formatter.timeZone = tz
         }
-        return formatter.string(from: Date())
+        return NexusToolResult(callID: call.id, output: formatter.string(from: Date()), succeeded: true)
     }
 }
 
 struct NexusCalculatorTool: NexusTool {
     let name = "calc"
-    let usage = "计算数学表达式。参数：表达式，如 (3+4)*2"
+    let usage = "计算数学表达式。参数：expr=表达式（如 (3+4)*2）"
 
-    func run(arguments: String) async throws -> String {
-        let expr = arguments.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !expr.isEmpty else { throw NexusToolError.invalidArguments("表达式为空") }
-        let allowed = CharacterSet(charactersIn: "0123456789.+-*/() ")
-        guard expr.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {
-            throw NexusToolError.invalidArguments("仅支持数字与 + - * / ( )")
+    func execute(_ call: NexusToolCall) async -> NexusToolResult {
+        let expr = (call.arguments["expr"] ?? call.arguments["expression"] ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !expr.isEmpty else {
+            return NexusToolResult(callID: call.id, output: "参数无效：表达式为空", succeeded: false)
         }
-        let nsExpr = NSExpression(format: expr)
-        guard let value = nsExpr.expressionValue(with: nil, context: nil) as? NSNumber else {
-            throw NexusToolError.invalidArguments("无法求值：\(expr)")
+        guard let value = NexusArithmetic.evaluate(expr) else {
+            return NexusToolResult(callID: call.id, output: "无法求值：\(expr)（仅支持数字与 + - * / ( )）", succeeded: false)
         }
-        return value.stringValue
+        // 整数结果去掉多余小数
+        if value == value.rounded(), abs(value) < 1e15 {
+            return NexusToolResult(callID: call.id, output: String(Int64(value)), succeeded: true)
+        }
+        return NexusToolResult(callID: call.id, output: String(value), succeeded: true)
     }
 }
 
-/// 本文件内使用的默认工具注册表构造函数（避免与外部定义冲突）
+/// 安全的四则运算求值器（递归下降），不使用 `NSExpression`，避免非法输入触发不可捕获的异常。
+enum NexusArithmetic {
+    static func evaluate(_ expression: String) -> Double? {
+        var parser = Parser(Array(expression))
+        guard let value = parser.parseExpression(), parser.isAtEnd else { return nil }
+        return value
+    }
+
+    private struct Parser {
+        let chars: [Character]
+        var index = 0
+        init(_ chars: [Character]) { self.chars = chars }
+
+        var isAtEnd: Bool { mutating get { skipSpaces(); return index >= chars.count } }
+
+        mutating func skipSpaces() { while index < chars.count, chars[index] == " " { index += 1 } }
+
+        mutating func peek() -> Character? { skipSpaces(); return index < chars.count ? chars[index] : nil }
+
+        mutating func parseExpression() -> Double? {
+            guard var value = parseTerm() else { return nil }
+            while let op = peek(), op == "+" || op == "-" {
+                index += 1
+                guard let rhs = parseTerm() else { return nil }
+                value = op == "+" ? value + rhs : value - rhs
+            }
+            return value
+        }
+
+        mutating func parseTerm() -> Double? {
+            guard var value = parseFactor() else { return nil }
+            while let op = peek(), op == "*" || op == "/" {
+                index += 1
+                guard let rhs = parseFactor() else { return nil }
+                if op == "/" { guard rhs != 0 else { return nil }; value /= rhs }
+                else { value *= rhs }
+            }
+            return value
+        }
+
+        mutating func parseFactor() -> Double? {
+            guard let ch = peek() else { return nil }
+            if ch == "+" { index += 1; return parseFactor() }
+            if ch == "-" { index += 1; guard let v = parseFactor() else { return nil }; return -v }
+            if ch == "(" {
+                index += 1
+                guard let v = parseExpression(), peek() == ")" else { return nil }
+                index += 1
+                return v
+            }
+            return parseNumber()
+        }
+
+        mutating func parseNumber() -> Double? {
+            skipSpaces()
+            var digits = ""
+            while index < chars.count, chars[index].isNumber || chars[index] == "." {
+                digits.append(chars[index]); index += 1
+            }
+            return Double(digits)
+        }
+    }
+}
+
+/// 本文件内使用的默认工具注册表构造函数（只读安全工具集）。
 private func nexusExecutorDefaultToolRegistry() -> NexusToolRegistry {
-    let registry = NexusToolRegistry()
-    registry.register(NexusClockTool())
-    registry.register(NexusCalculatorTool())
-    return registry
+    NexusToolRegistry([NexusClockTool(), NexusCalculatorTool(), EchoTool()])
 }
 
 // MARK: - 执行器
@@ -252,23 +316,12 @@ final class NexusExecutor {
         guard let tool = tools.tool(named: call.name) else {
             return (NexusToolError.unknownTool(call.name).localizedDescription, false)
         }
-        do {
-            let result = try await tool.run(arguments: call.arguments)
-            return (result, true)
-        } catch {
-            return (error.localizedDescription, false)
-        }
+        let result = await tool.execute(call)
+        return (result.output, result.succeeded)
     }
 
     private func stripToolLines(_ output: String) -> String {
-        output
-            .components(separatedBy: .newlines)
-            .filter { line in
-                let t = line.trimmingCharacters(in: .whitespaces)
-                return NexusToolCallParser.parse(t).isEmpty
-            }
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        NexusToolCallParser.stripCalls(from: output).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Prompt
@@ -298,7 +351,13 @@ final class NexusExecutor {
             if finalRound {
                 lines.append("本轮为最后一轮，不可再调用工具，请基于已有信息直接给出最终结果。")
             } else {
-                lines.append("如需使用工具，请单独一行输出：TOOL: 工具名 | 参数 。工具结果会在下一轮提供给你，随后再给出最终回答。若无需工具，直接输出结果。")
+                lines.append("""
+                如需调用工具，请输出一个代码块，格式为：
+                ```tool
+                {"name": "工具名", "arguments": {"键": "值"}}
+                ```
+                可输出多个 tool 代码块。工具结果会在下一轮回灌给你，随后再给出最终回答。若无需工具，直接输出该步骤结果。
+                """)
             }
         }
         if !transcript.isEmpty {
