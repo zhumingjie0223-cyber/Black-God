@@ -11,9 +11,13 @@ final class NexusRuntime: ObservableObject {
 
     private let planner: NexusPlanning = BasicNexusPlanner()
     private let verifier: NexusVerifying = BasicNexusVerifier()
+    private var executionLoop = NexusExecutionLoop()
     private(set) var sessionID = UUID()
 
     func begin(prompt: String) {
+        var loop = executionLoop
+        loop.installDefaults()
+        executionLoop = loop
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         runState = .planning
