@@ -23,7 +23,10 @@
 
 - 词根表只能在轴尾**追加**，绝不改动/删除/重排已有词根（否则历史编号全部错位）。
 - 改引擎必改双侧（Python + JS），并跑 `node tools/check-sync.mjs` 核对同仓 `web/nexus-do/` 消费副本。
-- 汉译纯中文；`decode→encode` 往返必须成立。
+- 汉译纯中文；`decode→encode` 与 `decode→encode_han/encodeHan` 往返都必须成立（拉丁与汉译两种写法同源同编号）。
+- 词根表追加新族时，新汉字不得与阶/相/频/标位后缀字撞车，也不得成为下一轴首字（汉译唯一可解码的结构引理，测试有守卫）。
+- 引擎导出面（decode/encode/encodeHan/search/compose/autoCoin/coinFromCoord/coinWord/coinFromState）两侧必须同名同义，
+  `tests/engine.test.mjs` 的跨实现用例与 `tools/check-sync.mjs` 都会逐一比对。
 
 ## 常用命令
 

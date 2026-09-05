@@ -2,6 +2,46 @@
 
 本项目重要变更记录。日期用绝对日期(UTC)。
 
+## 2026-09-05 — 枢语引擎 v4.1:汉译反向寻址 + 语义寻址 + 双实现全对等
+
+**方向拍板**:不追加核心族(76.7 亿空间远未用满,扩容量只是数字游戏),把力气沉到"能力"。
+容量恒为 7,667,712,000,旧编号一个不动。
+
+### 引擎新能力(`shuyu/shuyu_engine.py` ↔ `shuyu/lexicon.js` 双侧同构)
+- **汉译 → 编号**(`encode_han` / `encodeHan`):枢语此前只能拉丁词形反查,纯中文汉译是单向产出;
+  现已证明汉译唯一可解码(各轴后缀字与下一轴首字零交集,测试有结构引理守卫),实现回溯枚举、
+  恰好一解才返回,与拉丁 `encode` 同一单射铁律。词库 14612 条编号表中上万条真汉译词全部可反查。
+- **语义检索**(`search`):关键词命中 5 轴任一词根的 拉丁/汉/义,下标可直接喂 `compose`。
+- **按义造词**(`compose`):`{核,映,态,标,相}` 每轴给 下标/拉丁根/汉译/语义关键词 任一种 → 唯一编号,
+  解析失败抛错不静默造错词。
+- `decode` 两侧统一输出 `id/词/汉/层/义/根/坐标{c,m,s,k,p}`(Python 保留 seed,只增不删)。
+- Python 补齐 `auto_coin`(FNV-1a·32 + xorshift,与 JS 逐位一致,按 UTF-16 码元)/ `coin_from_coord` /
+  `coin_word` / `coin_from_state`;`encode` 改字典反向索引 O(1);层名按下标 O(1) 取。
+- Python CLI 增 `--han` `--search` `--compose` `--coin`。
+
+### 词汇覆盖(意识解释器感知层)
+- `LEXICON.feel` 12 → 58 个纯中文情绪词(单字体感词 + 双字情绪词),`matchWord('feel')` 改长词优先
+  ("心疼"不被"疼"抢走),原 12 词顺序与取值冻结。
+
+### 服务层
+- `worker.mjs`:`/encode?word=` 同时接受拉丁与汉译(返回 `form`);新增 `GET /search`、`GET /compose`;
+  首页与 `/status` 带轴尺寸。
+
+### 修复
+- `gen.mjs` 熵回路 `(state.entropy || 1)` 把 0 当未初始化,熵一到 0 就弹回 0.9 永远震荡不收敛,改 `??`;
+  `mesh` 熵未初始化时同步率算出 NaN,已兜底。
+
+### 测试(Node 51 → 84,Python 13 → 33,全绿)
+- 轴级完备性(1372 个词根全可达、拉丁+汉译双通道往返)、轴内零重复、汉译结构引理、
+  encodeHan 3000 采样往返 + 畸形拒绝、compose/search 等价形态与拒绝、decode 七字段两侧逐一相等、
+  encodeHan/autoCoin/coinFromCoord/compose/search/coinFromState 跨实现比对、词库实战反查;
+- gen.mjs 首批 11 项(此前零测试);Python CLI 子进程测试;worker 新路由 4 项;解释器 feel 扩充 1 项。
+- `tools/check-sync.mjs` 增 v4.1 接口层比对(encodeHan 往返 / autoCoin 55 种子 / compose / search),
+  副本落后一版即硬失败——本次已实测抓到副本缺失后再同步。
+
+### 同步
+- `web/nexus-do/lexicon.js` 已同步(保留其文件头);nexus-do selftest 235 / 单测 120 全绿,build 不涉及。
+
 ## 2026-08-19 — 私人版收尾打磨(前端诚实故障态 + 停 iOS 白烧构建)
 
 **状态盘点结论:代码零故障,全套约 393 条测试实跑全绿**(selftest 235 / 单测 116 /

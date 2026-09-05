@@ -1,6 +1,6 @@
 {
   "name": "shuyu-lang",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "枢语 Shuyu — 5维乘法语义空间语言引擎（核1040×映180×态80×标64×相8 = 7,667,712,000 词）",

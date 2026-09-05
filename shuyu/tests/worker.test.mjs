@@ -91,3 +91,57 @@ test('未知路由 404，OPTIONS 204', async () => {
   assert.equal((await call(mockEnv(), '/nope')).status, 404);
   assert.equal((await call(mockEnv(), '/talk', { method: 'OPTIONS' })).status, 204);
 });
+
+// ══════ v4.1 新路由（2026-09-05）：汉译反查 / 语义检索 / 按义造词 ══════
+
+test('GET /encode 同时接受拉丁与汉译，两种写法同源', async () => {
+  const env = mockEnv();
+  const lat = await (await call(env, '/encode?word=Nix-teks-ia1-h%C2%B7qi')).json();
+  const han = await (await call(env, `/encode?word=${encodeURIComponent('尼异朱极一外起')}`)).json();
+  assert.equal(lat.form, '拉丁');
+  assert.equal(han.form, '汉译');
+  assert.equal(han.id, lat.id);
+  // ?han= 别名也认
+  const alias = await (await call(env, `/encode?han=${encodeURIComponent('奥形凝起')}`)).json();
+  assert.equal(alias.id, 0);
+  // 畸形汉译照样 400
+  assert.equal((await call(env, `/encode?word=${encodeURIComponent('奥形凝起起')}`)).status, 400);
+});
+
+test('GET /search 语义检索与参数校验', async () => {
+  const env = mockEnv();
+  const r = await (await call(env, `/search?q=${encodeURIComponent('毁灭')}`)).json();
+  assert.equal(r.count, 1);
+  assert.equal(r.hits[0].拉丁, 'Nix');
+  const scoped = await (await call(env, `/search?q=gal&axis=${encodeURIComponent('标')}`)).json();
+  assert.deepEqual(scoped.hits.map(h => h.汉), ['时光']);
+  assert.equal((await call(env, '/search')).status, 400);
+  assert.equal((await call(env, '/search?q=x&axis=z')).status, 400);
+  const none = await (await call(env, `/search?q=${encodeURIComponent('绝不存在')}`)).json();
+  assert.equal(none.count, 0);
+});
+
+test('GET /compose 按义造词：成功 / 解析失败 400 / 空参 400', async () => {
+  const env = mockEnv();
+  const q = new URLSearchParams({ 核: '毁灭', 映: '光', 态: '爆', 标: '溯', 相: '起' }).toString();
+  const w = await (await call(env, `/compose?${q}`)).json();
+  assert.equal(w.汉, '尼光爆溯起');
+  assert.equal(w.id, 885744896);
+  assert.deepEqual(w.spec, { 核: '毁灭', 映: '光', 态: '爆', 标: '溯', 相: '起' });
+  const short = await (await call(env, '/compose?c=120&m=24&s=50&k=32&p=0')).json();
+  assert.equal(short.id, 885744896);
+  const bad = await call(env, `/compose?${new URLSearchParams({ 核: '绝不存在' })}`);
+  assert.equal(bad.status, 400);
+  assert.match((await bad.json()).error, /核轴找不到/);
+  assert.equal((await call(env, '/compose')).status, 400);
+  assert.equal((await call(env, '/compose?foo=bar')).status, 400);
+});
+
+test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
+  const root = await (await call(mockEnv(), '/')).json();
+  assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
+  assert.ok(root.endpoints.some(e => e.startsWith('/search')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/compose')));
+  const st = await (await call(mockEnv(), '/status')).json();
+  assert.deepEqual(st.axes, root.axes);
+});

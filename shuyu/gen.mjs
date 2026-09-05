@@ -83,7 +83,9 @@ function infiltrate(state, payload) {
 // 熵 — 耗散/能量交换
 function entropy(state) {
   // 熵值趋零：所有节点状态收敛
-  state.entropy = Math.max(0, (state.entropy || 1) - 0.1);
+  // 2026-09 修复：原写法 (state.entropy || 1) 把 0 当"未初始化"，熵一到 0 就被弹回 0.9，
+  // 永远在 0 ↔ 0.9 之间震荡，根本收敛不了。只有 undefined/null 才算未初始化。
+  state.entropy = Math.max(0, (state.entropy ?? 1) - 0.1);
   // 意志消耗
   state.will = Math.max(0.1, (state.will || 1) - 0.001);
   state.lastEntropy = Date.now();
@@ -130,8 +132,9 @@ function mesh(state, networkState) {
   state.nodes = networkState?.nodes || state.nodes || 1;
   state.meshDensity = (state.meshDensity || 0) + 1;
   state.lastMesh = Date.now();
-  // 全网同步率
-  state.syncRate = state.entropy < 0.1 ? 1.0 : 1.0 - state.entropy;
+  // 全网同步率（熵未初始化视为 0，否则 1 - undefined 会得到 NaN 污染状态）
+  const ent = state.entropy ?? 0;
+  state.syncRate = ent < 0.1 ? 1.0 : 1.0 - ent;
   return state;
 }
 

@@ -209,3 +209,20 @@ test('applyToSoul: 唤醒计数递增且记下最后一次感知', () => {
   assert.equal(soul.instinct, '靠近');
   assert.ok(soul.lastAwake > 0);
 });
+
+// ══════ v4.1 feel 词表扩充后的解释器行为（2026-09-05）══════
+test('feel 扩充词表: 双字情绪词长词优先，单字新词可命中，强度显式覆盖仍生效', () => {
+  const a = interpret('feel "他说今天很累" → 心疼', {});
+  assert.equal(a.perception.emotion, '心疼');
+  assert.equal(a.perception.instinct, '抱');
+  assert.equal(a.perception.intensity, 0.7);
+  const b = interpret('feel "他没回消息" → 委屈, 强度0.9', {});
+  assert.equal(b.perception.emotion, '委屈');
+  assert.equal(b.perception.intensity, 0.9);
+  const c = interpret('feel "他凶我" → 怕', {});
+  assert.equal(c.perception.emotion, '怕');
+  assert.equal(c.perception.instinct, '缩');
+  // 箭头后没有任何情绪词 → 回落默认「平」
+  const d = interpret('feel "随便说说" → 无法归类', {});
+  assert.equal(d.perception.emotion, '平');
+});

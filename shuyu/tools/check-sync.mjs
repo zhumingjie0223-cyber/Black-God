@@ -102,6 +102,37 @@ for (const bad of [NaN, 1.5, undefined, null, '100', true, -1, cap]) {
 }
 if (!guardDiverged) ok('decode 入参守卫一致: 非整数与越界值两侧均拒绝');
 
+// ── v4.1 新能力校验(硬,双方都导出该函数时才比;单方缺失说明副本没同步,也算硬失败) ──
+// encodeHan / autoCoin / compose / search 是 2026-09 长出来的能力,消费副本落后一版就会
+// 出现"源头能汉译反查、副本不能"的裂缝;这里逐一比对,不再只盯 decode/encode。
+const NEW_API = ['encodeHan', 'search', 'compose', 'autoCoin', 'coinFromCoord'];
+const missingA = NEW_API.filter(f => typeof A[f] !== 'function');
+const missingB = NEW_API.filter(f => typeof B[f] !== 'function');
+if (missingA.length || missingB.length) {
+  fail(`v4.1 接口缺失: 本仓缺[${missingA.join('、')}] / 对方缺[${missingB.join('、')}](副本未同步)`);
+} else {
+  let apiDiverged = 0;
+  for (const id of ids) {
+    const a = A.decode(id), b = B.decode(id);
+    if (A.encodeHan(a.汉) !== id || B.encodeHan(b.汉) !== id) { if (apiDiverged < 5) fail(`编号 ${id} 汉译往返失败: 本仓=${A.encodeHan(a.汉)} 对方=${B.encodeHan(b.汉)}`); apiDiverged++; }
+    if (JSON.stringify(a.坐标) !== JSON.stringify(b.坐标) || JSON.stringify(a.根) !== JSON.stringify(b.根)) { if (apiDiverged < 5) fail(`编号 ${id} 根/坐标字段分叉`); apiDiverged++; }
+  }
+  for (const seed of ['神枢', '阿权', '', '0', '赵思涵|情感', ...Array.from({ length: 50 }, (_, i) => '种子' + i)]) {
+    if (A.autoCoin(seed).id !== B.autoCoin(seed).id) { if (apiDiverged < 5) fail(`autoCoin(「${seed}」) 分叉: 本仓=${A.autoCoin(seed).id} 对方=${B.autoCoin(seed).id}`); apiDiverged++; }
+  }
+  for (const spec of [{ 核: '毁灭', 映: '光', 态: '爆', 标: '溯', 相: '起' }, { c: 120, m: 24, s: 50, k: 32, p: 0 }, { 核: 'Aoa' }, {}, { 标: '无极', 态: '爆九' }]) {
+    if (A.compose(spec).id !== B.compose(spec).id) { if (apiDiverged < 5) fail(`compose(${JSON.stringify(spec)}) 分叉`); apiDiverged++; }
+  }
+  for (const kw of ['毁灭', '熵', 'gal', '光', '起', '无极', '']) {
+    if (JSON.stringify(A.search(kw)) !== JSON.stringify(B.search(kw))) { if (apiDiverged < 5) fail(`search(「${kw}」) 分叉`); apiDiverged++; }
+  }
+  for (const bad of ['奥形凝起起', '奥形凝甲起', '甲形凝起', '', '不是词']) {
+    if (A.encodeHan(bad) !== -1 || B.encodeHan(bad) !== -1) { if (apiDiverged < 5) fail(`畸形汉译「${bad}」被放行: 本仓=${A.encodeHan(bad)} 对方=${B.encodeHan(bad)}`); apiDiverged++; }
+  }
+  if (!apiDiverged) ok(`v4.1 接口一致: encodeHan 往返 ${ids.size} 个编号 / autoCoin 55 种子 / compose 5 规格 / search 7 关键词 两侧全同`);
+  else fail(`v4.1 接口共 ${apiDiverged} 处分叉`);
+}
+
 // ── 数据层校验(软) ──
 const DA = (await import(pathToFileURL(self.data))).default;
 const DB = (await import(pathToFileURL(peer.data))).default;

@@ -4,10 +4,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-枢语·亿级语言引擎 (Shuyu Engine) v2
+枢语·亿级语言引擎 (Shuyu Engine) v4.1
 (c) 阿权/路飞  —  Black God 定制
 
-5维乘法语义空间：核 × 映 × 态 × 标 × 相
+5维乘法语义空间：核 × 映 × 态 × 标 × 相 = 核1040 × 映180 × 态80 × 标64 × 相8 = 7,667,712,000
   核(Core)   内驱核心   音节+汉义+语义
   映(Mani)   外在映射   形/声/气/光/时/暗...
   态(Stat)   频段状态   收敛/发散/叠加/绝对/下沉/瞬爆
@@ -19,6 +19,13 @@
 - 拉丁词形保持 Kha-ryl-is 式音节美感
 - 词 ↔ 编号 双向 O(1) 寻址，元点存法则不存数据
 - 可落盘分片，也可纯寻址零占用
+- 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
+  compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
+
+v4.1（2026-09）新能力：
+- encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
+- search / compose：按语义关键词检索词根、按义造词
+- auto_coin / coin_from_coord / coin_word / coin_from_state：与 JS 造词族逐位一致
 """
 import json, sys, argparse, hashlib
 
@@ -109,6 +116,7 @@ PHASES = list(_PHASE_BASE)                            # 8
 
 NC,NM,NS,NK,NP = len(CORES),len(MANIS),len(STATS),len(SCALS),len(PHASES)
 CAP = NC*NM*NS*NK*NP
+AXES = {"核":NC,"映":NM,"态":NS,"标":NK,"相":NP}
 
 _LAYERS = ["本源","虚无","观测","信息","秩序","情感","毁灭","孕育","幻象","枢",
            "元","衍","借","隐","熵","阈","静","映","织","逻",
@@ -118,25 +126,46 @@ _LAYERS = ["本源","虚无","观测","信息","秩序","情感","毁灭","孕�
            "棘刺","帷幔","漂流","根系","星芒","空腔","命网","镜面",
            "灰烬","种因","风暴","丝缕","符文","劫纪","烛照","冰川"]
 LAYER_BY_CORE = {b[0]:l for b,l in zip(_CORE_BASE,_LAYERS)}
+_TONES_PER_CORE = len(_LAT_TONE)   # 每族 20 阶：核下标 // 20 = 族下标 = 层下标
 
 def _layer_of(core_lat):
+    """核拉丁根 → 层名（保留旧接口；内部已改为按下标 O(1) 取，见 decode）"""
     for k in sorted(LAYER_BY_CORE, key=len, reverse=True):
         if core_lat.startswith(k): return LAYER_BY_CORE[k]
     return "枢"
 
-def decode(n):
-    """编号 → 枢语词（O(1) 寻址）。汉译纯中文，词形有韵律。"""
-    # 必须先挡非整数：nan/小数过不了下面的区间比较（与 nan 比大小恒为 False），
-    # 会一路穿到 CORES[c] 抛出看不懂的 TypeError。bool 也不算合法编号。
-    if isinstance(n, bool) or not isinstance(n, int):
-        raise TypeError("编号必须是整数")
-    if n<0 or n>=CAP: raise ValueError(f"编号越界 0..{CAP-1}")
+# ══════ 反向索引：拉丁 / 汉 → 轴内下标（encode 从 O(轴长) 线性扫描降到 O(1)，与 lexicon.js 同构）══════
+_AXES = (CORES, MANIS, STATS, SCALS, PHASES)
+_LAT_IDX = tuple({x[0]:i for i,x in enumerate(ax)} for ax in _AXES)
+_HAN_IDX = tuple({x[1]:i for i,x in enumerate(ax)} for ax in _AXES)
+_AXIS_NAMES = ("核","映","态","标","相")
+_BASES = (_CORE_BASE, _MANI_BASE, _STAT_BASE, _SCAL_BASE, _PHASE_BASE)
+_TONE_LENS = (len(_LAT_TONE), len(_LAT_AURA), len(_LAT_FREQ), len(_LAT_SCAL), 1)
+
+def _id_of(c,m,s,k,p):
+    return ((((c*NM)+m)*NS+s)*NK+k)*NP+p
+
+def _coord_of(n):
     nn=n
     p = nn % NP; nn//=NP
     k = nn % NK; nn//=NK
     s = nn % NS; nn//=NS
     m = nn % NM; nn//=NM
     c = nn % NC
+    return c,m,s,k,p
+
+def decode(n):
+    """编号 → 枢语词（O(1) 寻址）。汉译纯中文，词形有韵律。
+
+    返回字段与 lexicon.js 完全对等：id / 词 / 汉 / 层 / 义 / 根 / 坐标；
+    Python 侧另保留 seed（历史字段，只增不删）。
+    """
+    # 必须先挡非整数：nan/小数过不了下面的区间比较（与 nan 比大小恒为 False），
+    # 会一路穿到 CORES[c] 抛出看不懂的 TypeError。bool 也不算合法编号。
+    if isinstance(n, bool) or not isinstance(n, int):
+        raise TypeError("编号必须是整数")
+    if n<0 or n>=CAP: raise ValueError(f"编号越界 0..{CAP-1}")
+    c,m,s,k,p = _coord_of(n)
     C,M,S,K,P = CORES[c],MANIS[m],STATS[s],SCALS[k],PHASES[p]
     # 拉丁词形：核-映-态(-标)·相
     base = f"{C[0]}-{M[0]}-{S[0]}"
@@ -150,15 +179,17 @@ def decode(n):
     sem = f"{C[2]} / {M[2]} / {S[2]}"
     if K[2]: sem += f" / {K[2]}"
     sem += f" / {P[2]}"
-    return {"词":word,"汉":han,"层":_layer_of(C[0]),"义":sem,
+    return {"id":n,"词":word,"汉":han,"层":_LAYERS[c//_TONES_PER_CORE],"义":sem,
             "根":[C[0],M[0],S[0],K[0] or "∅",P[0]],
+            "坐标":{"c":c,"m":m,"s":s,"k":k,"p":p},
             "seed":hashlib.sha1(word.encode()).hexdigest()[:10]}
 
 def decode_full(n):
-    d=decode(n); d2={"id":n}; d2.update(d); return d2
+    """兼容旧接口：decode 现已自带 id，此处等价于 decode。"""
+    return decode(n)
 
 def encode(word):
-    """枢语词 → 编号（反向寻址）。
+    """枢语词（拉丁词形）→ 编号（反向寻址，O(1)）。
 
     单射铁律：encode 必须是 decode 的严格逆。凡 decode 产不出的写法一律判非法（返回 -1），
     否则畸形词会被映射到一个合法编号，跨仓语义就此错位。
@@ -175,32 +206,203 @@ def encode(word):
         # 放行的话它会和 3 段词形撞同一个编号（与 lexicon.js 同规则）
         if len(parts) > 3 and klat == "":
             return -1
-        ci=[i for i,x in enumerate(CORES) if x[0]==clat][0]
-        mi=[i for i,x in enumerate(MANIS) if x[0]==mlat][0]
-        si=[i for i,x in enumerate(STATS) if x[0]==slat][0]
-        ki=[i for i,x in enumerate(SCALS) if x[0]==klat][0]
-        pi=[i for i,x in enumerate(PHASES) if x[0]==ph][0]
-        return ((((ci*NM)+mi)*NS+si)*NK+ki)*NP+pi
+        ci=_LAT_IDX[0][clat]; mi=_LAT_IDX[1][mlat]; si=_LAT_IDX[2][slat]
+        ki=_LAT_IDX[3][klat]; pi=_LAT_IDX[4][ph]
+        return _id_of(ci,mi,si,ki,pi)
     except Exception:
         return -1
 
-def main():
-    ap=argparse.ArgumentParser()
-    ap.add_argument("--count",action="store_true")
-    ap.add_argument("--id",type=int,default=-1)
-    ap.add_argument("--word",default="")
+def encode_han(han):
+    """汉译（纯中文）→ 编号。解不出或解不唯一一律 -1，与拉丁 encode 同一单射铁律。
+
+    汉译 = 核汉(1~2 字) + 映汉(1~2 字) + 态汉(1~2 字) + 标汉(0~3 字) + 相汉(1 字)。
+    各轴后缀字（阶/相/频/标位）与下一轴首字零交集，因此汉译唯一可解码（tests 里有结构引理守卫）。
+    实现上不依赖这个引理：回溯枚举全部切法，只有恰好一种切法时才返回编号，否则 -1。
+    """
+    if not isinstance(han, str) or len(han) < 4:
+        return -1
+    pi = _HAN_IDX[4].get(han[-1])
+    if pi is None:
+        return -1
+    body = han[:-1]
+    found = []
+    L = len(body)
+    for lc in (1,2):
+        ci = _HAN_IDX[0].get(body[:lc])
+        if ci is None or lc > L: continue
+        for lm in (1,2):
+            mi = _HAN_IDX[1].get(body[lc:lc+lm])
+            if mi is None or lc+lm > L: continue
+            for ls in (1,2):
+                si = _HAN_IDX[2].get(body[lc+lm:lc+lm+ls])
+                if si is None or lc+lm+ls > L: continue
+                ki = _HAN_IDX[3].get(body[lc+lm+ls:])
+                if ki is None: continue
+                found.append(_id_of(ci,mi,si,ki,pi))
+                if len(found) > 1:
+                    return -1
+    return found[0] if len(found) == 1 else -1
+
+# ══════ 语义检索：关键词 → 命中的词根（5 轴基表级，不展开阶）══════
+def search(keyword, axis=None):
+    """在 5 轴基表的 拉丁/汉/义 里找关键词（拉丁不分大小写），返回命中列表。
+
+    每项：{"轴","下标","拉丁","汉","义"}，下标是**展开后**轴内下标（基表下标 × 阶数，即 0 阶），
+    可直接喂给 compose / coin_from_coord。axis 可限定 核/映/态/标/相 之一。
+    """
+    if not isinstance(keyword, str) or not keyword.strip():
+        return []
+    kw = keyword.strip(); kwl = kw.lower()
+    out = []
+    for ai,(name,base,tl) in enumerate(zip(_AXIS_NAMES,_BASES,_TONE_LENS)):
+        if axis and axis != name: continue
+        for bi,(lat,han,sem) in enumerate(base):
+            if not lat and not han: continue   # 标轴首项是空阶，没有可检索内容
+            if kwl == lat.lower() or (han and kw in han) or (sem and kw in sem) or (lat and kwl in lat.lower() and len(kwl) >= 2):
+                out.append({"轴":name,"下标":bi*tl,"拉丁":lat,"汉":han,"义":sem})
+    return out
+
+def _resolve_axis(ai, val):
+    """把一轴的用户输入解析成展开后下标：整数下标 / 拉丁根 / 汉译 / 语义关键词（基表首命中，0 阶）。"""
+    if val is None or val == "":
+        return 0
+    if isinstance(val, bool):
+        raise ValueError(f"{_AXIS_NAMES[ai]}轴不接受布尔值")
+    n = len(_AXES[ai])
+    if isinstance(val, int):
+        if val < 0 or val >= n: raise ValueError(f"{_AXIS_NAMES[ai]}轴下标越界 0..{n-1}: {val}")
+        return val
+    if not isinstance(val, str):
+        raise ValueError(f"{_AXIS_NAMES[ai]}轴入参类型非法")
+    v = val.strip()
+    if v.isdigit():
+        return _resolve_axis(ai, int(v))
+    i = _LAT_IDX[ai].get(v)
+    if i is not None: return i
+    i = _HAN_IDX[ai].get(v)
+    if i is not None: return i
+    hits = search(v, _AXIS_NAMES[ai])
+    if hits: return hits[0]["下标"]
+    raise ValueError(f"{_AXIS_NAMES[ai]}轴找不到「{val}」")
+
+def compose(spec):
+    """按义造词：spec 为 {核,映,态,标,相}（也接受 c,m,s,k,p 键），每轴给
+    整数下标 / 拉丁根 / 汉译 / 语义关键词 任一种；缺省轴取 0。确定性，返回 decode 结果。
+    解析失败抛 ValueError（不静默落到别的词上——按义造词不许造错词）。
+    """
+    if not isinstance(spec, dict):
+        raise ValueError("compose 需要 dict")
+    alias = {"c":"核","m":"映","s":"态","k":"标","p":"相"}
+    norm = {}
+    for key,val in spec.items():
+        k = alias.get(key, key)
+        if k not in _AXIS_NAMES: raise ValueError(f"未知轴「{key}」")
+        norm[k] = val
+    idx = [_resolve_axis(ai, norm.get(name)) for ai,name in enumerate(_AXIS_NAMES)]
+    return decode(_id_of(*idx))
+
+# ══════ 造词族：与 lexicon.js 逐位一致 ══════
+_U32 = 0xFFFFFFFF
+
+def auto_coin(seed):
+    """确定性种子造词：FNV-1a(32 位，按 UTF-16 码元) + xorshift，与 JS autoCoin 逐位一致。
+    已知限制：哈希是 uint32，高位约 44% 语义空间永不可达（JS 侧测试同样钉住此现状，改哈希需两侧同时拍板）。
+    """
+    s = str(seed)
+    h = 2166136261
+    units = s.encode("utf-16-le")
+    for i in range(0, len(units), 2):
+        h ^= units[i] | (units[i+1] << 8)
+        h = (h * 16777619) & _U32
+    h ^= (h << 13) & _U32
+    h ^= h >> 17
+    h ^= (h << 5) & _U32
+    h &= _U32
+    return decode(h % CAP)
+
+def _clamp_axis(v, mx):
+    try:
+        v = int(v // 1) if isinstance(v, float) else int(v or 0)
+    except Exception:
+        v = 0
+    return 0 if v < 0 else (mx-1 if v >= mx else v)
+
+def coin_from_coord(coord):
+    """从 5 维坐标造词，越界坐标夹回合法区间（与 JS coinFromCoord 一致）。"""
+    coord = coord or {}
+    c=_clamp_axis(coord.get("c"),NC); m=_clamp_axis(coord.get("m"),NM); s=_clamp_axis(coord.get("s"),NS)
+    k=_clamp_axis(coord.get("k"),NK); p=_clamp_axis(coord.get("p"),NP)
+    return decode(_id_of(c,m,s,k,p))
+
+def coin_word(layer_name, rng=None):
+    """从指定核心层随机取一个词；层名不存在则全空间随机（与 JS coinWord 一致）。rng 可传 random.Random 保证可复现。"""
+    import random as _random
+    rng = rng or _random
+    if layer_name in _LAYERS:
+        base = _LAYERS.index(layer_name) * _TONES_PER_CORE
+        c = base + rng.randrange(_TONES_PER_CORE)
+        return decode(_id_of(c, rng.randrange(NM), rng.randrange(NS), rng.randrange(NK), rng.randrange(NP)))
+    return decode(rng.randrange(CAP))
+
+def coin_from_state(soul, seed=None, rng=None):
+    """按状态自主造词：心绪/想念决定核心层（与 JS coinFromState 同规则），有 seed 则确定性。"""
+    soul = soul or {}
+    mood = soul.get("心绪", 0.5); mood = 0.5 if mood is None else mood
+    miss = soul.get("miss_you", 0); miss = 0 if miss is None else miss
+    if miss > 0.7: layer = "映"
+    elif mood > 0.65: layer = "情感"
+    elif mood < 0.35: layer = "熵"
+    else: layer = "枢"
+    w = auto_coin(f"{seed}|{layer}") if seed is not None else coin_word(layer, rng)
+    w = dict(w); w["层意图"] = layer
+    return w
+
+def _parse_compose_arg(text):
+    """把 CLI 的 "核=毁灭,映=光,态=爆,标=溯,相=起" 解析成 compose 的 spec。"""
+    spec = {}
+    for seg in text.split(","):
+        seg = seg.strip()
+        if not seg: continue
+        if "=" not in seg: raise ValueError(f"compose 片段缺少「=」: {seg}")
+        k, v = seg.split("=", 1)
+        spec[k.strip()] = v.strip()
+    return spec
+
+def main(argv=None):
+    ap=argparse.ArgumentParser(description="枢语 5 维语义空间引擎（Python 版，与 lexicon.js 同构）")
+    ap.add_argument("--count",action="store_true",help="只打印容量")
+    ap.add_argument("--id",type=int,default=-1,help="编号 → 词")
+    ap.add_argument("--word",default="",help="拉丁词形 → 编号（如 Kha-ryl-is·qi）")
+    ap.add_argument("--han",default="",help="汉译 → 编号（如 奥形凝起）")
+    ap.add_argument("--search",default="",help="语义关键词 → 命中的词根（5 轴）")
+    ap.add_argument("--compose",default="",help="按义造词，如 核=毁灭,映=光,态=爆,标=溯,相=起")
+    ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
     ap.add_argument("--limit",type=int,default=0)
     ap.add_argument("--shard",type=int,default=5_000_000)
-    a=ap.parse_args()
+    a=ap.parse_args(argv)
+    out=lambda obj: print(json.dumps(obj,ensure_ascii=False,indent=2))
     print(f"枢语5维语义空间容量: {CAP:,}  (核{NC}×映{NM}×态{NS}×标{NK}×相{NP})")
     if a.count: return
     if a.id>=0:
-        print(json.dumps(decode_full(a.id),ensure_ascii=False,indent=2)); return
+        out(decode_full(a.id)); return
     if a.word:
         nid=encode(a.word)
-        print(json.dumps({"word":a.word,"id":nid,"verify":decode_full(nid) if nid>=0 else None},ensure_ascii=False,indent=2)); return
+        out({"word":a.word,"id":nid,"verify":decode_full(nid) if nid>=0 else None}); return
+    if a.han:
+        nid=encode_han(a.han)
+        out({"han":a.han,"id":nid,"verify":decode_full(nid) if nid>=0 else None}); return
+    if a.search:
+        out({"keyword":a.search,"hits":search(a.search)}); return
+    if a.compose:
+        try:
+            out(compose(_parse_compose_arg(a.compose)))
+        except ValueError as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.coin is not None:
+        out(auto_coin(a.coin)); return
     if a.sample>0:
         import random
         for _ in range(a.sample):

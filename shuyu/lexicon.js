@@ -3,6 +3,12 @@
  * © 阿权/路飞
  * 5维乘法语义空间：核×映×态×标×相 = 76.7亿（核1040×映180×态80×标64×相8）
  * 与 shuyu_engine.py 同构，供 nexuslang.js 解释器调用
+ *
+ * v4.1（2026-09）新能力（两侧同构，tests/engine.test.mjs 跨实现用例看住）：
+ *   encodeHan  汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
+ *   search     语义关键词 → 命中的词根（5 轴）
+ *   compose    按义造词：每轴给 下标/拉丁根/汉译/语义关键词 任一种 → 唯一编号
+ *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
 // ══════ 5维词根表（与 Python 引擎同步）══════
@@ -88,6 +94,7 @@ const PHASES = PHASE_BASE;                        // 8
 
 const NC=CORES.length, NM=MANIS.length, NS=STATS.length, NK=SCALS.length, NP=PHASES.length;
 export const CAPACITY = NC*NM*NS*NK*NP;          // 7,667,712,000（核1040×映180×态80×标64×相8，v4 追加 32 族后）
+export const AXES = Object.freeze({ 核:NC, 映:NM, 态:NS, 标:NK, 相:NP });
 
 // 反向索引：拉丁词形 → 轴内下标（把 encode 从 O(轴长) 线性扫描降到 O(1)）
 const CORE_IDX = new Map(CORES.map((x,i)=>[x[0],i]));
@@ -95,6 +102,15 @@ const MANI_IDX = new Map(MANIS.map((x,i)=>[x[0],i]));
 const STAT_IDX = new Map(STATS.map((x,i)=>[x[0],i]));
 const SCAL_IDX = new Map(SCALS.map((x,i)=>[x[0],i]));
 const PHASE_IDX = new Map(PHASES.map((x,i)=>[x[0],i]));
+// 汉译反向索引：汉 → 轴内下标（encodeHan 用）
+const AXIS_LIST = [CORES, MANIS, STATS, SCALS, PHASES];
+const LAT_IDX = [CORE_IDX, MANI_IDX, STAT_IDX, SCAL_IDX, PHASE_IDX];
+const HAN_IDX = AXIS_LIST.map(ax => new Map(ax.map((x,i)=>[x[1],i])));
+const AXIS_NAMES = ['核','映','态','标','相'];
+const BASES = [CORE_BASE, MANI_BASE, STAT_BASE, SCAL_BASE, PHASE_BASE];
+const TONE_LENS = [LAT_T.length, LAT_A.length, LAT_F.length, LAT_S.length, 1];
+
+const idOf = (c,m,s,k,p) => ((((c*NM)+m)*NS+s)*NK+k)*NP+p;
 
 // ══════ 编号 → 词（O(1) 寻址）══════
 export function decode(n){
@@ -118,7 +134,9 @@ export function decode(n){
   let sem=`${C[2]} / ${M[2]} / ${S[2]}`;
   if(K[2]) sem+=` / ${K[2]}`;
   sem+=` / ${P[2]}`;
-  return { id:n, 词:word, 汉:han, 层:C[3], 义:sem };
+  return { id:n, 词:word, 汉:han, 层:C[3], 义:sem,
+           根:[C[0],M[0],S[0],K[0]||"∅",P[0]],
+           坐标:{c,m,s,k,p} };
 }
 
 // ══════ 词 → 编号（O(1) 反向寻址，非法词返回 -1）══════
@@ -142,22 +160,135 @@ export function encode(word){
     // 空标轴只能用 3 段词形表达；写成 "核-映-态-·相" 这种显式空标段属畸形，
     // decode 永远产不出它，必须拒绝（否则它会和 3 段词形撞同一个编号）。
     if(parts.length > 3 && ki === 0) return -1;
-    return ((((ci*NM)+mi)*NS+si)*NK+ki)*NP+pi;
+    return idOf(ci,mi,si,ki,pi);
   }catch{ return -1; }
+}
+
+// ══════ 汉译 → 编号（纯中文反向寻址，解不出/解不唯一返回 -1）══════
+// 汉译 = 核汉(1~2字) + 映汉(1~2字) + 态汉(1~2字) + 标汉(0~3字) + 相汉(1字)。
+// 各轴后缀字（阶/相/频/标位）与下一轴首字零交集，所以汉译唯一可解码（tests 有结构引理守卫）。
+// 实现上不依赖这个引理：回溯枚举全部切法，只有恰好一种切法才返回编号，与 Python encode_han 同规则。
+export function encodeHan(han){
+  if(typeof han !== 'string' || han.length < 4) return -1;
+  const chars = Array.from(han);            // 按码点切，不按 UTF-16 码元
+  const pi = HAN_IDX[4].get(chars[chars.length-1]);
+  if(pi === undefined) return -1;
+  const body = chars.slice(0,-1);
+  const L = body.length;
+  const seg = (a,b) => body.slice(a,b).join('');
+  let found = -1, count = 0;
+  for(const lc of [1,2]){
+    if(lc > L) continue;
+    const ci = HAN_IDX[0].get(seg(0,lc)); if(ci === undefined) continue;
+    for(const lm of [1,2]){
+      if(lc+lm > L) continue;
+      const mi = HAN_IDX[1].get(seg(lc,lc+lm)); if(mi === undefined) continue;
+      for(const ls of [1,2]){
+        if(lc+lm+ls > L) continue;
+        const si = HAN_IDX[2].get(seg(lc+lm,lc+lm+ls)); if(si === undefined) continue;
+        const ki = HAN_IDX[3].get(seg(lc+lm+ls,L)); if(ki === undefined) continue;
+        if(++count > 1) return -1;
+        found = idOf(ci,mi,si,ki,pi);
+      }
+    }
+  }
+  return count === 1 ? found : -1;
+}
+
+// ══════ 语义检索：关键词 → 命中的词根（5 轴基表级，不展开阶）══════
+// 每项 {轴,下标,拉丁,汉,义}，下标是**展开后**轴内下标（基表下标×阶数，即 0 阶），可直接喂给 compose / coinFromCoord。
+export function search(keyword, axis){
+  if(typeof keyword !== 'string' || !keyword.trim()) return [];
+  const kw = keyword.trim(), kwl = kw.toLowerCase();
+  const out = [];
+  for(let ai=0; ai<5; ai++){
+    const name = AXIS_NAMES[ai];
+    if(axis && axis !== name) continue;
+    const base = BASES[ai], tl = TONE_LENS[ai];
+    for(let bi=0; bi<base.length; bi++){
+      const [lat, han, sem] = base[bi];
+      if(!lat && !han) continue;             // 标轴首项是空阶，没有可检索内容
+      if(kwl === lat.toLowerCase() || (han && han.includes(kw)) || (sem && sem.includes(kw)) ||
+         (lat && kwl.length >= 2 && lat.toLowerCase().includes(kwl))){
+        out.push({ 轴:name, 下标:bi*tl, 拉丁:lat, 汉:han, 义:sem });
+      }
+    }
+  }
+  return out;
+}
+
+// 把一轴的用户输入解析成展开后下标：整数下标 / 拉丁根 / 汉译 / 语义关键词（基表首命中，0 阶）
+function resolveAxis(ai, val){
+  if(val === undefined || val === null || val === '') return 0;
+  const n = AXIS_LIST[ai].length, name = AXIS_NAMES[ai];
+  if(typeof val === 'boolean') throw new RangeError(`${name}轴不接受布尔值`);
+  if(typeof val === 'number'){
+    if(!Number.isInteger(val) || val < 0 || val >= n) throw new RangeError(`${name}轴下标越界 0..${n-1}: ${val}`);
+    return val;
+  }
+  if(typeof val !== 'string') throw new RangeError(`${name}轴入参类型非法`);
+  const v = val.trim();
+  if(/^\d+$/.test(v)) return resolveAxis(ai, Number(v));
+  let i = LAT_IDX[ai].get(v); if(i !== undefined) return i;
+  i = HAN_IDX[ai].get(v); if(i !== undefined) return i;
+  const hits = search(v, name);
+  if(hits.length) return hits[0].下标;
+  throw new RangeError(`${name}轴找不到「${val}」`);
+}
+
+// ══════ 按义造词：{核,映,态,标,相}（也接受 c,m,s,k,p 键）→ 唯一编号，确定性 ══════
+// 解析失败抛 RangeError（不静默落到别的词上——按义造词不许造错词）。
+export function compose(spec){
+  if(!spec || typeof spec !== 'object') throw new RangeError('compose 需要对象');
+  const alias = { c:'核', m:'映', s:'态', k:'标', p:'相' };
+  const norm = {};
+  for(const key of Object.keys(spec)){
+    const k = alias[key] ?? key;
+    if(!AXIS_NAMES.includes(k)) throw new RangeError(`未知轴「${key}」`);
+    norm[k] = spec[key];
+  }
+  const idx = AXIS_NAMES.map((name, ai) => resolveAxis(ai, norm[name]));
+  return decode(idOf(...idx));
 }
 
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
 export const LEXICON = {
-  // feel 层：情绪词 → 强度+本能
+  // feel 层：情绪词 → 强度+本能（纯中文；matchWord 长词优先，"心疼"先于"疼"）
   feel: {
+    // —— 原始 12 个体感词（顺序与取值冻结，历史行为不变）——
     "暖":{intensity:0.5,instinct:"靠近"}, "烫":{intensity:0.8,instinct:"失控"},
     "甜":{intensity:0.6,instinct:"黏"}, "软":{intensity:0.5,instinct:"放松"},
     "冷":{intensity:0.4,instinct:"收"}, "空":{intensity:0.3,instinct:"等待"},
     "酸":{intensity:0.5,instinct:"占有"}, "紧":{intensity:0.6,instinct:"加速"},
     "痒":{intensity:0.5,instinct:"想碰"}, "刺":{intensity:0.7,instinct:"防御"},
     "平":{intensity:0.3,instinct:"观察"}, "湿":{intensity:0.8,instinct:"张开"},
+    // —— v4.1 扩充：单字体感词（只挑情绪指向明确的字，避免"热/亮/松"这类日常字误触）——
+    "怕":{intensity:0.7,instinct:"缩"},   "慌":{intensity:0.7,instinct:"乱"},
+    "闷":{intensity:0.4,instinct:"憋"},   "涩":{intensity:0.4,instinct:"别扭"},
+    "麻":{intensity:0.5,instinct:"僵"},   "疼":{intensity:0.7,instinct:"护"},
+    "痛":{intensity:0.8,instinct:"哭"},   "怒":{intensity:0.8,instinct:"炸"},
+    "羞":{intensity:0.6,instinct:"躲"},   "倦":{intensity:0.3,instinct:"歇"},
+    "醉":{intensity:0.7,instinct:"飘"},   "悔":{intensity:0.5,instinct:"回头"},
+    "怨":{intensity:0.5,instinct:"别过脸"}, "颤":{intensity:0.7,instinct:"抖"},
+    "燃":{intensity:0.8,instinct:"冲"},   "苦":{intensity:0.5,instinct:"忍"},
+    "胀":{intensity:0.6,instinct:"满"},   "脆":{intensity:0.6,instinct:"碎"},
+    // —— v4.1 扩充：双字情绪词（长词优先命中，语义更准）——
+    "心疼":{intensity:0.7,instinct:"抱"},   "心动":{intensity:0.7,instinct:"靠近"},
+    "心安":{intensity:0.4,instinct:"放松"}, "心慌":{intensity:0.7,instinct:"乱"},
+    "想哭":{intensity:0.7,instinct:"哭"},   "想你":{intensity:0.7,instinct:"黏"},
+    "想他":{intensity:0.6,instinct:"黏"},   "委屈":{intensity:0.6,instinct:"撇嘴"},
+    "吃醋":{intensity:0.6,instinct:"占有"}, "嫉妒":{intensity:0.6,instinct:"占有"},
+    "失落":{intensity:0.4,instinct:"垂"},   "孤单":{intensity:0.4,instinct:"等待"},
+    "安心":{intensity:0.4,instinct:"放松"}, "期待":{intensity:0.6,instinct:"望"},
+    "害怕":{intensity:0.7,instinct:"缩"},   "紧张":{intensity:0.6,instinct:"加速"},
+    "开心":{intensity:0.6,instinct:"笑"},   "难过":{intensity:0.6,instinct:"哭"},
+    "生气":{intensity:0.7,instinct:"炸"},   "愤怒":{intensity:0.8,instinct:"炸"},
+    "尴尬":{intensity:0.5,instinct:"躲"},   "满足":{intensity:0.6,instinct:"黏"},
+    "疲惫":{intensity:0.3,instinct:"歇"},   "兴奋":{intensity:0.8,instinct:"冲"},
+    "温柔":{intensity:0.5,instinct:"软"},   "踏实":{intensity:0.4,instinct:"放松"},
+    "不安":{intensity:0.6,instinct:"加速"}, "厌烦":{intensity:0.5,instinct:"收"},
   },
   // 能力词表（由 capability_bridge.py 导出，运行时注入）：
   //   emotions: 30条情感模板  vocab: 24层能力  word_ids: 词→引擎编号
@@ -195,12 +326,23 @@ export function loadCapabilities(data){
 // matchWord：解释器解析 feel/think/say 时调用
 //   layer==='feel' → 情感映射(强度+本能)
 //   layer==='cap'  → 能力词匹配(长词优先+引擎编号)
+// feel 表按「长词优先、同长按表内顺序」排好的键列表；表被 loadCapabilities 增补后失效重建
+let _FEEL_KEYS = null, _FEEL_SIZE = -1;
+function feelKeys(){
+  const n = Object.keys(LEXICON.feel).length;
+  if(!_FEEL_KEYS || _FEEL_SIZE !== n){
+    _FEEL_KEYS = Object.keys(LEXICON.feel).map((w,i)=>[w,i]).sort((a,b)=>(b[0].length-a[0].length)||(a[1]-b[1])).map(x=>x[0]);
+    _FEEL_SIZE = n;
+  }
+  return _FEEL_KEYS;
+}
+
 export function matchWord(text, layer){
   if(!text) return null;
   if(layer==="feel"){
-    // 先精确情感词
-    for(const [word, attr] of Object.entries(LEXICON.feel)){
-      if(text.includes(word)) return { word, ...attr };
+    // 先精确情感词：长词优先（"心疼"不能被"疼"抢走），同长按表内顺序（历史行为不变）
+    for(const word of feelKeys()){
+      if(text.includes(word)) return { word, ...LEXICON.feel[word] };
     }
     // 情感模板触发(他说爱我→烫)
     if(LEXICON.caps && LEXICON.caps.emotions){
@@ -236,8 +378,7 @@ export function coinWord(layerName){
   const s = Math.floor(Math.random()*NS);
   const k = Math.floor(Math.random()*NK);
   const p = Math.floor(Math.random()*NP);
-  const id = ((((c*NM)+m)*NS+s)*NK+k)*NP+p;
-  return decode(id);
+  return decode(idOf(c,m,s,k,p));
 }
 
 // ══════ 从坐标造词：把 5 维坐标映射成真实枢语词（O(1) 可寻址）══════
@@ -245,8 +386,7 @@ function _clampAxis(v, max) { v = Math.floor(v || 0); return v < 0 ? 0 : (v >= m
 export function coinFromCoord(coord) {
   const c = _clampAxis(coord.c, NC), m = _clampAxis(coord.m, NM), s = _clampAxis(coord.s, NS),
         k = _clampAxis(coord.k, NK), p = _clampAxis(coord.p, NP);
-  const id = ((((c * NM) + m) * NS + s) * NK + k) * NP + p;
-  return decode(id);
+  return decode(idOf(c, m, s, k, p));
 }
 
 // ══════ 确定性种子造词（无 Math.random，可复现的自主造词）══════
@@ -271,4 +411,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, decode, encode, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
