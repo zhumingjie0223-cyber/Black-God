@@ -22,10 +22,12 @@ struct ChatMessage: Identifiable, Codable {
 struct AnthropicMessage: Codable {
     let role: String
     let content: String
+    let blocks: [NexusAssistantToolUseBlock]?
 
-    init(role: String, content: String) {
+    init(role: String, content: String, blocks: [NexusAssistantToolUseBlock]? = nil) {
         self.role = role
         self.content = content
+        self.blocks = blocks
     }
 }
 

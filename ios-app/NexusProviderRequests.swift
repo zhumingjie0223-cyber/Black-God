@@ -4,6 +4,7 @@ struct OpenAIRequest: Codable {
     let model: String
     let stream: Bool
     let messages: [AnthropicMessage]
+    let tools: [NexusToolDefinition]
 }
 
 struct NexusProviderRequestBuilder {
@@ -12,7 +13,7 @@ struct NexusProviderRequestBuilder {
         case .anthropic:
             return try JSONEncoder().encode(AnthropicRequest(model: model.modelID, maxTokens: 4096, stream: true, messages: messages.map { AnthropicMessage(role: $0.role, content: $0.content) }, tools: NexusToolCatalog.definitions))
         case .openAICompatible:
-            return try JSONEncoder().encode(OpenAIRequest(model: model.modelID, stream: true, messages: messages.map { AnthropicMessage(role: $0.role, content: $0.content) }))
+            return try JSONEncoder().encode(OpenAIRequest(model: model.modelID, stream: true, messages: messages.map { AnthropicMessage(role: $0.role, content: $0.content) }, tools: NexusToolCatalog.definitions))
         }
     }
 
