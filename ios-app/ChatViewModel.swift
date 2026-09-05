@@ -11,6 +11,7 @@ final class ChatViewModel: ObservableObject {
     @Published var lastError: String?
     @Published private(set) var runtime = NexusRuntime()
     private let agentLoop = NexusAgentLoop()
+    private let verifier = NexusIndependentVerifier()
     private var handledToolCalls = Set<UUID>()
     @Published var memory = NexusMemoryStore()
     @Published var evaluations = NexusEvaluationStore()
@@ -60,7 +61,8 @@ final class ChatViewModel: ObservableObject {
                         }
                         self.isTyping = false
                         self.runtime.observe(output: reply)
-                        self.evaluations.record(task: trimmed, success: !reply.isEmpty, recovered: false, verified: !reply.isEmpty, latency: Date().timeIntervalSince(startedAt))
+                        let report = self.verifier.verify(goal: trimmed, output: reply)
+                        self.evaluations.record(task: trimmed, success: report.passed, recovered: false, verified: report.passed, latency: Date().timeIntervalSince(startedAt))
                         self.memory.remember(reply, kind: "result", source: "assistant", confidence: 0.6)
                         self.runtime.append(.completed)
                     }
