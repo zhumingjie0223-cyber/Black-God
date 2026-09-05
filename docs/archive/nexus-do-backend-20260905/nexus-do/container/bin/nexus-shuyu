@@ -1,3 +1,0 @@
-#!/bin/sh
-# 神枢伪命令:枢语词典检索。用法: nexus-shuyu <词或义>
-exec node /usr/local/bin/nexus.mjs shuyu.query "$@"

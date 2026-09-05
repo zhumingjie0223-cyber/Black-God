@@ -1,4 +1,0 @@
-#!/bin/sh
-# 神枢伪命令:记忆。用法: nexus-memory search <关键词> | nexus-memory note <内容>
-sub="$1"; [ -n "$sub" ] && shift
-exec node /usr/local/bin/nexus.mjs "memory.${sub:-search}" "$@"
