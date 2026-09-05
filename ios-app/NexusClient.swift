@@ -34,9 +34,10 @@ struct AnthropicRequest: Codable {
     let maxTokens: Int
     let stream: Bool
     let messages: [AnthropicMessage]
+    let tools: [NexusToolDefinition]?
 
     enum CodingKeys: String, CodingKey {
-        case model, stream, messages
+        case model, stream, messages, tools
         case maxTokens = "max_tokens"
     }
 }
