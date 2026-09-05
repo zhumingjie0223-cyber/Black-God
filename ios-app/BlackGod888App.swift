@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 @main
 struct BlackGod888App: App {
