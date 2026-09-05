@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>神枢 Black God · App Store 截图（iPhone 6.7″ · 5 张）</title>
+<!--
+  神枢 Black God · App Store 截图源文件
+  ─────────────────────────────────────────────
+  · 自包含单文件，无任何外链依赖（字体走系统栈，图标为内联 SVG）
+  · 5 张截图并排，每张 393×852 CSS 像素（iPhone 6.7″ 逻辑尺寸）
+  · 以设备像素比 3 导出即得 1290×2796 PNG（App Store 6.7″ 规格）
+  · 色系：石墨暗流 · 玉绿（主色 #3FA57A，背景 #0E1114）
+  · 导出方法见同目录 screenshots_guide.md
+  · 地址加 ?export 可隐藏顶部工具条、去掉间距，便于整页/逐张截图
+-->
+<style>
+/* ═══════════════════════════════════════════════
+   0. 设计令牌 · 石墨暗流 · 玉绿
+   ═══════════════════════════════════════════════ */
+:root{
+  --bg:#0E1114;
+  --bg-2:#12161A;
+  --surface:#161B20;
+  --surface-2:#1C2227;
+  --surface-3:#242B32;
+  --line:rgba(255,255,255,.075);
+  --line-2:rgba(255,255,255,.14);
+
+  --jade:#3FA57A;        /* 主色 */
+  --jade-hi:#4FE096;     /* 高光 */
+  --jade-2:#3BC77E;
+  --jade-4:#8FE3AE;      /* 最浅 */
+  --jade-deep:#2B7A5A;
+  --jade-ink:#07110C;    /* 玉绿底上的深色文字 */
+  --jade-glow:rgba(63,165,122,.38);
+
+  --text:#E9EDF0;
+  --text-2:#A2ABB3;
+  --text-3:#6E7880;
+  --danger:#E5534B;
+
+  --font-sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","PingFang SC",
+              "Noto Sans CJK SC","Noto Sans SC","Source Han Sans SC","Helvetica Neue",Arial,sans-serif;
+  --font-serif:"Songti SC","STSong","Noto Serif CJK SC","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+  --font-mono:"SF Mono",Menlo,"JetBrains Mono","Roboto Mono",Consolas,monospace;
+
+  --s:.78;               /* 手机样机内 App 界面缩放比 */
+  --bezel:11px;          /* 样机边框厚度 */
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#080A0C}
+body{
+  font-family:var(--font-sans);color:var(--text);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  min-height:100vh;
+}
+
+/* ═══════════════════════════════════════════════
+   1. 页面外壳（工具条 + 横向排列）
+   ═══════════════════════════════════════════════ */
+.toolbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:14px 24px;
+  background:rgba(8,10,12,.85);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+  font-size:12.5px;color:var(--text-2);
+}
+.toolbar b{color:var(--text);font-weight:600;letter-spacing:.02em}
+.toolbar .dot{width:8px;height:8px;border-radius:50%;background:var(--jade-hi);box-shadow:0 0 12px var(--jade-hi)}
+.toolbar code{font:12px var(--font-mono);color:var(--jade-4);background:rgba(63,165,122,.1);padding:2px 7px;border-radius:6px}
+.toolbar .sp{flex:1}
+
+.board{
+  display:flex;gap:28px;align-items:flex-start;
+  padding:36px 32px 48px;width:max-content;
+}
+body.export{background:var(--bg)}
+body.export .toolbar{display:none}
+body.export .board{gap:0;padding:0}
+body.export .shot{box-shadow:none;border-radius:0}
+
+/* ═══════════════════════════════════════════════
+   2. 单张截图画布 393×852
+   ═══════════════════════════════════════════════ */
+.shot{
+  position:relative;flex:0 0 auto;
+  width:393px;height:852px;overflow:hidden;
+  background:var(--bg);
+  border-radius:22px;
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.06);
+  isolation:isolate;
+}
+/* 石墨底纹：细网格，向下渐隐 */
+.shot::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.032) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.032) 1px,transparent 1px);
+  background-size:26px 26px;
+  -webkit-mask-image:linear-gradient(#000 0%,rgba(0,0,0,.6) 40%,transparent 80%);
+          mask-image:linear-gradient(#000 0%,rgba(0,0,0,.6) 40%,transparent 80%);
+}
+/* 顶部弧形暗流 */
+.shot::after{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 60% at 50% -10%,rgba(255,255,255,.05),transparent 60%),
+    linear-gradient(180deg,transparent 60%,rgba(0,0,0,.35));
+}
+.glow{
+  position:absolute;left:50%;top:120px;z-index:0;
+  width:620px;height:620px;transform:translateX(-50%);
+  background:radial-gradient(closest-side,rgba(63,165,122,.42),rgba(63,165,122,.10) 50%,transparent 74%);
+  filter:blur(6px);pointer-events:none;
+}
+.glow.b{top:520px;width:520px;height:520px;opacity:.55}
+/* 水印「神」 */
+.mark{
+  position:absolute;right:-26px;top:96px;z-index:0;pointer-events:none;
+  font:700 320px/1 var(--font-serif);
+  color:transparent;-webkit-text-stroke:1px rgba(143,227,174,.09);
+  letter-spacing:0;user-select:none;
+}
+
+/* ─── 营销文案区 ─── */
+.copy{position:absolute;left:0;right:0;top:0;z-index:2;padding:34px 24px 0;text-align:center}
+.brand{
+  display:inline-flex;align-items:center;gap:8px;
+  font:600 10.5px/1 var(--font-sans);letter-spacing:.24em;color:var(--text-3);text-transform:uppercase;
+}
+.brand i{
+  width:18px;height:18px;border-radius:5px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#2B323A,#0F1316);
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 14px -4px var(--jade-glow);
+  font:700 11px/1 var(--font-serif);color:var(--jade-4);letter-spacing:0;font-style:normal;
+}
+.kicker{
+  margin-top:24px;display:inline-flex;align-items:center;gap:10px;
+  font:600 11px/1 var(--font-sans);letter-spacing:.32em;color:var(--jade-hi);text-transform:uppercase;
+}
+.kicker::before,.kicker::after{content:"";width:22px;height:1px;background:linear-gradient(90deg,transparent,var(--jade));}
+.kicker::after{background:linear-gradient(90deg,var(--jade),transparent)}
+h2{
+  margin:12px 0 0;
+  font:600 31px/1.28 var(--font-serif);letter-spacing:.03em;
+  background:linear-gradient(165deg,#F6F8FA 0%,#D3D9DF 38%,#A7B2BB 62%,#E4E9ED 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:none;
+}
+h2 em{
+  font-style:normal;
+  background:linear-gradient(135deg,var(--jade-4) 0%,var(--jade-hi) 45%,var(--jade) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.en{
+  margin:11px auto 0;max-width:330px;
+  font:400 12.5px/1.55 var(--font-sans);color:var(--text-2);letter-spacing:.015em;
+}
+
+/* ─── iPhone 样机 ─── */
+.phone{
+  position:absolute;left:50%;top:252px;z-index:3;
+  transform:translateX(-50%);
+  width:calc(393px * var(--s) + var(--bezel) * 2);
+  height:calc(852px * var(--s) + var(--bezel) * 2);
+  padding:var(--bezel);
+  border-radius:calc(58px * var(--s) + var(--bezel));
+  background:linear-gradient(160deg,#3D444B 0%,#1E2429 35%,#12161A 65%,#2B3238 100%);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.18),
+    inset 0 0 0 1px rgba(0,0,0,.6),
+    0 50px 90px -30px rgba(0,0,0,.85),
+    0 0 120px -30px var(--jade-glow);
+}
+.phone::before{ /* 钛金属高光边 */
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(160deg,rgba(255,255,255,.22),transparent 30%,transparent 70%,rgba(255,255,255,.10));
+  -webkit-mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);
+  -webkit-mask-composite:xor;mask-composite:exclude;padding:1.5px;
+}
+.phone .k{position:absolute;background:linear-gradient(90deg,#2B3238,#1A1F24);border-radius:2px}
+.phone .k.l1{left:-3px;top:112px;width:3px;height:28px}
+.phone .k.l2{left:-3px;top:160px;width:3px;height:54px}
+.phone .k.l3{left:-3px;top:226px;width:3px;height:54px}
+.phone .k.r1{right:-3px;top:180px;width:3px;height:84px;background:linear-gradient(270deg,#2B3238,#1A1F24)}
+.screen{
+  position:relative;width:100%;height:100%;overflow:hidden;
+  border-radius:calc(58px * var(--s));
+  background:#0B0E11;
+  box-shadow:inset 0 0 0 2px #000;
+}
+.screen::after{ /* 屏幕玻璃反光 */
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:9;
+  background:linear-gradient(115deg,rgba(255,255,255,.06) 0%,transparent 28%,transparent 100%);
+}
+.app{
+  position:absolute;left:0;top:0;width:393px;height:852px;
+  transform:scale(var(--s));transform-origin:0 0;
+  font-family:var(--font-sans);color:var(--text);
+  background:linear-gradient(180deg,#13181C 0%,#0E1114 100%);
+  overflow:hidden;
+}
+.island{
+  position:absolute;left:50%;top:11px;z-index:8;
+  width:125px;height:37px;transform:translateX(-50%);
+  background:#000;border-radius:24px;
+}
+.statusbar{
+  position:absolute;top:0;left:0;right:0;height:54px;z-index:7;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 30px 0 44px;
+  font:600 16.5px/1 var(--font-sans);letter-spacing:.01em;
+}
+.statusbar .r{display:flex;align-items:center;gap:6px}
+.statusbar svg{display:block}
+.home{
+  position:absolute;bottom:9px;left:50%;z-index:8;
+  width:140px;height:5px;border-radius:3px;
+  background:rgba(255,255,255,.55);transform:translateX(-50%);
+}
+
+/* ═══════════════════════════════════════════════
+   3. App 内通用 iOS 组件
+   ═══════════════════════════════════════════════ */
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-.12em;flex:none}
+
+.nav{padding:66px 20px 0;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.nav .title{font:700 30px/1.15 var(--font-sans);letter-spacing:-.015em}
+.nav .sub{margin-top:5px;font:400 13px/1.4 var(--font-sans);color:var(--text-2)}
+.nav .act{font:500 16px/1 var(--font-sans);color:var(--jade-hi);padding-bottom:6px}
+.nav .back{display:inline-flex;align-items:center;gap:2px;font:400 16px/1 var(--font-sans);color:var(--jade-hi);margin-bottom:8px}
+.nav .back .ico{font-size:18px}
+
+.label{margin:22px 32px 8px;font:600 12px/1 var(--font-sans);letter-spacing:.07em;color:var(--text-3);text-transform:uppercase}
+.group{
+  margin:0 16px;background:var(--surface);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.cell{display:flex;align-items:center;gap:12px;padding:13px 16px;min-height:50px;font:400 16px/1.3 var(--font-sans)}
+.cell + .cell{border-top:1px solid var(--line)}
+.cell .grow{flex:1;min-width:0}
+.cell .val{color:var(--text-2);font-size:15px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cell .chev{color:var(--text-3);font-size:14px}
+.cell .icobox{
+  width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;
+  background:rgba(63,165,122,.14);color:var(--jade-hi);font-size:16px;
+}
+.cell .icobox.grey{background:rgba(255,255,255,.07);color:var(--text-2)}
+.cell .icobox.red{background:rgba(229,83,75,.14);color:#FF7B73}
+.foot{margin:9px 32px 0;font:400 12.5px/1.55 var(--font-sans);color:var(--text-3)}
+.mono{font-family:var(--font-mono)}
+
+.btn-primary{
+  margin:22px 16px 0;height:52px;border-radius:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font:600 16.5px/1 var(--font-sans);color:var(--jade-ink);
+  background:linear-gradient(135deg,var(--jade-hi) 0%,var(--jade) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 30px -10px var(--jade-glow);
+}
+.btn-ghost{
+  margin:12px 16px 0;height:48px;border-radius:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font:500 16px/1 var(--font-sans);color:#FF7B73;
+  background:var(--surface);border:1px solid var(--line);
+}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;
+  font:600 11px/1 var(--font-sans);letter-spacing:.02em;
+  background:rgba(63,165,122,.14);color:var(--jade-hi);border:1px solid rgba(63,165,122,.3);
+}
+.pill.grey{background:rgba(255,255,255,.06);color:var(--text-2);border-color:var(--line-2)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--jade-hi);box-shadow:0 0 8px var(--jade-hi)}
+.tag{display:inline-block;padding:2px 6px;border-radius:5px;font:600 10px/1.3 var(--font-mono);letter-spacing:.02em;background:rgba(255,255,255,.07);color:var(--text-2)}
+
+/* ═══════════════════════════════════════════════
+   4. 截图 ① · 主对话
+   ═══════════════════════════════════════════════ */
+.chat-head{
+  padding:62px 18px 12px;display:flex;align-items:center;gap:12px;
+  background:rgba(14,17,20,.9);border-bottom:1px solid var(--line);
+}
+.avatar{
+  width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:linear-gradient(145deg,#2A3138,#0E1215);
+  box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--jade);
+  font:700 20px/1 var(--font-serif);color:var(--jade-4);
+}
+.chat-head .name{font:600 18px/1.15 var(--font-sans)}
+.chat-head .state{margin-top:3px;display:flex;align-items:center;gap:5px;font:400 11.5px/1 var(--font-sans);color:var(--text-2)}
+.chat-head .state i{width:6px;height:6px;border-radius:50%;background:var(--jade-hi);box-shadow:0 0 8px var(--jade-hi)}
+.chat-head .grow{flex:1}
+
+.msgs{padding:14px 16px 0;display:flex;flex-direction:column;gap:12px}
+.day{align-self:center;font:500 11px/1 var(--font-sans);color:var(--text-3);letter-spacing:.06em;margin-bottom:2px}
+.bubble{
+  max-width:84%;padding:11px 15px;border-radius:19px;
+  font:400 15.5px/1.5 var(--font-sans);white-space:pre-line;word-break:break-word;
+}
+.bubble.user{
+  align-self:flex-end;border-bottom-right-radius:6px;color:var(--jade-ink);
+  background:linear-gradient(135deg,var(--jade-hi) 0%,var(--jade) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 24px -10px var(--jade-glow);
+}
+.bubble.ai{
+  align-self:flex-start;border-bottom-left-radius:6px;
+  background:var(--surface-2);border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.bubble ol{padding-left:20px;margin-top:4px;display:flex;flex-direction:column;gap:3px}
+.bubble ol li::marker{color:var(--jade-hi);font-weight:600}
+.bubble .cursor{
+  display:inline-block;width:8px;height:16px;vertical-align:-3px;margin-left:2px;border-radius:2px;
+  background:var(--jade-hi);box-shadow:0 0 10px var(--jade-hi);
+}
+.meta{align-self:flex-start;margin:-4px 0 0 6px;display:flex;align-items:center;gap:8px;font:500 11px/1 var(--font-mono);color:var(--text-3)}
+.meta i{width:5px;height:5px;border-radius:50%;background:var(--jade-hi);box-shadow:0 0 8px var(--jade-hi)}
+
+.inputbar{
+  position:absolute;left:0;right:0;top:662px;
+  padding:10px 14px 14px;display:flex;align-items:center;gap:10px;
+  background:rgba(14,17,20,.98);border-top:1px solid var(--line);
+}
+.inputbar .mic{width:34px;height:34px;display:grid;place-items:center;color:var(--jade-hi);font-size:20px}
+.inputbar .field{
+  flex:1;height:44px;border-radius:22px;display:flex;align-items:center;padding:0 16px;
+  background:var(--surface-3);border:1px solid var(--line);
+  font:400 15.5px/1 var(--font-sans);color:var(--text-3);
+}
+.inputbar .send{
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:var(--jade-ink);
+  background:linear-gradient(135deg,var(--jade-hi),var(--jade));
+  box-shadow:0 6px 16px -6px var(--jade-glow);
+}
+
+/* ═══════════════════════════════════════════════
+   5. 截图 ② · API Key 配置
+   ═══════════════════════════════════════════════ */
+.hero-card{
+  margin:16px 16px 0;padding:16px;border-radius:18px;display:flex;align-items:center;gap:14px;
+  background:linear-gradient(135deg,rgba(63,165,122,.18),rgba(63,165,122,.05) 60%,transparent),var(--surface);
+  border:1px solid rgba(63,165,122,.35);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 20px 40px -24px var(--jade-glow);
+}
+.hero-card .big{
+  width:48px;height:48px;border-radius:14px;flex:none;display:grid;place-items:center;font-size:24px;color:var(--jade-ink);
+  background:linear-gradient(135deg,var(--jade-hi),var(--jade));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 24px -10px var(--jade-glow);
+}
+.hero-card .t{font:600 16.5px/1.2 var(--font-sans)}
+.hero-card .d{margin-top:4px;font:400 12.5px/1.4 var(--font-sans);color:var(--text-2)}
+.keyfield{
+  font:500 14px/1 var(--font-mono);letter-spacing:.02em;color:var(--text);
+  flex:1;min-width:0;overflow:hidden;white-space:nowrap;
+}
+.keyfield .dots{color:var(--text-2);letter-spacing:.14em}
+.eye{color:var(--text-2);font-size:18px}
+.ok{color:var(--jade-hi)}
+
+/* ═══════════════════════════════════════════════
+   6. 截图 ③ · 多模型选择
+   ═══════════════════════════════════════════════ */
+.models{margin:14px 16px 0;display:flex;flex-direction:column;gap:10px}
+.model{
+  position:relative;display:flex;align-items:center;gap:13px;padding:13px 14px 13px 14px;border-radius:16px;
+  background:var(--surface);border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.model .mono-ico{
+  width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:var(--surface-3);border:1px solid var(--line-2);
+  font:700 13px/1 var(--font-mono);color:var(--text-2);letter-spacing:.02em;
+}
+.model .n{font:600 15px/1.2 var(--font-mono);letter-spacing:-.01em}
+.model .d{margin-top:4px;font:400 12.5px/1.35 var(--font-sans);color:var(--text-2);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.model .radio{
+  width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;
+  border:1.5px solid var(--line-2);color:var(--jade-ink);font-size:14px;
+}
+.model.sel{
+  border-color:rgba(79,224,150,.6);
+  background:linear-gradient(135deg,rgba(63,165,122,.16),rgba(63,165,122,.04) 60%,transparent),var(--surface);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 3px rgba(63,165,122,.12),0 18px 36px -22px var(--jade-glow);
+}
+.model.sel .mono-ico{background:linear-gradient(135deg,var(--jade-hi),var(--jade));color:var(--jade-ink);border-color:transparent}
+.model.sel .radio{border-color:transparent;background:linear-gradient(135deg,var(--jade-hi),var(--jade));box-shadow:0 0 14px -2px var(--jade-glow)}
+.bars{display:inline-flex;gap:2px;align-items:flex-end;height:10px}
+.bars i{width:3px;border-radius:1px;background:var(--line-2)}
+.bars i.on{background:var(--jade-hi)}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:6px}.bars i:nth-child(3){height:8px}.bars i:nth-child(4){height:10px}
+
+/* ═══════════════════════════════════════════════
+   7. 截图 ④ · 本地历史记录
+   ═══════════════════════════════════════════════ */
+.search{
+  margin:14px 16px 0;height:40px;border-radius:12px;display:flex;align-items:center;gap:8px;padding:0 12px;
+  background:var(--surface-3);color:var(--text-3);font:400 15.5px/1 var(--font-sans);
+}
+.stats{
+  margin:14px 16px 0;padding:14px 8px;border-radius:16px;display:grid;grid-template-columns:1fr 1fr 1fr;
+  background:var(--surface);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.stats div{text-align:center;position:relative}
+.stats div + div::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:1px;background:var(--line)}
+.stats b{display:block;font:700 22px/1 var(--font-sans);letter-spacing:-.02em}
+.stats b.j{color:var(--jade-hi)}
+.stats small{display:block;margin-top:6px;font:500 11px/1 var(--font-sans);color:var(--text-3);letter-spacing:.04em}
+.hist{margin:0 16px}
+.hist .lbl{margin:20px 4px 8px;font:600 12px/1 var(--font-sans);letter-spacing:.07em;color:var(--text-3);text-transform:uppercase}
+.hist .grp{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.row{position:relative;display:flex;gap:12px;padding:12px 14px;align-items:flex-start;background:var(--surface)}
+.row + .row{border-top:1px solid var(--line)}
+.row .ib{
+  width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
+  background:rgba(63,165,122,.13);color:var(--jade-hi);font-size:17px;margin-top:1px;
+}
+.row .t{font:600 15px/1.25 var(--font-sans);display:flex;justify-content:space-between;gap:8px}
+.row .t time{font:400 12px/1 var(--font-sans);color:var(--text-3);white-space:nowrap;margin-top:2px}
+.row .p{margin-top:4px;font:400 13px/1.4 var(--font-sans);color:var(--text-2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.row .m{margin-top:6px;display:flex;gap:6px;align-items:center}
+.row .grow{flex:1;min-width:0}
+.row.swiped{transform:translateX(-76px)}
+.swipe-wrap{position:relative;overflow:hidden;background:#C9463F}
+.swipe-wrap .del{
+  position:absolute;right:0;top:0;bottom:0;width:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:#fff;font:600 12px/1 var(--font-sans);
+}
+.swipe-wrap .del .ico{font-size:20px}
+.hist-foot{margin:16px 28px 0;text-align:center;font:400 12px/1.6 var(--font-sans);color:var(--text-3)}
+
+/* ═══════════════════════════════════════════════
+   8. 截图 ⑤ · 隐私安全
+   ═══════════════════════════════════════════════ */
+.shield-hero{position:relative;height:140px;display:grid;place-items:center;margin-top:0}
+.ring{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);border:1px solid rgba(79,224,150,.18)}
+.ring.a{width:124px;height:124px;border-color:rgba(79,224,150,.35)}
+.ring.b{width:172px;height:172px;border-color:rgba(79,224,150,.16)}
+.ring.c{width:220px;height:220px;border-color:rgba(79,224,150,.07)}
+.shield{
+  position:relative;width:86px;height:86px;border-radius:26px;display:grid;place-items:center;font-size:46px;color:var(--jade-ink);
+  background:linear-gradient(145deg,var(--jade-hi) 0%,var(--jade) 60%,var(--jade-deep) 100%);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -2px 0 rgba(0,0,0,.2),0 24px 60px -18px var(--jade-glow),0 0 0 8px rgba(63,165,122,.10);
+}
+.priv-title{text-align:center;margin-top:2px}
+.priv-title .t{font:700 22px/1.2 var(--font-sans);letter-spacing:-.01em}
+.priv-title .d{margin-top:6px;font:400 13px/1.4 var(--font-sans);color:var(--text-2)}
+.flow{
+  margin:14px 16px 0;padding:12px 12px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:6px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.node{display:flex;flex-direction:column;align-items:center;gap:6px;width:96px;text-align:center}
+.node .bx{
+  width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;color:var(--jade-hi);
+  background:rgba(63,165,122,.14);border:1px solid rgba(63,165,122,.3);
+}
+.node .n{font:600 12px/1.2 var(--font-sans)}
+.node .s{font:400 10.5px/1.2 var(--font-mono);color:var(--text-3)}
+.node.dead .bx{color:var(--text-3);background:rgba(255,255,255,.04);border:1px dashed var(--line-2);position:relative}
+.node.dead .bx::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:#FF7B73;transform:rotate(-30deg);border-radius:1px}
+.node.dead .n{color:var(--text-3);text-decoration:line-through}
+.node.dead .s{color:#FF7B73}
+.link{flex:1;position:relative;height:2px;background:linear-gradient(90deg,var(--jade),var(--jade-hi));border-radius:1px}
+.link::after{content:"";position:absolute;right:-1px;top:-3px;border:4px solid transparent;border-left:6px solid var(--jade-hi)}
+.link span{position:absolute;left:50%;top:-17px;transform:translateX(-50%);font:600 9.5px/1 var(--font-sans);color:var(--jade-hi);letter-spacing:.08em;white-space:nowrap}
+.link.off{background:repeating-linear-gradient(90deg,var(--line-2) 0 6px,transparent 6px 11px)}
+.link.off::after{display:none}
+.link.off span{color:var(--text-3)}
+.checks .cell{font-size:15px;min-height:44px;padding:10px 16px}
+.checks .cell .grow small{display:block;margin-top:2px;font-size:12px;color:var(--text-3)}
+.chk{
+  width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:13px;color:var(--jade-ink);
+  background:linear-gradient(135deg,var(--jade-hi),var(--jade));box-shadow:0 0 12px -3px var(--jade-glow);
+}
+
+/* 打印 */
+@media print{
+  .toolbar{display:none}
+  body{background:#000}
+  .board{gap:0;padding:0}
+  .shot{box-shadow:none;border-radius:0;page-break-after:always}
+}
+</style>
+</head>
+<body>
+
+<!-- ─────────── 内联 SVG 图标库 ─────────── -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 10.5V8a4 4 0 018 0v2.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="14" r="4.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M11.5 11.5L20 3M16 7l2.5 2.5M14 9l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.8l7.5 3v6.2c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V5.8l7.5-3z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8.6 12.2l2.3 2.3 4.6-4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-shield-fill" viewBox="0 0 24 24"><path d="M12 2.2l8.2 3.3v6.6c0 5-3.5 9-8.2 10.4C7.3 21.1 3.8 17.1 3.8 12.1V5.5L12 2.2z" fill="currentColor" opacity=".95"/><path d="M8.4 12.3l2.4 2.4 4.9-5.1" fill="none" stroke="#4FE096" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v3M9 21h6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5L12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 6a3 3 0 013-3h10a3 3 0 013 3v7a3 3 0 01-3 3H10l-5 4v-4H7a3 3 0 01-3-3V6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M14 3v5h5M10 13h6M10 17h6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.4-7.5 10-7.5 10z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M3.5 12h17M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L5 13.5h6L10 22l9-11.5h-6L13 2z" fill="currentColor"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M10 5h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="18" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6.5" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="7.2" r="1" fill="currentColor"/><circle cx="8" cy="16.7" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" fill="currentColor"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" fill="currentColor" opacity=".7"/></symbol>
+    <symbol id="i-nosign" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M6.5 6.5l11 11" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M4 16l9-9a2 2 0 012.8 0l3.2 3.2a2 2 0 010 2.8L13 19H7l-3-3z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9 11l5 5" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-ban" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M6 19l12-14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M4.5 20.5c1.3-4 4.2-6 7.5-6s6.2 2 7.5 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 20 14"><rect x="0" y="9" width="3.2" height="5" rx="1" fill="currentColor"/><rect x="5.3" y="6.5" width="3.2" height="7.5" rx="1" fill="currentColor"/><rect x="10.6" y="3.5" width="3.2" height="10.5" rx="1" fill="currentColor"/><rect x="15.9" y="0" width="3.2" height="14" rx="1" fill="currentColor"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 20 14"><path d="M1.5 4.5a12.5 12.5 0 0117 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4.7 7.9a8 8 0 0110.6 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M7.9 11.2a3.4 3.4 0 014.2 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-batt" viewBox="0 0 30 14"><rect x="1" y="1" width="25" height="12" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".55"/><rect x="2.8" y="2.8" width="19.5" height="8.4" rx="2" fill="currentColor"/><rect x="27.3" y="4.5" width="1.9" height="5" rx="1" fill="currentColor" opacity=".55"/></symbol>
+  </defs>
+</svg>
+
+<!-- ─────────── 顶部工具条（导出时隐藏） ─────────── -->
+<div class="toolbar">
+  <span class="dot"></span>
+  <b>神枢 Black God · App Store 截图</b>
+  <span>iPhone 6.7″ · 5 张 · 每张 393×852（@3x → 1290×2796）</span>
+  <span class="sp"></span>
+  <span>导出：地址加 <code>?export</code> 隐藏本条 → DevTools 对每个 <code>section.shot</code> 「捕获节点截图」（DPR 设为 3）。详见 <code>screenshots_guide.md</code></span>
+</div>
+
+<main class="board">
+
+<!-- ═══════════════════════ ① 主对话界面 ═══════════════════════ -->
+<section class="shot" id="shot-1" data-title="主对话">
+  <div class="glow"></div><div class="glow b"></div>
+  <div class="mark">神</div>
+  <header class="copy">
+    <div class="brand"><i>神</i>神枢 · Black God</div>
+    <div class="kicker">01 · 对话 Chat</div>
+    <h2>直连 Claude<br><em>逐字</em>实时回复</h2>
+    <p class="en">Straight to Claude. Streamed word by word,<br>no relay in between.</p>
+  </header>
+
+  <div class="phone">
+    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
+    <div class="screen">
+      <div class="app">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
+
+        <div class="chat-head">
+          <div class="avatar">神</div>
+          <div>
+            <div class="name">神枢 Nexus</div>
+            <div class="state"><i></i>直连 Anthropic · 流式输出</div>
+          </div>
+          <div class="grow"></div>
+          <span class="pill mono">sonnet-4-6</span>
+        </div>
+
+        <div class="msgs">
+          <div class="day">今天 09:41</div>
+          <div class="bubble user">帮我把这段周报压缩成三句话。</div>
+          <div class="bubble ai">好的，压缩后如下：<ol><li>本周完成 iOS 端流式对话与 Keychain 密钥存储，核心链路闭环。</li><li>修复 3 个高优先级问题，崩溃率降至 0.1% 以下。</li><li>下周重点：多模型切换与历史导出。</li></ol></div>
+          <div class="meta"><i></i>claude-sonnet-4-6 · 1.2s · 本地保存</div>
+          <div class="bubble user">再来一个英文版，发给海外团队。</div>
+          <div class="bubble ai">Sure — here's the English version:<ol><li>Shipped streaming chat with Keychain-backed key storage on iOS, clos<span class="cursor"></span></li></ol></div>
+        </div>
+
+        <div class="inputbar">
+          <span class="mic"><svg class="ico"><use href="#i-mic"/></svg></span>
+          <div class="field">跟神枢说点什么…</div>
+          <span class="send"><svg class="ico"><use href="#i-up"/></svg></span>
+        </div>
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ ② API Key 配置 ═══════════════════════ -->
+<section class="shot" id="shot-2" data-title="API Key 配置">
+  <div class="glow"></div><div class="glow b"></div>
+  <div class="mark">枢</div>
+  <header class="copy">
+    <div class="brand"><i>神</i>神枢 · Black God</div>
+    <div class="kicker">02 · 密钥 API Key</div>
+    <h2>自带 API Key<br><em>零后端</em> · 零中转</h2>
+    <p class="en">Bring your own key. Requests go from your<br>iPhone straight to Anthropic — no servers of ours.</p>
+  </header>
+
+  <div class="phone">
+    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
+    <div class="screen">
+      <div class="app">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
+
+        <div class="nav">
+          <div><div class="title">API 配置</div></div>
+          <div class="act">完成</div>
+        </div>
+
+        <div class="hero-card">
+          <div class="big"><svg class="ico"><use href="#i-lock"/></svg></div>
+          <div class="grow" style="flex:1">
+            <div class="t">Keychain 加密存储</div>
+            <div class="d">仅本机可读 · 不上传任何服务器</div>
+          </div>
+          <span class="pill"><span class="dot"></span>已连接</span>
+        </div>
+
+        <div class="label">Anthropic API Key</div>
+        <div class="group">
+          <div class="cell">
+            <span class="icobox"><svg class="ico"><use href="#i-key"/></svg></span>
+            <div class="keyfield">sk-ant-api03-<span class="dots">••••••••••</span>7Qx</div>
+            <svg class="ico eye"><use href="#i-eye"/></svg>
+          </div>
+        </div>
+        <div class="foot">Key 仅存储在本机 Keychain，不上传任何服务器。<br>获取 Key：console.anthropic.com</div>
+
+        <div class="label">模型</div>
+        <div class="group">
+          <div class="cell">
+            <span class="icobox grey"><svg class="ico"><use href="#i-spark"/></svg></span>
+            <div class="grow">选择模型</div>
+            <span class="val mono">claude-sonnet-4-6 <svg class="ico chev"><use href="#i-chev-r"/></svg></span>
+          </div>
+        </div>
+
+        <div class="label">连接</div>
+        <div class="group">
+          <div class="cell">
+            <span class="icobox grey"><svg class="ico"><use href="#i-bolt"/></svg></span>
+            <div class="grow">连接测试</div>
+            <span class="val ok"><svg class="ico"><use href="#i-check"/></svg> 通过 · <span class="mono">412 ms</span></span>
+          </div>
+          <div class="cell">
+            <span class="icobox grey"><svg class="ico"><use href="#i-globe"/></svg></span>
+            <div class="grow">请求端点</div>
+            <span class="val mono" style="font-size:13px">api.anthropic.com</span>
+          </div>
+        </div>
+
+        <div class="btn-primary" style="margin-top:18px"><svg class="ico"><use href="#i-check"/></svg>已保存</div>
+        <div class="foot" style="text-align:center;margin-top:10px">费用按你自己的 API 账户结算 · App 不收取任何订阅费</div>
+
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ ③ 多模型选择 ═══════════════════════ -->
+<section class="shot" id="shot-3" data-title="多模型选择">
+  <div class="glow"></div><div class="glow b"></div>
+  <div class="mark">模</div>
+  <header class="copy">
+    <div class="brand"><i>神</i>神枢 · Black God</div>
+    <div class="kicker">03 · 模型 Models</div>
+    <h2>多模型<em>自由切换</em><br>费用自己掌控</h2>
+    <p class="en">Switch between Claude models in one tap.<br>You only pay your own API bill.</p>
+  </header>
+
+  <div class="phone">
+    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
+    <div class="screen">
+      <div class="app">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
+
+        <div class="nav" style="align-items:flex-start;flex-direction:column;gap:4px">
+          <div class="back"><svg class="ico"><use href="#i-chev-l"/></svg>API 配置</div>
+          <div class="title">选择模型</div>
+          <div class="sub">切换即时生效 · 按你自己的 Anthropic 账户计费</div>
+        </div>
+
+        <div class="models">
+          <div class="model">
+            <div class="mono-ico">O5</div>
+            <div class="grow" style="flex:1;min-width:0">
+              <div class="n">claude-opus-5</div>
+              <div class="d">旗舰 · 最强推理 <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
+            </div>
+            <div class="radio"></div>
+          </div>
+          <div class="model">
+            <div class="mono-ico">F5</div>
+            <div class="grow" style="flex:1;min-width:0">
+              <div class="n">claude-fable-5-1</div>
+              <div class="d">长文创作 · 叙事 <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
+            </div>
+            <div class="radio"></div>
+          </div>
+          <div class="model">
+            <div class="mono-ico">O4</div>
+            <div class="grow" style="flex:1;min-width:0">
+              <div class="n">claude-opus-4-8</div>
+              <div class="d">稳定旗舰 · 复杂任务 <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+            </div>
+            <div class="radio"></div>
+          </div>
+          <div class="model sel">
+            <div class="mono-ico">S4</div>
+            <div class="grow" style="flex:1;min-width:0">
+              <div class="n">claude-sonnet-4-6</div>
+              <div class="d">均衡 · 日常首选 <span class="pill" style="padding:2px 7px;font-size:10px">推荐</span></div>
+            </div>
+            <div class="radio"><svg class="ico"><use href="#i-check"/></svg></div>
+          </div>
+          <div class="model">
+            <div class="mono-ico">H4</div>
+            <div class="grow" style="flex:1;min-width:0">
+              <div class="n">claude-haiku-4-5</div>
+              <div class="d">极速 · 低成本 <span class="bars"><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+            </div>
+            <div class="radio"></div>
+          </div>
+        </div>
+
+        <div class="foot" style="margin-top:16px;text-align:center">模型列表随 Anthropic 官方接口更新 · 无需升级 App</div>
+
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ ④ 本地历史记录 ═══════════════════════ -->
+<section class="shot" id="shot-4" data-title="本地历史记录">
+  <div class="glow"></div><div class="glow b"></div>
+  <div class="mark">记</div>
+  <header class="copy">
+    <div class="brand"><i>神</i>神枢 · Black God</div>
+    <div class="kicker">04 · 历史 History</div>
+    <h2>对话记录<br>只留在<em>你的 iPhone</em></h2>
+    <p class="en">Your history lives only on your device.<br>Never uploaded, never synced, never analyzed.</p>
+  </header>
+
+  <div class="phone">
+    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
+    <div class="screen">
+      <div class="app">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
+
+        <div class="nav">
+          <div><div class="title">历史记录</div></div>
+          <div class="act">编辑</div>
+        </div>
+
+        <div class="stats">
+          <div><b>128</b><small>会话</small></div>
+          <div><b>3.2 <span style="font-size:14px;font-weight:600">MB</span></b><small>本机占用</small></div>
+          <div><b class="j">0 <span style="font-size:14px;font-weight:600">B</span></b><small>已上传</small></div>
+        </div>
+
+        <div class="hist">
+          <div class="lbl">今天</div>
+          <div class="grp">
+            <div class="row">
+              <span class="ib"><svg class="ico"><use href="#i-doc"/></svg></span>
+              <div class="grow">
+                <div class="t">周报压缩成三句话 <time>09:41</time></div>
+                <div class="p">好的，压缩后如下：1. 本周完成 iOS 端流式对话与 Keychain…</div>
+                <div class="m"><span class="tag">sonnet-4-6</span><span class="tag">6 条</span></div>
+              </div>
+            </div>
+            <div class="row">
+              <span class="ib"><svg class="ico"><use href="#i-code"/></svg></span>
+              <div class="grow">
+                <div class="t">SwiftUI 列表性能优化 <time>08:12</time></div>
+                <div class="p">LazyVStack 配合 id 稳定与 equatable 视图可以显著减少重绘…</div>
+                <div class="m"><span class="tag">opus-5</span><span class="tag">14 条</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lbl">昨天</div>
+          <div class="grp">
+            <div class="row">
+              <span class="ib"><svg class="ico"><use href="#i-heart"/></svg></span>
+              <div class="grow">
+                <div class="t">给妈妈的生日祝福 <time>22:05</time></div>
+                <div class="p">妈，又一年了。谢谢你把最好的时光都给了我们…</div>
+                <div class="m"><span class="tag">fable-5-1</span><span class="tag">3 条</span></div>
+              </div>
+            </div>
+            <div class="swipe-wrap">
+              <div class="del"><svg class="ico"><use href="#i-trash"/></svg>删除</div>
+              <div class="row swiped" style="border-top:1px solid var(--line)">
+                <span class="ib"><svg class="ico"><use href="#i-globe"/></svg></span>
+                <div class="grow">
+                  <div class="t">翻译产品说明书（中→英） <time>15:30</time></div>
+                  <div class="p">Here is the English version of the product manual…</div>
+                  <div class="m"><span class="tag">sonnet-4-6</span><span class="tag">9 条</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="hist-foot"><svg class="ico" style="color:var(--jade-hi)"><use href="#i-lock"/></svg> 全部对话仅保存在此 iPhone · 不上传 · 不同步</div>
+
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ ⑤ 隐私安全 ═══════════════════════ -->
+<section class="shot" id="shot-5" data-title="隐私安全">
+  <div class="glow"></div><div class="glow b"></div>
+  <div class="mark">私</div>
+  <header class="copy">
+    <div class="brand"><i>神</i>神枢 · Black God</div>
+    <div class="kicker">05 · 隐私 Privacy</div>
+    <h2><em>Keychain</em> 加密<br>无账号 · 无埋点</h2>
+    <p class="en">Encrypted by iOS Keychain. No account,<br>no tracking, no ads — wipe everything in one tap.</p>
+  </header>
+
+  <div class="phone">
+    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
+    <div class="screen">
+      <div class="app">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
+
+        <div class="nav" style="align-items:flex-start;flex-direction:column;gap:4px;padding-top:62px">
+          <div class="back"><svg class="ico"><use href="#i-chev-l"/></svg>我的</div>
+          <div class="title">隐私保护</div>
+        </div>
+
+        <div class="shield-hero">
+          <span class="ring c"></span><span class="ring b"></span><span class="ring a"></span>
+          <div class="shield"><svg class="ico"><use href="#i-shield"/></svg></div>
+        </div>
+        <div class="priv-title">
+          <div class="t">零后端 · 本地优先</div>
+          <div class="d">你的对话，只属于你自己</div>
+        </div>
+
+        <div class="flow">
+          <div class="node">
+            <div class="bx"><svg class="ico"><use href="#i-phone"/></svg></div>
+            <div class="n">你的 iPhone</div>
+            <div class="s">Keychain · 本地</div>
+          </div>
+          <div class="link"><span>直连 HTTPS</span></div>
+          <div class="node">
+            <div class="bx"><svg class="ico"><use href="#i-spark"/></svg></div>
+            <div class="n">Anthropic</div>
+            <div class="s">api.anthropic.com</div>
+          </div>
+          <div class="link off"><span>无</span></div>
+          <div class="node dead">
+            <div class="bx"><svg class="ico"><use href="#i-server"/></svg></div>
+            <div class="n">中转服务器</div>
+            <div class="s">不存在</div>
+          </div>
+        </div>
+
+        <div class="group checks" style="margin-top:12px">
+          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">API Key 存于 iOS Keychain<small>系统级加密，仅本机可读</small></div></div>
+          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">对话历史仅存本机<small>不上传 · 不同步 · 不分析</small></div></div>
+          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">无账号、无注册、无埋点、无广告</div></div>
+          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">开源可审计<small>github.com/zhumingjie0223-cyber/Black-God</small></div></div>
+        </div>
+
+        <div class="btn-ghost"><svg class="ico"><use href="#i-eraser"/></svg>一键清除全部数据</div>
+
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  // 地址带 ?export 或 #export 时隐藏工具条与间距，便于整页 / 逐张截图
+  if (/[?&#]export\b/.test(location.search + location.hash)) document.body.classList.add('export');
+</script>
+</body>
+</html>

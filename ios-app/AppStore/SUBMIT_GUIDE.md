@@ -8,6 +8,9 @@
 ```
 ios-app/AppStore/
 ├── SUBMIT_GUIDE.md            ← 本文档
+├── screenshots.html           ← 5 张 App Store 截图源文件（HTML+CSS，石墨暗流·玉绿）
+├── screenshots_guide.md       ← 截图导出 PNG 操作指南
+├── export_screenshots.mjs     ← 截图一键导出脚本（Playwright）
 ├── PRIVACY_POLICY.md          ← 隐私政策（中英双语，privacy_url 指向它）
 └── metadata/
     ├── privacy_url.txt        ← 隐私政策网址
@@ -86,9 +89,9 @@ open BlackGod888.xcodeproj
 进入 App → **1.0 准备提交** 页面：
 
 1. **截屏**：至少上传 6.7 英寸（iPhone 15 Pro Max / 16 Pro Max）尺寸 1290×2796 的截图 3~10 张。
-   建议顺序：聊天界面 → API Key 配置 → 模型切换 → 我的页。
-   用模拟器 `iPhone 16 Pro Max` 运行后 ⌘S 即可截图。
-   （6.5 英寸尺寸 Apple 可自动缩放复用 6.7 英寸的，不用单独做。）
+   **成品已备好**：`screenshots.html` 里有 5 张带营销标语的精修图（主对话 → API Key 配置 →
+   多模型选择 → 本地历史记录 → 隐私安全），按 `screenshots_guide.md` 一键导出 PNG 后直接上传，
+   不必再用模拟器裸截。（6.5 英寸尺寸 Apple 可自动缩放复用 6.7 英寸的，不用单独做。）
 2. **推广文本** ← `metadata/zh-Hans/promotional_text.txt`
 3. **描述** ← `metadata/zh-Hans/description.txt`
 4. **关键词** ← `metadata/zh-Hans/keywords.txt`

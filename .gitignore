@@ -72,3 +72,8 @@ ios-app/*.xcodeproj/
 ios-app/Info.plist
 ios-app/build/
 ios-app/DerivedData/
+
+# ── App Store 截图脚本产出（由 screenshots.html 随时可重新生成）──
+ios-app/AppStore/png/
+ios-app/AppStore/node_modules/
+ios-app/AppStore/package*.json
