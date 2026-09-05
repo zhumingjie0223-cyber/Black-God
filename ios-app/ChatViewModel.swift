@@ -13,6 +13,7 @@ final class ChatViewModel: ObservableObject {
     private let agentLoop = NexusAgentLoop()
     private var handledToolCalls = Set<UUID>()
     @Published var memory = NexusMemoryStore()
+    @Published var evaluations = NexusEvaluationStore()
     @Published var modelRegistry = NexusModelRegistry()
 
     var apiKeyConfigured: Bool { NexusKeychain.shared.hasAPIKey }
@@ -31,6 +32,7 @@ final class ChatViewModel: ObservableObject {
         lastError = nil
 
         let history = messages
+        let startedAt = Date()
         var reply = ""
 
         Task {
@@ -58,6 +60,7 @@ final class ChatViewModel: ObservableObject {
                         }
                         self.isTyping = false
                         self.runtime.observe(output: reply)
+                        self.evaluations.record(task: trimmed, success: !reply.isEmpty, recovered: false, verified: !reply.isEmpty, latency: Date().timeIntervalSince(startedAt))
                         self.memory.remember(reply, kind: "result", source: "assistant", confidence: 0.6)
                         self.runtime.append(.completed)
                     }
@@ -66,6 +69,7 @@ final class ChatViewModel: ObservableObject {
                     Task { @MainActor in
                         self.isTyping = false
                         self.lastError = error.localizedDescription
+                        self.evaluations.record(task: trimmed, success: false, recovered: false, verified: false, latency: Date().timeIntervalSince(startedAt))
                         self.runtime.append(.status("失败：\(error.localizedDescription)"))
                         self.messages.append(ChatMessage(role: "assistant", content: "出错了：\(error.localizedDescription)"))
                     }
