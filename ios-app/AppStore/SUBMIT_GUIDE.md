@@ -29,8 +29,8 @@ ios-app/AppStore/
 | 项目 | 值 |
 |---|---|
 | Bundle ID | `com.blackgod.nexus` |
-| 版本号 MARKETING_VERSION | `1.0.0` |
-| 构建号 CURRENT_PROJECT_VERSION | `1`（每次上传 +1） |
+| 版本号 MARKETING_VERSION | `1.1.0` |
+| 构建号 CURRENT_PROJECT_VERSION | `2`（每次上传 +1） |
 | 最低系统 | iOS 17.0 |
 | 设备 | 仅 iPhone |
 | 开发语言 | 简体中文，另附英文本地化 |
@@ -45,9 +45,10 @@ ios-app/AppStore/
 - [ ] **Xcode 签名**：在 Xcode 里选中 target → Signing & Capabilities → 勾选
       "Automatically manage signing"，Team 选自己的开发者团队。
       （`project.yml` 里 `CODE_SIGNING_ALLOWED: NO` 只影响 CI 无签名构建，真机/发布用 Xcode 自动签名即可。）
-- [ ] **App 图标**：确认 `ios-app/AppIcon.png` 为 1024×1024、无透明通道、无圆角（Apple 自己会裁圆角）。
-      工程用 `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`，首次打包前需在 Xcode 里新建
-      `Assets.xcassets` → App Icon，把这张 1024 图拖进去（iOS 17 起只需单尺寸）。
+- [x] **App 图标**：已内置合规图标 `ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon.png`
+      （1024×1024、RGB 无透明通道、全出血无圆角，Apple 自己会裁圆角）。工程 `project.yml` 已把
+      `Assets.xcassets` 纳入 target，`ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` 直接命中，
+      `xcodegen generate` 后即带图标，**无需再在 Xcode 手动导入**。（`ios-app/AppIcon.png` 保留为源图备份。）
 - [ ] **隐私政策网址可访问**：仓库必须是 **Public**，否则审核员打不开
       `metadata/privacy_url.txt` 里的链接。若仓库必须私有，请把 `PRIVACY_POLICY.md`
       另行发布到任意公开网页（GitHub Pages / Cloudflare Pages 均可），再改 `privacy_url.txt`。
@@ -98,7 +99,7 @@ open BlackGod888.xcodeproj
 5. **技术支持网址** ← `metadata/support_url.txt`
 6. **营销网址**：可留空。
 7. **副标题**（在页面上方"App 信息"区）← `metadata/zh-Hans/subtitle.txt`
-8. **版本**：`1.0.0`
+8. **版本**：`1.1.0`
 9. **版权**：`© 2026 Black God`
 10. **构建版本**：点 ＋ 选择步骤 2 上传的那个 build。
 
