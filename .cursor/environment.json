@@ -1,4 +1,4 @@
 {
-  "name": "Black God / 神枢",
-  "install": "cd shuyu && node --test tests/*.test.mjs && python3 -m unittest discover -s tests"
+  "name": "Black God / 神枢 · iOS 上架",
+  "install": "node ios-app/AppStore/preflight.mjs"
 }
