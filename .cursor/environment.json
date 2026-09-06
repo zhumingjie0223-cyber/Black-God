@@ -1,0 +1,4 @@
+{
+  "name": "Black God / 神枢",
+  "install": "cd shuyu && node --test tests/*.test.mjs && python3 -m unittest discover -s tests"
+}
