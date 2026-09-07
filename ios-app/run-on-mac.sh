@@ -30,9 +30,11 @@ if [ -n "${DEV_TEAM:-}" ]; then
   echo "==> 2/3 命令行自动签名并构建(Team=$DEV_TEAM)"
   # 找到第一台已连接的真机 iPhone 的 UDID(Xcode 15+ 的 devicectl)
   UDID="$(xcrun devicectl list devices 2>/dev/null | awk '/iPhone/ {print $NF; exit}')" || true
+  # 免费 Apple ID 只有「Apple Development」证书(没有付费的 Apple Distribution),
+  # 本地 Debug 装机显式用 Development,避免报「找不到 Apple Distribution 证书」。
   xcodebuild -project BlackGod888.xcodeproj -scheme BlackGod888 -configuration Debug \
     -destination "generic/platform=iOS" -allowProvisioningUpdates \
-    DEVELOPMENT_TEAM="$DEV_TEAM" CODE_SIGN_STYLE=Automatic \
+    DEVELOPMENT_TEAM="$DEV_TEAM" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" \
     -derivedDataPath build clean build
   APP="$(/usr/bin/find build/Build/Products -maxdepth 2 -name '*.app' -type d | head -1)"
   echo "==> 3/3 安装到设备"
@@ -54,6 +56,13 @@ else
       若报 bundle id 被占用,把 PRODUCT_BUNDLE_IDENTIFIER 改成独一无二的即可(自用随便改)。
    2) 顶部设备下拉,选中你那台已连线的 iPhone。
    3) 按 Cmd+R(或点 ▶︎)。装好后到 iPhone「设置 → 通用 → VPN与设备管理」信任开发者。
+
+   常见报错处理:
+   • 报「Apple Distribution 证书找不到」:你是免费账号,把 Signing 里
+     「Automatically manage signing」勾上,Xcode 会自动改用 Apple Development,再跑即可。
+   • 报「bundle identifier 不可用/已被占用」:把 Bundle Identifier 改成独一无二的
+     (自用随便改,例如 com.<你的名字>.nexus)。
+   • 装不上/设备灰色:确认 iPhone 系统 ≥ iOS 17(本工程最低 iOS 17),且已点「信任此电脑」。
    ※ 免费 Apple ID 签名 7 天有效,过期把手机连上 Mac 再跑一次本脚本 / 再 Cmd+R 即可。
 TIP
 fi
