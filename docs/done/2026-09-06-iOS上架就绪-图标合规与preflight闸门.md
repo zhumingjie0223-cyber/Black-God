@@ -3,7 +3,8 @@
 任务背景:先前把环境搭建理解成"跑 shuyu/CF 演示",权哥澄清——**要的是可以上架**,CF/神枢 Worker 在本分支不要了。遂转向 iOS 上架线(纯 SwiftUI 客户端、零后端、用户自带 API Key,构建走 Codemagic macOS 出 IPA)。
 
 - [x] 摸清上架链:`ios-app/`(SwiftUI 工程,XcodeGen 定义)+ `codemagic.yaml`(macOS 出 IPA、发 TestFlight)+ `AppStore/`(中英文案、隐私政策、截图源)。安卓 TWA 依赖 CF Worker(`aquan.lufei.uk`),与"CF 不要了"冲突,本轮不动。
-- [x] **修上架硬伤**:`ios-app/AppIcon.png` 原是 **764×1024 竖版海报(含标语)**,不符合 App Store 图标 **1024×1024** 硬要求。以品牌神字 Logo(`assets/logo/brand_logo.png`)为源,裁神字主体重构为 **1024×1024、RGB 无 alpha、全出血无圆角**的深石墨底方图(忠实品牌、不另起炉灶)。
+- [x] **修上架硬伤**:`ios-app/AppIcon.png` 原是 **764×1024 竖版海报(含标语)**,不符合 App Store 图标 **1024×1024** 硬要求。**沿用一直在用的品牌图标**(`web/icon-512.png` = `web/logo.png`,玉绿描边神字),按硬要求放大到 **1024×1024 并去除 alpha**,内置到 asset catalog。
+  > 修正记录:初版曾自作主张用海报 `brand_logo.png` 裁神字重造了一张黑金图标,经权哥指出"图标一直在用的那张",已撤回并改回既有官方玉绿图标(仓库内最高清 512,已放大到 1024;有更高清原图可直接替换)。
 - [x] 新增 `ios-app/Assets.xcassets/AppIcon.appiconset`(1024 单尺寸)并在 `project.yml` 纳入 `Assets.xcassets`——`xcodegen generate` 后工程直接带图标,不必再在 Xcode 手动导入。
 - [x] 新增上架就绪校验器 `ios-app/AppStore/preflight.mjs`(纯 Node 零依赖):核对工程名/BundleID/版本号/构建号/加密声明、CI 与工程一致性、中英双语文案齐全与字符上限、隐私/支持链接、图标 1024×1024 无 alpha、asset catalog 引用完整。**32 项全绿**;负向验证(塞回旧图标)精确报红并退出码 1,证明闸门有效。
 - [x] 修正 `AppStore/SUBMIT_GUIDE.md` 滞后的版本号(`1.0.0/构建1` → `1.1.0/构建2`,与 `project.yml`、`release_notes` 一致),并把图标步骤改为"已内置、无需手动导入"。
