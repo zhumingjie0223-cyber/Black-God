@@ -11,6 +11,12 @@ struct MeView: View {
     @ObservedObject var practice: NexusSkillPractice
     @State private var showSkills = false
     @State private var showPrivacy = false
+    @State private var showLicenses = false
+    private var version: String {
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(name)（\(build)）"
+    }
     @State private var showMemory = false
     @State private var showNexusConnection = false
 
@@ -50,9 +56,11 @@ struct MeView: View {
                     SettingRow(icon: "heart.fill", title: "助手模式", value: "神枢", color: .pink)
                     Divider().background(Color.bgCardLight)
                     Button { showPrivacy = true } label: { SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "数据使用说明", color: .green) }.accessibilityIdentifier("privacy.open")
+                    Divider().background(Color.bgCardLight)
+                    Button { showLicenses = true } label: { SettingRow(icon: "doc.text", title: "开源许可", value: "源码与许可文本", color: .bgGold) }.accessibilityIdentifier("licenses.open")
                 }
                 .bgCard().padding(.horizontal, 16)
-                Text("Black God · v1.0\nBlack God AI私人专属版 · 神枢")
+                Text("Black God · \(version)\nBlack God AI私人专属版 · 神枢")
                     .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                     .multilineTextAlignment(.center).padding(.top, 8)
             }
@@ -60,6 +68,7 @@ struct MeView: View {
         }
         .padding(.top, 50)
         .sheet(isPresented: $showPrivacy) { NexusPrivacyView() }
+        .sheet(isPresented: $showLicenses) { NexusPrivacyView(resource: "OPEN_SOURCE_LICENSES", title: "开源许可") }
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
         .sheet(isPresented: $showNexusConnection) {

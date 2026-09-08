@@ -29,7 +29,7 @@ def validate_alpine(root):
         if required != provided:
             raise ValueError('Collected source inputs do not match APKBUILD')
         if not required and (origin['origin'], origin['aports_commit']) != (
-                'alpine-base', '96586cb7ed12d722ab560ee2ec0fc5294a9dc84b'):
+                'alpine-base', 'ba66879782e41ce6781dc34513a4953278ba832f'):
             raise ValueError('Unexpected recipe without source checksums')
         for item in origin['sources']:
             path = root / item['file']
@@ -47,7 +47,7 @@ def source_files(repo):
     files.update(repo / x for x in [
         'LICENSE', 'THIRD_PARTY.md', 'Makefile', 'ios-app/project.yml',
         'ios-app/PrivacyInfo.xcprivacy', 'ios-app/AppStore/PRIVACY_POLICY.md',
-        'ios-app/AppStore/SUBMIT_GUIDE.md',
+        'ios-app/AppStore/SUBMIT_GUIDE.md', 'ios-app/AppStore/OPEN_SOURCE_LICENSES.md',
     ])
     for directory in ['vendor/ish', 'ios-app/Assets.xcassets', 'ios-app/ShuyuRuntime',
                       'ios-app/zh-Hans.lproj', 'ios-app/en.lproj',
@@ -73,6 +73,12 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     alpine = validate_alpine(args.alpine_dir)
+    installed = []
+    for record in (ROOT / 'ios-app/Runtime/AlpineRootfs/data/lib/apk/db/installed').read_text().split('\n\n'):
+        fields = dict(line.split(':', 1) for line in record.splitlines() if ':' in line)
+        if 'P' in fields: installed.append({key: fields[key] for key in ['P', 'V', 'L', 'o', 'c']})
+    if sorted(installed, key=lambda p: p['P']) != sorted(alpine['packages'], key=lambda p: p['P']):
+        raise ValueError('Source packages do not match the bundled runtime')
     entries = [(p, 'Black-God/' + str(p.relative_to(ROOT))) for p in source_files(ROOT)]
     for p in sorted(args.alpine_dir.rglob('*')):
         if p.is_symlink():
@@ -81,7 +87,10 @@ def main():
             entries.append((p, 'Black-God/third-party-sources/alpine/' + str(p.relative_to(args.alpine_dir))))
     files = [{'path': name, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'size': p.stat().st_size}
              for p, name in entries]
-    manifest = {'version': '1.2.0', 'build': '3', 'files': files,
+    project = (ROOT / 'ios-app/project.yml').read_text()
+    version = re.search(r'MARKETING_VERSION: \"?([0-9.]+)', project).group(1)
+    build = re.search(r'CURRENT_PROJECT_VERSION: \"?([0-9]+)', project).group(1)
+    manifest = {'version': version, 'build': build, 'files': files,
                 'alpinePackages': len(alpine['packages']), 'alpineOrigins': len(alpine['origins']),
                 'note': 'Source snapshot plus verified source inputs; public hosting and distribution review remain separate.'}
     args.output.parent.mkdir(parents=True, exist_ok=True)

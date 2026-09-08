@@ -5,11 +5,15 @@
 ## 当前发布配置
 
 - 名称：Black God；Bundle ID：com.blackgod.nexus。
-- 版本 1.2.0，构建 3，iPhone，最低 iOS 17。
+- 版本 1.2.0，构建 4，iPhone，最低 iOS 17。
 - 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
 - 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
 
-## 本轮更新
+## 构建 4 更新
+
+内置 Alpine 升级为 3.22.5，并通过 apk 签名验证安装 OpenSSL 3.5.8。升级保留旧运行环境，只迁移用户工作区；文件/索引不完整时停止迁移，不静默丢弃。工作区初始化可恢复中断。新增应用内开源许可和真实版本显示。221 项不同单元测试、3 项界面测试通过；16 个安装包完成 144 次 Alpine secdb 修复版本对比，无落后项。新构建的上传状态须单独确认，不能沿用构建 3 的成功状态。
+
+## 构建 3 更新
 
 Claude 官方 API 配置支持可选 Workspace ID。Claude.ai 订阅登录不作为 Black God 原生 OAuth 实现；OpenRouter 授权后的 Claude 使用 OpenRouter 的账号额度。
 

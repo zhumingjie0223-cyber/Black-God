@@ -12,7 +12,7 @@ def run(*args, **kwargs):
 def configure(platform):
     build = BUILD / platform
     if not (build/'build.ninja').exists():
-        args = [MESON, 'setup', build, SRC, '--buildtype=release', '-Db_ndebug=true', '-Dguest_arch=arm64', '-Dlog_handler=nslog']
+        args = [MESON, 'setup', build, SRC, '--buildtype=release', '-Db_ndebug=true', '-Dguest_arch=arm64', '-Dlog_handler=' + ('dprintf' if platform == 'host' else 'nslog')]
         if platform != 'host':
             sdk = subprocess.check_output(['xcrun', '--sdk', platform, '--show-sdk-path'], text=True).strip()
             target = 'arm64-apple-ios17.0' + ('-simulator' if platform == 'iphonesimulator' else '')
@@ -47,18 +47,6 @@ for platform in ['iphoneos', 'iphonesimulator']:
 # libarchive is used only by the host-side rootfs conversion tool.
 b = configure('host')
 run('ninja', '-C', b, 'tools/fakefsify')
-print('Runtime libraries ready; rootfs preparation is a separate verified step.')
-archive = BUILD/'alpine-minirootfs-3.22.1-aarch64.tar.gz'
-expected = '188416d41f9f0c9a6e9427b75149e43ccf3a89587b2d27c9ad506e7ffca78d1c'
-if not archive.exists():
-    urllib.request.urlretrieve('https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/aarch64/'+archive.name, archive)
-if hashlib.sha256(archive.read_bytes()).hexdigest() != expected:
-    raise RuntimeError('Alpine archive SHA256 mismatch; refusing import')
-rootfs = ROOT/'ios-app/Runtime/AlpineRootfs'
-if not rootfs.exists():
-    staging = BUILD/'rootfs-staging'
-    if staging.exists(): shutil.rmtree(staging)
-    run(b/'tools/fakefsify', archive, staging)
-    # Close the importer before copying; no live sqlite WAL is bundled.
-    shutil.move(str(staging), rootfs)
-print('Verified Alpine rootfs ready')
+run(MESON, 'configure', b, '-Dlog_handler=dprintf')
+run('ninja', '-C', b, 'ish')
+run(sys.executable, ROOT/'tools/runtime/prepare_image.py')

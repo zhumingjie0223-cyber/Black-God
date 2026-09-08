@@ -31,21 +31,10 @@ final class NexusLinuxRuntime {
         if ready { return }
         interruptedCount = try journal.recoverInterrupted()
         let fm = FileManager.default
-        let root = rootParent.appendingPathComponent("alpine-3.22.1-arm64")
-        if !fm.fileExists(atPath: root.appendingPathComponent("meta.db").path) {
-            guard let source = Bundle.main.url(forResource: "AlpineRootfs", withExtension: nil) else {
-                throw NexusReasoningError.execution("缺少 Linux 文件系统，请重新构建运行环境。")
-            }
-            try fm.createDirectory(at: rootParent, withIntermediateDirectories: true)
-            let staging = rootParent.appendingPathComponent("install-" + UUID().uuidString)
-            do {
-                try fm.copyItem(at: source, to: staging)
-                guard fm.fileExists(atPath: staging.appendingPathComponent("data/bin/busybox").path) else {
-                    throw NexusReasoningError.execution("Linux 文件系统不完整。")
-                }
-                try fm.moveItem(at: staging, to: root)
-            } catch { try? fm.removeItem(at: staging); throw error }
+        guard let source = Bundle.main.url(forResource: "AlpineRootfs", withExtension: nil) else {
+            throw NexusReasoningError.execution("缺少 Linux 文件系统，请重新构建运行环境。")
         }
+        let root = try NexusRuntimeImage.install(source: source, parent: rootParent)
         var excluded = rootParent
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
@@ -94,6 +83,7 @@ final class NexusLinuxRuntime {
         if !preparedWorkspaces.contains(workspace) {
             let setup = """
             set -e
+            if [ ! -d '\(root)' ] && [ -d '\(root).previous' ]; then mv '\(root).previous' '\(root)'; fi
             if [ ! -f '\(root)/.ready' ]; then
               mkdir -p /sessions
               chmod 700 /sessions
@@ -105,8 +95,11 @@ final class NexusLinuxRuntime {
               cp -a /dev/null /dev/zero /dev/urandom "$staging/dev/"
               chown 1000:1000 "$staging/workspace" "$staging/tmp"
               chmod 700 "$staging/workspace" "$staging/tmp"
+              if [ -d '\(root)/workspace' ]; then cp -a '\(root)/workspace/.' "$staging/workspace/"; fi
               touch "$staging/.ready"
+              if [ -d '\(root)' ]; then rm -rf '\(root).previous'; mv '\(root)' '\(root).previous'; fi
               mv "$staging" '\(root)'
+              rm -rf '\(root).previous'
             fi
             """
             ISHKernel.shared.nextRoot = nil

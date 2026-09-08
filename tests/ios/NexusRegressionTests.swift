@@ -6,7 +6,7 @@ final class NexusRegressionTests: XCTestCase {
         let bundle = Bundle(for: ChatViewModel.self)
         XCTAssertNotNil(bundle.url(forResource: "Localizable", withExtension: "strings", subdirectory: "zh-Hans.lproj"))
         XCTAssertNotNil(bundle.object(forInfoDictionaryKey: "UILaunchScreen"))
-        XCTAssertEqual(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0.0")
+        XCTAssertEqual(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.2.0")
     }
 
     func testCalculatorRejectsMalformedExpressions() async throws {

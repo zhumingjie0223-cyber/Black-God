@@ -2,6 +2,21 @@ import XCTest
 
 final class BlackGodUITests: XCTestCase {
     @MainActor
+    func testVersionAndBundledLicensePage() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch(); app.buttons["tab.4"].tap()
+        let entry = app.buttons["licenses.open"]
+        for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（4）")).firstMatch.exists)
+        XCTAssertTrue(entry.isHittable); entry.tap()
+        XCTAssertTrue(app.navigationBars["开源许可"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["说明文档暂不可用"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "开源许可"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["完成"].tap()
+    }
+
+    @MainActor
     func testOAuthLoginEntryAndBrowserCancellation() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
