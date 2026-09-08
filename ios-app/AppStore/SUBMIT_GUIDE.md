@@ -5,9 +5,13 @@
 ## 当前发布配置
 
 - 名称：Black God；Bundle ID：com.blackgod.nexus。
-- 版本 1.2.0，构建 4，iPhone，最低 iOS 17。
+- 版本 1.2.0，构建 5，iPhone，最低 iOS 17。
 - 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
 - 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
+
+## 构建 5 更新
+
+修复完整开源许可单个超长文本无法绘制的问题，采用分段加载；界面测试检查正文可见及可滚动。构建 4 已于 2026-09-09 04:54（UTC+7）上传，因上述显示问题由构建 5 取代。构建 5 的上传和处理状态须独立确认。
 
 ## 构建 4 更新
 

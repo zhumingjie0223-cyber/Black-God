@@ -8,7 +8,7 @@ Run:
 
 ```
 python3 tools/release/collect_alpine.py --output /path/to/verified-alpine-sources
-python3 tools/release/package_source.py --alpine-dir /path/to/verified-alpine-sources --output /path/to/Black-God-1.2.0-build4-source.tar.gz
+python3 tools/release/package_source.py --alpine-dir /path/to/verified-alpine-sources --output /path/to/Black-God-1.2.0-build5-source.tar.gz
 ```
 
 The packager writes a SHA-256 file manifest, normalizes archive ownership/times and reads every archive member back for verification. Rebuild the App with `make generate`, then the Xcode project and scheme documented in `ios-app/AppStore/SUBMIT_GUIDE.md`. Build tools (Xcode, Python, ninja, Meson, llvm, libarchive, pkg-config and XcodeGen) are prerequisites; the runtime build verifies the original Alpine rootfs download before conversion.
@@ -16,3 +16,5 @@ The packager writes a SHA-256 file manifest, normalizes archive ownership/times 
 Source packaging does not validate API credentials, authorize public CLI OAuth client identities, certify GPL compliance, or submit App Review. Public access to the source and applicable notices must be established before public binary distribution. Preserve original third-party licensing; do not label the linked App MIT-only.
 
 Build 4 verification: 220-test full unit regression plus one additional guest bootstrap recovery test passed; three UI tests cover Claude consent, streaming cancellation, version and bundled licenses. Alpine secdb check used 16 installed packages and 144 fixed-version comparisons, with zero outdated entries. The old image was correctly rejected with 18 outdated comparisons. These checks do not replace real provider account or physical device acceptance.
+
+Build 5 fixes blank rendering of the long license text by displaying paragraphs lazily. The UI check requires visible first-paragraph text and content after scrolling; opening the sheet alone is insufficient.

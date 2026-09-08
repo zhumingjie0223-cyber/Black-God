@@ -8,10 +8,16 @@ final class BlackGodUITests: XCTestCase {
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["licenses.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（4）")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（5）")).firstMatch.exists)
         XCTAssertTrue(entry.isHittable); entry.tap()
         XCTAssertTrue(app.navigationBars["开源许可"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["说明文档暂不可用"].exists)
+        let text = app.staticTexts["document.paragraph.0"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        XCTAssertTrue(text.isHittable)
+        XCTAssertTrue(text.label.contains("Black God 开源许可与源码"))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Embedded runtime source and notices")).firstMatch.exists)
+        app.swipeDown()
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "开源许可"; shot.lifetime = .keepAlways; add(shot)
         app.buttons["完成"].tap()
     }

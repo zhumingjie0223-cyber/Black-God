@@ -11,7 +11,15 @@ struct NexusPrivacyView: View {
     }
     var body: some View {
         NavigationStack {
-            ScrollView { Text(policy).font(.body).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding() }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    ForEach(Array(policy.components(separatedBy: "\n\n").enumerated()), id: \.offset) { index, paragraph in
+                        Text(paragraph).font(.body).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("document.paragraph.\(index)")
+                    }
+                }.padding()
+            }
                 .navigationTitle(title)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
         }
