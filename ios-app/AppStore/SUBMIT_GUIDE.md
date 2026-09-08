@@ -5,9 +5,13 @@
 ## 当前发布配置
 
 - 名称：Black God；Bundle ID：com.blackgod.nexus。
-- 版本 1.2.0，构建 6，iPhone，最低 iOS 17。
+- 版本 1.2.0，构建 7，iPhone，最低 iOS 17。
 - 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
 - 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
+
+## 构建 7：自我状态流开发版
+
+新增事件驱动的自我状态记录、运行绑定公开自评工具、暂停/清空和重启中断处理。没有主观意识证明或后台持续推理。本轮242项单元测试、3项界面测试通过（含新增9项状态流测试）。构建6的签名或上传状态不代表构建7，真实账号与真机验收仍待完成。公共隐私政策仍需同步。
 
 ## 构建 6：神枢成长开发版
 

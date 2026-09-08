@@ -15,6 +15,9 @@ struct NexusCognitiveView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("自我状态") {
+                    NavigationLink("查看自我状态流") { NexusSelfContinuityView(stream: control.continuity) }.accessibilityIdentifier("self.open")
+                }
                 Section("可验证的自我检查") {
                     Text("记录已知资料、来源、错误和工具结果。不会宣称具有主观意识，也不会自行改写模型权重或提升权限。")
                     Text("数学：计算工具\n因果：给定线性模型的干预计算\n长期规划：依赖检查、时长下界和任务检查点\n科学发现：可辅助提出假设，仍需外部证据与真实实验验证。")

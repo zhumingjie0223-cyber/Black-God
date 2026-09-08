@@ -2,6 +2,36 @@ import XCTest
 
 final class BlackGodUITests: XCTestCase {
     @MainActor
+    func testSelfContinuityEntryPauseAndClear() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch(); app.buttons["tab.4"].tap()
+        let entry = app.buttons["cognitive.open"]
+        for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
+        entry.tap(); app.buttons["self.open"].tap()
+        XCTAssertTrue(app.navigationBars["自我状态流"].waitForExistence(timeout: 5))
+        let toggle = app.switches["self.enabled"]
+        XCTAssertTrue(toggle.isHittable)
+        let knob = toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5))
+        if toggle.value as? String == "0" {
+            knob.tap()
+            expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: toggle)
+            waitForExpectations(timeout: 3)
+        }
+        knob.tap()
+        expectation(for: NSPredicate(format: "label == %@", "记录已暂停或不可用"), evaluatedWith: app.staticTexts["self.status"])
+        waitForExpectations(timeout: 3)
+        knob.tap()
+        expectation(for: NSPredicate(format: "label == %@", "等待任务"), evaluatedWith: app.staticTexts["self.status"])
+        waitForExpectations(timeout: 3)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "自我状态流"; shot.lifetime = .keepAlways; add(shot)
+        let clear = app.buttons["self.clear"]
+        for _ in 0..<4 where !clear.isHittable { app.swipeUp() }
+        clear.tap(); app.buttons["清空记录"].tap()
+        XCTAssertTrue(app.staticTexts["self.empty"].exists)
+    }
+
+    @MainActor
     func testCognitivePermissionsAndObservationEntry() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
@@ -33,7 +63,7 @@ final class BlackGodUITests: XCTestCase {
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["licenses.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（6）")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（7）")).firstMatch.exists)
         XCTAssertTrue(entry.isHittable); entry.tap()
         XCTAssertTrue(app.navigationBars["开源许可"].waitForExistence(timeout: 5))
         let text = app.staticTexts["document.paragraph.0"]

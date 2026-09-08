@@ -22,11 +22,13 @@ final class NexusCognitiveControl: ObservableObject {
     @Published private(set) var state = State()
     @Published private(set) var error: String?
     @Published private(set) var revision = 0
+    let continuity: NexusSelfContinuity
     private let url: URL
     private var writable = true
     private var expiryTask: Task<Void, Never>?
     init(url: URL) {
         self.url = url
+        self.continuity = NexusSelfContinuity(url: url.deletingPathExtension().appendingPathExtension("self.json"))
         do {
             if FileManager.default.fileExists(atPath: url.path) {
                 guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) <= 4_000_000 else { throw NexusError.invalidResponse }
@@ -111,7 +113,7 @@ final class NexusCognitiveControl: ObservableObject {
     }
     func begin(_ call: NexusToolCall, now: Date = Date()) throws -> Int {
         let readOnly: Set<String> = ["echo", "calc", "clock", "shuyu", "shuyu_execute", "skill_search", "skill_read", "memory_search", "causal_model", "dependency_plan"]
-        let allowed = !state.stopped && (readOnly.contains(call.name) || call.name == "knowledge_propose" || (call.name == "shell_execute" && (state.workspaceUntil.map { $0 > now } ?? false)))
+        let allowed = !state.stopped && (readOnly.contains(call.name) || ["knowledge_propose", "self_reflect"].contains(call.name) || (call.name == "shell_execute" && (state.workspaceUntil.map { $0 > now } ?? false)))
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let hash = SHA256.hash(data: try encoder.encode(call.arguments)).map { String(format: "%02x", $0) }.joined()
         try commit(state, event: allowed ? "tool.started" : "tool.denied", subject: call.name + ":" + call.id.uuidString + ":" + hash)

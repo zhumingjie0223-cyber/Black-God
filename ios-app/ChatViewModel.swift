@@ -14,6 +14,7 @@ final class ChatViewModel: ObservableObject {
     @Published var skills: NexusSkillStore
     let cognitive: NexusCognitiveControl
     private var cognitiveSubscription: AnyCancellable?
+    private var continuitySubscription: AnyCancellable?
     private var skillsSubscription: AnyCancellable?
     private var memorySubscription: AnyCancellable?
     let live = NexusLiveExecution()
@@ -71,6 +72,10 @@ final class ChatViewModel: ObservableObject {
         cognitiveSubscription = self.cognitive.$revision.dropFirst().sink { [weak self] _ in
             guard let self, self.isTyping else { return }
             self.cancel(); self.statusHint = "权限或核对资料已改变，当前任务已停止；继续时重新检查。"
+        }
+        continuitySubscription = self.cognitive.continuity.$revision.dropFirst().sink { [weak self] _ in
+            guard let self, self.isTyping else { return }
+            self.cancel(); self.statusHint = "自我状态流设置已改变，当前任务已停止。"
         }
         skillsSubscription = self.skills.$items.dropFirst().sink { [weak self] _ in
             guard let self, self.isTyping else { return }
@@ -153,6 +158,7 @@ final class ChatViewModel: ObservableObject {
         isTyping = true
         lastError = nil
         statusHint = "正在思考…"
+        cognitive.continuity.begin(run: id, goal: prompt, redacting: key)
         live.begin(goal: prompt, redacting: key)
         runtime.begin(prompt: prompt)
         // Freeze credentials and destination for the entire task, including later tool rounds.
@@ -168,10 +174,11 @@ final class ChatViewModel: ObservableObject {
             ? "当前长期记忆清单为空。历史资料中的旧记忆条目不能视为仍有效的偏好或约束；以本次用户要求为准。"
             : NexusMemoryStore.context(memorySnapshot) + "\n历史中的同名旧记忆已失效，以这份当前清单为准。"
         let skillSnapshot = skills.available
-        let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context
+        let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context + "\n" + cognitive.continuity.context
         var tools = NexusToolRegistry(control: cognitive)
         tools.register(NexusCausalTool()); tools.register(NexusDependencyTool())
         tools.register(NexusKnowledgeProposalTool(control: cognitive))
+        tools.register(NexusSelfReflectionTool(stream: cognitive.continuity, run: id))
         if !skillSnapshot.isEmpty {
             tools.register(NexusSkillSearchTool(items: skillSnapshot))
             tools.register(NexusSkillReadTool(items: skillSnapshot))
@@ -205,11 +212,13 @@ final class ChatViewModel: ObservableObject {
             return try await completion(history + [ChatMessage(role: "user", content: recoveryContext + "\n" + skillIndex + "\n" + context + request)], selectedModel)
         }, nativeTurn: nativeTurn, onCheckpoint: { [weak self] progress in
             guard let self, self.runID == id, !Task.isCancelled, var saved = self.taskCheckpoint else { throw CancellationError() }
+            self.cognitive.continuity.observe(run: id, traces: progress.traces)
             self.live.observe(progress.traces)
             saved.update(progress)
             self.taskCheckpoint = try self.checkpointStore.save(saved, redacting: key)
         }, onEvent: { [weak self] event in
             guard let self, self.runID == id else { return }
+            self.cognitive.continuity.phase(run: id, text: event)
             self.live.phase(event)
             self.statusHint = event
             self.runtime.append(.status(event))
@@ -238,6 +247,7 @@ final class ChatViewModel: ObservableObject {
                 self.persist()
                 self.runtime.append(.text(reply))
                 self.runtime.append(.completed)
+                self.cognitive.continuity.finish(run: id, kind: outcome.warning == nil ? .answered : .warning, summary: outcome.warning ?? "答复已生成；请依据实际证据判断结果。")
                 self.live.finish(outcome.warning == nil ? .answered : .warning, message: outcome.warning ?? "本次答复已生成")
                 self.evaluations.record(task: prompt, success: outcome.warning == nil, recovered: !appendUser && outcome.warning == nil,
                     verified: outcome.reviewPassed, latency: Date().timeIntervalSince(startedAt), recoveryAttempt: !appendUser)
@@ -255,6 +265,7 @@ final class ChatViewModel: ObservableObject {
                     do { self.taskCheckpoint = try self.checkpointStore.save(saved, redacting: key) }
                     catch { self.lastError = "保存失败状态失败：" + error.localizedDescription }
                 }
+                self.cognitive.continuity.finish(run: id, kind: .failed, summary: error.localizedDescription)
                 self.live.finish(.failed, message: error.localizedDescription)
                 self.runtime.fail(error.localizedDescription)
                 self.evaluations.record(task: prompt, success: false, recovered: false, verified: false, latency: Date().timeIntervalSince(startedAt), recoveryAttempt: !appendUser)
@@ -270,6 +281,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func cancel() {
+        cognitive.continuity.finish(run: runID, kind: .cancelled, summary: "任务已停止；没有自动继续或自行扩权。")
         live.finish(.cancelled, message: "任务已停止")
         if isTyping, let startedAt = activeStartedAt {
             evaluations.record(task: lastPrompt ?? "", success: false, recovered: false, verified: false,

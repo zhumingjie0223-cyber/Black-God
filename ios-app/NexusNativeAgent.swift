@@ -131,6 +131,7 @@ extension NexusToolRegistry {
             ("memory_search", "检索用户此前明确说过的内容", ["query": "检索内容"], ["query"]),
             ("causal_model", NexusCausalTool().usage, ["model": "线性结构模型JSON"], ["model"]),
             ("dependency_plan", NexusDependencyTool().usage, ["tasks": "任务依赖JSON数组"], ["tasks"]),
+            ("self_reflect", "记录公开自评摘要，不是事实验证或授权", ["assessment": "简短判断，最多800字", "uncertainty": "不确定事项，最多400字", "next_step": "建议下一步，最多400字"], ["assessment", "uncertainty", "next_step"]),
             ("knowledge_propose", "提交知识候选，必须经用户核对后才可启用；不改变权限", ["topic": "主题", "statement": "内容，区分推断与观测", "source": "可核对的来源"], ["topic", "statement", "source"])
         ]
         return definitions.filter { contains($0.0) }.map {
