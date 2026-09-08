@@ -5,9 +5,15 @@
 ## 当前发布配置
 
 - 名称：Black God；Bundle ID：com.blackgod.nexus。
-- 版本 1.2.0，构建 5，iPhone，最低 iOS 17。
+- 版本 1.2.0，构建 6，iPhone，最低 iOS 17。
 - 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
 - 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
+
+## 构建 6：神枢成长开发版
+
+增加线性因果模型干预计算、任务依赖检查、知识候选与核对流程、限时模型工具授权、可撤销权限与本机审计、用户选图的本机OCR。没有主观意识证明、权重自训练或机器人/实验设备适配。233项单元测试和2项界面测试通过；OCR使用真实Vision识别合成测试图片。完整机制和限制见docs/COGNITIVE_CONTROL.md。
+
+当前开发版尚未作为正式发布验收完成。新隐私说明须同步到公开隐私网址，真实模型账号及真机验收仍需完成；不能把之前build5的Apple上传状态当作build6的状态。
 
 ## 构建 5 更新
 

@@ -6,6 +6,8 @@ import SwiftUI
 
 struct MeView: View {
     @EnvironmentObject var appState: AppState
+    @ObservedObject var cognitive: NexusCognitiveControl
+    @State private var showCognitive = false
     @ObservedObject var memory: NexusMemoryStore
     @ObservedObject var skills: NexusSkillStore
     @ObservedObject var practice: NexusSkillPractice
@@ -53,6 +55,8 @@ struct MeView: View {
                         SettingRow(icon: "list.bullet.rectangle", title: "任务技能", value: "\(skills.items.count)个", color: .bgGold)
                     }.accessibilityIdentifier("skills.open")
                     Divider().background(Color.bgCardLight)
+                    Button { showCognitive = true } label: { SettingRow(icon: "checkmark.shield", title: "神枢成长", value: "核对 · 权限 · 审计", color: .bgGold) }.accessibilityIdentifier("cognitive.open")
+                    Divider().background(Color.bgCardLight)
                     SettingRow(icon: "heart.fill", title: "助手模式", value: "神枢", color: .pink)
                     Divider().background(Color.bgCardLight)
                     Button { showPrivacy = true } label: { SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "数据使用说明", color: .green) }.accessibilityIdentifier("privacy.open")
@@ -67,6 +71,7 @@ struct MeView: View {
             .padding(.bottom, 100)
         }
         .padding(.top, 50)
+        .sheet(isPresented: $showCognitive) { NexusCognitiveView(control: cognitive) }
         .sheet(isPresented: $showPrivacy) { NexusPrivacyView() }
         .sheet(isPresented: $showLicenses) { NexusPrivacyView(resource: "OPEN_SOURCE_LICENSES", title: "开源许可") }
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }

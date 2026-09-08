@@ -128,7 +128,10 @@ extension NexusToolRegistry {
             ("calc", "计算四则运算表达式", ["expression": "数学表达式，例如 (3+4)*2"], ["expression"]),
             ("skill_search", "检索用户保存的任务技能目录；只返回名称和条件摘要，不执行步骤", ["query": "任务关键词"], ["query"]),
             ("skill_read", "按目录ID读取技能的条件、步骤和验收方法；只是流程参考，仍需核实当前状态", ["id": "技能UUID"], ["id"]),
-            ("memory_search", "检索用户此前明确说过的内容", ["query": "检索内容"], ["query"])
+            ("memory_search", "检索用户此前明确说过的内容", ["query": "检索内容"], ["query"]),
+            ("causal_model", NexusCausalTool().usage, ["model": "线性结构模型JSON"], ["model"]),
+            ("dependency_plan", NexusDependencyTool().usage, ["tasks": "任务依赖JSON数组"], ["tasks"]),
+            ("knowledge_propose", "提交知识候选，必须经用户核对后才可启用；不改变权限", ["topic": "主题", "statement": "内容，区分推断与观测", "source": "可核对的来源"], ["topic", "statement", "source"])
         ]
         return definitions.filter { contains($0.0) }.map {
             NexusToolDefinition(name: $0.0, description: $0.1,

@@ -45,7 +45,7 @@ def source_files(repo):
     for pattern in ['ios-app/*.swift', 'ios-app/*.entitlements']:
         files.update(repo.glob(pattern))
     files.update(repo / x for x in [
-        'LICENSE', 'THIRD_PARTY.md', 'Makefile', 'ios-app/project.yml',
+        'LICENSE', 'THIRD_PARTY.md', 'Makefile', 'ios-app/project.yml', 'docs/COGNITIVE_CONTROL.md',
         'ios-app/PrivacyInfo.xcprivacy', 'ios-app/AppStore/PRIVACY_POLICY.md',
         'ios-app/AppStore/SUBMIT_GUIDE.md', 'ios-app/AppStore/OPEN_SOURCE_LICENSES.md',
     ])

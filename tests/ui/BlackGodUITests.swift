@@ -2,13 +2,38 @@ import XCTest
 
 final class BlackGodUITests: XCTestCase {
     @MainActor
+    func testCognitivePermissionsAndObservationEntry() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch(); app.buttons["tab.4"].tap()
+        let entry = app.buttons["cognitive.open"]
+        for _ in 0..<4 where !entry.isHittable { app.swipeUp() }
+        XCTAssertTrue(entry.isHittable); entry.tap()
+        XCTAssertTrue(app.navigationBars["神枢成长"].waitForExistence(timeout: 5))
+        let grant = app.buttons["cognitive.grant"]
+        for _ in 0..<4 where !grant.isHittable { app.swipeUp() }
+        grant.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "工作区授权至")).firstMatch.exists)
+        let revoke = app.buttons["cognitive.revoke"]
+        for _ in 0..<3 where !revoke.isHittable { app.swipeUp() }
+        revoke.tap()
+        XCTAssertTrue(app.staticTexts["已停止"].exists)
+        app.buttons["仅允许本地分析与候选记录"].tap()
+        let photo = app.buttons["cognitive.photo"]
+        for _ in 0..<4 where !photo.isHittable { app.swipeUp() }
+        XCTAssertTrue(photo.isHittable)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "神枢成长与图片观察"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["完成"].tap()
+    }
+
+    @MainActor
     func testVersionAndBundledLicensePage() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["licenses.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（5）")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（6）")).firstMatch.exists)
         XCTAssertTrue(entry.isHittable); entry.tap()
         XCTAssertTrue(app.navigationBars["开源许可"].waitForExistence(timeout: 5))
         let text = app.staticTexts["document.paragraph.0"]
