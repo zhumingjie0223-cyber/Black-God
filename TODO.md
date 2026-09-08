@@ -133,3 +133,13 @@
 - [x] 公开隐私政策已更新至 GitHub main，提交 6f80179077c60f3dbf37aafd0ef2832a775bdd50，与包内内容一致。
 - [ ] Apple 构建处理结果、App Review 提交与上架：网页持续返回 502 / authResult=FAILED，无法核实联系人、发行范围和版本审核状态。
 - [ ] 真实模型账号端到端验收、审核可用凭据或演示入口、第三方完整对应源码及分发条件、真机新增功能验收仍待完成。上传成功不等于这些验收通过，也不等于已上架或达到 ASI。
+
+
+## 2026-09-09 源码发行与处理确认
+
+- [x] Transporter 确认 1.2.0（3）已完成处理。
+- [x] 本轮源码提交 fdd26f55b2fe67ba42a3f3bd7d5ef813dd390b8a 已推送 codex/release-readiness。
+- [x] 按固定 aports 提交收集内置 Alpine 的 16 个包、10 个源码组；122 个源输入 SHA-512 通过。
+- [x] 2,028 个文件打包回读校验、5 项源码完整性测试通过。
+- [x] 源码包与 SHA-256 清单已公开：https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.2.0-build3；GitHub 服务端摘要与本机一致。
+- [ ] 审核后台登录仍失败；未提交 App Review。实际模型账号、物理设备新增功能和分发条件验收仍未关闭。

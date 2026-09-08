@@ -7,7 +7,7 @@
 - 名称：Black God；Bundle ID：com.blackgod.nexus。
 - 版本 1.2.0，构建 3，iPhone，最低 iOS 17。
 - 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
-- 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付、Apple 正在处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
+- 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
 
 ## 本轮更新
 
@@ -45,3 +45,7 @@ Claude 官方 API 配置支持可选 Workspace ID。Claude.ai 订阅登录不作
 - https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
 - https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api
 - https://code.claude.com/docs/en/legal-and-compliance
+
+## 源码发行记录
+
+2026-09-09，源码分支 codex/release-readiness 已发布，提交 fdd26f55b2fe67ba42a3f3bd7d5ef813dd390b8a。对应源码与校验清单已公开于 [https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.2.0-build3](https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.2.0-build3)，标记为开发预发布。归档含 2,028 个文件及 Alpine 16 个包的 10 组源码，122 个上游 SHA-512 输入校验全部通过；5 项源码完整性测试通过。两个公开附件的 GitHub digest 与本地 SHA-256 完全相同。公开源码解决源码访问问题，不表示账号 API、真机验收或 App Review 已完成。
