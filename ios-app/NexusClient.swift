@@ -1,5 +1,4 @@
-// NexusClient.swift — 纯客户端直连 Anthropic API
-// 用户自带 API key，存 Keychain，直连，零后端依赖
+// NexusClient.swift — 用户许可后的直连请求；严格、可取消且有时间上限的 SSE 传输
 
 import Foundation
 
@@ -68,6 +67,16 @@ actor NexusClient {
     static let shared = NexusClient()
 
     private let defaultModel = NexusModelCatalog.defaultModelID
+    private let configuration: URLSessionConfiguration
+    private let timeout: TimeInterval
+    private let maxResponseCharacters: Int
+
+    init(configuration: URLSessionConfiguration = .ephemeral, timeout: TimeInterval = 120,
+         maxResponseCharacters: Int = 64_000) {
+        self.configuration = configuration.copy() as! URLSessionConfiguration
+        self.timeout = min(max(timeout, 0.01), 120)
+        self.maxResponseCharacters = min(max(maxResponseCharacters, 1), 64_000)
+    }
 
     // MARK: 流式对话
 
@@ -79,81 +88,78 @@ actor NexusClient {
         onComplete: @escaping () -> Void,
         onError: @escaping (Error) -> Void
     ) async {
-        let selectedModel = model ?? defaultModel
-        let entry = NexusModelCatalog.entry(for: selectedModel)
-        guard let apiKey = NexusKeychain.shared.key(for: entry.providerID), !apiKey.isEmpty else {
-            onError(NexusError.missingAPIKey)
-            return
-        }
-        guard let url = NexusProviderRequestBuilder.adapter(for: entry).endpoint(for: entry),
-              let bodyData = try? NexusProviderRequestBuilder.body(model: entry, messages: messages) else {
-            onError(NexusError.invalidResponse)
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = bodyData
-        for (name, value) in NexusProviderRequestBuilder.adapter(for: entry).headers(for: entry, apiKey: apiKey) {
-            request.setValue(value, forHTTPHeaderField: name)
-        }
-
-        var assembler = NexusToolCallAssembler()
+        // Native tool schemas are not requested: the executor owns the text tool protocol.
+        // Retain this callback argument for bridge compatibility, but never execute unexpected calls.
+        _ = onToolCall
         do {
-            let (bytes, response) = try await URLSession.shared.bytes(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                onError(NexusError.invalidResponse)
-                return
+            try Task.checkCancellation()
+            let entry = NexusModelCatalog.entry(for: model ?? defaultModel)
+            guard NexusKeychain.shared.hasSharingConsent(for: entry.providerID) else {
+                throw NexusError.apiError("请先在 API 配置中确认向所选 AI 服务商发送数据。")
             }
-
-            guard httpResponse.statusCode == 200 else {
-                onError(NexusError.apiError("HTTP \(httpResponse.statusCode)"))
-                return
+            guard let apiKey = NexusKeychain.shared.key(for: entry.providerID), !apiKey.isEmpty else {
+                throw NexusError.missingAPIKey
             }
-
-            // SSE 解析
-            for try await line in bytes.lines {
-                guard line.hasPrefix("data: ") else { continue }
-                let data = String(line.dropFirst(6))
-                guard data != "[DONE]" else { break }
-
-                if let json = data.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any] {
-                    if entry.providerType == .openAICompatible,
-                       let choices = obj["choices"] as? [[String: Any]],
-                       let delta = choices.first?["delta"] as? [String: Any],
-                       let calls = delta["tool_calls"] as? [[String: Any]],
-                       let first = calls.first,
-                       let function = first["function"] as? [String: Any] {
-                        let id = (first["id"] as? String) ?? UUID().uuidString
-                        let call = assembler.append(id: id, name: function["name"] as? String, arguments: function["arguments"] as? String)
-                        if let call { onToolCall(call) }
-                    } else if entry.providerType == .openAICompatible,
-                       let toolCall = NexusNativeToolEventParser.parseOpenAI(obj) {
-                        onToolCall(toolCall)
-                    } else if entry.providerType == .anthropic,
-                              let toolCall = NexusNativeToolEventParser.parse(obj) {
-                        onToolCall(toolCall)
-                    } else if entry.providerType == .openAICompatible,
-                       let choices = obj["choices"] as? [[String: Any]],
-                       let delta = choices.first?["delta"] as? [String: Any],
-                       let text = delta["content"] as? String {
-                        onDelta(text)
-                    } else if let type_ = obj["type"] as? String,
-                              type_ == "content_block_delta",
-                              let delta = obj["delta"] as? [String: Any],
-                              let text = delta["text"] as? String {
-                        onDelta(text)
-                    } else if obj["type"] as? String == "message_stop" {
-                        break
+            guard let url = NexusProviderRequestBuilder.adapter(for: entry).endpoint(for: entry),
+                  url.scheme?.lowercased() == "https", url.host != nil else {
+                throw NexusError.invalidResponse
+            }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = timeout
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.httpBody = try NexusProviderRequestBuilder.body(model: entry, messages: messages)
+            for (name, value) in NexusProviderRequestBuilder.adapter(for: entry).headers(for: entry, apiKey: apiKey) {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            let config = configuration.copy() as! URLSessionConfiguration
+            config.timeoutIntervalForRequest = timeout
+            config.timeoutIntervalForResource = timeout
+            config.urlCache = nil
+            config.httpCookieStorage = nil
+            let delegate = NexusProviderSessionDelegate(origin: url)
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
+            let watchdog = Task {
+                do { try await Task.sleep(for: .seconds(timeout)) }
+                catch { return }
+                session.invalidateAndCancel()
+            }
+            defer { watchdog.cancel() }
+            do {
+                try await withTaskCancellationHandler {
+                    try Task.checkCancellation()
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let response = response as? HTTPURLResponse else { throw NexusError.invalidResponse }
+                    guard response.statusCode == 200 else { throw NexusError.apiError("HTTP \(response.statusCode)") }
+                    guard response.mimeType?.lowercased() == "text/event-stream" else { throw NexusError.invalidResponse }
+                    var parser = NexusSSEParser(format: entry.providerType == .anthropic ? .anthropic : .openAICompatible,
+                                                maxResponseCharacters: maxResponseCharacters)
+                    for try await byte in bytes {
+                        try Task.checkCancellation()
+                        guard ContinuousClock.now < deadline else { throw NexusStreamError.timedOut }
+                        if let delta = try parser.consume(byte) { onDelta(delta) }
+                        if parser.completed { break }
                     }
+                    try Task.checkCancellation()
+                    try parser.finish()
+                } onCancel: {
+                    session.invalidateAndCancel()
                 }
+            } catch {
+                if Task.isCancelled { throw CancellationError() }
+                if ContinuousClock.now >= deadline || (error as? URLError)?.code == .timedOut {
+                    throw NexusStreamError.timedOut
+                }
+                throw error
             }
+            // A single terminal callback, after the provider's normal finish marker.
+            try Task.checkCancellation()
             onComplete()
-
         } catch {
-            onError(NexusError.networkError(error))
+            onError(error)
         }
     }
 
@@ -165,5 +171,25 @@ actor NexusClient {
 
     func availableModels() -> [String] {
         NexusModelCatalog.entries.map { $0.modelID }
+    }
+}
+
+/// Never forward a provider credential to another origin through an HTTP redirect.
+final class NexusProviderSessionDelegate: NSObject, URLSessionTaskDelegate {
+    private let origin: URL
+    init(origin: URL) { self.origin = origin }
+
+    func allows(_ destination: URL?) -> Bool {
+        guard let destination else { return false }
+        return destination.scheme?.lowercased() == "https"
+            && destination.host?.lowercased() == origin.host?.lowercased()
+            && (destination.port ?? 443) == (origin.port ?? 443)
+            && destination.user == nil && destination.password == nil
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(allows(request.url) ? request : nil)
     }
 }

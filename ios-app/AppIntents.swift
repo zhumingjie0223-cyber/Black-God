@@ -16,18 +16,7 @@ enum NexusIntentAPI {
         guard NexusKeychain.shared.hasAPIKey else {
             throw IntentError.missingKey
         }
-        return try await withCheckedThrowingContinuation { cont in
-            Task {
-                await NexusClient.shared.streamChat(
-                    messages: [ChatMessage(role: "user", content: text)],
-                    onDelta: { _ in },
-                    onComplete: { },
-                    onError: { _ in }
-                )
-            }
-            // streamChat 通过回调交付，这里用同步兜底：返回提示语
-            cont.resume(returning: "已在 App 内打开对话，请在聊天页查看结果。")
-        }
+        return try await NexusModelBridge.complete(text, model: NexusKeychain.shared.selectedModel)
     }
 }
 
@@ -53,8 +42,8 @@ struct AskBlackGodIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        _ = try await NexusIntentAPI.ask(text)
-        return .result(dialog: "已打开 Black God AI。")
+        let answer = try await NexusIntentAPI.ask(text)
+        return .result(dialog: "\(answer)")
     }
 }
 

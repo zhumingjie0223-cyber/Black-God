@@ -12,12 +12,22 @@
 
 # Black God / 神枢 — 项目指南
 
-Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 Cloudflare Workers Durable Object，
-仓库内 `web/nexus-do/`）；对外助手身份统一为 Black God AI，不绑定人物角色。品牌、神枢与枢语名称不要混用。
+Black God 是产品品牌；神枢 Nexus 是原生 iOS 客户端与任务引擎，入口为
+`ios-app/BlackGod888App.swift`，工程由 `ios-app/project.yml` 生成。对外助手身份为 Black God AI。
+当前任务主链是 `ChatViewModel → NexusExecutor`；`web/nexus-do/` 已不在当前分支，
+不要再照旧文档运行网页构建、Durable Object 部署或双副本校验。
 
-**两仓已合一**：枢语源头引擎并入本仓 `shuyu/` 目录（权威源，Python + JS 双实现 + 词根表 + 测试），
-`web/nexus-do/` 里是它的消费副本。改引擎在 `shuyu/` 改，再同步到消费副本，见下方同步校验命令。
-（原独立的 shuyu-lang 仓库已封存归档，不再更新。）
+本仓 `shuyu/` 保留 v4.1 引擎（JS 包 1.2.0 / Python 4.1.0），独立 shuyu-lang 仍有旧基线。
+统一版本时保留新版能力和测试，不得旧版覆盖新版。iOS 当前不导入这些 JS / Python 文件。
+
+## 当前能力边界
+
+- 模型制定步骤，执行器逐步执行；`onUpdate` 更新界面与检查点，恢复跳过已完成步骤。
+- 默认工具只有时钟、受限计算和原样文本回传。未开放网页检索、任意文件操作、shell 或手机系统控制。
+- 验证器检查完整性和格式，不验证事实，不得宣称已经实现通用超级智能或能够保证任务成功。
+- 记忆仅由用户手动收藏/添加，最多 200 条，每条 4000 字；不要恢复“所有对话自动入记忆”。
+- 本机保存最近 50 次任务历史；磁盘失败必须显示错误，清除全部数据返回每个未完成删除的原因。
+- 首次访问各模型服务商前需取得用户对数据共享的明确同意；密钥只发往对应服务商用于鉴权。
 
 ## 语言规则（强制，不可违反）
 
@@ -37,7 +47,7 @@ Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 C
 
 ## 铁律
 
-- 不要碰服务器（SSH/部署）除非权哥明确要求——神枢架构是纯 Cloudflare Workers，不用 VPS。
+- 除非任务明确要求，不操作服务器或历史 Cloudflare 部署；当前 iOS 运行不依赖自有后端。
 - 做事必须先备份/归档再删除，禁止对未核实的目录做粗暴的 `rm -rf`/`git add -A` 一把梭。
 - "读一遍/看一遍"类要求必须完整输出原文，不许摘要、不许截断冒充读完。
 - 品牌/UI 相关决策（配色、Logo、核心视觉）改动前，先看 `web/logo.png` 或 `assets/logo/brand_logo.png`
@@ -46,9 +56,12 @@ Black God（对外品牌）= 神枢 Nexus（技术架构/意识引擎，跑在 C
 ## 常用命令
 
 ```bash
-cd web/nexus-do && node build.mjs && node selftest.mjs   # 构建 + 自测
-node tools/check-sync.mjs                                  # 校验 shuyu/ 源头 ↔ web/nexus-do 消费副本
-node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释器测试(合仓后在本仓跑)
+make test-ios       # 真实 Swift 运行时与隔离存储回归（Mac）
+make test-shuyu     # 枢语 Node + Python 双实现测试
+make test          # 两组全部运行
+make build         # 生成 Xcode 工程并验证无签名 Release 构建
+# 跨仓对照必须显式指定对方路径；旧同步脚本不证明完整 API 等价
+make check-sync SHUYU_PEER=/绝对路径/shuyu-lang
 ```
 
 ## Sub-agent 模型路由（成本分级，自动遵守）
@@ -65,41 +78,19 @@ node --test shuyu/tests/*.test.mjs                        # 枢语引擎/解释�
 路由原则：默认从最便宜的能胜任的一级开始（batch-sweeper → dev-worker → sync-auditor/heavy-architect），
 只在任务确实需要判断力时升级；多个独立子任务并行派发。
 
-## 设计系统铁律(现状:石墨暗流·玉绿)
+## 设计系统：沿用现有暗绿品牌
 
-**现状(2026-08-17 直接从 main 的 `index.html` 抓取实际令牌值复核,如实描述,不许骗)**:
-主线 UI 实际用的是「**石墨暗流 · 玉绿**」色系,**不是**深海·潮光青。
-`web/nexus-do/index.html` 是自包含单文件(构建时整页注入 Worker),
-CSS 令牌**内联在页内**(`:root` / `:root[data-theme="dark"|"light"]`)。
+当前原生样式以 `ios-app/Theme.swift` 为唯一依据，沿用玄黑森林底色与翡翠绿强调色。
+标识沿用 `web/logo.png` 和工程内现有品牌资源；不能把未采用的历史蓝图当作当前界面。
 
-主强调**玉绿**,当前实际值(以页内为准,本表若与代码不符一律以代码为准):
-
-| 令牌 | 实际值 |
+| 原生令牌 | 当前 RGB 值（0 到 1） |
 |---|---|
-| `--cy-hi` | `#4FE096`(最亮,高光) |
-| `--cy-1` / `--cy-3` | `#3BC77E` |
-| `--cy-2` | `#41CC84` |
-| `--cy-4` | `#8FE3AE`(最浅) |
-| `--live` | `#3BC77E`(在线态) |
-| `--chrome-grad` | 绿渐变 |
+| `bgGold` | `0.25, 0.48, 0.35` |
+| `bgGoldLight` | `0.31, 0.78, 0.48` |
+| `bgDark` | `0.043, 0.082, 0.055` |
+| `bgCard` | `0.078, 0.129, 0.098` |
+| `bgTextPrimary` | `0.91, 0.96, 0.92` |
 
-冷石墨骨 + 素银字,深浅双主题。登录门有一圈潮光青 `rgba(79,196,217)` 光晕是历史残留,非主色。
-
-> 📌 **2026-08-17 修正记录**:本节此前写的 `--cy-hi:#3DDC84`、`--cy-1:#2FB96B`、`--live:#2FB96B`
-> **三个值全是错的**(实际为 `#4FE096` / `#3BC77E` / `#3BC77E`)。铁律文档落后于实现,已按代码订正。
-> 改色值时请同步更新本表,别让铁律再骗人。
-
-> ⚠️ **别再误判**:仓里存在 `docs/design/DESIGN_SYSTEM_V3.md`(「深海·潮光」潮光青 #4FC4D9)——
-> 那是一份**未被采用的备选设计方向蓝图**(源自从未合并的 UI 重设计 PR #29),**不是当前实现**。
-> 权哥 2026-07-17 拍板:**保留石墨绿现状**。要改成潮光青属未来单独立项(需逐屏迁色核对不回退),
-> 在此之前别把深海·潮光当成"已上线/该对齐"的东西。
-
-- 改 UI 颜色,**以页内既有 `--cy-*` / `--chrome-*` / `--live` 等玉绿令牌为准**,沿用不硬编码;
-  动效只用 transform/opacity。
-- 改 `web/nexus-do/index.html` 后必须重新构建(`node build.mjs`,页面是构建时整体注入 Worker 的),
-  并跑 `node tools/sync-ui.mjs --check` 校验双副本同步。
-- **危险操作二次确认是安全红线,任何重构不得移除。** 注意实现里**没有** `/api/confirm` 这个字面路由
-  (旧措辞易误导),真正的闸门是这几处(2026-08-17 对着 `nexus_do.core.mjs` 核实):
-  - `/import`、`/checkpoint/restore` 必须带 `?confirm=1`(覆盖记忆/人格前自动备份,可回滚);
-  - 执行脑 `execRemote` 的 `need_confirm` 透传闸(危险命令未确认一律拦下,`execDevLoop`/`execAgentTask` 均不绕过);
-  - 对话里的 `__exec_confirm__:` 前缀二次确认通道(带 confirm 重跑,不走 AI)。
+改界面优先复用 Theme.swift 中现有令牌和组件，并同步确认可读性与动态字体。
+不要运行已经失效的网页 CSS 注入或双副本检查。删除本机数据的确认与数据共享同意界面必须保留。
+原生界面、模拟器/真机运行、正式签名归档和提交审核需要分别验证；无签名编译或纯逻辑测试通过不等于已经上架。

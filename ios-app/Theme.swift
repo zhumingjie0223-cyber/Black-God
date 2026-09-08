@@ -18,7 +18,7 @@ extension Color {
 
 extension LinearGradient {
     static let goldGradient = LinearGradient(colors: [.bgGold, .bgGoldLight], startPoint: .topLeading, endPoint: .bottomTrailing)
-    static let darkGradient = LinearGradient(colors: [Color(red: 0.06, green: 0.06, blue: 0.09), .bgDark], startPoint: .top, endPoint: .bottom)
+    static let darkGradient = LinearGradient(colors: [Color(red: 0.033, green: 0.061, blue: 0.045), .bgDark], startPoint: .top, endPoint: .bottom)
     static let cyberGradient = LinearGradient(colors: [.bgPurple, .bgCyan], startPoint: .leading, endPoint: .trailing)
 }
 

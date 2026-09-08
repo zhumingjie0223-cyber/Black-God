@@ -1,0 +1,9 @@
+event:message_start
+data:{"type":"message_start","message":{"id":"msg_fixture","role":"assistant","content":[]}}
+
+event:content_block_start
+data:{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"partial"}}
+
+event:error
+data:{"type":"error","error":{"type":"overloaded_error","message":"Example provider error; this text is not displayed"}}
+

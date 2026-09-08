@@ -1,36 +1,27 @@
-Black God Nexus is a pure client-side AI assistant. Bring your own API key from a model provider, and the app talks to that provider's official API directly — no middleman servers, no accounts, and all data stays on your iPhone.
+Black God Nexus is an iPhone AI assistant for questions, writing, coding discussions, and tasks with multiple steps. Bring your own provider API key and use a native SwiftUI interface with a deep green theme.
 
-ZERO BACKEND, DIRECT TO THE MODEL
-• Enter your own API key and use models from Anthropic (Claude), OpenAI (GPT), DeepSeek, or xAI (Grok)
-• Requests go straight from your device to the provider you chose — never through our servers
-• Streaming responses appear word by word in real time
-• Keys are stored per provider and you can switch freely; usage is billed to your own API account, and the app itself has no subscription
+CHOOSE YOUR PROVIDER
+• Configure an API key for Anthropic, OpenAI, DeepSeek, or xAI and select a model
+• Store keys separately by provider in iOS Keychain
+• Send AI requests directly from your device to the selected provider over HTTPS
 
-MORE THAN CHAT: PLANS, EXECUTES, VERIFIES
-• Complex tasks are broken into steps, executed and verified one by one, and re-planned automatically on failure
-• Built-in tool bus: clock, calculator, local file read/write; any write or command-type action requires your approval first
-• The Monitor tab shows task success, verification and recovery rates — all computed on-device
+FOLLOW TASK PROGRESS
+• Plan goals as steps, follow task progress and tool activity, and receive a final result
+• Stop a task or continue from a saved checkpoint
+• Review local task history, steps, output, and run status
+• Share final results using the system share sheet
+• Manually save and delete memory to provide context for later tasks
+• A completed workflow does not mean the content has been fact-checked
 
-PRIVACY FIRST, LOCAL STORAGE
-• Your API keys are encrypted in the iOS Keychain and readable only on this device
-• Memory, run records and tool outputs are stored locally — never uploaded, synced, or analyzed
-• No account, no sign-up, no tracking, no ads
-• Wipe all data with a single tap on the Me tab
+MANAGE YOUR DATA
+• Review sharing information and choose whether to allow each provider before its first use
+• AI requests send your input, recent conversation messages, relevant saved memory, and task context to that provider; your key authenticates requests
+• Withdraw sharing under Me → API configuration
+• Read the privacy policy or clear locally saved keys, memory, and run records from Me
+• Clearing local data does not erase provider-held data or revoke API keys
+• No separate app account and no embedded ads
 
-BUILT FOR IPHONE
-• Immersive dark theme with emerald accents, easy on the eyes
-• Native SwiftUI with smooth animations and haptic feedback
-• Shortcuts and Siri support — start a conversation hands-free
-• Fully localized in English and Simplified Chinese, following your system language
+BEFORE YOU START
+An internet connection and a valid API key for your chosen provider are required. The provider may charge for API usage under your account terms. Model availability depends on your account permissions and service status. The app does not sell API credits or subscriptions.
 
-WHO IT'S FOR
-• Developers and creators who already have a provider API key and want the model in their pocket
-• Privacy-conscious users who don't want their conversations routed through any third party
-• Anyone looking for a clean AI tool with no ads and no subscription
-
-PLEASE NOTE
-• An API key from your chosen provider (e.g. console.anthropic.com, platform.openai.com) is required to use this app
-• Model usage is billed directly by that provider to your API account, independent of this app
-• Black God Nexus is an independent third-party client and is not affiliated with Anthropic, OpenAI, DeepSeek, or xAI
-
-Nexus — AI that truly belongs to you.
+The interface is primarily in Simplified Chinese, with some English system and navigation text. AI responses may contain errors; verify important results. Black God Nexus is an independent client and is not affiliated with the model providers listed above.

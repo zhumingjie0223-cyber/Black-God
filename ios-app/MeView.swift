@@ -6,9 +6,13 @@ import SwiftUI
 
 struct MeView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var vm: ChatViewModel
     @State private var showNexusConnection = false
     @State private var showWipeConfirm = false
     @State private var showWipeDone = false
+    @State private var showPrivacy = false
+    @State private var showMemory = false
+    @State private var wipeErrors: [String] = []
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
@@ -18,10 +22,8 @@ struct MeView: View {
         ScrollView {
             VStack(spacing: 20) {
                 VStack(spacing: 14) {
-                    Image(systemName: "sparkles").font(.system(size: 44, weight: .semibold))
-                        .foregroundStyle(Color.bgGold)
-                        .frame(width: 100, height: 100).clipShape(Circle())
-                        .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 3))
+                    Image("BrandMark").resizable().scaledToFit()
+                        .frame(width: 100, height: 100).clipShape(RoundedRectangle(cornerRadius: 24))
                     Text("Black God AI").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
                     Text("Black God AI 助手 · 为你工作")
                         .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
@@ -38,9 +40,13 @@ struct MeView: View {
                         SettingRow(icon: "key.fill", title: "API 配置", value: "直连模型 · Keychain", color: .bgGold)
                     }
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "gearshape.2.fill", title: "工作模式", value: "本地 Agent 闭环", color: .bgCyan)
+                    Button { showMemory = true } label: {
+                        SettingRow(icon: "bookmark.fill", title: "记忆管理", value: "由你收藏 · 随时删除", color: .bgCyan)
+                    }
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "本地优先", color: .green)
+                    Button { showPrivacy = true } label: {
+                        SettingRow(icon: "lock.shield.fill", title: "隐私政策", value: "数据与服务商", color: .green)
+                    }
                 }
                 .bgCard().padding(.horizontal, 16)
                 VStack(spacing: 0) {
@@ -53,25 +59,28 @@ struct MeView: View {
                     .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                     .multilineTextAlignment(.center).padding(.top, 8)
             }
-            .padding(.bottom, 100)
+            .padding(.bottom, 24)
         }
-        .padding(.top, 50)
+        .padding(.top, 12)
         .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }
+        .sheet(isPresented: $showPrivacy) { NexusPrivacyView() }
+        .sheet(isPresented: $showMemory) { NexusMemoryView(store: vm.memory) }
         .alert("清除全部数据？", isPresented: $showWipeConfirm) {
             Button("清除", role: .destructive) {
-                NexusDataReset.wipeAll()
+                vm.resetAfterWipe()
+                wipeErrors = NexusDataReset.wipeAll()
                 showWipeDone = true
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("将删除本机保存的全部 API Key、所选模型、记忆、运行记录与工具产物。此操作不可撤销；本 App 无云端，删了就是没了。")
+            Text("将删除本机保存的全部 API Key、所选模型、记忆、运行记录与工具产物。此操作不可撤销。它不会删除 AI 服务商保存的副本或设备备份中的数据。")
         }
-        .alert("已清除", isPresented: $showWipeDone) {
+        .alert(wipeErrors.isEmpty ? "已清除" : "部分数据未能清除", isPresented: $showWipeDone) {
             Button("好", role: .cancel) {}
         } message: {
-            Text("全部本地数据已删除。重新填写 API Key 即可继续使用。")
+            Text(wipeErrors.isEmpty ? "本机数据已清除。服务商副本和设备备份需另行管理。" : wipeErrors.joined(separator: "\n"))
         }
     }
 }

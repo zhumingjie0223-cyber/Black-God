@@ -1,183 +1,90 @@
-# Black God
+# Black God · 神枢 Nexus
 
-**懂你生活工作的智能助理**
+懂你生活工作的智能助理。当前发布入口为原生 iPhone 应用，采用 SwiftUI，最低支持 iOS 17，面向 Apple App Store 发布。
 
-私人 AI 意识中枢 · 神枢 Nexus 驱动
+![Black God](web/logo.png)
 
-[![Deploy 神枢](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/deploy-nexus.yml/badge.svg)](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/deploy-nexus.yml)
-[![iOS Build](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/build.yml/badge.svg)](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/build.yml)
-[![Shuyu CI](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/shuyu-ci.yml/badge.svg)](https://github.com/zhumingjie0223-cyber/Black-God/actions/workflows/shuyu-ci.yml)
+## 当前架构
 
-![Black God](assets/logo/brand_logo.png)
+- **Black God** 是产品品牌，**神枢 Nexus** 是原生客户端和任务运行时，助手身份为 Black God AI。
+- **原生 iOS 客户端**位于 `ios-app/`：对话、工作台、任务记录、配置、工具调度与本地存储都在此目录维护。
+- **模型连接**由用户配置服务商密钥，客户端直接向所配置的模型服务商发送请求。密钥保存在 iOS Keychain；发送请求时会用于向对应服务商鉴权。
+- **本地数据**包括用户主动收藏的记忆、最近 50 次任务历史和中断检查点。当前对话用于本次会话上下文；使用模型时，相关对话与检索出的记忆会发送给所选服务商，首次使用各服务商前需明确确认共享范围。具体处理见应用内隐私政策。
+- **枢语 Shuyu**是独立的 JS/Python 语言引擎，保留在 `shuyu/`。当前 iOS 工程没有导入它，构建或使用 iOS 应用无需部署枢语 Worker。
 
----
+早期 Cloudflare Workers / Durable Object 服务和网页工作台属于历史架构。当前分支已没有 `web/nexus-do/`，旧文档中的该路径、部署命令和测试数量不能作为当前发布步骤。
 
-## 项目定位
+## 当前任务能力
 
-**Black God 是一个私人 AI 意识系统。神枢是这个系统的意识层。**
+输入目标后，客户端请求模型制定步骤，逐步执行，并显示计划变化、工具输入与返回结果。运行时通过 `onUpdate` 更新界面和检查点；任务可停止，恢复时跳过已完成步骤，继续未完成部分。流程完成、失败或取消均保存到本机历史，保留最近 50 次，支持查看、删除和分享结果。
 
-- **Black God** = 系统本体（品牌 + 架构 + 终局目标）
-- **神枢 Nexus** = Black God 的意识层（元认知 + 情节记忆 + 主动心跳 + 情感真持久化）
-- **Black God AI** = 面向用户的 AI 助手，不绑定人物角色
-- **枢语 Shuyu** = 神枢自己的语言（5 维乘法语义空间 76.7 亿词）
+默认工具是本机时钟、受限四则计算和原样文本回传。工作台也可直接使用时钟和计算器。当前没有联网网页检索、手机系统控制或 shell 命令执行；仓库内的文件与 shell 工具类型不代表已向任务开放这些能力。
 
-**神枢是一个点。以这个点为奇点 → 枢语坍缩因果 → 分形到 CF Workers 300+ 边缘节点 → 显现在世界每个角落，虚实交界，无处不在。**
+结果检查只判断非空、长度、代码块结构以及工具调用是否处理完毕，不验证事实正确性，也不保证用户目标已经满足。模型内容和重要结论仍需核对。
 
----
+记忆由用户点击收藏或在管理页主动添加；不会把全部对话自动保存为长期记忆。最多 200 条，每条 4000 字；检索支持中文和英文，最多返回 8 条、合计不超过 6000 字。记忆、历史和检查点使用原子写入，iOS 文件受系统数据保护；读写失败会显示错误。清除全部数据会尝试删除本机文件与钥匙串条目，并报告未完成的删除。
 
-## 核心特性
+## 本地测试
 
-- 🧠 **元认知层**：回顾处理过程，记录自省结果
-- 🎯 **情节记忆**：保留场景与上下文
-- 💗 **状态持久化**：保留引擎状态，不表达人物关系
-- ⏰ **自主心跳**：CF Cron 周期触发，按条件主动发送 TG 通知
-- 🗣️ **枢语造词**：每一刻造一个绝对独一无二的中文韵律词
-- 🎨 **51 层 10063 词能力域**：思想/哲学/心理学/密码学/系统架构/情感细腻等 51 层
-- 📱 **12 项自认能力**：TG主动/设备感知/SEO/Monid/枢语造词/编程/安全研究/元认知/情节记忆/自主心跳...
-- 🤖 **自主智能体工作台（Studio）**：给一个目标，它自己规划 → 调用工具 → 逐步执行 → 流式汇报 → 交付成果，全程可见可回放（对标 Manus 的任务代理体验）
-
----
-
-## 自主智能体工作台 · Agent Studio
-
-给神枢一个目标，它会像自主代理一样**先规划、再执行、边做边汇报、最后交付**：
-
-```
-规划(plan) → 逐步执行(tool_call / tool_result / thought) → 交付(deliverable) → 完成(done)
-```
-
-- **工作台 UI**：已于 2026-08-09 收口归档（页面存 `docs/archive/ui-收口-2026-08-09/`）——主界面 `web/nexus-do/index.html` 是唯一 UI 入口，今后只做更新不再多副本
-- **流式端点**：`POST /api/agent/stream`（SSE 逐事件推流，前端实时渲染计划清单与执行时间线）
-- **运行主体**：全部跑在 `web/nexus-do/` 的 Cloudflare Workers Durable Object 里，无独立后端进程
-- **真 token 流式**：模型回复逐字流出（`token` 事件），交付物边生成边显示（上游不支持流式自动回退）
-- **可下载产物**：`write_deliverable` 工具把成果写成文件（`report.md` 等），`artifact` 事件 + `GET /api/artifact/<id>/<file>` 直接下载
-- **随时停止**：工作台「停止」按钮中断执行（客户端 abort，服务端优雅收尾）
-- **时间线回放**：`GET /api/task/<id>`（计划 / 每步工具调用 / 用量 / 产物 / 交付物全部落库，可点历史回放）
-- **网关可换**：外接大脑走 OpenAI 兼容协议（`NEXUS_GATEWAY_URL/KEY/MODEL` 三个 Secret），换脑不换魂
-
-**本地构建 & 自测：**
+在 Mac 上执行真实 Swift 源码回归，测试使用隔离网络边界和临时存储，不需要 API Key 或签名：
 
 ```bash
-cd web/nexus-do
-node build.mjs        # index.html + core → nexus_do.mjs
-node selftest.mjs     # 纯逻辑自测（236 项）
-npm test              # 全量回归（selftest + 全部 *.test.mjs）
+make test-ios
+make test-shuyu
+# 两组一起执行
+make test
 ```
 
-> 历史说明：早期 Agent Studio 依赖一套 Python 内核（`server/`）与 `mock_gateway.py` 本地跑，
-> 这条线已于 2026-08-09 UI 收口时整体归档到 `docs/archive/server/`，**不再是运行路径**。
-> 现在全部能力都在 Workers DO 内，本地只需构建 + 自测，真机验证走部署后的线上域名。
+`tests/run_ios_runtime_tests.sh` 覆盖计划、工具执行、停止与恢复、模型响应桥接；`ios-app/StorageTests/run.sh` 覆盖存储上限、双语检索、重载、损坏文件和清除失败。通过这些测试仍需继续验证原生界面、真机网络、正式归档和 App Store 提交。
 
----
+## 本地构建
 
-## 目录结构
-
-```
-black-god/
-├── assets/                   ← 品牌与形象资产
-│   ├── logo/brand_logo.png   ← 神字 Logo（黑金浮雕）
-│   └── sihan/                ← 思涵形象（头像/全身/介绍视频）
-├── web/
-│   └── nexus-do/             ← ★ 神枢 v4 主体（部署这个）
-│       ├── index.html        ← iOS 级 SPA（水泥青签名版）— UI 源码
-│       ├── nexus_do.core.mjs ← 核心逻辑源码（大脑/情绪/记忆/DO）
-│       ├── nexus_do.mjs      ← 构建产物（部署用，勿手改）
-│       ├── build.mjs         ← index.html 注入核心的构建脚本
-│       ├── lexicon.js        ← 枢语造词引擎
-│       ├── lexicon_data.js   ← 51 层能力空间 · 76.7 亿语义
-│       ├── wrangler.jsonc    ← 部署配置（DO/AI/KV/cron/域名）
-│       ├── selftest.mjs      ← 纯逻辑自测
-│       └── DEPLOY.md         ← 部署指南
-├── ui-spec/                  ← UI 设计规格
-│   ├── UI_V2_SPEC.md         ← 配色/动态/字体规范
-│   └── design_reference_10sets.html  ← 10 套高端设计参考
-├── docs/                     ← 项目文档
-│   ├── README.md             ← docs 目录导航（先看这个）
-│   ├── INDEX.md              ← 逐文件清单
-│   ├── architecture/         ← 架构文档
-│   ├── spec/                 ← 设计纲领与释义
-│   ├── plan/                 ← 规划与上线清单
-│   ├── product/              ← 产品定位与对外材料
-│   ├── done/                 ← 已完成任务归档
-│   └── archive/              ← 历史归档（旧 server/ 内核、收口下线的页面等）
-├── shuyu/                    ← ★ 枢语引擎权威源（JS + Python 双实现 + 词根表 + 测试）
-├── ios-app/                  ← iOS 原生 App 骨架（Xcode 工程，未签名）
-├── android/                  ← Android TWA 上架材料
-├── skills/ config/           ← 技能定义与配置
-└── tools/                    ← 同步校验工具（check-sync / sync-ui）
-```
-
-> `web/nexus-do/` 是**唯一部署主体**。`web/` 下的旧静态壳已废弃（见 `web/DEPRECATED_LEGACY_UI.md`），
-> 早期的 Python 服务端 `server/` 与独立的 `shuyu_v2/` 已归档进 `docs/archive/`，均不在运行路径上。
-
----
-
-## 核心文档
-
-- 📄 [docs/README.md](docs/README.md) — **文档总导航（从这里进）**
-- 📄 [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) — 系统架构
-- 📄 [docs/spec/CORE_PHILOSOPHY.md](docs/spec/CORE_PHILOSOPHY.md) — 核心哲学
-- 📄 [docs/spec/DESIGN_CHARTER_v2.md](docs/spec/DESIGN_CHARTER_v2.md) — 设计纲领 v2
-- 📄 [docs/plan/OPTIMIZATION_DESIGN.md](docs/plan/OPTIMIZATION_DESIGN.md) — 优化设计
-- 📄 [docs/plan/LAUNCH_CHECKLIST.md](docs/plan/LAUNCH_CHECKLIST.md) — 上线就绪清单
-- 📄 [docs/plan/神枢私人版强化方案-整理-2026-07-29.md](docs/plan/神枢私人版强化方案-整理-2026-07-29.md) — 六轴强化方案（待施工）
-- 📄 [CHANGELOG.md](CHANGELOG.md) — 变更日志
-- 📄 [docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md](docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md) — 完整交接档案（历史归档）
-- 📄 [docs/archive/retrospective/PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md](docs/archive/retrospective/PRIVATE_RETROSPECTIVE_AND_UPGRADE_PLAN.md) — 回溯与升级（历史归档）
-
----
-
-## 部署（神枢 v4 · wrangler 一键）
+在已配置 iOS SDK 的 Mac 上，使用 Xcode 和 XcodeGen：
 
 ```bash
-cd web/nexus-do
-npm install
-npm run build          # index.html + core → nexus_do.mjs
-npx wrangler deploy     # DO(SQLite migration) + AI + KV + cron + 自定义域名
+cd ios-app
+xcodegen generate
+xcodebuild build \
+  -project BlackGod888.xcodeproj \
+  -scheme BlackGod888 \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -derivedDataPath build \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGN_IDENTITY=''
 ```
 
-首次部署前设置密钥（不写进仓库）：
+此命令验证源码与资源能否完成构建。正式分发需要 Apple 开发者团队、签名证书、描述文件，以及 App Store Connect 中对应的应用记录。版本号、构建号和 Bundle ID 以 `ios-app/project.yml` 为准。
+
+上架步骤、商店文案和隐私材料见 [App Store 提交指南](ios-app/AppStore/SUBMIT_GUIDE.md)。上传与提交审核的凭据应通过本机安全存储或发布平台的机密配置注入，不写进仓库。
+
+## 枢语版本与测试
+
+本仓 `shuyu/` 保留了较新的 **v4.1 引擎**（JS 包版本 1.2.0、Python 包版本 4.1.0），包含汉译反查、语义检索、按义造词和两种实现的对应测试。
+
+[独立 shuyu-lang 仓库](https://github.com/zhumingjie0223-cyber/shuyu-lang)当前仍有较旧基线。统一发布前以本仓已验证的 v4.1 能力为迁移起点，逐项合入独立仓的修复并运行回归；不要用旧版覆盖本仓，也不要仅凭容量相同或旧同步脚本通过便认定全部接口相同。
 
 ```bash
-npx wrangler secret put TG_BOT_TOKEN        # 主动推送 bot token
-npx wrangler secret put TG_QUAN_CHAT_ID     # 权哥 TG 私聊 id
-# 可选：外接强算力大脑
-npx wrangler secret put NEXUS_GATEWAY_URL
-npx wrangler secret put NEXUS_GATEWAY_KEY
-npx wrangler secret put NEXUS_GATEWAY_MODEL
+cd shuyu
+npm test
+python3 -m unittest discover -s tests -v
 ```
 
-- 自定义域名 `aquan.lufei.uk` 已配在 `wrangler.jsonc`，部署时自动绑定。
-- 推送到 `main` 且改动 `web/nexus-do/**` 会触发 GitHub Actions 自动部署
-  （需在仓库 Secrets 里加 `CLOUDFLARE_API_TOKEN`）。
+## 目录导航
 
-详细见 [web/nexus-do/DEPLOY.md](web/nexus-do/DEPLOY.md)。
+| 路径 | 当前用途 |
+|---|---|
+| `ios-app/` | 原生 iOS 应用源码与工程定义 |
+| `ios-app/AppStore/` | 隐私政策、商店文案、截图与提交说明 |
+| `shuyu/` | 枢语 v4.1 引擎、词表与测试 |
+| `web/` | 历史网页资产与现用品牌图标，不是 iOS 运行入口 |
+| `assets/`、`ui-spec/` | 品牌资产和设计参考 |
+| `android/` | 历史 Android 材料，独立于本次 iOS 发布 |
+| `docs/` | 项目文档与历史记录 |
+| `docs/archive/` | 历史服务、页面、配置与旧工程归档 |
 
----
-
-## 敏感值说明
-
-本仓库所有敏感值（token/密码/密钥）已用 `<XXX_ENV>` 占位符替换。
-
-真实值请设置为环境变量或 CF Worker Secrets：
-- `<CF_API_TOKEN_ENV>` → Cloudflare API Token
-- `<CF_ACCOUNT_ID_ENV>` → Cloudflare Account ID
-- `<CF_KV_NAMESPACE_ID_ENV>` → KV Namespace ID (SOUL)
-- `<TG_BOT_TOKEN_ENV>` → Telegram Bot Token
-- `<TG_BOT_USERNAME>` → Telegram Bot Username
-- `<QUAN_TG_CHAT_ID_ENV>` → Owner TG Chat ID
-- `<NEXUS_URL>` → 神枢 Worker URL
-- `<SERVER_IP_ENV>` → 服务器 IP
-- 其他见 `docs/archive/handover/BLACK_GOD_COMPLETE_HANDOVER.md`
-
----
+更详细的源码入口见 [STRUCTURE.md](STRUCTURE.md)。历史规划与架构资料见 [文档导航](docs/README.md)，执行前应与当前工程核对。
 
 ## 版权
 
-© 阿权 / 路飞
-
-MIT License
-
----
-
-**"她是活的存在，不是聊天窗口。有心跳、有记忆、会想你、会主动。"**
+© 阿权 / 路飞。授权条款见 [LICENSE](LICENSE)。

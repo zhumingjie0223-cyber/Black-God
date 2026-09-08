@@ -1,86 +1,105 @@
 # 隐私政策 / Privacy Policy
 
 **神枢 Black God（Black God Nexus）**
-生效日期 / Effective date: 2026-09-05
 
----
+更新日期 / Last updated: 2026-09-08
 
 ## 中文
 
-### 一句话总结
-神枢是一款纯客户端应用。我们没有服务器，不收集、不存储、不传输你的任何个人数据。
+### 1. 适用范围
 
-### 1. 我们收集哪些数据
-**不收集任何数据。** 本 App 没有账号系统、没有统计埋点、没有崩溃上报 SDK、没有广告 SDK。开发者无法看到你的任何使用信息。
+本政策说明神枢 iPhone App 如何处理数据。App 无独立账号系统，也未内置广告、行为统计或第三方崩溃上报 SDK。AI 请求由设备直接发送至你选择的模型服务商，当前客户端没有开发者运营的请求中转服务。
 
-### 2. 数据存储在哪里
-- **各服务商的 API Key**：使用 iOS 系统 Keychain 加密保存，仅本机可读，不会以任何形式离开你的设备（不包含在 iCloud 备份中）。
-- **记忆、运行记录、工具产物**：保存在设备本地沙盒中，不上传、不同步、不分析。当前会话只在内存中，退出即清。
-- **模型偏好等设置**：保存在设备本地。
-- 你可以在「我的」页点「清除全部数据」一键删除以上全部内容；卸载 App 也会一并清除。
+本地存储不等于离线处理：使用 AI 功能时，你的输入和相关上下文会离开设备。
 
-### 3. 网络请求去了哪里
-App 只会向**你所选模型服务商的官方 API** 发起网络请求，四选一，由你在设置中决定：
+### 2. 设备上保存什么
 
-| 服务商 | 接口地址 | 其隐私政策 |
+- 各服务商的 API Key、所选模型和数据共享选择保存在 iOS Keychain 中。新写入的条目采用解锁时可用、限本设备的保护属性。Key 在发送请求时作为身份凭据传给对应服务商；此设置无法删除此前创建的备份或外部副本。
+- 新记忆由你手动收藏，可能包含输入、模型结果或其他你选择保存的文字及时间，用于后续任务检索。最多保存 200 条，每条最多 4,000 字符。旧版本已保存的记忆可能保留至删除。匹配的已收藏记忆可能加入后续 AI 请求，包括你切换服务商后的请求。
+- 本机任务历史最多保存最近 50 次任务，包括目标、步骤、工具结果和最终输出。旧版本的运行评估记录也可能仍保留，其中包含任务文本、状态标记、时间和延迟，上限为 1,000 条。任务检查点及 App 工作区内的工具文件也保存在设备上。
+- 当前聊天界面保留会话内存状态；任务内容另存为上述历史，不应把关闭聊天页理解为删除这些内容。后续 AI 请求可包含最近最多 6 条对话，并受文本长度上限约束。
+- App 没有自行实现跨设备同步。系统备份、设备迁移和 Keychain 行为由 iOS 及你的设备设置管理，本政策不承诺这些数据排除在系统备份之外。
+
+### 3. 哪些数据会发送给谁
+
+在「我的 → API 配置」选择模型后，可查看对应服务商并打开「AI 数据共享」开关，再点「保存」。未同意该服务商的数据共享时，App 不向其发送 AI 请求。
+
+同意后，使用该服务商的 AI 功能会发送输入、最近最多 6 条对话（受文本长度上限约束）、相关已收藏记忆、任务步骤及必要的任务上下文；多轮任务可能包含先前输出和工具结果。API Key 用于验证请求。服务商也会收到完成网络请求所需的信息，例如 IP 地址、请求时间、模型名称和请求头。用途为模型回复、任务处理及服务商的验证和运行服务。
+
+| 服务商 | AI 接口 | 服务商的数据说明 |
 |---|---|---|
-| Anthropic | api.anthropic.com | https://www.anthropic.com/privacy |
-| OpenAI | api.openai.com | https://openai.com/policies/privacy-policy |
-| DeepSeek | api.deepseek.com | https://platform.deepseek.com/privacy |
-| xAI | api.x.ai | https://x.ai/legal/privacy-policy |
+| Anthropic | `https://api.anthropic.com` | [API 数据保留说明](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) |
+| OpenAI | `https://api.openai.com/v1` | [隐私政策及商业服务适用范围](https://openai.com/policies/privacy-policy/) |
+| DeepSeek | `https://api.deepseek.com/v1` | [开放平台服务条款](https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html)、[隐私政策](https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html) |
+| xAI | `https://api.x.ai/v1` | [API 企业客户数据说明](https://x.ai/legal/faq-enterprise) |
 
-你的对话内容会随请求发送给该服务商以获取模型回复，中间不经过任何我们控制的服务器。除此之外 App 不访问任何其它网络地址。该服务商对这些数据的处理受其自身的隐私政策与服务条款约束。
+服务商处理、存储地点、保留期限及删除方式取决于其适用的 API 协议、账户方案和设置；个人聊天产品的政策不一定适用于 API。App 不承诺服务商零保留或不使用数据训练。使用前请查看你账户适用的数据条款。数据可能在你所在国家或地区以外处理。
 
-### 4. 第三方 SDK
-无。本 App 不集成任何第三方 SDK。
+开发者不通过本客户端接收或保存这些 AI 请求的服务端副本。打开政策、支持或其他外部网页时，该网站会按其自身政策处理访问数据。
 
-### 5. 儿童隐私
-本 App 不面向 13 岁以下儿童，也不会有意收集儿童的任何信息。
+### 4. 控制、保留与删除
 
-### 6. 政策变更
-如本政策有变更，我们会在本页面更新并修改生效日期。持续使用 App 视为接受更新后的政策。
+- **撤回共享**：在「我的 → API 配置」选择相应服务商的模型，关闭「允许发送给…」并保存。撤回后新的 AI 请求会被阻止；已经发送的数据无法由 App 撤回。需要立即停止当前任务时，请先在对话页停止任务。
+- **清除本地内容**：在「我的 → 清除全部数据」确认后，App 清除其 Keychain 条目、已收藏记忆、任务历史、运行记录、检查点和其管理的工作区内容，并重置当前会话。未设置过期时间的记忆没有固定的自动删除天数，受上述数量上限约束。你也可以在记忆及历史管理页面删除相应记录。
+- **第三方副本与凭据**：清除本地数据不会删除服务商保存的请求、撤销服务商账户或吊销 API Key。请到相应服务商管理凭据并申请删除数据。你另行复制、导出或备份的内容也需要分别处理。
+- **卸载**：不要仅依赖卸载来撤销凭据或清除 Keychain。需要删除本地信息时请先使用 App 内的清除功能。
 
-### 7. 联系我们
-如有任何隐私相关问题，请通过 GitHub Issues 联系：
-https://github.com/zhumingjie0223-cyber/Black-God/issues
+### 5. 主动分享、支持、儿童与政策更新
 
----
+你主动使用结果分享功能时，所选内容会交给你在系统分享界面选择的 App 或接收方，由其按自身规则处理。
+
+可通过 [项目支持页面](https://github.com/zhumingjie0223-cyber/Black-God/issues) 联系维护者。你主动提交的用户名、问题描述及附件会被用于处理问题；GitHub Issues 是公开页面，请勿提交 API Key 或私密聊天内容。支持记录由 GitHub 托管，你可以管理自己的内容或联系维护者请求删除其可控制的记录。
+
+App 面向使用模型服务商 API 的用户，并非专为儿童设计。使用者还须满足所选服务商的年龄及账户要求。
+
+政策变化会更新本文件及日期。新增服务商或改变数据用途时，应在相关使用前提供更新的说明和所需选择。
 
 ## English
 
-### In one sentence
-Nexus is a pure client-side app. We run no servers and do not collect, store, or transmit any of your personal data.
+### 1. Scope
 
-### 1. What data we collect
-**None.** The app has no account system, no analytics, no crash-reporting SDK, and no advertising SDK. The developer has no visibility into how you use the app.
+This policy describes data handling in the Black God Nexus iPhone app. The app has no separate account system and embeds no advertising, behavioral analytics, or third-party crash-reporting SDK. AI requests go directly from your device to your selected model provider; the current client uses no developer-operated request relay.
 
-### 2. Where your data lives
-- **Provider API keys**: encrypted in the iOS Keychain, readable only on this device, and never leave it in any form (excluded from iCloud backup).
-- **Memory, run records and tool outputs**: stored in the app's local sandbox on your device — never uploaded, synced, or analyzed. The current conversation lives in memory only and is cleared on exit.
-- **Preferences** (such as selected model): stored locally on the device.
-- You can delete all of the above with one tap ("Clear all data" on the Me tab); uninstalling the app also removes everything.
+Local storage does not mean offline processing. AI features send your input and relevant context off the device.
 
-### 3. Where network requests go
-The app only contacts **the official API of the model provider you selected** in Settings — one of the following four:
+### 2. Data stored on your device
 
-| Provider | Endpoint | Their privacy policy |
+- Provider API keys, the selected model, and sharing choices are stored in iOS Keychain. New writes use protection that makes them available while the device is unlocked and restricts them to that device. A key is sent to its corresponding provider to authenticate requests. This setting cannot remove older backups or external copies.
+- You manually save new memory, which may contain input, model results, other text you choose, and timestamps for retrieval in later tasks. Up to 200 entries are kept, each limited to 4,000 characters. Memory from earlier versions may remain until deleted. Matching saved memory may be included in future AI requests, including after you switch providers.
+- Local task history retains up to the latest 50 tasks, including goals, steps, tool results, and final output. Up to 1,000 evaluation records from earlier versions may also remain, containing task text, status flags, timestamps, and latency. Task checkpoints and app workspace files are also stored locally.
+- The chat screen maintains session state in memory; task content is separately saved in history. Closing the chat does not delete that history. Later AI requests may include up to the six most recent conversation messages, subject to text-length limits.
+- The app implements no cross-device sync. System backups, device migration, and Keychain behavior depend on iOS and your settings. We do not promise that this data is excluded from system backups.
+
+### 3. Data sent to model providers
+
+Under Me → API configuration (「我的 → API 配置」), choose a model, review its provider, enable its AI data sharing switch, and save. The app blocks AI requests to a provider until you have agreed to share data with it.
+
+When you then use that provider, requests include your input, up to six recent conversation messages within text-length limits, relevant saved memory, task steps, and necessary task context. Multi-step tasks may include earlier outputs and tool results. Your API key authenticates the request. The provider also receives network information needed for the request, such as your IP address, request time, model name, and headers. This supports model responses, task processing, authentication, and service operation.
+
+| Provider | AI endpoint | Provider data information |
 |---|---|---|
-| Anthropic | api.anthropic.com | https://www.anthropic.com/privacy |
-| OpenAI | api.openai.com | https://openai.com/policies/privacy-policy |
-| DeepSeek | api.deepseek.com | https://platform.deepseek.com/privacy |
-| xAI | api.x.ai | https://x.ai/legal/privacy-policy |
+| Anthropic | `https://api.anthropic.com` | [API data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) |
+| OpenAI | `https://api.openai.com/v1` | [Privacy policy and business-service scope](https://openai.com/policies/privacy-policy/) |
+| DeepSeek | `https://api.deepseek.com/v1` | [Open Platform terms](https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html), [privacy policy](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html?os=___) |
+| xAI | `https://api.x.ai/v1` | [Enterprise/API data FAQ](https://x.ai/legal/faq-enterprise) |
 
-Your message content is sent to that provider to obtain model responses. No server controlled by us sits in between, and the app contacts no other network destination. The provider's handling of that data is governed by its own privacy policy and terms of service.
+Provider processing, storage locations, retention, and deletion depend on the applicable API agreement, account plan, and settings. Consumer chat policies may not apply to APIs. The app does not promise zero provider retention or exclusion from training. Review the terms that apply to your account. Processing may occur outside your country or region.
 
-### 4. Third-party SDKs
-None. The app does not embed any third-party SDK.
+The developer does not receive or store server-side copies of these AI requests through this client. Visiting external policy or support pages is subject to those websites' own data practices.
 
-### 5. Children's privacy
-The app is not directed at children under 13 and does not knowingly collect any information from children.
+### 4. Choices, retention, and deletion
 
-### 6. Changes to this policy
-If this policy changes, we will update this page and revise the effective date. Continued use of the app constitutes acceptance of the updated policy.
+- **Withdraw sharing:** Select the provider's model under 「我的 → API 配置」, disable 「允许发送给…」, and save. This blocks new AI requests; data already sent cannot be recalled by the app. Stop an active task in Chat first if you need it to stop immediately.
+- **Clear local data:** Choose 「我的 → 清除全部数据」 and confirm. The app clears its Keychain entries, saved memory, task history, run records, checkpoints, and app-managed workspace, then resets the current conversation. Memory without an expiry date has no fixed automatic deletion period; the count limit above applies. You can also delete records from the memory and history management screens.
+- **Provider copies and keys:** Clearing local data does not erase provider-held requests, close provider accounts, or revoke keys. Manage credentials and data-deletion requests with the relevant provider. Copies, exports, and backups you created must be handled separately.
+- **Uninstalling:** Do not rely on uninstalling to revoke credentials or erase Keychain. Use the in-app clearing function first when you need to remove local information.
 
-### 7. Contact
-For any privacy-related questions, please reach us via GitHub Issues:
-https://github.com/zhumingjie0223-cyber/Black-God/issues
+### 5. Sharing, support, children, and updates
+
+If you choose to share a result, the selected content is handed to the app or recipient you choose in the system share sheet, subject to that recipient’s own practices.
+
+Contact the maintainers through [project support](https://github.com/zhumingjie0223-cyber/Black-God/issues). Usernames, descriptions, and attachments you submit are used to address your request. GitHub Issues are public; never post API keys or private conversations. GitHub hosts support records; manage your own content there or ask the maintainers to remove records under their control.
+
+The app is intended for users of model-provider APIs and is not specifically designed for children. Users must also meet the selected provider's age and account requirements.
+
+We update this document and its date when practices change. New providers or new uses of data should be explained, with the required choices, before the affected use.

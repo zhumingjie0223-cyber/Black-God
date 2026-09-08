@@ -8,9 +8,9 @@
 
 /* ===== Bottom tabs ===== */
 "tab.chat" = "Chat";
-"tab.tools" = "Tools";
+"tab.tools" = "Workspace";
 "tab.media" = "Create";
-"tab.monitor" = "Monitor";
+"tab.monitor" = "History";
 "tab.me" = "Me";
 
 /* ===== Chat ===== */
@@ -22,7 +22,7 @@
 /* ===== API configuration ===== */
 "api.title" = "API Settings";
 "api.key.section" = "Anthropic API Key";
-"api.key.footer" = "Your key is stored only in the on-device Keychain and never uploaded anywhere.\nGet a key at console.anthropic.com";
+"api.key.footer" = "Your key is stored in Keychain and sent to your selected provider for authentication.\nGet a key at console.anthropic.com";
 "api.model.section" = "Model";
 "api.model.picker" = "Choose Model";
 "api.save" = "Save";
@@ -40,7 +40,7 @@
 "me.footer" = "Black God Nexus · v%@\nClient-only · Direct to model · Local storage";
 
 /* ===== Errors ===== */
-"error.missing_api_key" = "Please enter your Anthropic API Key in Settings first";
+"error.missing_api_key" = "Please configure the selected provider’s API key first";
 "error.invalid_response" = "Unexpected response format from server";
 "error.network" = "Network error: %@";
 
@@ -56,7 +56,7 @@
 "跟Black God AI说点什么…" = "Say something to Nexus…";
 "API 配置" = "API Settings";
 "Anthropic API Key" = "Anthropic API Key";
-"Key 仅存储在本机 Keychain，不上传任何服务器。\n获取 Key：console.anthropic.com" = "Your key is stored only in the on-device Keychain and never uploaded anywhere.\nGet a key at console.anthropic.com";
+"Key 保存在本机 Keychain，仅发送给所选服务商用于认证。\n获取 Key：console.anthropic.com" = "Your key is stored in Keychain and sent to your selected provider for authentication.\nGet a key at console.anthropic.com";
 "模型" = "Model";
 "选择模型" = "Choose Model";
 "保存" = "Save";

@@ -20,10 +20,9 @@ settings:
     # App Store 版本号，语义化三段式；构建号每次上传 +1
     MARKETING_VERSION: "1.1.0"
     CURRENT_PROJECT_VERSION: "2"
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: "8429ZL8NQ9"
     # Codemagic / Xcode 自动签名；无凭据时可通过命令行覆盖为 NO 做验证构建
     CODE_SIGNING_STYLE: Automatic
-    CODE_SIGN_IDENTITY: "Apple Distribution"
     SWIFT_EMIT_LOC_STRINGS: YES
 
 targets:
@@ -35,12 +34,17 @@ targets:
       - path: .
         includes:
           - "*.swift"
-          - "**/*.swift"
       # 多语言资源：Localizable.strings / InfoPlist.strings
       - path: zh-Hans.lproj
+        type: folder
+        buildPhase: resources
       - path: en.lproj
+        type: folder
+        buildPhase: resources
       # App 图标资源目录（1024×1024 已内置，xcodegen 直接纳入，无需在 Xcode 手动导入）
       - path: Assets.xcassets
+      - path: AppStore/PRIVACY_POLICY.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.blackgod.nexus
@@ -56,6 +60,17 @@ targets:
       path: Info.plist
       properties:
         CFBundleDevelopmentRegion: zh-Hans
+        CFBundleDisplayName: "神枢"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSRequiresIPhoneOS: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations: {}
         CFBundleLocalizations:
           - zh-Hans
           - en

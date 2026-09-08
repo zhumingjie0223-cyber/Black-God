@@ -41,13 +41,32 @@ final class NexusCheckpointStore {
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         url = base.appendingPathComponent("nexus-checkpoint.json")
     }
-    func save(_ checkpoint: NexusCheckpoint) {
-        guard let data = try? JSONEncoder().encode(checkpoint) else { return }
-        try? data.write(to: url, options: .atomic)
+    private(set) var lastError: String?
+    @discardableResult
+    func save(_ checkpoint: NexusCheckpoint) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(checkpoint)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            #if os(iOS)
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
+            #else
+            try data.write(to: url, options: .atomic)
+            #endif
+            lastError = nil
+            return true
+        } catch { lastError = "保存任务检查点失败：\(error.localizedDescription)"; return false }
     }
     func load() -> NexusCheckpoint? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(NexusCheckpoint.self, from: data)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        do { return try JSONDecoder().decode(NexusCheckpoint.self, from: Data(contentsOf: url)) }
+        catch { lastError = "读取任务检查点失败：\(error.localizedDescription)"; return nil }
     }
-    func clear() { try? FileManager.default.removeItem(at: url) }
+    @discardableResult
+    func clear() -> Bool {
+        do {
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            lastError = nil
+            return true
+        } catch { lastError = "删除任务检查点失败：\(error.localizedDescription)"; return false }
+    }
 }

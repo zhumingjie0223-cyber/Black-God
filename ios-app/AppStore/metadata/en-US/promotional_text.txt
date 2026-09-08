@@ -1,1 +1,1 @@
-Bring your own API key and talk to Claude, GPT, DeepSeek or Grok directly. No account, no subscription, no relay servers. Your data never leaves your iPhone.
+Bring your API key, choose a model provider, and follow task progress. Manage local memory, run records, and sharing choices for each provider.

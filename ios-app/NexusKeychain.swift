@@ -11,13 +11,25 @@ final class NexusKeychain {
     private let apiKeyAccount = "anthropic_api_key"
     private let modelAccount = "selected_model"
 
+    func hasSharingConsent(for providerID: String) -> Bool {
+        load(account: "ai_sharing_consent_v1_\(providerID)") == "accepted"
+    }
+
+    func setSharingConsent(_ accepted: Bool, for providerID: String) {
+        let account = "ai_sharing_consent_v1_\(providerID)"
+        if accepted { save("accepted", account: account) } else { delete(account: account) }
+    }
+
     func key(for providerID: String) -> String? {
         load(account: "provider_api_key_\(providerID)") ?? (providerID == "anthropic" ? apiKey : nil)
     }
 
     func setKey(_ value: String?, for providerID: String) {
         let account = "provider_api_key_\(providerID)"
-        if let value, !value.isEmpty { save(value, account: account) } else { delete(account: account) }
+        if let value, !value.isEmpty { save(value, account: account) } else {
+            delete(account: account)
+            if providerID == "anthropic" { delete(account: apiKeyAccount) }
+        }
     }
 
     // MARK: API Key
@@ -39,17 +51,19 @@ final class NexusKeychain {
     }
 
     var hasAPIKey: Bool {
-        guard let key = apiKey else { return false }
+        guard let key = key(for: NexusModelCatalog.entry(for: selectedModel).providerID) else { return false }
         return !key.isEmpty
     }
 
     /// 抹掉本 App 在钥匙串里的全部条目（所有服务商 Key + 选中模型）。按 service 整体删，不逐个 account 枚举。
-    func wipeAll() {
+    @discardableResult
+    func wipeAll() -> [String] {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
         ]
-        SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound ? [] : ["钥匙串清除失败（\(status)）"]
     }
 
     // MARK: Keychain 操作
@@ -61,10 +75,16 @@ final class NexusKeychain {
             kSecAttrService: service,
             kSecAttrAccount: account,
         ]
-        SecItemDelete(query as CFDictionary)
-        var addQuery = query
-        addQuery[kSecValueData] = data
-        SecItemAdd(addQuery as CFDictionary, nil)
+        let attributes: [CFString: Any] = [
+            kSecValueData: data,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        ]
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            var addQuery = query
+            attributes.forEach { addQuery[$0.key] = $0.value }
+            SecItemAdd(addQuery as CFDictionary, nil)
+        }
     }
 
     private func load(account: String) -> String? {

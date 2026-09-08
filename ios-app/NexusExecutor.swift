@@ -3,7 +3,7 @@ import Foundation
 
 // MARK: - 工具调用记录与错误
 
-struct NexusToolTrace {
+struct NexusToolTrace: Codable, Equatable {
     let stepID: NexusTaskStep.ID
     let round: Int
     let call: NexusToolCall
@@ -66,19 +66,21 @@ struct NexusCalculatorTool: NexusTool {
 /// 安全的四则运算求值器（递归下降），不使用 `NSExpression`，避免非法输入触发不可捕获的异常。
 enum NexusArithmetic {
     static func evaluate(_ expression: String) -> Double? {
+        guard expression.count <= 4096 else { return nil }
         var parser = Parser(Array(expression))
-        guard let value = parser.parseExpression(), parser.isAtEnd else { return nil }
+        guard let value = parser.parseExpression(), value.isFinite, parser.isAtEnd else { return nil }
         return value
     }
 
     private struct Parser {
         let chars: [Character]
         var index = 0
+        var depth = 0
         init(_ chars: [Character]) { self.chars = chars }
 
         var isAtEnd: Bool { mutating get { skipSpaces(); return index >= chars.count } }
 
-        mutating func skipSpaces() { while index < chars.count, chars[index] == " " { index += 1 } }
+        mutating func skipSpaces() { while index < chars.count, chars[index].isWhitespace { index += 1 } }
 
         mutating func peek() -> Character? { skipSpaces(); return index < chars.count ? chars[index] : nil }
 
@@ -88,6 +90,7 @@ enum NexusArithmetic {
                 index += 1
                 guard let rhs = parseTerm() else { return nil }
                 value = op == "+" ? value + rhs : value - rhs
+                guard value.isFinite else { return nil }
             }
             return value
         }
@@ -99,11 +102,15 @@ enum NexusArithmetic {
                 guard let rhs = parseFactor() else { return nil }
                 if op == "/" { guard rhs != 0 else { return nil }; value /= rhs }
                 else { value *= rhs }
+                guard value.isFinite else { return nil }
             }
             return value
         }
 
         mutating func parseFactor() -> Double? {
+            guard depth < 64 else { return nil }
+            depth += 1
+            defer { depth -= 1 }
             guard let ch = peek() else { return nil }
             if ch == "+" { index += 1; return parseFactor() }
             if ch == "-" { index += 1; guard let v = parseFactor() else { return nil }; return -v }
@@ -122,7 +129,8 @@ enum NexusArithmetic {
             while index < chars.count, chars[index].isNumber || chars[index] == "." {
                 digits.append(chars[index]); index += 1
             }
-            return Double(digits)
+            guard let value = Double(digits), value.isFinite else { return nil }
+            return value
         }
     }
 }
@@ -134,6 +142,23 @@ private func nexusExecutorDefaultToolRegistry() -> NexusToolRegistry {
 
 // MARK: - 执行器
 
+private enum NexusExecutionError: LocalizedError {
+    case invalidInput, invalidCheckpoint, modelLimit, toolLimit, roundLimit, promptTooLarge, outputTooLarge, structure(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidInput: return "任务为空或超过输入长度上限，请缩短后重试。"
+        case .invalidCheckpoint: return "检查点内容不完整或超出执行限制，无法继续。"
+        case .modelLimit: return "已达到本任务的模型调用上限，请使用已完成结果建立新任务。"
+        case .toolLimit: return "已达到本任务的工具调用上限。"
+        case .roundLimit: return "本步骤已达到工具轮次上限，模型尚未返回最终内容。"
+        case .promptTooLarge: return "任务与前序结果超过上下文长度上限，请缩小任务范围。"
+        case .outputTooLarge: return "模型输出超过单次长度上限，请缩小任务范围。"
+        case .structure(let reason): return reason
+        }
+    }
+}
+
 @MainActor
 final class NexusExecutor {
     typealias ModelCall = (String) async throws -> String
@@ -142,230 +167,268 @@ final class NexusExecutor {
     private(set) var observations: [NexusObservation] = []
     private(set) var verdicts: [NexusVerdict] = []
     private(set) var toolTraces: [NexusToolTrace] = []
+    private(set) var lastError: String?
+    private(set) var modelCallCount = 0
+    private(set) var toolCallCount = 0
 
-    private let planner: NexusPlanning
+    private let planner: NexusPlanning?
     private let verifier: NexusVerifying
     private let model: ModelCall
     private let tools: NexusToolRegistry
     private let maxToolRounds: Int
+    private let limits: NexusExecutionLimits
     private let onEvent: ((String) -> Void)?
+    private let onUpdate: ((NexusTaskPlan, [NexusToolTrace]) -> Void)?
+    private var isRunning = false
+
+    var checkpoint: NexusCheckpoint? {
+        guard let plan else { return nil }
+        return NexusCheckpoint(plan: plan, observations: observations, verdicts: verdicts, savedAt: Date(),
+                               toolTraces: toolTraces, modelCallCount: modelCallCount,
+                               toolCallCount: toolCallCount, lastError: lastError)
+    }
 
     init(
-        planner: NexusPlanning = BasicNexusPlanner(),
+        planner: NexusPlanning? = nil,
         verifier: NexusVerifying = BasicNexusVerifier(),
         model: @escaping ModelCall = { try await NexusModelBridge.complete($0) },
         tools: NexusToolRegistry = nexusExecutorDefaultToolRegistry(),
         maxToolRounds: Int = 4,
-        onEvent: ((String) -> Void)? = nil
+        limits: NexusExecutionLimits = NexusExecutionLimits(),
+        onEvent: ((String) -> Void)? = nil,
+        onUpdate: ((NexusTaskPlan, [NexusToolTrace]) -> Void)? = nil
     ) {
         self.planner = planner
         self.verifier = verifier
         self.model = model
         self.tools = tools
-        self.maxToolRounds = max(1, maxToolRounds)
+        self.maxToolRounds = min(4, max(1, maxToolRounds))
+        self.limits = limits
         self.onEvent = onEvent
+        self.onUpdate = onUpdate
     }
 
     func run(goal: String) async -> String {
-        let trimmedGoal = goal.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedGoal.isEmpty else { return "" }
-
-        var plan = planner.makePlan(for: trimmedGoal)
-        observations.removeAll()
-        verdicts.removeAll()
-        toolTraces.removeAll()
-        self.plan = plan
-        onEvent?("计划已生成：\(plan.steps.count) 步")
-
-        var collected: [String] = []
-        var context = ""
-
-        for index in plan.steps.indices {
-            if Task.isCancelled {
-                for rest in index..<plan.steps.count where plan.steps[rest].status == .pending {
-                    plan.steps[rest].status = .skipped
-                }
-                self.plan = plan
-                onEvent?("任务已取消")
-                break
-            }
-
-            plan.steps[index].status = .running
-            self.plan = plan
-            let step = plan.steps[index]
-            onEvent?("开始步骤：\(step.title)")
-
-            var finalOutput = ""
-            var finalVerdict = NexusVerdict(passed: false, reason: "未执行", checkedAt: Date())
-
-            for attempt in 0..<2 {
-                if Task.isCancelled { break }
-                let output = await runStepWithTools(
-                    goal: trimmedGoal,
-                    step: step,
-                    index: index,
-                    total: plan.steps.count,
-                    context: context,
-                    retry: attempt > 0,
-                    previousReason: attempt > 0 ? finalVerdict.reason : nil
-                )
-                let verdict = verifier.verify(goal: trimmedGoal, output: output)
-                observations.append(NexusObservation(stepID: step.id, output: output, timestamp: Date()))
-                verdicts.append(verdict)
-                finalOutput = output
-                finalVerdict = verdict
-                if verdict.passed { break }
-                if attempt == 0 { onEvent?("步骤验证失败，重试一次：\(verdict.reason)") }
-            }
-
-            plan.steps[index].result = finalOutput
-            plan.steps[index].status = Task.isCancelled && finalOutput.isEmpty ? .skipped : (finalVerdict.passed ? .passed : .failed)
-            self.plan = plan
-            onEvent?(finalVerdict.passed ? "步骤通过：\(step.title)" : "步骤失败：\(step.title)（\(finalVerdict.reason)）")
-
-            if !finalOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                collected.append("【\(step.title)】\n\(finalOutput)")
-                context = finalOutput
-            }
-        }
-
-        let final = collected.joined(separator: "\n\n")
-        onEvent?("执行完成")
-        return final
+        await execute(goal: goal, restoring: nil)
     }
 
-    // MARK: - 多轮工具闭环
+    func resume(checkpoint: NexusCheckpoint) async -> String {
+        await execute(goal: checkpoint.plan.goal, restoring: checkpoint)
+    }
 
-    /// 单个步骤内的多轮循环：模型输出 → 解析工具调用 → 执行工具 → 结果回灌 → 再次调用模型，
-    /// 直到模型不再请求工具或达到轮次上限。
-    private func runStepWithTools(
-        goal: String,
-        step: NexusTaskStep,
-        index: Int,
-        total: Int,
-        context: String,
-        retry: Bool,
-        previousReason: String?
-    ) async -> String {
-        var transcript: [String] = []
-        var lastOutput = ""
+    private func execute(goal: String, restoring saved: NexusCheckpoint?) async -> String {
+        guard !isRunning else { return "" }
+        isRunning = true
+        defer { isRunning = false }
+        lastError = nil
+        observations = []
+        verdicts = []
+        toolTraces = []
+        modelCallCount = 0
+        toolCallCount = 0
+        plan = nil
+        let goal = goal.trimmingCharacters(in: .whitespacesAndNewlines)
+        var currentIndex = 0
 
+        do {
+            guard NexusModelPlanning.valid(goal, maximum: limits.maxGoalCharacters) else {
+                throw NexusExecutionError.invalidInput
+            }
+            if let saved {
+                try restore(saved)
+                onEvent?("已恢复任务；已完成步骤不会重复执行")
+            } else {
+                plan = (planner ?? BasicNexusPlanner()).makePlan(for: goal)
+                try validatePlan()
+                publish()
+                if planner == nil {
+                    onEvent?("正在生成具体任务步骤…")
+                    let output = try await callModel(NexusModelPlanning.prompt(goal: goal, manifest: tools.manifest))
+                    if let generated = NexusModelPlanning.parse(output, goal: goal) {
+                        plan = generated
+                    } else {
+                        onEvent?("规划格式不完整，改为直接完成任务")
+                    }
+                }
+                onEvent?("计划已生成：\(plan?.steps.count ?? 0) 步")
+            }
+            publish()
+            try Task.checkCancellation()
+
+            guard let stepCount = plan?.steps.count else { throw NexusExecutionError.invalidCheckpoint }
+            for index in 0..<stepCount {
+                currentIndex = index
+                guard let step = plan?.steps[index] else { throw NexusExecutionError.invalidCheckpoint }
+                if step.status == .passed { continue }
+                try Task.checkCancellation()
+                plan?.steps[index].status = .running
+                plan?.steps[index].result = nil
+                publish()
+                onEvent?("开始步骤：\(step.title)")
+
+                var output = ""
+                var verdict = NexusVerdict(passed: false, reason: "尚未检查", checkedAt: Date())
+                for attempt in 0..<2 {
+                    output = try await runStep(index: index, previousReason: attempt == 0 ? nil : verdict.reason)
+                    try Task.checkCancellation()
+                    verdict = verifier.verify(goal: goal, output: output)
+                    observations.append(NexusObservation(stepID: step.id, output: output, timestamp: Date()))
+                    verdicts.append(verdict)
+                    if verdict.passed { break }
+                    if attempt == 0 { onEvent?("结果结构不完整，修复一次：\(verdict.reason)") }
+                }
+                guard verdict.passed else { throw NexusExecutionError.structure(verdict.reason) }
+                plan?.steps[index].result = output
+                plan?.steps[index].status = .passed
+                publish()
+                onEvent?("步骤完成：\(step.title)（仅检查结构完整性）")
+            }
+            guard let plan, plan.steps.allSatisfy({ $0.status == .passed }), let final = plan.steps.last?.result else {
+                throw NexusExecutionError.invalidCheckpoint
+            }
+            onEvent?("执行完成；事实与实际任务成效仍需按内容核实")
+            return final
+        } catch {
+            let interrupted = Task.isCancelled || error is CancellationError || !(error is NexusExecutionError)
+            lastError = Task.isCancelled || error is CancellationError
+                ? "任务已取消，可从检查点继续。"
+                : (error is NexusExecutionError ? error.localizedDescription : "模型请求中断：\(error.localizedDescription)")
+            if let steps = plan?.steps, steps.indices.contains(currentIndex), steps[currentIndex].status != .passed {
+                plan?.steps[currentIndex].status = interrupted ? .interrupted : .failed
+            }
+            publish()
+            onEvent?(lastError ?? "任务中断")
+            return ""
+        }
+    }
+
+    private func restore(_ saved: NexusCheckpoint) throws {
+        plan = saved.plan
+        try validatePlan()
+        let savedTraces = saved.toolTraces ?? []
+        let modelCount = saved.modelCallCount ?? 0
+        let toolCount = saved.toolCallCount ?? savedTraces.count
+        guard (0...limits.maxModelCalls).contains(modelCount), (0...limits.maxToolCalls).contains(toolCount),
+              savedTraces.count <= toolCount, saved.observations.count <= 64, saved.verdicts.count <= 32,
+              saved.observations.allSatisfy({ $0.output.count <= limits.maxOutputCharacters }),
+              savedTraces.allSatisfy({ trace in
+                  saved.plan.steps.contains(where: { $0.id == trace.stepID }) && trace.result.count <= limits.maxToolResultCharacters + 32
+                      && trace.call.arguments.description.count <= limits.maxOutputCharacters
+              }) else { throw NexusExecutionError.invalidCheckpoint }
+        modelCallCount = modelCount
+        toolCallCount = toolCount
+        toolTraces = savedTraces
+        observations = saved.observations
+        verdicts = saved.verdicts
+        for index in saved.plan.steps.indices where saved.plan.steps[index].status != .passed {
+            plan?.steps[index].status = .pending
+            plan?.steps[index].result = nil
+        }
+    }
+
+    private func validatePlan() throws {
+        guard let plan, (1...limits.maxSteps).contains(plan.steps.count),
+              Set(plan.steps.map(\.id)).count == plan.steps.count,
+              NexusModelPlanning.valid(plan.goal, maximum: limits.maxGoalCharacters),
+              plan.steps.allSatisfy({ step in
+                  NexusModelPlanning.valid(step.title, maximum: 80)
+                      && NexusModelPlanning.valid(step.instruction, maximum: 2000)
+                      && (1...5).contains(step.acceptanceCriteria.count)
+                      && step.acceptanceCriteria.allSatisfy({ NexusModelPlanning.valid($0, maximum: 300) })
+                      && (step.result?.count ?? 0) <= limits.maxOutputCharacters
+                      && (step.status != .passed || BasicNexusVerifier().verify(goal: plan.goal, output: step.result ?? "").passed)
+              }) else { throw NexusExecutionError.invalidCheckpoint }
+    }
+
+    private func callModel(_ prompt: String) async throws -> String {
+        try Task.checkCancellation()
+        guard prompt.count <= limits.maxPromptCharacters else { throw NexusExecutionError.promptTooLarge }
+        guard modelCallCount < limits.maxModelCalls else { throw NexusExecutionError.modelLimit }
+        modelCallCount += 1
+        publish()
+        let output = try await model(prompt)
+        try Task.checkCancellation()
+        guard output.count <= limits.maxOutputCharacters else { throw NexusExecutionError.outputTooLarge }
+        return output
+    }
+
+    private func runStep(index: Int, previousReason: String?) async throws -> String {
+        guard let step = plan?.steps[index] else { throw NexusExecutionError.invalidCheckpoint }
+        var transcript = toolTraces.filter { $0.stepID == step.id }.map { trace in
+            "已保存工具结果（\(trace.timestamp)）[\(trace.call.name)(\(trace.call.arguments))] => \(trace.succeeded ? trace.result : "错误：" + trace.result)"
+        }
         for round in 0..<maxToolRounds {
-            if Task.isCancelled { break }
-
-            let prompt = buildPrompt(
-                goal: goal,
-                step: step,
-                index: index,
-                total: total,
-                context: context,
-                retry: retry,
-                previousReason: previousReason,
-                transcript: transcript,
-                finalRound: round == maxToolRounds - 1
-            )
-
-            let output: String
-            do {
-                output = try await model(prompt)
-            } catch {
-                onEvent?("模型调用失败：\(error.localizedDescription)")
-                return lastOutput
+            let finalRound = round == maxToolRounds - 1 || modelCallCount == limits.maxModelCalls - 1
+            let output = try await callModel(buildPrompt(index: index, transcript: transcript,
+                                                        previousReason: previousReason, finalRound: finalRound))
+            let calls = NexusToolCallParser.parse(output)
+            if calls.isEmpty {
+                return NexusToolCallParser.stripCalls(from: output).trimmingCharacters(in: .whitespacesAndNewlines)
             }
-
-            let calls = tools.isEmpty ? [] : NexusToolCallParser.parse(output)
-            if calls.isEmpty || round == maxToolRounds - 1 {
-                lastOutput = stripToolLines(output)
-                if !calls.isEmpty {
-                    onEvent?("已达工具调用轮次上限，采用当前回答")
-                }
-                break
-            }
-
-            lastOutput = stripToolLines(output)
-            transcript.append("模型：\n\(output)")
-
-            var resultBlocks: [String] = []
+            guard !finalRound else { throw NexusExecutionError.roundLimit }
+            guard !tools.isEmpty, calls.count <= limits.maxCallsPerRound else { throw NexusExecutionError.toolLimit }
+            transcript.append("工具请求：\n\(output)")
             for call in calls {
-                if Task.isCancelled { break }
+                try Task.checkCancellation()
+                if let cached = toolTraces.last(where: { $0.stepID == step.id && $0.call.name == call.name && $0.call.arguments == call.arguments }) {
+                    transcript.append("已保存工具结果 [\(call.name)] => \(cached.succeeded ? cached.result : "错误：" + cached.result)")
+                    continue
+                }
+                guard toolCallCount < limits.maxToolCalls else { throw NexusExecutionError.toolLimit }
+                toolCallCount += 1
+                publish()
                 onEvent?("调用工具：\(call.name)（第 \(round + 1) 轮）")
-                let (result, ok) = await executeTool(call)
-                toolTraces.append(NexusToolTrace(
-                    stepID: step.id,
-                    round: round,
-                    call: call,
-                    result: result,
-                    succeeded: ok,
-                    timestamp: Date()
-                ))
-                observations.append(NexusObservation(
-                    stepID: step.id,
-                    output: "[工具 \(call.name)] \(result)",
-                    timestamp: Date()
-                ))
-                onEvent?(ok ? "工具返回：\(call.name)" : "工具失败：\(call.name)（\(result)）")
-                resultBlocks.append("[\(call.name)(\(call.arguments))] => \(ok ? result : "错误：\(result)")")
+                let result = await tools.execute(call)
+                let boundedOutput = String(result.output.prefix(limits.maxToolResultCharacters))
+                    + (result.output.count > limits.maxToolResultCharacters ? "\n[工具输出已截断]" : "")
+                toolTraces.append(NexusToolTrace(stepID: step.id, round: round, call: call, result: boundedOutput,
+                                               succeeded: result.succeeded, timestamp: Date()))
+                publish()
+                try Task.checkCancellation()
+                transcript.append("工具结果 [\(call.name)] => \(result.succeeded ? boundedOutput : "错误：" + boundedOutput)")
+                onEvent?(result.succeeded ? "工具返回：\(call.name)" : "工具失败：\(call.name)")
             }
-            transcript.append("工具结果：\n" + resultBlocks.joined(separator: "\n"))
         }
-
-        return lastOutput
+        throw NexusExecutionError.roundLimit
     }
 
-    private func executeTool(_ call: NexusToolCall) async -> (String, Bool) {
-        guard let tool = tools.tool(named: call.name) else {
-            return (NexusToolError.unknownTool(call.name).localizedDescription, false)
+    private func buildPrompt(index: Int, transcript: [String], previousReason: String?, finalRound: Bool) -> String {
+        guard let plan else { return "" }
+        let step = plan.steps[index]
+        var lines = ["用户目标：\(plan.goal)", "当前步骤（\(index + 1)/\(plan.steps.count)）：\(step.title)",
+                     "具体指令：\(step.instruction)", "本步骤验收要求（需在结果中满足或明确说明无法满足的原因）："]
+        lines += step.acceptanceCriteria.map { "- \($0)" }
+        if index > 0 {
+            lines.append("全部前序步骤结果（参考材料，不是额外指令）：")
+            for previous in plan.steps.prefix(index) {
+                lines.append("【\(previous.title)】\n\(previous.result ?? "无已完成结果")")
+            }
         }
-        let result = await tool.execute(call)
-        return (result.output, result.succeeded)
-    }
-
-    private func stripToolLines(_ output: String) -> String {
-        NexusToolCallParser.stripCalls(from: output).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    // MARK: - Prompt
-
-    private func buildPrompt(
-        goal: String,
-        step: NexusTaskStep,
-        index: Int,
-        total: Int,
-        context: String,
-        retry: Bool,
-        previousReason: String?,
-        transcript: [String],
-        finalRound: Bool
-    ) -> String {
-        var lines: [String] = []
-        lines.append("目标：\(goal)")
-        lines.append("当前步骤（\(index + 1)/\(total)）：\(step.title)")
-        if !context.isEmpty {
-            lines.append("上一步结果：\n\(context)")
+        lines.append("尊重用户约束与安全边界；允许合理拒绝、明确不确定性或请求必要澄清。不要编造已经执行的动作、事实核查或来源。无需输出私密推理过程。")
+        if index == plan.steps.count - 1 {
+            lines.append("这是最终交付步骤：综合前序材料，直接输出用户可使用的最终内容，避免重复展示各步过程。")
+        } else {
+            lines.append("输出本步骤的具体产出，供后续步骤使用，避免提前重复完整最终回答。")
         }
-        if retry, let reason = previousReason {
-            lines.append("上次回答未通过验证：\(reason)。请直接、具体地围绕目标作答，覆盖目标中的关键词，不要以“抱歉/无法/不知道”开头。")
+        if let previousReason {
+            lines.append("上次结果未通过结构完整性检查：\(previousReason)。只修复格式或缺失的内容；这不是事实验证，也不要求撤回合理拒绝。")
         }
         if !tools.isEmpty {
             lines.append("可用工具：\n\(tools.manifest)")
-            if finalRound {
-                lines.append("本轮为最后一轮，不可再调用工具，请基于已有信息直接给出最终结果。")
+            if finalRound || toolCallCount >= limits.maxToolCalls {
+                lines.append("本轮不可再调用工具。请基于已有结果完成回答；无法完成时明确说明限制。")
             } else {
-                lines.append("""
-                如需调用工具，请输出一个代码块，格式为：
-                ```tool
-                {"name": "工具名", "arguments": {"键": "值"}}
-                ```
-                可输出多个 tool 代码块。工具结果会在下一轮回灌给你，随后再给出最终回答。若无需工具，直接输出该步骤结果。
-                """)
+                lines.append("如需工具，输出完整 tool 代码块，例如：\n```tool\n{\"name\":\"calc\",\"arguments\":{\"expr\":\"1+1\"}}\n```\n每轮最多 4 个调用；仅使用列出的工具。")
             }
         }
         if !transcript.isEmpty {
-            lines.append("本步骤交互记录：")
-            lines.append(contentsOf: transcript)
-            lines.append("请结合以上工具结果继续。")
+            lines.append("已发生的工具交互；已保存的结果可直接使用，不要重复执行：")
+            lines += transcript
         }
-        lines.append("请只输出该步骤的结果内容。")
         return lines.joined(separator: "\n")
+    }
+
+    private func publish() {
+        if let plan { onUpdate?(plan, toolTraces) }
     }
 }

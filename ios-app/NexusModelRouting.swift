@@ -41,9 +41,10 @@ final class NexusModelRegistry: ObservableObject {
     @Published var selectedID: String
 
     init() {
-        models = NexusModelCatalog.entries
+        let entries = NexusModelCatalog.entries
+        models = entries
         let saved = NexusKeychain.shared.selectedModel
-        selectedID = models.first(where: { $0.modelID == saved })?.id ?? models[0].id
+        selectedID = entries.first(where: { $0.modelID == saved })?.id ?? entries[0].id
     }
 
     var selected: NexusModelEntry { models.first(where: { $0.id == selectedID }) ?? models[0] }

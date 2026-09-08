@@ -73,54 +73,44 @@ enum NexusKeywordExtractor {
     }
 }
 
+/// These checks detect incomplete output only. They do not establish factual
+/// accuracy, satisfy semantic acceptance criteria, or override a justified refusal.
 extension BasicNexusVerifier {
     func verify(goal: String, output: String) -> NexusVerdict {
-        let now = Date()
-        let cleanOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanGoal = goal.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !cleanOutput.isEmpty else {
-            return NexusVerdict(passed: false, reason: "结果为空", checkedAt: now)
-        }
-
-        let refusalPrefixes = ["抱歉", "对不起", "无法", "我无法", "不知道", "我不知道", "sorry", "i cannot", "i can't", "i don't know"]
-        let loweredOutput = cleanOutput.lowercased()
-        if let hit = refusalPrefixes.first(where: { loweredOutput.hasPrefix($0) }) {
-            return NexusVerdict(passed: false, reason: "结果以拒绝语「\(hit)」开头", checkedAt: now)
-        }
-
-        let keywords = NexusKeywordExtractor.keywords(from: cleanGoal)
-        guard !keywords.isEmpty else {
-            return NexusVerdict(passed: true, reason: "目标无可提取关键词，结果非空且非拒绝，视为通过", checkedAt: now)
-        }
-
-        let matched = keywords.filter { loweredOutput.contains($0) }
-        let required = Int((Double(keywords.count) / 2.0).rounded(.up))
-        let missing = keywords.filter { !matched.contains($0) }
-        let passed = matched.count >= required
-
-        if passed {
-            return NexusVerdict(passed: true, reason: "关键词覆盖 \(matched.count)/\(keywords.count)（需≥\(required)）：命中「\(matched.joined(separator: "、"))」", checkedAt: now)
-        } else {
-            return NexusVerdict(passed: false, reason: "关键词覆盖不足 \(matched.count)/\(keywords.count)（需≥\(required)），缺失「\(missing.joined(separator: "、"))」", checkedAt: now)
-        }
+        let report = NexusIndependentVerifier().verify(goal: goal, output: output)
+        return NexusVerdict(passed: report.passed, reason: report.reason, checkedAt: Date())
     }
 }
 
 struct NexusIndependentVerifier {
     func verify(goal: String, output: String) -> NexusVerificationReport {
-        let cleanGoal = goal.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let nonEmpty = !cleanOutput.isEmpty
-        let hasError = ["出错了", "失败", "error", "timeout"].contains { cleanOutput.localizedCaseInsensitiveContains($0) }
-        let keywords = NexusKeywordExtractor.keywords(from: cleanGoal)
-        let lowered = cleanOutput.lowercased()
-        let matched = keywords.filter { lowered.contains($0) }.count
-        let hasGoalSignal = keywords.isEmpty || matched * 2 >= keywords.count
-        let refusal = ["抱歉", "对不起", "无法", "不知道", "sorry", "i cannot", "i can't"].contains { lowered.hasPrefix($0) }
-        let checks = ["non_empty": nonEmpty, "no_error_signal": !hasError, "goal_signal": hasGoalSignal, "no_refusal": !refusal]
-        let allPassed = checks.values.allSatisfy { $0 }
-        let failed = checks.filter { !$0.value }.keys.sorted().joined(separator: ", ")
-        return NexusVerificationReport(passed: allPassed, checks: checks, reason: allPassed ? "独立验证通过（关键词 \(matched)/\(keywords.count)）" : "未通过检查：\(failed)")
+        let meaningful = cleanOutput.unicodeScalars.contains {
+            CharacterSet.alphanumerics.contains($0) || $0.properties.isEmojiPresentation
+        }
+        var activeFence: (character: Character, count: Int)?
+        for line in cleanOutput.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard let first = trimmed.first, first == "`" || first == "~" else { continue }
+            let count = trimmed.prefix(while: { $0 == first }).count
+            guard count >= 3 else { continue }
+            if let active = activeFence {
+                if first == active.character, count >= active.count,
+                   trimmed.dropFirst(count).trimmingCharacters(in: .whitespaces).isEmpty { activeFence = nil }
+            } else {
+                activeFence = (first, count)
+            }
+        }
+        let checks = ["non_empty_content": meaningful,
+                      "complete_code_fences": activeFence == nil,
+                      "no_pending_tool_calls": NexusToolCallParser.parse(cleanOutput).isEmpty,
+                      "bounded_output": cleanOutput.count <= 12000]
+        let labels = ["non_empty_content": "缺少有效内容", "complete_code_fences": "代码块未闭合",
+                      "no_pending_tool_calls": "尚有未处理的工具调用", "bounded_output": "输出超过长度上限"]
+        let failed = checks.filter { !$0.value }.keys.sorted().map { labels[$0] ?? $0 }
+        let reason = failed.isEmpty
+            ? "结构完整性检查通过；不代表事实正确或任务成效已验证。"
+            : "结构完整性检查未通过：" + failed.joined(separator: "、") + "。此检查不验证事实。"
+        return NexusVerificationReport(passed: failed.isEmpty, checks: checks, reason: reason)
     }
 }

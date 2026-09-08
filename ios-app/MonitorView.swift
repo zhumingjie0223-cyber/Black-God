@@ -1,92 +1,84 @@
-//
-//  MonitorView.swift — 神枢本地运行监测
-//
-//  纯客户端：展示本地 AI 助手的能力指标（任务成功率、验证率、恢复率、延迟），
-//  数据来自本地任务评测存储，不连任何远端服务。
-
 import SwiftUI
 
 struct MonitorView: View {
-    @EnvironmentObject var appState: AppState
-    @StateObject private var model = NexusMonitorModel()
+    @EnvironmentObject var vm: ChatViewModel
+    var body: some View { NexusHistoryList(store: vm.history) }
+}
 
+struct NexusHistoryList: View {
+    @ObservedObject var store: NexusTaskHistoryStore
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("神枢监测").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
-                        Text("本地 AI 助手能力指标").font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
+        NavigationStack {
+            List {
+                Section {
+                    HStack {
+                        Label("本机任务记录", systemImage: "clock.arrow.circlepath")
+                        Spacer()
+                        Text("\(store.records.count) / 50").foregroundStyle(Color.bgGoldLight)
                     }
-                    Spacer()
-                    Button { model.refresh() } label: {
-                        Image(systemName: "arrow.clockwise.circle")
-                            .font(.system(size: 24)).foregroundStyle(Color.bgGold)
-                    }
+                    Text("保留最近 50 次任务。左滑删除，点击查看计划、工具记录和最终结果。删除记录不清空当前对话；对话页可选择新对话。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 16).padding(.top, 8)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                    MetricCard(title: "任务成功率", valueText: model.successRateText, symbol: "checkmark.circle")
-                    MetricCard(title: "验证率", valueText: model.verificationRateText, symbol: "checkmark.shield")
-                    MetricCard(title: "恢复率", valueText: model.recoveryRateText, symbol: "arrow.triangle.2.circlepath")
-                    MetricCard(title: "平均延迟", valueText: model.latencyText, symbol: "clock")
-                    MetricCard(title: "任务记录", valueText: "\(model.recordCount)", symbol: "list.bullet.rectangle")
+                if store.records.isEmpty {
+                    ContentUnavailableView("还没有任务记录", systemImage: "tray", description: Text("完成或停止一次任务后，结果会保存在这里。"))
                 }
-                .padding(.horizontal, 16)
-
-                if model.recordCount == 0 {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("暂无任务记录", systemImage: "info.circle.fill").foregroundStyle(.orange)
-                        Text("完成一次对话后，这里会展示 AI 助手的成功率、验证率等能力指标。")
-                            .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
+                ForEach(store.records) { record in
+                    NavigationLink {
+                        NexusHistoryDetail(record: record)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(record.goal).lineLimit(2).foregroundStyle(Color.bgTextPrimary)
+                            HStack {
+                                Text(record.status.displayName).foregroundStyle(record.status == .completed ? Color.bgGoldLight : Color.orange)
+                                Spacer()
+                                Text(record.updatedAt, style: .date).foregroundStyle(.secondary)
+                            }.font(.caption)
+                        }.padding(.vertical, 4)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(16).bgCard().padding(.horizontal, 16)
-                } else {
-                    Text("指标基于本地 \(model.recordCount) 次任务记录，数据仅存于此设备。")
-                        .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(16).bgCard().padding(.horizontal, 16)
+                    .swipeActions { Button("删除", role: .destructive) { store.remove(record.id) } }
+                }
+                if let error = store.lastError { Text(error).foregroundStyle(.orange).font(.caption) }
+            }
+            .scrollContentBackground(.hidden).background(Color.bgDark)
+            .navigationTitle("记录")
+        }
+    }
+}
+
+private struct NexusHistoryDetail: View {
+    let record: NexusTaskHistoryRecord
+    var body: some View {
+        List {
+            Section("任务") { Text(record.goal).textSelection(.enabled); Text("\(record.model) · \(record.status.displayName)").font(.caption).foregroundStyle(.secondary) }
+            if let plan = record.plan {
+                Section("步骤") {
+                    ForEach(plan.steps) { step in
+                        DisclosureGroup {
+                            Text(step.result ?? "无输出").font(.caption).textSelection(.enabled)
+                        } label: { Label(step.title, systemImage: step.status.symbol) }
+                    }
                 }
             }
-            .padding(.bottom, 100)
-        }
-        .padding(.top, 50)
-        .task { model.refresh() }
+            if !record.toolTraces.isEmpty {
+                Section("工具结果") {
+                    ForEach(record.toolTraces) { trace in
+                        DisclosureGroup("\(trace.name) · \(trace.succeeded ? "完成" : "失败")") { Text(trace.result).font(.caption).textSelection(.enabled) }
+                    }
+                }
+            }
+            Section("结果") { Text(record.result).textSelection(.enabled) }
+            Section { ShareLink(item: "# \(record.goal)\n\n\(record.result)") { Label("分享结果", systemImage: "square.and.arrow.up") } }
+        }.scrollContentBackground(.hidden).background(Color.bgDark)
+            .navigationTitle("任务详情").navigationBarTitleDisplayMode(.inline)
     }
 }
 
-@MainActor
-final class NexusMonitorModel: ObservableObject {
-    @Published private(set) var successRateText = "—"
-    @Published private(set) var verificationRateText = "—"
-    @Published private(set) var recoveryRateText = "—"
-    @Published private(set) var latencyText = "—"
-    @Published private(set) var recordCount = 0
-
-    func refresh() {
-        let store = NexusEvaluationStore()
-        successRateText = percent(store.successRate)
-        verificationRateText = percent(store.verificationRate)
-        recoveryRateText = percent(store.recoveryRate)
-        recordCount = store.records.count
-        let lat = store.averageLatency
-        latencyText = lat == 0 ? "—" : String(format: "%.1fs", lat)
-    }
-
-    private func percent(_ v: Double) -> String { String(format: "%.0f%%", v * 100) }
-}
-
-private struct MetricCard: View {
-    let title: String
-    let valueText: String
-    let symbol: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Image(systemName: symbol).foregroundStyle(Color.bgCyan)
-            Text(valueText).font(.system(size: 22, weight: .bold)).foregroundStyle(Color.bgTextPrimary)
-            Text(title).font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
+extension NexusTaskHistoryStatus {
+    var displayName: String {
+        switch self {
+        case .completed: return "流程完成"
+        case .failed: return "未完成"
+        case .cancelled: return "已停止"
         }
-        .frame(maxWidth: .infinity, alignment: .leading).padding(16).bgCard()
     }
 }

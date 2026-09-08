@@ -1,23 +1,28 @@
-// NexusDataReset.swift — 「清除全部数据」：钥匙串全部条目 + Application Support 下全部本地文件
-
+// NexusDataReset.swift — 清除钥匙串与应用本地文件，汇总无法删除的项目。
 import Foundation
 
 extension Notification.Name {
-    /// 数据已抹除；各内存态存储收到后清空自身，避免重启前旧数据还挂在界面上
+    /// 抹除流程已执行；即使部分文件失败，也清空当前内存视图并显示错误。
     static let nexusDataWiped = Notification.Name("com.blackgod.nexus.dataWiped")
 }
 
 enum NexusDataReset {
-    /// 兑现商店描述与隐私政策里的"一键清除全部数据"：
-    /// 所有服务商 API Key、选中模型、记忆、评估记录、检查点、工具工作区文件。
-    /// 本 App 零后端，本地这两处就是全部数据。
-    static func wipeAll() {
-        NexusKeychain.shared.wipeAll()
+    /// 返回失败说明；空数组表示全部已清除。可注入目录与钥匙串操作供隔离测试。
+    @MainActor @discardableResult
+    static func wipeAll(directory: URL? = nil, keychainWipe: (() -> [String])? = nil) -> [String] {
+        var errors = keychainWipe?() ?? NexusKeychain.shared.wipeAll()
+        let base = NexusStoreFile.directory(directory)
         let fm = FileManager.default
-        if let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first,
-           let items = try? fm.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
-            for url in items { try? fm.removeItem(at: url) }
+        if fm.fileExists(atPath: base.path) {
+            do {
+                let items = try fm.contentsOfDirectory(at: base, includingPropertiesForKeys: nil)
+                for url in items {
+                    do { try fm.removeItem(at: url) }
+                    catch { errors.append("清除 \(url.lastPathComponent) 失败：\(error.localizedDescription)") }
+                }
+            } catch { errors.append("读取本地数据目录失败：\(error.localizedDescription)") }
         }
         NotificationCenter.default.post(name: .nexusDataWiped, object: nil)
+        return errors
     }
 }

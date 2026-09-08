@@ -10,10 +10,12 @@ import UIKit
 @main
 struct BlackGod888App: App {
     @StateObject private var appState = AppState()
+    @StateObject private var chat = ChatViewModel()
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .environmentObject(chat)
                 .preferredColorScheme(.dark)
                 .tint(Color.bgGold)
         }

@@ -1,14 +1,17 @@
-name: Build Black God 888 iOS
+name: iOS 构建与回归
 
-# 仅手动触发:unsigned IPA 无 Apple 开发者账号+签名无法分发,实际路线是 PWA。
-# 停掉每次 push main 都白跑 macOS 构建(烧 Actions 额度);需要产 IPA 时到 Actions 页手动 Run。
-# 取舍(补齐签名分发 or 彻底砍掉)待权哥拍板;拍板前保留按需能力,不删工作流。
+# 保留手动触发，按需运行 macOS 回归与无签名构建。
+# 产物用于编译检查；正式签名、归档和 App Store 上传走独立发布流程。
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -16,11 +19,16 @@ jobs:
     - name: Install XcodeGen
       run: brew install xcodegen
 
+    - name: 运行原生任务回归
+      run: bash tests/run_ios_runtime_tests.sh
+
+    - name: 运行隔离存储回归
+      run: bash ios-app/StorageTests/run.sh
+
     - name: Generate Xcode Project
       run: |
         cd ios-app
         xcodegen generate
-        ls -la
 
     - name: Build App (unsigned)
       run: |
@@ -38,10 +46,10 @@ jobs:
     - name: Package unsigned IPA
       run: |
         cd ios-app
-        APP_PATH=$(find build -name "*.app" -type d | head -1)
-        echo "App路径: $APP_PATH"
+        app_path="build/Build/Products/Release-iphoneos/BlackGod888.app"
+        test -d "$app_path"
         mkdir -p Payload
-        cp -r "$APP_PATH" Payload/
+        cp -r "$app_path" Payload/
         zip -r BlackGod888-unsigned.ipa Payload
         echo "✅ IPA: $(ls -lh BlackGod888-unsigned.ipa)"
 

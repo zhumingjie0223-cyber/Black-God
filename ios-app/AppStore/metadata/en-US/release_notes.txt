@@ -1,7 +1,7 @@
-What's new in v1.1.0:
-• New execution loop: give it a goal and the assistant plans steps, calls tools, executes step by step, verifies the result, and retries within budget when a check fails.
-• Multi-provider direct connect: Anthropic, OpenAI, DeepSeek, and xAI (Grok); each provider's API key is encrypted separately in the on-device Keychain.
-• Built-in read-only tools: clock, calculator and more run locally; tools that write require your confirmation first.
-• On-device capability monitor: task success rate, verification rate and recovery rate, stored only on your device.
-• UI and privacy polish: streamlined to Chat, Capabilities, Monitor and Me; removed unused permissions for a smaller privacy footprint.
-• Clear all data in one tap: new entry on the Me tab wipes every key, memory item and run record after a confirmation.
+1.1.0
+• Configure keys separately by provider, with consistent model selection and request routing.
+• View task plans, step progress, and tool activity; stop tasks, resume checkpoints, and share results.
+• Manage local task history and manually save or delete memory.
+• Manage AI data-sharing choices for each provider and read the privacy policy in the app.
+• Clear local keys, memory, run records, and app workspace data from Me.
+• Updated Chat, Workspace, History, and Me screens with the existing deep green design.

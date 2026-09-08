@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// App Store 上架就绪校验器 · 神枢 Black God iOS
-// 纯 Node、零依赖。把上架前必须满足的硬约束一次性自动核对,输出清单。
-// 任一红项 → 退出码 1(可作 CI / environment.json install 的上架闸门)。
+// App Store 本地材料检查器 · 神枢 Black God iOS
+// 纯 Node、零依赖。仅核对本地结构/格式及部分静态安全条件。
+// 任一红项 → 退出码 1。通过不代表签名、网络实测、隐私申报或 Apple 审核通过。
 //
 // 用法: node ios-app/AppStore/preflight.mjs   (也可在 ios-app/AppStore/ 目录内直接 node preflight.mjs)
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -33,8 +33,8 @@ const encExempt = /ITSAppUsesNonExemptEncryption:\s*(false|true|NO|YES)/i.test(p
 projName ? ok(`工程名 name = ${projName}`) : bad('project.yml 缺少 name');
 /^com\.[\w.]+$/.test(bundleId) ? ok(`Bundle ID = ${bundleId}`) : bad(`Bundle ID 非法或缺失: "${bundleId}"`);
 /^\d+\.\d+\.\d+$/.test(marketing) ? ok(`版本号 MARKETING_VERSION = ${marketing}(合法三段式)`) : bad(`MARKETING_VERSION 非三段式: "${marketing}"`);
-/^\d+$/.test(buildNo) ? ok(`构建号 CURRENT_PROJECT_VERSION = ${buildNo}`) : bad(`构建号非正整数: "${buildNo}"`);
-encExempt ? ok('已声明 ITSAppUsesNonExemptEncryption(免出口合规文档)') : bad('project.yml 未声明 ITSAppUsesNonExemptEncryption');
+/^\d+$/.test(buildNo) && Number(buildNo) > 0 ? ok(`构建号 CURRENT_PROJECT_VERSION = ${buildNo}`) : bad(`构建号非正整数: "${buildNo}"`);
+encExempt ? ok('已声明 ITSAppUsesNonExemptEncryption（具体出口申报仍需核实）') : bad('project.yml 未声明 ITSAppUsesNonExemptEncryption');
 
 // ── CI 配置与工程一致 ──
 const cmPath = path.join(ROOT, 'codemagic.yaml');
@@ -97,7 +97,44 @@ for (const [f, label] of [['privacy_url.txt', '隐私政策网址'], ['support_u
   /^https:\/\/\S+$/.test(u) ? ok(`${label} 是 https 链接`) : bad(`${label} 不是合法 https 链接: "${u}"`);
 }
 existsSync(path.join(HERE, 'PRIVACY_POLICY.md')) ? ok('隐私政策正文 PRIVACY_POLICY.md 存在') : bad('缺少 PRIVACY_POLICY.md');
-existsSync(path.join(HERE, 'screenshots.html')) ? ok('截图源 screenshots.html 存在') : bad('缺少 screenshots.html');
+existsSync(path.join(HERE, 'screenshots.html'))
+  ? rows.push(['➖', '旧截图设计稿存在；真实界面与正式 PNG 需另行检查'])
+  : rows.push(['➖', '无旧截图设计稿；不影响使用真实 App 截图']);
+
+for (const locale of ['zh-Hans', 'en-US']) {
+  for (const name of ['privacy_url.txt', 'support_url.txt']) {
+    const fp = path.join(HERE, 'metadata', locale, name);
+    existsSync(fp) && /^https:\/\/\S+$/.test(read(fp).trim())
+      ? ok(`${locale}/${name} 有可供 fastlane 使用的 HTTPS 值（未检查在线内容）`)
+      : bad(`缺少或无效的本地化 ${locale}/${name}`);
+  }
+}
+
+// ── 网络/隐私控制的静态前置条件（不是运行时安全测试） ──
+const catalogPath = path.join(IOS, 'NexusModelCatalog.swift');
+if (existsSync(catalogPath)) {
+  const endpoints = [...read(catalogPath).matchAll(/url:\s*"([^"]+)"/g)].map(m => m[1]);
+  const secure = endpoints.length > 0 && endpoints.every(value => {
+    try { return new URL(value).protocol === 'https:'; } catch { return false; }
+  });
+  secure ? ok('模型目录中的静态服务商 URL 均为 HTTPS') : bad('模型目录含非 HTTPS / 无效端点，或没有找到端点');
+} else bad('缺少 NexusModelCatalog.swift');
+/NSAllowsArbitraryLoads(?:InWebContent|ForMedia)?:\s*(true|YES)/i.test(proj)
+  ? bad('project.yml 开启了广泛明文加载例外')
+  : ok('project.yml 未发现开启的广泛 ATS 加载例外（静态检查）');
+const plistPath = path.join(IOS, 'Info.plist');
+if (existsSync(plistPath)) {
+  /<key>NSAllowsArbitraryLoads(?:InWebContent|ForMedia)?<\/key>\s*<true\s*\/>/.test(read(plistPath))
+    ? bad('Info.plist 开启了广泛 ATS 加载例外')
+    : ok('Info.plist 未发现开启的广泛 ATS 加载例外（静态检查）');
+}
+const clientPath = path.join(IOS, 'NexusClient.swift');
+existsSync(clientPath) && /guard\s+NexusKeychain\.shared\.hasSharingConsent/.test(read(clientPath))
+  ? ok('客户端源码包含共享选择前置检查；拒绝/撤回行为仍需实测')
+  : bad('客户端源码缺少预期的共享选择前置检查');
+/AppStore\/PRIVACY_POLICY\.md\s*\n\s*buildPhase:\s*resources/.test(proj)
+  ? ok('project.yml 将隐私政策加入资源；发布包仍需确认可打开')
+  : bad('project.yml 未按预期打包隐私政策');
 
 // ── App 图标:1024×1024、PNG、无 alpha(App Store marketing icon 硬要求) ──
 function pngInfo(fp) {
@@ -151,10 +188,10 @@ swiftCount > 0 ? ok(`工程根含 ${swiftCount} 个 .swift(由 **/*.swift 纳入
 report();
 
 function report() {
-  console.log('\n══════ App Store 上架就绪校验 · 神枢 Black God iOS ══════\n');
+  console.log('\n══════ App Store 本地材料检查 · 神枢 Black God iOS ══════\n');
   for (const [icon, msg] of rows) console.log(`  ${icon}  ${msg}`);
   console.log(`\n  合计: ${pass} 通过 / ${fail} 失败\n`);
-  if (fail > 0) { console.error(`✗ 上架就绪校验未通过:${fail} 项需修复\n`); process.exit(1); }
-  console.log('✓ 上架就绪校验全绿:iOS 上架所需的工程配置、文案、图标、隐私材料均已达标\n');
+  if (fail > 0) { console.error(`✗ 本地材料检查未通过:${fail} 项需修复\n`); process.exit(1); }
+  console.log('✓ 本地格式与静态检查通过；签名、模型请求、正式截图、线上政策、账号与申报仍需验证。未执行上传或审核。\n');
   process.exit(0);
 }

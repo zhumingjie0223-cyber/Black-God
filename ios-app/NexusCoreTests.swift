@@ -32,13 +32,13 @@ struct NexusCoreSelfTest {
         // 工具调用解析 + 剥离
         let calls = NexusToolCallParser.parse("先算\n```tool\n{\"name\":\"calc\",\"arguments\":{\"expr\":\"1+1\"}}\n```")
         expect(calls.count == 1 && calls.first?.name == "calc" && calls.first?.arguments["expr"] == "1+1", "parse tool block")
-        expect(NexusToolCallParser.stripCalls(from: "答案\n```tool\n{\"name\":\"x\"}\n```\n尾").contains("答案") &&
-               !NexusToolCallParser.stripCalls(from: "答案\n```tool\n{\"name\":\"x\"}\n```\n尾").contains("```"), "strip tool block")
+        expect(NexusToolCallParser.stripCalls(from: "答案\n```tool\n{\"name\":\"x\",\"arguments\":{}}\n```\n尾").contains("答案") &&
+               !NexusToolCallParser.stripCalls(from: "答案\n```tool\n{\"name\":\"x\",\"arguments\":{}}\n```\n尾").contains("```"), "strip tool block")
 
         // 验证器
         let verifier = BasicNexusVerifier()
         expect(verifier.verify(goal: "写关于春天的诗", output: "这是关于春天的诗").passed, "verify pass")
-        expect(!verifier.verify(goal: "介绍量子计算", output: "抱歉，我无法回答").passed, "verify refusal")
+        expect(verifier.verify(goal: "介绍量子计算", output: "抱歉，我无法回答").passed, "verify allows refusal")
         expect(!verifier.verify(goal: "任意", output: "").passed, "verify empty")
 
         return failures
@@ -67,7 +67,7 @@ struct NexusCoreSelfTest {
             }
         }
         let responder = Responder()
-        let executor = NexusExecutor(model: { _ in responder.reply() })
+        let executor = NexusExecutor(planner: BasicNexusPlanner(), model: { _ in responder.reply() })
         let final = await executor.run(goal: "计算 1+1")
         expect(!final.contains("```tool"), "executor strips blocks")
         expect(executor.toolTraces.contains { $0.call.name == "calc" && $0.result == "2" }, "executor tool trace")

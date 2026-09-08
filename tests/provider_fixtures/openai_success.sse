@@ -1,0 +1,14 @@
+: documented Chat Completions chunk shape; synthetic content
+
+data:{"id":"chatcmpl_fixture","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data:{"id":"chatcmpl_fixture","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello "},"finish_reason":null}]}
+
+data: {"id":"chatcmpl_fixture","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"world"},"finish_reason":null}]}
+
+data:{"id":"chatcmpl_fixture","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data:{"id":"chatcmpl_fixture","object":"chat.completion.chunk","choices":[],"usage":{"completion_tokens":2}}
+
+data:[DONE]
+
