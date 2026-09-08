@@ -26,10 +26,11 @@ assignees: ''
 如果适用，添加截图帮助解释你的问题
 
 ## 🖥️ 环境信息
-- 浏览器: [如 Chrome 120, Safari 17]
-- 操作系统: [如 iOS 17.2, macOS 14.2]
-- 设备: [如 iPhone 15 Pro, MacBook Pro]
-- 版本: [如 v1.0.0]
+- 子系统: [iOS App / 枢语引擎]
+- iOS 版本 + 设备: [如 iOS 17.2, iPhone 15 Pro]（iOS 问题填）
+- App 版本: [「我的」页底部显示，如 v1.1.0]（iOS 问题填）
+- 所选模型 / 服务商: [如 claude-opus-5 / Anthropic]（iOS 问题填）
+- Node / Python 版本: [如 Node 22, Python 3.12]（枢语问题填）
 
 ## 📝 附加信息
 添加关于问题的任何其他上下文

@@ -1,39 +1,22 @@
 # ── 环境变量与密钥（绝不上传）────────────────
 .env
-.env.cloudflare
-*.env.cloudflare
+.env.*
+!.env.example
 .dev.vars*
-!.dev.vars.example
 *.key
 *.pem
+*.p8
 *password*
 *secret*
-server/webpush/vapid_private.pem
-server/webpush/vapid_keys.txt
 
 # ── 私人数据 ──────────────────────────────
-server/data/
-server/memory/*.json
-server/uploads/
-server/voice_cache/
-server/generated_images/
 *.db
-claude_pool/
 .learnings/
 
 # ── 构建产物 ──────────────────────────────
 build/
 DerivedData
 .buildstamp
-index.built.html
-web/nexus-do/index.built.html
-# nexus_do.mjs 由 build.mjs 从 nexus_do.core.mjs + index.html 注入生成(构建产物,勿手改)
-web/nexus-do/nexus_do.mjs
-web/nexus-do/node_modules/
-web/nexus-do/container/node_modules/
-web/nexus-do/package-lock.json
-.wrangler
-web/_old_backup/
 
 # ── 备份与临时文件 ─────────────────────────
 *.bak
@@ -44,6 +27,7 @@ web/_old_backup/
 *.log
 *.moved-aside
 .DS_Store
+node_modules/
 
 # ── Python ───────────────────────────────
 __pycache__/

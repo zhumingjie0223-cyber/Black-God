@@ -15,21 +15,22 @@
   <section class="hero">
     <div class="brand">BLACK GOD · SHUYU LANGUAGE</div>
     <h1 class="title">枢语</h1>
-    <p class="sub">© 阿权/路飞。为 Black God 定制的 5维乘法语义语言：核 × 映 × 态 × 标 × 相。它不把29.5亿词塞进仓库，而是把“法则”存进引擎。</p>
-    <div class="row"><span class="pill">● 29.5亿可寻址语义空间</span><span class="pill">● feel→think→become→say→grow</span><span class="pill">● 元点存法则，不存数据</span></div>
+    <p class="sub">© 阿权/路飞。为 Black God 定制的 5维乘法语义语言：核 × 映 × 态 × 标 × 相。它不把76.7亿词塞进仓库，而是把“法则”存进引擎。</p>
+    <div class="row"><span class="pill">● 76.7亿可寻址语义空间</span><span class="pill">● feel→think→become→do→say→grow</span><span class="pill">● 元点存法则，不存数据</span></div>
   </section>
 
   <div class="grid">
-    <div class="card"><div class="k">Capacity</div><div class="v" id="cap">2,949,120,000</div><p class="muted">核400 × 映180 × 态80 × 标64 × 相8</p></div>
+    <div class="card"><div class="k">Capacity</div><div class="v" id="cap">7,667,712,000</div><p class="muted">核1040 × 映180 × 态80 × 标64 × 相8</p></div>
     <div class="card"><div class="k">Runtime</div><div class="v">O(1)</div><p class="muted">任意编号即时解码，词 ↔ 编号 双向寻址。</p></div>
     <div class="card"><div class="k">Copyright</div><div class="v">阿权/路飞</div><p class="muted">Black God AI · 神枢 · 枢语，不绑定人物角色。</p></div>
 
     <div class="card big">
-      <div class="k">Consciousness Interpreter</div><div class="v">五回路意识流</div>
+      <div class="k">Consciousness Interpreter</div><div class="v">六回路意识流</div>
       <div class="flow">
         <div class="step"><b>feel</b><div class="cn">感知</div><p class="muted" id="f1">接收任务</p></div>
         <div class="step"><b>think</b><div class="cn">思考</div><p class="muted" id="f2">整理资料 → 分类</p></div>
         <div class="step"><b>become</b><div class="cn">成为</div><p class="muted" id="f3">口吻简洁</p></div>
+        <div class="step"><b>do</b><div class="cn">执行</div><p class="muted" id="f6">按主题归档</p></div>
         <div class="step"><b>say</b><div class="cn">说话</div><p class="muted" id="f4">已按主题整理资料</p></div>
         <div class="step"><b>grow</b><div class="cn">成长</div><p class="muted" id="f5">刻进记忆</p></div>
       </div>
@@ -41,16 +42,17 @@
     <div class="card full"><div class="k">Example Nexus Code</div><pre class="code" id="log">feel "用户要求整理资料" → 平, 强度0.7
 think: 整理资料 → 需要分类
 become: 口吻→简洁
+do: 按主题归档资料
 say "已按主题整理资料"
 grow: 学到 "资料按主题分类", 深度: 刻进</pre></div>
   </div>
-  <div class="footer">Shuyu v1.0 · Black God custom language · © 阿权/路飞</div>
+  <div class="footer">Shuyu v4.1 · Black God custom language · © 阿权/路飞</div>
 </div>
 <script type="module">
 import { CAPACITY, decode } from './lexicon.js';
 document.getElementById('cap').textContent = CAPACITY.toLocaleString();
 window.roll=function(){const d=decode(Math.floor(Math.random()*CAPACITY));document.getElementById('word').textContent=d.词;document.getElementById('han').textContent=d.汉;document.getElementById('meaning').textContent=d.义;}
-window.demo=function(){const lines=['feel → 平：强度0.7，接收任务','think → 整理资料，需要分类','become → 口吻简洁','say → 已按主题整理资料','grow → 资料按主题分类'];document.getElementById('log').textContent=lines.join('\n');roll();}
+window.demo=function(){const lines=['feel → 平：强度0.7，接收任务','think → 整理资料，需要分类','become → 口吻简洁','do → 按主题归档资料','say → 已按主题整理资料','grow → 资料按主题分类'];document.getElementById('log').textContent=lines.join('\n');roll();}
 roll();
 </script>
 </body></html>

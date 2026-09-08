@@ -15,18 +15,18 @@
 5维乘法语义空间语言引擎：核(1040) × 映(180) × 态(80) × 标(64) × 相(8) = **7,667,712,000** 个可寻址词。
 双实现同构：`shuyu_engine.py`（Python）↔ `lexicon.js`（JS），同一编号必须解出同一个词。
 
-**已并入 Black God（两仓合一）**：本目录 `shuyu/` 是枢语权威源头；同仓 `web/nexus-do/`
-内嵌一份消费副本，是消费方。改引擎在此处改，再同步到消费副本，跑 `node tools/check-sync.mjs`
-（不带参数即自动比对上一级 `web/nexus-do/`）。
+**在 Black God 仓内**：本目录 `shuyu/` 是枢语**唯一权威源**。原 `web/nexus-do/` 内嵌的消费副本
+已于 2026-09-05 随后端删除，现无消费方、也无跨副本同步校验（`tools/check-sync.mjs` 已一并移除）。
+双实现同构由本目录 `tests/` 的跨实现用例守护。
 
 ## 铁律
 
 - 词根表只能在轴尾**追加**，绝不改动/删除/重排已有词根（否则历史编号全部错位）。
-- 改引擎必改双侧（Python + JS），并跑 `node tools/check-sync.mjs` 核对同仓 `web/nexus-do/` 消费副本。
+- 改引擎必改双侧（Python + JS），跑 `npm test` + `python3 -m unittest discover -s tests`，跨实现一致性由 `tests/engine.test.mjs` 守护。
 - 汉译纯中文；`decode→encode` 与 `decode→encode_han/encodeHan` 往返都必须成立（拉丁与汉译两种写法同源同编号）。
 - 词根表追加新族时，新汉字不得与阶/相/频/标位后缀字撞车，也不得成为下一轴首字（汉译唯一可解码的结构引理，测试有守卫）。
 - 引擎导出面（decode/encode/encodeHan/search/compose/autoCoin/coinFromCoord/coinWord/coinFromState）两侧必须同名同义，
-  `tests/engine.test.mjs` 的跨实现用例与 `tools/check-sync.mjs` 都会逐一比对。
+  `tests/engine.test.mjs` 的跨实现用例会逐一比对。
 
 ## 常用命令
 
@@ -34,7 +34,6 @@
 # 以下命令在本目录 shuyu/ 下执行
 npm test                                  # Node 测试（引擎/解释器/Worker/跨引擎一致性）
 python3 -m unittest discover -s tests -v  # Python 测试
-node tools/check-sync.mjs                 # 同仓同步校验（自动比对上一级 web/nexus-do/）
 ```
 
 ## Sub-agent 模型路由（成本分级，自动遵守）
