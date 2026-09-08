@@ -29,8 +29,8 @@ ios-app/AppStore/
 | 项目 | 值 |
 |---|---|
 | Bundle ID | `com.blackgod.nexus` |
-| 版本号 MARKETING_VERSION | `1.0.0` |
-| 构建号 CURRENT_PROJECT_VERSION | `1`（每次上传 +1） |
+| 版本号 MARKETING_VERSION | `1.1.0` |
+| 构建号 CURRENT_PROJECT_VERSION | `2`（每次上传 +1） |
 | 最低系统 | iOS 17.0 |
 | 设备 | 仅 iPhone |
 | 开发语言 | 简体中文，另附英文本地化 |
@@ -45,12 +45,39 @@ ios-app/AppStore/
 - [ ] **Xcode 签名**：在 Xcode 里选中 target → Signing & Capabilities → 勾选
       "Automatically manage signing"，Team 选自己的开发者团队。
       （`project.yml` 里 `CODE_SIGNING_ALLOWED: NO` 只影响 CI 无签名构建，真机/发布用 Xcode 自动签名即可。）
-- [ ] **App 图标**：确认 `ios-app/AppIcon.png` 为 1024×1024、无透明通道、无圆角（Apple 自己会裁圆角）。
-      工程用 `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`，首次打包前需在 Xcode 里新建
-      `Assets.xcassets` → App Icon，把这张 1024 图拖进去（iOS 17 起只需单尺寸）。
+- [x] **App 图标**：沿用一直在用的品牌图标（`web/icon-512.png` = `web/logo.png`，玉绿描边神字），
+      已按 App Store 硬要求放大到 **1024×1024 并去除 alpha 通道**，内置到
+      `ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon.png`。工程 `project.yml` 已把
+      `Assets.xcassets` 纳入 target，`ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` 直接命中，
+      `xcodegen generate` 后即带图标，**无需再在 Xcode 手动导入**。（`ios-app/AppIcon.png` 为同一张源图备份。）
+      > 备注：仓库内该图标最高清为 512×512，已放大到 1024；若日后有更高清原图，直接替换这两处 PNG 即可。
 - [ ] **隐私政策网址可访问**：仓库必须是 **Public**，否则审核员打不开
       `metadata/privacy_url.txt` 里的链接。若仓库必须私有，请把 `PRIVACY_POLICY.md`
       另行发布到任意公开网页（GitHub Pages / Cloudflare Pages 均可），再改 `privacy_url.txt`。
+
+## ⭐ 最省事:一条命令上架(fastlane)
+
+在你 Mac 上,装好 Xcode / `brew install xcodegen fastlane` / Node 18+,并用 App Store Connect
+API Key 设好环境变量(见 `fastlane/Appfile`),然后:
+
+```bash
+cd ios-app
+export ASC_KEY_ID=你的KeyID
+export ASC_ISSUER_ID=你的IssuerID
+export ASC_KEY_P8=/绝对路径/AuthKey_你的KeyID.p8
+fastlane release
+```
+
+它会自动:生成工程 → 出 App Store 截图 → 构建 → 上传(二进制+中英文案+截图)→ 提交审核。
+
+**首次上架仍需你在网页点几项(苹果只允许网页操作,任何工具替不了)**:
+先在 App Store Connect 建好 App(套装 ID `com.blackgod.nexus`);首次提交时的
+**年龄分级问卷、App 隐私、价格与销售范围** 到网页点一下(下方第 6 步有逐项答案)。
+之后的版本更新就真的一条 `fastlane release` 搞定。
+
+> 不想用命令行?下面第 2~8 节是全程 Xcode 图形界面的手动上架流程,同样可行。
+
+---
 
 ## 2. 生成工程并打包
 
@@ -98,7 +125,7 @@ open BlackGod888.xcodeproj
 5. **技术支持网址** ← `metadata/support_url.txt`
 6. **营销网址**：可留空。
 7. **副标题**（在页面上方"App 信息"区）← `metadata/zh-Hans/subtitle.txt`
-8. **版本**：`1.0.0`
+8. **版本**：`1.1.0`
 9. **版权**：`© 2026 Black God`
 10. **构建版本**：点 ＋ 选择步骤 2 上传的那个 build。
 

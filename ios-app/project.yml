@@ -39,6 +39,8 @@ targets:
       # 多语言资源：Localizable.strings / InfoPlist.strings
       - path: zh-Hans.lproj
       - path: en.lproj
+      # App 图标资源目录（1024×1024 已内置，xcodegen 直接纳入，无需在 Xcode 手动导入）
+      - path: Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.blackgod.nexus

@@ -1,0 +1,4 @@
+{
+  "name": "Black God / 神枢 · iOS 上架",
+  "install": "node ios-app/AppStore/preflight.mjs"
+}
