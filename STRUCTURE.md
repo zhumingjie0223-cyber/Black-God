@@ -1,64 +1,52 @@
-# 神枢仓库结构
+# Black God 仓库结构
 
-> 改动前先看这里。核心入口只有一个：`web/nexus-do/nexus_do.core.mjs`。
-> （2026-08-17 大扫除时对照实际文件重写，此前版本引用的 `wrangler.toml`、
-> `ui-polish.css` 均为已不存在的过时信息。）
+> 当前发布入口是 `ios-app/BlackGodApp.swift`，工程定义为 `ios-app/project.yml`。
+> 本说明依据当前原生 iOS 架构整理；历史资料中的 `web/nexus-do/` 已不在当前分支中。
 
-## 核心系统（唯一部署主体）
+## 原生应用与任务运行时
 
-| 路径 | 说明 |
+| 路径 | 作用 |
 |---|---|
-| `web/nexus-do/` | CF Worker 主系统（神枢本体） |
-| `web/nexus-do/nexus_do.core.mjs` | **唯一手写核心源码**，意识/记忆/路由/执行全在这里 |
-| `web/nexus-do/index.html` | 前端主界面（唯一 UI 入口，2026-08-09 收口确认），build 时整页内嵌进 Worker |
-| `web/nexus-do/build.mjs` | 构建脚本，产出 `nexus_do.mjs`（构建产物，勿手改） |
-| `web/nexus-do/wrangler.jsonc` | **生产权威部署配置**（DO×3 / AI / KV / cron / containers） |
-| `web/nexus-do/container/` | 内置容器执行脑镜像（`ExecContainer`，随主部署上线） |
-| `web/nexus-do/selftest.mjs` + `*.test.mjs` | 纯逻辑自测 236 项 + 各模块单测 |
-| `shuyu/` | 枢语引擎权威源（`lexicon.js` / `nexuslang.js` / Python 双实现 / 词根表 / 测试） |
+| `ios-app/BlackGodApp.swift` | SwiftUI 应用入口、全局状态和本地化入口 |
+| `ios-app/RootView.swift`、`ChatView.swift` | 应用导航与对话界面 |
+| `ios-app/ChatViewModel.swift` | 对话状态与请求协调 |
+| `ios-app/NexusClient.swift`、`NexusModelBridge.swift` | 模型请求与响应桥接 |
+| `ios-app/NexusModelCatalog.swift`、`NexusModelRouting.swift` | 模型目录和路由逻辑 |
+| `ios-app/NexusRuntime.swift`、`NexusAgentLoop.swift` | 计划、运行事件与任务执行循环 |
+| `ios-app/NexusTooling.swift`、`NexusExecutor.swift` | 工具注册、输入及执行接口 |
+| `ios-app/NexusApproval.swift`、`NexusPermissions.swift` | 工具调用审批与权限判断 |
+| `ios-app/NexusMemory.swift`、`NexusLocalTools.swift` | 本地记忆、检查点和文件工具 |
+| `ios-app/NexusKeychain.swift` | 服务商密钥的 Keychain 存储 |
+| `ios-app/Theme.swift` | 原生界面配色与公共样式 |
+| `ios-app/zh-Hans.lproj/`、`ios-app/en.lproj/` | 简体中文与英文资源 |
+| `ios-app/project.yml` | XcodeGen 工程定义、版本、标识符与资源列表 |
+| `ios-app/BlackGod.xcodeproj/` | Xcode 工程，结构变更后按 `project.yml` 重新生成 |
+| `ios-app/AppStore/` | 提交指南、商店文案、隐私政策与截图材料 |
 
-## 同步与工具
+客户端直接访问用户配置的模型服务商，不依赖自有 Cloudflare 后端。网络请求会将模型所需的对话和上下文发送给对应服务商；本地存储与第三方处理范围以当前隐私政策为准。
 
-| 路径 | 说明 |
+## 枢语引擎
+
+| 路径 | 作用 |
 |---|---|
-| `tools/check-sync.mjs` | 枢语源头 ↔ `web/nexus-do/` 消费副本一致性校验 |
-| `tools/sync-ui.mjs` | 主界面 ↔ 构建产物内嵌副本逐字节校验 |
-| `Makefile` | `make build` / `make test`（全链路） / `make check-sync` |
+| `shuyu/lexicon.js`、`shuyu/shuyu_engine.py` | v4.1 语义引擎的 JS / Python 实现 |
+| `shuyu/lexicon_data.js` | 词族、情绪模板与能力词编号数据 |
+| `shuyu/nexuslang.js`、`shuyu/gen.mjs` | 意识流解释器与状态生成逻辑 |
+| `shuyu/worker.mjs` | 可选的 Cloudflare Worker 入口，独立于 iOS |
+| `shuyu/tests/` | 引擎、解释器、Worker 与双实现测试 |
+| `shuyu/docs/done/` | v4.1 能力变更与验证记录 |
 
-## 公开静态站（与神枢本体无关）
+本仓 v4.1 比独立 `shuyu-lang` 仓库的旧基线更新；统一版本应保留这些能力与测试。现有编号一致性校验不能替代全部导出接口、解释器和 Worker 的回归。原生工程未嵌入枢语 JS / Python 文件，也无需调用其 Worker 才能构建。
 
-| 路径 | 说明 |
+## 资产、文档与历史工具
+
+| 路径 | 作用 |
 |---|---|
-| `worker.mjs` | 公开版 `blackgod88` Worker 入口（纯静态托管），独立部署 |
-| `config/wrangler.jsonc` | `blackgod88` 的部署配置（修好还是关掉待权哥拍板，勿动） |
-| `web/`（nexus-do 之外的文件） | 旧静态壳资产。**注意：`sw.js` / `manifest.json` 仍被 `nexus_do.core.mjs` 运行时引用，不可归档删除** |
+| `web/`、`assets/` | 网页历史资产、品牌图标与媒体资产 |
+| `ui-spec/` | 界面设计参考，当前实际样式以原生 `Theme.swift` 为准 |
+| `android/` | 旧 Android 分发材料 |
+| `docs/README.md`、`docs/INDEX.md` | 文档导航；其中历史状态需结合当前源码判断 |
+| `docs/archive/` | 旧服务、页面、配置、Xcode 工程及历史资料 |
+| `tools/`、`Makefile`、`.github/workflows/` | 开发和构建自动化，使用前确认目标为当前 iOS / 枢语路径 |
 
-## 客户端与上架材料
-
-| 路径 | 说明 |
-|---|---|
-| `ios-app/` | iOS 原生 App 骨架（未签名，取舍待权哥拍板） |
-| `android/` | Android TWA 上架材料 |
-| `assets/` | 品牌资产（`logo/brand_logo.png` 神字 Logo 等） |
-| `ui-spec/` | UI 设计规格 |
-| `skills/` | 技能定义 |
-
-## 文档（全部在 docs/ 下，入口 `docs/README.md`）
-
-| 路径 | 说明 |
-|---|---|
-| `docs/plan/` | 规划与上线清单（含 `BLUEPRINT.md`、六轴强化方案、`LAUNCH_CHECKLIST.md`） |
-| `docs/architecture/` `docs/spec/` | 架构与设计纲领 |
-| `docs/product/` | 产品定位与对外材料 |
-| `docs/done/` | 已完成任务归档（TODO/PROGRESS 完工后进这里） |
-| `docs/archive/` | 历史归档（旧 Python server、收口下线页面、孤儿脚本等） |
-
-## CI（.github/workflows/，共 5 条）
-
-| 工作流 | 触发 | 作用 |
-|---|---|---|
-| `deploy-nexus.yml` | push main（nexus-do/shuyu 变更） | 构建+全测+部署+安全闸 |
-| `nexus-do-ci.yml` | push/PR（nexus-do 变更） | 构建+自测+单测+双副本校验 |
-| `shuyu-ci.yml` | 枢语变更 | 枢语双实现测试 |
-| `build.yml` | push main | iOS unsigned IPA（取舍待拍板） |
-| `exec-shell.yml` | 手动/神枢派发 | 执行脑 GitHub Actions 通道 |
+旧的 `web/nexus-do` 构建、DO 部署和网页双副本检查属于已退出当前运行路径的流程。当前应用构建和枢语测试命令见 [README.md](README.md)；正式上架见 [提交指南](ios-app/AppStore/SUBMIT_GUIDE.md)。

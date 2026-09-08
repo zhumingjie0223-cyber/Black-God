@@ -77,3 +77,9 @@ ios-app/DerivedData/
 ios-app/AppStore/png/
 ios-app/AppStore/node_modules/
 ios-app/AppStore/package*.json
+
+# Reproducible iSH runtime build artifacts
+.runtime-build/
+.runtime-build-tools/
+ios-app/Runtime/Libs/
+ios-app/Runtime/AlpineRootfs/

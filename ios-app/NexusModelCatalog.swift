@@ -10,6 +10,11 @@ struct NexusModelCatalog {
         NexusModelEntry(providerID: "apiclaude", providerType: .openAICompatible, providerURL: "https://apiclaude.cc/v1", modelID: "gpt-6-astra", displayName: "GPT-6 Astra", isHidden: false)
     ]
     static func entry(for modelID: String) -> NexusModelEntry {
-        entries.first(where: { $0.modelID == modelID }) ?? entries[0]
+        if let saved = NexusKeychain.shared.selectedConnection, saved.modelID == modelID { return saved }
+        if let entry = entries.first(where: { $0.modelID == modelID }) { return entry }
+        if modelID.hasPrefix("claude-") {
+            return NexusModelEntry(providerID: "anthropic", providerType: .anthropic, providerURL: "https://api.anthropic.com", modelID: modelID, displayName: modelID, isHidden: false)
+        }
+        return NexusModelEntry(providerID: "unconfigured", providerType: .openAICompatible, providerURL: "", modelID: modelID, displayName: modelID, isHidden: false)
     }
 }

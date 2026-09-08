@@ -1,1 +1,1 @@
-Private AI Chat, Your API Key
+AI chat and local task tools

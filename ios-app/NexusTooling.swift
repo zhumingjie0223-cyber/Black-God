@@ -14,11 +14,24 @@ struct NexusToolResult: Codable, Equatable {
 
 protocol NexusTool {
     var name: String { get }
+    var usage: String { get }
+    var canReuseResult: Bool { get }
     func execute(_ call: NexusToolCall) async -> NexusToolResult
+}
+
+extension NexusTool {
+    var usage: String { name }
+    var canReuseResult: Bool { false }
 }
 
 struct NexusToolRegistry {
     private var tools: [String: any NexusTool] = [:]
+    var isEmpty: Bool { tools.isEmpty }
+    func contains(_ name: String) -> Bool { tools[name] != nil }
+    func canReuseResult(_ name: String) -> Bool { tools[name]?.canReuseResult ?? false }
+    var manifest: String {
+        tools.keys.sorted().compactMap { tools[$0] }.map { "\($0.name): \($0.usage)" }.joined(separator: "\n")
+    }
     mutating func register(_ tool: any NexusTool) { tools[tool.name] = tool }
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         guard let tool = tools[call.name] else {

@@ -1,14 +1,14 @@
 import Foundation
 
-/// iOS 安全边界：App Store 版 App 不直接执行任意 shell 命令。
-/// `Process` / `NSTask` 在 iOS 上不存在，且审核禁止任意代码执行。
-/// 此工具保留为神枢工具总线的占位，明确返回环境限制。
+/// 当前工程尚未链接 Linux 用户态模拟器，也未配置远程执行服务。
+/// iSH 类执行能力需要独立的内核、rootfs、进程管理与权限边界。
+/// 此占位工具不注册到模型的原生工具列表。
 struct NexusShellTool: NexusTool {
     let name = "shell"
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         NexusToolResult(
             callID: call.id,
-            output: "当前 iOS 客户端不提供 shell 执行环境。命令执行能力仅存在于服务端/开发环境。",
+            output: "当前 iOS 客户端不提供 shell 执行环境。尚未接入 iSH/Linux 或远程执行后端。",
             succeeded: false
         )
     }

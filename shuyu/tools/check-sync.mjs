@@ -4,12 +4,20 @@
 //   引擎层(词根表/容量/编解码行为)不一致 → 硬失败(退出码 1)
 //   数据层(词库/情绪表/编号表)分叉      → 警告报告(--strict 时也算失败)
 import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const HERE = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // 本仓根目录
 const args = process.argv.slice(2).filter(a => a !== '--strict');
 const strict = process.argv.includes('--strict');
+
+// 当前消费方是原生iOS，验证生成资源与权威源，而不是跳过同步。
+const hostRoot = path.dirname(HERE);
+if (args.length === 0 && existsSync(path.join(hostRoot, 'ios-app/ShuyuRuntime'))) {
+  execFileSync('python3', [path.join(hostRoot, 'tools/shuyu/bundle.py'), '--check'], {stdio: 'inherit'});
+  process.exit(0);
+}
 
 // 定位一个仓库里的引擎与数据文件(源头仓在根目录，Black God 在 web/nexus-do/)
 function locate(repoRoot) {

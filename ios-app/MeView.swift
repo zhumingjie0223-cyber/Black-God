@@ -6,6 +6,12 @@ import SwiftUI
 
 struct MeView: View {
     @EnvironmentObject var appState: AppState
+    @ObservedObject var memory: NexusMemoryStore
+    @ObservedObject var skills: NexusSkillStore
+    @ObservedObject var practice: NexusSkillPractice
+    @State private var showSkills = false
+    @State private var showPrivacy = false
+    @State private var showMemory = false
     @State private var showNexusConnection = false
 
     var body: some View {
@@ -21,7 +27,7 @@ struct MeView: View {
                         .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
                     HStack(spacing: 8) {
                         Label("神枢", systemImage: "infinity")
-                        Label("888专属", systemImage: "crown.fill")
+                        Label("智能助手", systemImage: "crown.fill")
                     }
                     .font(.system(size: 12)).foregroundStyle(Color.bgGold)
                 }
@@ -29,23 +35,33 @@ struct MeView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
                 VStack(spacing: 0) {
                     Button { appState.haptic(); showNexusConnection = true } label: {
-                        SettingRow(icon: "shield.lefthalf.filled", title: "神枢连接", value: "Cloudflare · Keychain", color: .bgGold)
+                        SettingRow(icon: "shield.lefthalf.filled", title: "神枢连接", value: "OAuth 登录 · 模型直连", color: .bgGold)
                     }
+                    .accessibilityIdentifier("api.open")
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "waveform", title: "语音音色", value: "灵光·甜美", color: .bgPurple)
+                    Button { showMemory = true } label: {
+                        SettingRow(icon: "brain.head.profile", title: "长期记忆", value: "\(memory.curated.count)条", color: .bgGold)
+                    }.accessibilityIdentifier("memory.open")
+                    Divider().background(Color.bgCardLight)
+                    Button { showSkills = true } label: {
+                        SettingRow(icon: "list.bullet.rectangle", title: "任务技能", value: "\(skills.items.count)个", color: .bgGold)
+                    }.accessibilityIdentifier("skills.open")
                     Divider().background(Color.bgCardLight)
                     SettingRow(icon: "heart.fill", title: "助手模式", value: "神枢", color: .pink)
                     Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "本地优先", color: .green)
+                    Button { showPrivacy = true } label: { SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "数据使用说明", color: .green) }.accessibilityIdentifier("privacy.open")
                 }
                 .bgCard().padding(.horizontal, 16)
-                Text("Black God 888 · v1.0\nBlack God AI私人专属版 · 神枢")
+                Text("Black God · v1.0\nBlack God AI私人专属版 · 神枢")
                     .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                     .multilineTextAlignment(.center).padding(.top, 8)
             }
             .padding(.bottom, 100)
         }
         .padding(.top, 50)
+        .sheet(isPresented: $showPrivacy) { NexusPrivacyView() }
+        .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
+        .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
         .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }

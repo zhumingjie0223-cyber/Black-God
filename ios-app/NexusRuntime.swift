@@ -41,6 +41,7 @@ final class NexusRuntime: ObservableObject {
     }
 
     func append(_ event: NexusRunEvent) {
+        if case .completed = event { runState = .completed }
         events.append(event)
         if events.count > 500 { events.removeFirst(events.count - 500) }
     }
@@ -107,6 +108,11 @@ final class NexusRuntime: ObservableObject {
         metrics.rejections += 1
         runState = .failed("用户拒绝工具调用：\(call.name)")
         append(.status("已拒绝：\(call.name)"))
+    }
+
+    func fail(_ message: String) {
+        runState = .failed(message)
+        append(.status("失败：\(message)"))
     }
 
     func cancel() {
