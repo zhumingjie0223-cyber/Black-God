@@ -1,0 +1,20 @@
+# 生成物 / 构建产物,不入库(工程由 xcodegen 现场生成)
+*.xcodeproj/
+build/
+DerivedData/
+Payload/
+*.ipa
+
+# 截图与依赖(fastlane / 导出脚本现场生成)
+AppStore/png/
+AppStore/screenshots/
+AppStore/node_modules/
+AppStore/package.json
+AppStore/package-lock.json
+
+# fastlane 运行产物
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+fastlane/*.log

@@ -55,6 +55,30 @@ ios-app/AppStore/
       `metadata/privacy_url.txt` 里的链接。若仓库必须私有，请把 `PRIVACY_POLICY.md`
       另行发布到任意公开网页（GitHub Pages / Cloudflare Pages 均可），再改 `privacy_url.txt`。
 
+## ⭐ 最省事:一条命令上架(fastlane)
+
+在你 Mac 上,装好 Xcode / `brew install xcodegen fastlane` / Node 18+,并用 App Store Connect
+API Key 设好环境变量(见 `fastlane/Appfile`),然后:
+
+```bash
+cd ios-app
+export ASC_KEY_ID=你的KeyID
+export ASC_ISSUER_ID=你的IssuerID
+export ASC_KEY_P8=/绝对路径/AuthKey_你的KeyID.p8
+fastlane release
+```
+
+它会自动:生成工程 → 出 App Store 截图 → 构建 → 上传(二进制+中英文案+截图)→ 提交审核。
+
+**首次上架仍需你在网页点几项(苹果只允许网页操作,任何工具替不了)**:
+先在 App Store Connect 建好 App(套装 ID `com.blackgod.nexus`);首次提交时的
+**年龄分级问卷、App 隐私、价格与销售范围** 到网页点一下(下方第 6 步有逐项答案)。
+之后的版本更新就真的一条 `fastlane release` 搞定。
+
+> 不想用命令行?下面第 2~8 节是全程 Xcode 图形界面的手动上架流程,同样可行。
+
+---
+
 ## 2. 生成工程并打包
 
 ```bash

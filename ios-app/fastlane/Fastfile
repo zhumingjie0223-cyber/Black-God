@@ -1,0 +1,60 @@
+# 神枢 Black God · iOS 上架流水线
+# 在 Mac 上执行:  cd ios-app && fastlane release
+# 前置:已装 Xcode、xcodegen(brew install xcodegen)、fastlane(brew install fastlane)、Node 18+;
+#      并已用 App Store Connect API Key 设好环境变量(见 Appfile)。
+# 说明:本文件在 Linux 上无法实测(iOS 构建只能在 macOS),逻辑已按 fastlane 官方用法编写。
+
+default_platform(:ios)
+
+platform :ios do
+  desc "一键上架 App Store:生成工程 → 出截图 → 构建 → 上传(二进制/文案/截图)→ 提交审核"
+  lane :release do
+    # 1) App Store Connect API Key 认证(凭据只从环境变量读,绝不写进仓库)
+    api_key = nil
+    if ENV["ASC_KEY_ID"] && ENV["ASC_ISSUER_ID"] && ENV["ASC_KEY_P8"]
+      api_key = app_store_connect_api_key(
+        key_id: ENV["ASC_KEY_ID"],
+        issuer_id: ENV["ASC_ISSUER_ID"],
+        key_filepath: ENV["ASC_KEY_P8"],
+        in_house: false
+      )
+    else
+      UI.important("未检测到 ASC_* 环境变量;将走 Apple ID 登录(需在 Appfile 填 apple_id 并完成双重认证)。")
+    end
+
+    # 2) 由 project.yml 生成 Xcode 工程(sh 默认在 fastlane/ 目录执行,cd .. 回到 ios-app)
+    sh("cd .. && xcodegen generate")
+
+    # 3) 生成 App Store 6.7\" 截图(1290×2796),并整理成 deliver 需要的 <locale> 结构(中英共用同一套)
+    sh("cd ../AppStore && (npm ls playwright > /dev/null 2>&1 || npm i -D playwright) && npx playwright install chromium && node export_screenshots.mjs")
+    sh("cd ../AppStore && rm -rf screenshots && for L in zh-Hans en-US; do mkdir -p \"screenshots/$L\" && cp png/6_7/*.png \"screenshots/$L/\"; done")
+
+    # 4) 构建 App Store 发布包(自动签名由 Xcode 管理;分发证书来自你的开发者账号)
+    build_app(
+      project: "BlackGod888.xcodeproj",
+      scheme: "BlackGod888",
+      configuration: "Release",
+      export_method: "app-store"
+    )
+
+    # 5) 上传二进制 + 商店文案 + 截图,并提交审核
+    #    首次上架前:App 必须已在 App Store Connect 建好;分级问卷/价格/App隐私 等
+    #    App 级设置苹果只允许在网页点选,任何工具替不了(见 AppStore/SUBMIT_GUIDE.md 第 6 步)。
+    upload_to_app_store(
+      api_key: api_key,
+      metadata_path: "./AppStore/metadata",
+      screenshots_path: "./AppStore/screenshots",
+      submit_for_review: true,
+      automatic_release: false,     # 审核通过后由你手动点发布,便于控制时间
+      force: true,                  # 跳过 HTML 预览的人工确认
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        export_compliance_uses_encryption: false,        # 仅用 HTTPS 标准加密
+        content_rights_contains_third_party_content: false,
+        add_id_info_uses_idfa: false
+      }
+    )
+
+    UI.success("已提交 App Store 审核。若报缺分级/隐私/价格,去 App Store Connect 网页把这几项点一下再重跑即可。")
+  end
+end
