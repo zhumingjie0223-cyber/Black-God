@@ -1,0 +1,6 @@
+1.2.0 (8)
+- Self-improvement governance: the model may propose low-risk improvements based on tool failures; proposals are only recorded and must be reviewed by you in Growth > Self Decisions before publishing. Nothing is executed automatically.
+- Growth / image observation: text in your pictures is recognized on device; the original image is not sent to the model, and recognized text is only sent after you confirm it.
+- Self-state stream: recent task summaries and tool states are kept on device and can be paused or cleared.
+- Built-in runtime: interrupted, cancelled and failed commands are now reported distinctly.
+- Fixed governance records failing to load after upgrading from an earlier build.

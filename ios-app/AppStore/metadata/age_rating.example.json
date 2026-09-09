@@ -1,0 +1,17 @@
+{
+  "_comment": "复制为 age_rating.json 并由人按 App 实际内容逐项填写。等级字段取 NONE / INFREQUENT_OR_MILD / FREQUENT_OR_INTENSE；布尔字段取 true / false。工具不接受占位值，也不提供“全选无”的默认答案。unrestrictedWebAccess 指 App 是否内含可自由浏览任意网页的浏览器。",
+  "alcoholTobaccoOrDrugUseOrReferences": "FILL_ME",
+  "contests": "FILL_ME",
+  "gamblingSimulated": "FILL_ME",
+  "horrorOrFearThemes": "FILL_ME",
+  "matureOrSuggestiveThemes": "FILL_ME",
+  "medicalOrTreatmentInformation": "FILL_ME",
+  "profanityOrCrudeHumor": "FILL_ME",
+  "sexualContentGraphicAndNudity": "FILL_ME",
+  "sexualContentOrNudity": "FILL_ME",
+  "violenceCartoonOrFantasy": "FILL_ME",
+  "violenceRealistic": "FILL_ME",
+  "violenceRealisticProlongedGraphicOrSadistic": "FILL_ME",
+  "gambling": "FILL_ME",
+  "unrestrictedWebAccess": "FILL_ME"
+}
