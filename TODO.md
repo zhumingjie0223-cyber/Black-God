@@ -1,31 +1,35 @@
 # TODO · 按 Codex 主线完成 Black God iOS 1.2.0 正式上线与发布
 
-开工：2026-09-09 08:27 (UTC+7)，08:36 后执行环境从权哥的 Mac 切到云端 Linux 机器
-基线：`codex/release-readiness` @ a862ddd（Codex 主线，已推送）
-工作分支：`cursor/release-1-2-0-build8-1769`
-
-## 环境切换说明（重要）
-
-Mac 上那份 Codex 工作区（`~/Documents/Codex/2026-09-08/ke/work/Black-God`）里有 **365 行未提交的"自决策治理"代码**
-和我 08:31 改的 4 处去 iSH 文案，**都只在 Mac 本地，云端拿不到**。云端只能做不依赖 Xcode 的事；
-打包 / 上传 Apple / 提审 必须回 Mac 或走 Codemagic CI。
+开工：2026-09-09 08:27 (UTC+7)
+基线：`codex/release-readiness` @ a862ddd（Codex 主线）
+结果：代码侧已全部合入 `main`（e3568e8，标签 v1.2.0），GitHub 正式 Release「Black God 1.2.0 (8)」已发布；
+Apple 上传与 App Store 审核提交属 Mac + 权哥本人（2FA）环节，见下方"剩余"。
 
 ## 步骤
 
-- [x] 0. 核对 Codex 工作区现状（Mac 侧完成）：分支/未提交改动/测试入口/证书/账号均已确认
-- [x] 1b. UI 文案去 "iSH"（Mac 侧已改但未提交；云端重新应用一遍到工作分支）
-- [~] 1c. 首轮全量测试（Mac 侧）：252 单元测试全过；UI 13 项 9 过 4 败，重跑被环境切换打断
-- [x] 2. 云端：`ios-app/project.yml` CURRENT_PROJECT_VERSION 7 → 8
-- [x] 3. 云端测试：枢语资源与权威源一致；JS 88 项通过；Python 37 项通过；源码打包工具 5 项通过
-- [x] 4. Codemagic：评估后**不改**——Codex 主线的 codemagic.yaml 已指向 BlackGod 工程；888 分支的 preflight.mjs 绑定该分支结构（本地化 URL 文件、共享检查等），套过来 8 项误报，不值得为它改仓结构
-- [x] 5. 云端：三笔提交已推送，PR #114 已开（目标 main）；Codex 原 TODO.md（145 行）已归档到 docs/done/
-- [ ] 6. 【需回 Mac】提交那 365 行代码并推送；归档 → 导出 → 上传 1.2.0 (8)
-- [ ] 7. 【需权哥】App Store Connect 填版本信息 / 隐私标签 / 分级 / 选构建 → 提交审核（2FA 只能人做）
-- [ ] 8. GitHub Release v1.2.0-build8 正式版；合并 PR 到 main 并打 tag
-- [ ] 9. 写总结，TODO.md 归档到 docs/done/
+- [x] 0. 核对 Codex 工作区现状（Mac 侧）：分支 / 365 行未提交 / 测试入口 / 证书 / Xcode 账号
+- [x] 1. 365 行"自决策治理"代码 → 已在 Mac 侧提交为 51b0546（含旧治理文件兼容修复、UI 测试按需滚动修复），248 单元 + 13 UI 全过
+- [x] 1b. UI 文案去 iSH，统一"内置执行环境"（Mac 侧随 51b0546 一并进 main；云端分支同样改动已被 main 覆盖）
+- [x] 2. 构建号 1.2.0 (7) → (8)
+- [x] 3. 云端可跑测试：枢语资源一致；JS 88 / Python 37 / 源码打包 5 全过
+- [x] 4. Codemagic：评估后不改（Codex 主线 codemagic.yaml 已指向 BlackGod 工程；888 分支 preflight 不适用）
+- [x] 5. 云端 PR #114：main 已先行合入同等内容，本分支已合回 main，现仅剩 TODO 归档差异，**不要当发布 PR 合并**
+- [x] 6. 合并到 main + 打 tag v1.2.0（Mac 侧完成，e3568e8）
+- [x] 7. GitHub Release v1.2.0「Black God 1.2.0 (8)」正式版（非预发布），源码包 + SHA-256 清单两个资产
+- [ ] 8. 【Mac】归档 → App Store 导出 → 上传 1.2.0 (8) 到 App Store Connect
+- [ ] 9. 【权哥】App Store Connect 填版本信息 / 隐私标签 / 年龄分级 / 选构建 8 → 提交审核（网页此前反复 502，2FA 必须本人）
+- [ ] 10. 审核通过后：手动发布上架；把本文件归档到 docs/done/
+
+## 剩余事项说明
+
+- 第 8、9 步需要 Xcode 与 Apple 登录会话，只能在权哥 Mac 上的本地会话执行；云端 Linux 机器无法进行。
+- 顺带发现：`.github/workflows/deploy-nexus.yml` 在每次 push main 时失败，原因是 `web/nexus-do/` 目录早在 7ed48e2（iOS 纯客户端重构）就已删除，
+  工作流是僵尸配置，与本次发布无关；建议单独清理。
 
 ## 进度记录
 
-- 08:28 Mac：`make test-ios` 252 单元测试通过，UI 4 项失败（历史日志显示本就不稳定）
-- 08:31 Mac：4 处 iSH 文案改为品牌口径（未提交，留在 Mac）
-- 08:38 云端：从 origin/codex/release-readiness 建分支 cursor/release-1-2-0-build8-1769
+- 08:28 Mac：`make test-ios` 252 单元通过，UI 4 项失败（旧脚本不滚动）
+- 08:31 Mac：4 处 iSH 文案改品牌口径
+- 08:36 云端接手：建分支 cursor/release-1-2-0-build8-1769，重做文案 + 构建号 + TODO 归档，开 PR #114
+- 09:08 Mac 侧并行推进：51b0546 提交全部代码修复，09:16 合并 main、打 tag v1.2.0、发布 GitHub Release
+- 11:4x 云端：确认 main 已包含一切，合并 main 回工作分支，PR #114 降为文档归档
