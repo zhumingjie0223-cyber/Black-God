@@ -1,6 +1,6 @@
 //
 //  AppIntents.swift
-//  Black God 888 — 把 Black God AI 暴露为系统可调用的意图
+//  Black God — 把 Black God AI 暴露为系统可调用的意图
 //
 //  通过 App Intents 让 Siri / 快捷指令 / 系统 Agent 调用 Black God AI。
 //  纯客户端：直接使用本地模型配置（用户自带 API Key），零后端。
@@ -13,21 +13,27 @@ import Foundation
 @MainActor
 enum NexusIntentAPI {
     static func ask(_ text: String) async throws -> String {
-        guard NexusKeychain.shared.hasAPIKey else {
+        let model = NexusKeychain.shared.selectedModel
+        guard !(NexusKeychain.shared.key(for: NexusModelCatalog.entry(for: model).credentialID) ?? "").isEmpty else {
             throw IntentError.missingKey
         }
-        return try await withCheckedThrowingContinuation { cont in
-            Task {
-                await NexusClient.shared.streamChat(
-                    messages: [ChatMessage(role: "user", content: text)],
-                    onDelta: { _ in },
-                    onComplete: { },
-                    onError: { _ in }
-                )
-            }
-            // streamChat 通过回调交付，这里用同步兜底：返回提示语
-            cont.resume(returning: "已在 App 内打开对话，请在聊天页查看结果。")
-        }
+        let connection = NexusModelCatalog.entry(for: model)
+        let key = NexusKeychain.shared.key(for: connection.credentialID)
+        let client = NexusClient(keyProvider: { _ in key }, resolver: { _ in connection })
+        var tools = NexusToolRegistry(control: .shared)
+        tools.register(NexusCausalTool()); tools.register(NexusDependencyTool())
+        tools.register(NexusShuyuTool())
+        tools.register(NexusClockTool())
+        tools.register(NexusCalculatorTool())
+        if NexusLinuxTool.enabled { tools.register(NexusLinuxTool(workspace: NexusWorkspaceIdentity.id(for: "shortcuts"))) }
+        let nativeTurn: NexusNativeTurn? = NexusModelCatalog.entry(for: model).usesNativeTools ? {
+            try await client.nativeTurn(messages: $0, tools: $1, model: model)
+        } : nil
+        tools.register(NexusShuyuRunTool(tools: tools))
+        let engine = NexusReasoningEngine(tools: tools, model: { try await client.complete(messages: [ChatMessage(role: "user", content: $0)], model: model) },
+            nativeTurn: nativeTurn)
+        let result = try await engine.run(goal: text)
+        return result.text + (result.warning.map { "\n\n" + $0 } ?? "")
     }
 }
 
@@ -43,7 +49,7 @@ enum IntentError: LocalizedError {
 // —— 问 Black God AI ——
 struct AskBlackGodIntent: AppIntent {
     static var title: LocalizedStringResource = "问 Black God AI"
-    static var description = IntentDescription("把问题交给 Black God AI，打开 App 查看回答。")
+    static var description = IntentDescription("把问题交给 Black God AI，返回实际回答。")
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "你想说什么")
@@ -53,8 +59,8 @@ struct AskBlackGodIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        _ = try await NexusIntentAPI.ask(text)
-        return .result(dialog: "已打开 Black God AI。")
+        let answer = try await NexusIntentAPI.ask(text)
+        return .result(dialog: "\(answer)")
     }
 }
 

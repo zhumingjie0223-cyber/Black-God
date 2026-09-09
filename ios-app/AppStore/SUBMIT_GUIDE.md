@@ -1,190 +1,69 @@
-# App Store 上架指南 · 神枢 Black God
+# Black God 发布流程
 
-> 本文档面向权哥，按步骤照做即可完成首次上架。所有材料已备齐在本目录下，
-> 上架过程中只需复制粘贴，不需要临场写文案。
+更新：2026-09-09。此文件替换旧版仅支持 Anthropic 的草案。不能把构建成功、测试通过或 IPA 导出称为已上架。
 
-## 0. 目录速览
+## 当前发布配置
 
-```
-ios-app/AppStore/
-├── SUBMIT_GUIDE.md            ← 本文档
-├── screenshots.html           ← 5 张 App Store 截图源文件（HTML+CSS，石墨暗流·玉绿）
-├── screenshots_guide.md       ← 截图导出 PNG 操作指南
-├── export_screenshots.mjs     ← 截图一键导出脚本（Playwright）
-├── PRIVACY_POLICY.md          ← 隐私政策（中英双语，privacy_url 指向它）
-└── metadata/
-    ├── privacy_url.txt        ← 隐私政策网址
-    ├── support_url.txt        ← 技术支持网址（GitHub Issues）
-    ├── zh-Hans/               ← 简体中文商店文案
-    │   ├── name.txt           App 名称（≤30 字符）
-    │   ├── subtitle.txt       副标题（≤30 字符）
-    │   ├── description.txt    详细描述（≤4000 字符）
-    │   ├── keywords.txt       关键词，英文逗号分隔（≤100 字符）
-    │   └── promotional_text.txt 推广文本（≤170 字符，可随时改不用重新审核）
-    └── en-US/                 ← 英文商店文案，文件同上
-```
+- 名称：Black God；Bundle ID：com.blackgod.nexus。
+- 版本 1.2.0，构建 7，iPhone，最低 iOS 17。
+- 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
+- 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
 
-工程关键参数（已在 `project.yml` 固定，不要改）：
+## 构建 7：自我状态流开发版
 
-| 项目 | 值 |
-|---|---|
-| Bundle ID | `com.blackgod.nexus` |
-| 版本号 MARKETING_VERSION | `1.0.0` |
-| 构建号 CURRENT_PROJECT_VERSION | `1`（每次上传 +1） |
-| 最低系统 | iOS 17.0 |
-| 设备 | 仅 iPhone |
-| 开发语言 | 简体中文，另附英文本地化 |
+新增事件驱动的自我状态记录、运行绑定公开自评工具、暂停/清空和重启中断处理。没有主观意识证明或后台持续推理。本轮242项单元测试、3项界面测试通过（含新增9项状态流测试）。构建6的签名或上传状态不代表构建7，真实账号与真机验收仍待完成。公共隐私政策仍需同步。
 
----
+## 构建 6：神枢成长开发版
 
-## 1. 上架前准备（一次性）
+增加线性因果模型干预计算、任务依赖检查、知识候选与核对流程、限时模型工具授权、可撤销权限与本机审计、用户选图的本机OCR。没有主观意识证明、权重自训练或机器人/实验设备适配。233项单元测试和2项界面测试通过；OCR使用真实Vision识别合成测试图片。完整机制和限制见docs/COGNITIVE_CONTROL.md。
 
-- [ ] **Apple Developer Program**：已付费加入（个人或公司账号，99 美元/年）。
-- [ ] **Bundle ID 注册**：登录 https://developer.apple.com/account → Identifiers → 新建 App ID，
-      填 `com.blackgod.nexus`。Capabilities 不需要勾选任何项（纯客户端，entitlements 为空）。
-- [ ] **Xcode 签名**：在 Xcode 里选中 target → Signing & Capabilities → 勾选
-      "Automatically manage signing"，Team 选自己的开发者团队。
-      （`project.yml` 里 `CODE_SIGNING_ALLOWED: NO` 只影响 CI 无签名构建，真机/发布用 Xcode 自动签名即可。）
-- [ ] **App 图标**：确认 `ios-app/AppIcon.png` 为 1024×1024、无透明通道、无圆角（Apple 自己会裁圆角）。
-      工程用 `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`，首次打包前需在 Xcode 里新建
-      `Assets.xcassets` → App Icon，把这张 1024 图拖进去（iOS 17 起只需单尺寸）。
-- [ ] **隐私政策网址可访问**：仓库必须是 **Public**，否则审核员打不开
-      `metadata/privacy_url.txt` 里的链接。若仓库必须私有，请把 `PRIVACY_POLICY.md`
-      另行发布到任意公开网页（GitHub Pages / Cloudflare Pages 均可），再改 `privacy_url.txt`。
+当前开发版尚未作为正式发布验收完成。新隐私说明须同步到公开隐私网址，真实模型账号及真机验收仍需完成；不能把之前build5的Apple上传状态当作build6的状态。
 
-## 2. 生成工程并打包
+## 构建 5 更新
 
-```bash
-cd ios-app
-brew install xcodegen          # 首次
-xcodegen generate              # 由 project.yml 生成 BlackGod888.xcodeproj
-open BlackGod888.xcodeproj
-```
+修复完整开源许可单个超长文本无法绘制的问题，采用分段加载；界面测试检查正文可见及可滚动。构建 4 已于 2026-09-09 04:54（UTC+7）上传，因上述显示问题由构建 5 取代。构建 5 的上传和处理状态须独立确认。
 
-在 Xcode 中：
+## 构建 4 更新
 
-1. 顶部设备选 **Any iOS Device (arm64)**。
-2. 菜单 **Product → Archive**，等待归档完成，自动弹出 Organizer。
-3. Organizer 里选中刚生成的 Archive → **Distribute App** → **App Store Connect** → **Upload**。
-   一路默认（勾选自动管理签名、包含 bitcode 选项若有则不勾），点 Upload。
-4. 上传成功后约 10~30 分钟，App Store Connect 里会出现该构建版本（期间会收到"已完成处理"邮件）。
+内置 Alpine 升级为 3.22.5，并通过 apk 签名验证安装 OpenSSL 3.5.8。升级保留旧运行环境，只迁移用户工作区；文件/索引不完整时停止迁移，不静默丢弃。工作区初始化可恢复中断。新增应用内开源许可和真实版本显示。221 项不同单元测试、3 项界面测试通过；16 个安装包完成 144 次 Alpine secdb 修复版本对比，无落后项。新构建的上传状态须单独确认，不能沿用构建 3 的成功状态。
 
-> 若报 "No profiles for 'com.blackgod.nexus'"，回到步骤 1 检查 Bundle ID 是否已注册且 Team 选对。
+## 构建 3 更新
 
-## 3. 在 App Store Connect 创建 App
+Claude 官方 API 配置支持可选 Workspace ID。Claude.ai 订阅登录不作为 Black God 原生 OAuth 实现；OpenRouter 授权后的 Claude 使用 OpenRouter 的账号额度。
 
-登录 https://appstoreconnect.apple.com → **我的 App** → 左上 **＋** → **新建 App**：
+新增按连接的数据发送许可，聊天和原生工具回合请求前强制检查。应用内可阅读完整隐私政策。隐私清单包含文件元数据、应用定时、磁盘空间与本机偏好所需理由。真实磁盘空间只用于本机显示/写入保护；Linux statfs 返回逻辑工作空间预算，避免工具输出携带手机真实磁盘容量。
 
-| 字段 | 填写 |
-|---|---|
-| 平台 | iOS |
-| 名称 | 粘贴 `metadata/zh-Hans/name.txt` 内容：`神枢 Black God` |
-| 主要语言 | 简体中文 |
-| 套装 ID | 选 `com.blackgod.nexus` |
-| SKU | `blackgod-nexus-ios`（内部编号，随意但唯一） |
-| 用户访问权限 | 完全访问 |
+商店中英文文案已按当前能力重写。不得复用旧文案中的“不发送任何数据”“密钥不会离开设备”“一键删除全部”“已上线”或“所有分级都填无”。不得使用旧 screenshots.html 的模拟聊天截图冒充真实运行截图。
 
-## 4. 填写商店信息（中文，主要语言）
+## 可复现的本地归档
 
-进入 App → **1.0 准备提交** 页面：
+在仓库运行 xcodegen generate --spec ios-app/project.yml，然后使用 xcodebuild archive：
 
-1. **截屏**：至少上传 6.7 英寸（iPhone 15 Pro Max / 16 Pro Max）尺寸 1290×2796 的截图 3~10 张。
-   **成品已备好**：`screenshots.html` 里有 5 张带营销标语的精修图（主对话 → API Key 配置 →
-   多模型选择 → 本地历史记录 → 隐私安全），按 `screenshots_guide.md` 一键导出 PNG 后直接上传，
-   不必再用模拟器裸截。（6.5 英寸尺寸 Apple 可自动缩放复用 6.7 英寸的，不用单独做。）
-2. **推广文本** ← `metadata/zh-Hans/promotional_text.txt`
-3. **描述** ← `metadata/zh-Hans/description.txt`
-4. **关键词** ← `metadata/zh-Hans/keywords.txt`
-5. **技术支持网址** ← `metadata/support_url.txt`
-6. **营销网址**：可留空。
-7. **副标题**（在页面上方"App 信息"区）← `metadata/zh-Hans/subtitle.txt`
-8. **版本**：`1.0.0`
-9. **版权**：`© 2026 Black God`
-10. **构建版本**：点 ＋ 选择步骤 2 上传的那个 build。
+- project：ios-app/BlackGod.xcodeproj；scheme：BlackGod；configuration：Release；destination：generic/platform=iOS。
+- DEVELOPMENT_TEAM=8429ZL8NQ9；CODE_SIGN_STYLE=Automatic；CODE_SIGN_IDENTITY=Apple Development。
+- 不传手动 PROVISIONING_PROFILE_SPECIFIER；现有描述文件由 Xcode 自动管理。
+- archivePath 指向工作目录中的 .xcarchive。
 
-## 5. 添加英文本地化
+导出使用 method=app-store-connect、destination=export、signingStyle=automatic、teamID，允许使用 Xcode 已登录账号更新发布描述文件。先本地导出并校验签名；是否上传以及最终构建号要以 App Store Connect 的真实状态为准。
 
-在版本页右上角语言下拉 → **添加语言** → **英语（美国）**，然后把 `metadata/en-US/` 五个文件
-逐项粘贴到对应字段（名称、副标题、推广文本、描述、关键词）。截图可复用中文的，
-或用英文系统语言的模拟器再截一套。
+## 提交前仍需完成
 
-## 6. App 信息 / 分级 / 隐私（左侧栏）
+1. 使用真实且有额度的账号验证 Claude/其他拟发布连接的对话、工具回传和授权刷新；提供审核可用的受限凭据或可审核的演示入口，不把占位密钥提交给 Apple。
+2. 在 App Store Connect 完成登录，核实应用与构建记录，填写真实审核联系人、地区、价格、内容权利和年龄分级。不能编造信息或代替用户接受未审阅的合同。
+3. 已通过设备现有 GitHub 登录发布隐私政策，提交 6f80179077c60f3dbf37aafd0ef2832a775bdd50；匿名读取公共 raw 页面与包内文件逐字节一致。仍需在 App Store Connect 核实隐私网址字段。
+4. 按实际第三方服务数据行为填写隐私标签。当前清单按账号关联的用户内容和账号识别信息声明应用功能用途、无追踪；服务商保留策略仍需核对，不默认填“未收集数据”。
+5. 核验内置 iSH/Alpine 及修改源码的许可、源码提供与分发义务；明确说明解释执行、软件包与联网能力，按 Apple 对可执行代码和小程序/插件的实际适用要求准备审核说明。
+6. 为新增 CLI OAuth 兼容路线确认客户端登记与分发权限，不把能握手称为厂商正式授权合作。
+7. 使用当前二进制的真实截图与测试记录，完成真机前后台、取消、存储不足与网络切换验证。截图尺寸以 Apple 当前文档和后台要求为准。
+8. 上传后等待 Apple 处理与审核；状态必须从后台核实。审核未通过或未发布时，不对外宣称上线。
 
-### App 信息
-- **类别**：主要 **效率**（Productivity），次要 **工具**（Utilities）。
-- **内容版权**：不包含第三方内容。
-- **隐私政策网址** ← `metadata/privacy_url.txt`
+## 官方参考
 
-### 年龄分级
-按问卷全部选"无"，最终得到 **4+**。
-（AI 生成内容不需要额外标注，但下方审核备注里会说明。）
+- https://developer.apple.com/app-store/review/guidelines/
+- https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
+- https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api
+- https://code.claude.com/docs/en/legal-and-compliance
 
-### App 隐私（重点，审核最常卡这里）
-- 问"是否收集数据" → **否，我们不会从此 App 收集数据**。
-  依据：无账号、无埋点、无第三方 SDK，Key 和聊天记录只存本机。
-  对话内容发送给 Anthropic 是用户使用自己 Key 主动发起的，不属于开发者收集。
-- 保存后隐私标签会显示"未收集数据"。
+## 源码发行记录
 
-### 定价与销售范围
-- 价格：**免费**。
-- 销售范围：全部国家/地区（如需只发中国大陆 + 美国也可以，按需勾选）。
-- **注意**：中国大陆区上架 App 若含"互联网信息服务"可能被要求提供 ICP 备案号。
-  本 App 零后端、无自有服务，若被要求，可在"审核备注"中说明并申诉；
-  若坚持要求，可先取消勾选中国大陆，其它地区照常上线。
-
-### 出口合规（加密）
-上传构建后会问"是否使用加密"。本 App 仅使用 HTTPS 标准加密：
-- 选 **是** → 再选 **仅使用 Apple 操作系统内置的加密或标准加密（HTTPS/TLS）** → 免于提交文档。
-- 为避免每次上传都问，可在 `project.yml` 的 `info.properties` 加
-  `ITSAppUsesNonExemptEncryption: false`（已加，见工程文件）。
-
-## 7. 审核备注（App 审核信息 → 备注）
-
-复制粘贴以下内容，能大幅减少被审核员误判为"需要登录/功能不完整"的概率：
-
-```
-本 App 是纯客户端的 AI 对话工具，无自有服务器、无账号系统。
-用户需自行在 console.anthropic.com 申请 Anthropic API Key 并在 App 设置中填入，
-App 直接调用 Anthropic 官方 API 完成对话。Key 存储在 iOS Keychain，聊天记录存储在本机。
-
-测试用 API Key（仅供审核，有额度限制）：sk-ant-api03-XXXXXXXX
-填入路径：打开 App → 底部"我的" → "神枢连接" → 粘贴 Key → 保存 → 回到"对话"页发送消息。
-
-模型回复内容由 Anthropic Claude 生成，本 App 不做任何内容修改。
-```
-
-> **务必**在提交前去 https://console.anthropic.com 建一个单独的、设置了低月度额度上限的
-> Key 给审核员，审核通过后立即吊销。
-
-**联系信息**：填自己的姓名、电话、邮箱（审核员有问题会打电话/发邮件）。
-**登录信息**：选"不需要登录"。
-
-## 8. 提交与发布
-
-1. 页面顶部 **添加以供审核** → 检查所有黄点警告都消掉 → **提交以供审核**。
-2. 发布方式建议选 **手动发布**，审核通过后自己点"发布"，方便控制时间。
-3. 审核状态邮件通知；首次审核一般 24~48 小时，被拒会附具体条款和截图。
-
-## 9. 常见被拒原因与应对
-
-| 拒审条款 | 原因 | 应对 |
-|---|---|---|
-| Guideline 2.1 – 无法完成审核 | 审核员没填 Key 就说功能不可用 | 审核备注里给测试 Key + 精确到点击的填入路径（第 7 步模板） |
-| Guideline 5.1.1 – 数据收集 | 隐私标签与实际不符 | 确认标签为"未收集数据"，隐私政策网址可公开访问 |
-| Guideline 4.2 – 最低功能 | 认为是简单网页套壳 | 回复中强调：原生 SwiftUI、Keychain、流式输出、快捷指令集成 |
-| Guideline 1.2 – 用户生成内容 | AI 生成内容无过滤 | 回复：内容由 Anthropic 生成，受 Anthropic 使用政策约束；App 仅为个人工具，无社交/分享功能 |
-| Guideline 3.1.1 – 应用内购买 | 误认为 API Key 是绕过 IAP 的付费 | 回复：Key 由用户自行在第三方获取，App 不销售任何数字商品，属 3.1.3(b) 允许范围 |
-
-## 10. 后续版本更新
-
-1. `project.yml` 里 `MARKETING_VERSION` 改成新版本号（如 `1.0.1`），`CURRENT_PROJECT_VERSION` +1。
-2. `xcodegen generate` → Archive → Upload。
-3. App Store Connect 里 **＋ 版本** → 填"此版本的新增内容"（中英各一份）→ 选新 build → 提交。
-4. 只改推广文本/截图不需要发新版本，可随时改。
-
----
-
-### 铁律回顾
-- Bundle ID `com.blackgod.nexus` 一旦提交 **不可更改**，提交前再核对一次。
-- 审核 Key 用完立即吊销。
-- 仓库保持 Public，否则隐私政策链接失效导致拒审。
+2026-09-09，源码分支 codex/release-readiness 已发布，提交 fdd26f55b2fe67ba42a3f3bd7d5ef813dd390b8a。对应源码与校验清单已公开于 [https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.2.0-build3](https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.2.0-build3)，标记为开发预发布。归档含 2,028 个文件及 Alpine 16 个包的 10 组源码，122 个上游 SHA-512 输入校验全部通过；5 项源码完整性测试通过。两个公开附件的 GitHub digest 与本地 SHA-256 完全相同。公开源码解决源码访问问题，不表示账号 API、真机验收或 App Review 已完成。

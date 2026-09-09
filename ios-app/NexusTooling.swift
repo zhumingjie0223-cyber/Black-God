@@ -14,17 +14,37 @@ struct NexusToolResult: Codable, Equatable {
 
 protocol NexusTool {
     var name: String { get }
+    var usage: String { get }
+    var canReuseResult: Bool { get }
     func execute(_ call: NexusToolCall) async -> NexusToolResult
+}
+
+extension NexusTool {
+    var usage: String { name }
+    var canReuseResult: Bool { false }
 }
 
 struct NexusToolRegistry {
     private var tools: [String: any NexusTool] = [:]
+    private let control: NexusCognitiveControl?
+    init(control: NexusCognitiveControl? = nil) { self.control = control }
+    var isEmpty: Bool { tools.isEmpty }
+    func contains(_ name: String) -> Bool { tools[name] != nil }
+    func canReuseResult(_ name: String) -> Bool { tools[name]?.canReuseResult ?? false }
+    var manifest: String {
+        tools.keys.sorted().compactMap { tools[$0] }.map { "\($0.name): \($0.usage)" }.joined(separator: "\n")
+    }
     mutating func register(_ tool: any NexusTool) { tools[tool.name] = tool }
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
-        guard let tool = tools[call.name] else {
-            return NexusToolResult(callID: call.id, output: "未知工具：\(call.name)", succeeded: false)
-        }
-        return await tool.execute(call)
+        do {
+            try Task.checkCancellation()
+            let revision = try await control?.begin(call)
+            guard let tool = tools[call.name] else { throw NexusReasoningError.execution("未知工具：\(call.name)") }
+            let result = await tool.execute(call)
+            if let control, let revision { try await control.finish(call, succeeded: result.succeeded, startedRevision: revision) }
+            try Task.checkCancellation()
+            return result
+        } catch { return NexusToolResult(callID: call.id, output: error.localizedDescription, succeeded: false) }
     }
 }
 

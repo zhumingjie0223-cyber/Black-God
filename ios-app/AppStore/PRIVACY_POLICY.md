@@ -22,6 +22,10 @@ API 密钥、OAuth 访问令牌和刷新令牌存放在本机 Keychain，设置�
 
 启用并运行联网工具、脚本或软件包命令后，请求可能访问命令指定的网站和软件仓库。工具输出可用于后续模型回合。请在执行前查看任务计划，避免让工具读取或发送不必要的敏感信息。设备实际剩余存储空间只用于本机空间显示和写入保护。
 
+### 神枢成长与图片观察
+
+用户选取的图片通过 Apple Vision 在本机识别文字，当前不把原图发送至模型。图片的 SHA-256 校验值、识别时间和可编辑的识别文本用于资料候选；识别可能出错。候选须由用户核对后启用；启用的资料、来源和校验值可能随之后获准的模型请求发送。模型工具权限与连接的数据发送许可分开管理。治理记录在本机保存资料版本和权限/工具审计；审计保存参数哈希，不保存原始参数，但哈希不等于匿名化。撤回资料会停止后续使用，历史记录仍保留以支持复核。
+
 ### 管理与删除
 
 可以在对话、记忆和技能页面删除对应记录，在运行环境页面清理工作空间。OAuth 连接可通过“断开此连接”清除本机授权凭据；服务商侧的撤销与数据删除需在其账号页面办理。手填密钥可在连接设置中清空后保存。应用没有 Black God 自有账号，也不提供一个会同时清除所有数据的一键按钮。
@@ -45,3 +49,10 @@ Network-enabled tools, scripts and package commands may contact their specified 
 Delete individual chats, memories and skills in their respective screens and clear workspace files in the runtime screen. Disconnect an OAuth connection to remove its local credential; provider-side revocation and deletion are managed with that provider. Clear and save a manually entered key to remove it. There is no Black God account and no single button that deletes every data category.
 
 Support and privacy requests: https://github.com/zhumingjie0223-cyber/Black-God/issues . Do not post credentials or private conversations publicly. Policy changes update this date. The app is not designed for children; its store rating depends on the actual questionnaire and review.
+
+Images selected by the user are processed locally with Apple Vision OCR; the current feature does not send the original image to a model. Editable extracted text, an image SHA-256 digest and recognition time form a candidate record. Only after user review and activation can that record and source information enter subsequent permitted model requests. Tool permissions are separate from connection data consent. Local governance records retain knowledge revisions and tool/permission audit events. Audits store argument hashes, not raw arguments; hashes are not anonymization. Withdrawing a record prevents future use but retains its history for review.
+
+
+自我状态流在本机保存最近120条目标摘要、执行阶段、工具返回状态和模型公开自评；这不是内部思维链。较早记录滚动移除并显示计数，当前连接凭据按精确匹配隐藏，但不保证识别其他秘密。最近6条摘要可能随后续获准的模型请求发送。用户可在“神枢成长 → 自我状态流”暂停或清空；这不会删除聊天、知识、任务检查点、系统备份或服务商已有的数据。状态流按任务事件更新，不额外调用模型，应用休眠时不持续运行。
+
+The self-state stream stores the latest 120 goal summaries, task phases, tool return statuses and public model assessments locally, not private chain-of-thought. Older entries roll off with an omission count. The current connection credential is redacted by exact match, which does not identify every possible secret. The latest six summaries may enter subsequent permitted model requests. Users can pause or clear the stream under Cognitive Growth → Self-State Stream; this does not delete chats, knowledge, task checkpoints, system backups or provider-held data. Updates follow task events without extra model requests or continuous execution while the app is suspended.

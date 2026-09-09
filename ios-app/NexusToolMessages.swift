@@ -1,7 +1,7 @@
 import Foundation
 
 struct NexusToolResultBlock: Codable, Equatable {
-    let type = "tool_result"
+    var type = "tool_result"
     let toolUseID: String
     let content: String
     let isError: Bool
@@ -14,12 +14,12 @@ struct NexusToolResultBlock: Codable, Equatable {
 }
 
 struct NexusToolResultMessage: Codable, Equatable {
-    let role = "user"
+    var role = "user"
     let content: [NexusToolResultBlock]
 }
 
 struct NexusAssistantToolUseBlock: Codable, Equatable {
-    let type = "tool_use"
+    var type = "tool_use"
     let id: String
     let name: String
     let input: [String: String]

@@ -1,8 +1,6 @@
-name: Build Black God 888 iOS
+name: Build Black God iOS
 
-# 仅手动触发:unsigned IPA 无 Apple 开发者账号+签名无法分发,实际路线是 PWA。
-# 停掉每次 push main 都白跑 macOS 构建(烧 Actions 额度);需要产 IPA 时到 Actions 页手动 Run。
-# 取舍(补齐签名分发 or 彻底砍掉)待权哥拍板;拍板前保留按需能力,不删工作流。
+# 手动运行原生 iOS 回归与无签名发布构建；正式分发另需开发者签名。
 on:
   workflow_dispatch:
 
@@ -14,21 +12,24 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install XcodeGen
-      run: brew install xcodegen
+      run: brew install xcodegen ninja llvm libarchive pkg-config
 
     - name: Generate Xcode Project
       run: |
-        cd ios-app
-        xcodegen generate
-        ls -la
+        make generate
+
+    - name: Run iOS regression tests
+      run: |
+        DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(d["udid"] for group in data["devices"].values() for d in group if d.get("isAvailable") and "iPhone" in d["name"]))')
+        make test-ios IOS_DESTINATION="platform=iOS Simulator,id=$DEVICE_ID"
 
     - name: Build App (unsigned)
       run: |
         cd ios-app
         set -o pipefail
         xcodebuild build \
-          -project BlackGod888.xcodeproj \
-          -scheme BlackGod888 \
+          -project BlackGod.xcodeproj \
+          -scheme BlackGod \
           -configuration Release \
           -sdk iphoneos \
           -derivedDataPath build \
@@ -42,12 +43,12 @@ jobs:
         echo "App路径: $APP_PATH"
         mkdir -p Payload
         cp -r "$APP_PATH" Payload/
-        zip -r BlackGod888-unsigned.ipa Payload
-        echo "✅ IPA: $(ls -lh BlackGod888-unsigned.ipa)"
+        zip -r BlackGod-unsigned.ipa Payload
+        echo "✅ IPA: $(ls -lh BlackGod-unsigned.ipa)"
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: BlackGod888-unsigned-IPA
-        path: ios-app/BlackGod888-unsigned.ipa
+        name: BlackGod-unsigned-IPA
+        path: ios-app/BlackGod-unsigned.ipa
         if-no-files-found: error

@@ -86,3 +86,19 @@ python3 shuyu_engine.py --coin 神枢
 ## 版权
 
 © 阿权/路飞  |  Black God  |  枢语 (Shuyu)
+
+
+## 原生神枢接入（2026-09-09）
+
+当前消费者是同仓 `ios-app/`，旧网页消费副本已不存在。`python3 ../tools/shuyu/bundle.py` 从权威词汇引擎与 `task_bridge.js` 生成 iOS 资源；`node tools/check-sync.mjs` 校验资源指纹和内容，失败即阻断。iOS通过JavaScriptCore执行随包资源，用户输入仅作为函数参数，不作为JavaScript代码求值。
+
+新增执行方言v1（JS/Python双实现）：
+
+```text
+行：计算("12*3") → "36"
+行：枢语("往返","神枢") → "true"
+```
+
+`行：`与旧`do:`兼容，参数使用JSON字符串；支持计算/calc、枢语/shuyu、执行/shell，最多4行和8192字符。箭头之后是独立预期字符串，可省略但不算已有结果校验。中文/拉丁词形的编号不变。`task_bridge.py`提供同构 `compile_task` 与有界 `primes` 原语，原有 `nexuslang.js` 六回路解释器保留；本轮未把情绪状态或文字描述作为真实意识、记忆学习或执行能力。
+
+神枢先编译完整程序，再检查已注册工具，然后执行；shell仍受iSH权限、时间、输出与空间预算约束。当前执行方言不是通用编程语言，也不能凭词汇编码触发未开放的手机权限。

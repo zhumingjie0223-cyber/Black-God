@@ -1,0 +1,22 @@
+{
+  "id": "alpine-3.22.5-security1-arm64",
+  "alpineVersion": "3.22.5",
+  "branch": "v3.22",
+  "archive": {
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/aarch64/alpine-minirootfs-3.22.5-aarch64.tar.gz",
+    "file": "alpine-minirootfs-3.22.5-aarch64.tar.gz",
+    "sha256": "3fbc6285032ed46821b511292633d7b2a6306a2e254f590e92bdafff56cf2f70"
+  },
+  "packages": [
+    {
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/libcrypto3-3.5.8-r0.apk",
+      "file": "libcrypto3-3.5.8-r0.apk",
+      "sha256": "094c5816644ade889f74387e8d91aad89dc9a05eda150494e3f91b80ffc15460"
+    },
+    {
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/libssl3-3.5.8-r0.apk",
+      "file": "libssl3-3.5.8-r0.apk",
+      "sha256": "2b175c982f9ff9a80fc88fa587f6db0ae1c58eef4b3f7fe69e8f066be9ff1090"
+    }
+  ]
+}

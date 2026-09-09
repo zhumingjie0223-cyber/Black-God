@@ -10,14 +10,14 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.blackgod.nexus
       vars:
-        XCODE_WORKSPACE: ios-app/BlackGod888.xcodeproj
-        XCODE_SCHEME: BlackGod888
+        XCODE_WORKSPACE: ios-app/BlackGod.xcodeproj
+        XCODE_SCHEME: BlackGod
       xcode: latest
     scripts:
       - name: Install XcodeGen
-        script: brew install xcodegen
+        script: brew install xcodegen ninja llvm libarchive pkg-config
       - name: Generate Xcode project
-        script: cd ios-app && xcodegen generate
+        script: make generate
       - name: Resolve signing
         script: xcode-project use-profiles
       - name: Build archive
