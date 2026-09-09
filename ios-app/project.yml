@@ -19,7 +19,7 @@ settings:
   base:
     # App Store 版本号，语义化三段式；构建号每次上传 +1
     MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "7"
+    CURRENT_PROJECT_VERSION: "8"
     DEVELOPMENT_TEAM: ""
     # Codemagic / Xcode 自动签名；无凭据时可通过命令行覆盖为 NO 做验证构建
     CODE_SIGNING_STYLE: Automatic
