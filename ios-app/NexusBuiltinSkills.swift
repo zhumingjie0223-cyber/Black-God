@@ -41,7 +41,7 @@ enum NexusBuiltinSkills {
             ("神枢种子", program("枢语", ["往返", "神枢"], expected: "true")),
             ("品牌种子", program("枢语", ["往返", "Black God"], expected: "true")),
             ("混合字符", program("枢语", ["往返", "枢语-2026-🌱"], expected: "true"))]),
-        make("04", "工作区文本统计", conditions: "在内置工作区处理文本、列表和数值汇总", steps: "按用户目标生成必要脚本，使用已有sh/awk工具。先用合成样例检查空输入、重复项和求和，再处理用户明确给定的数据。避免改变用户原文件，说明产物位置和限制。", check: "真实输出与已知统计结果一致；退出码为0；没有输入不能编造结果。", source: "当前内置iSH工具", cases: [
+        make("04", "工作区文本统计", conditions: "在内置工作区处理文本、列表和数值汇总", steps: "按用户目标生成必要脚本，使用已有sh/awk工具。先用合成样例检查空输入、重复项和求和，再处理用户明确给定的数据。避免改变用户原文件，说明产物位置和限制。", check: "真实输出与已知统计结果一致；退出码为0；没有输入不能编造结果。", source: "Black God 内置执行环境", cases: [
             ("求和", shell("printf '%s\\n' 12 18 9 | awk '{s+=$1} END {print s}'", output: "39\n")),
             ("空输入", shell("printf '' | awk 'END {print NR}'", output: "0\n")),
             ("重复计数", shell("printf '%s\\n' apple apple banana | sort | uniq | wc -l", output: "2\n"))]),
