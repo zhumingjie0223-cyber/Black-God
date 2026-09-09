@@ -42,12 +42,21 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["神枢成长"].waitForExistence(timeout: 5))
         let grant = app.buttons["cognitive.grant"]
         for _ in 0..<4 where !grant.isHittable { app.swipeUp() }
+        XCTAssertTrue(grant.isHittable)
         grant.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "工作区授权至")).firstMatch.exists)
+        let granted = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "工作区授权至")).firstMatch
+        // 状态文字在按钮上方；页面若已滑过，需要慢速回滚一小段（sheet 内不能整屏下拉，会关掉面板）。
+        if !granted.waitForExistence(timeout: 3) {
+            for _ in 0..<3 where !granted.exists { app.swipeDown(velocity: .slow) }
+        }
+        let afterGrant = XCTAttachment(screenshot: app.screenshot()); afterGrant.name = "授权后"; afterGrant.lifetime = .keepAlways; add(afterGrant)
+        XCTAssertTrue(granted.waitForExistence(timeout: 3))
         let revoke = app.buttons["cognitive.revoke"]
-        for _ in 0..<3 where !revoke.isHittable { app.swipeUp() }
+        reveal(revoke, in: app)
         revoke.tap()
-        XCTAssertTrue(app.staticTexts["已停止"].exists)
+        let stopped = app.staticTexts["已停止"]
+        reveal(stopped, in: app)
+        XCTAssertTrue(stopped.exists)
         app.buttons["仅允许本地分析与候选记录"].tap()
         let photo = app.buttons["cognitive.photo"]
         for _ in 0..<4 where !photo.isHittable { app.swipeUp() }
@@ -63,7 +72,10 @@ final class BlackGodUITests: XCTestCase {
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["licenses.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.2.0（7）")).firstMatch.exists)
+        // 版本文案随 project.yml 的版本号变化；只校验“x.y.z（build）”格式，避免每次升 build 都改测试。
+        let versionText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Black God · ")).firstMatch
+        XCTAssertTrue(versionText.exists, "应显示版本文案")
+        XCTAssertNotNil(versionText.label.range(of: #"\d+\.\d+\.\d+（\d+）"#, options: .regularExpression), "版本文案应形如 1.2.0（8），实际：\(versionText.label)")
         XCTAssertTrue(entry.isHittable); entry.tap()
         XCTAssertTrue(app.navigationBars["开源许可"].waitForExistence(timeout: 5))
         let text = app.staticTexts["document.paragraph.0"]
@@ -231,13 +243,17 @@ final class BlackGodUITests: XCTestCase {
             let tab = app.buttons["tab.1"]
             XCTAssertTrue(tab.waitForExistence(timeout: 10))
             tab.tap()
-            app.swipeUp()
-        app.buttons["linux.advanced"].tap()
+            let advanced = app.buttons["linux.advanced"]
+            reveal(advanced, in: app)
+            advanced.tap()
             XCTAssertTrue(app.buttons["linux.run"].waitForExistence(timeout: 10))
         }
         func enter(_ script: String) {
-            app.buttons["linux.clear"].tap()
+            let clear = app.buttons["linux.clear"]
+            reveal(clear, in: app)
+            clear.tap()
             let editor = app.textViews["linux.command"]
+            reveal(editor, in: app)
             editor.tap()
             editor.typeText(script)
             app.buttons["linux.run"].tap()
@@ -268,9 +284,9 @@ final class BlackGodUITests: XCTestCase {
         app.launch()
         openTools()
         // This record comes from forced termination, not an automatic retry.
-        app.swipeUp()
-        XCTAssertTrue(app.staticTexts["意外中断"].firstMatch.waitForExistence(timeout: 10))
-        app.swipeDown()
+        let interrupted = app.staticTexts["意外中断"].firstMatch
+        reveal(interrupted, in: app, upSwipes: 8)
+        XCTAssertTrue(interrupted.waitForExistence(timeout: 10))
         enter("cat " + file + "; rm " + file)
         finished(containing: "retained")
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -290,14 +306,20 @@ final class BlackGodUITests: XCTestCase {
         let gemini = app.buttons["Google Gemini"]
         XCTAssertTrue(gemini.waitForExistence(timeout: 5))
         gemini.tap()
-        XCTAssertEqual(app.textFields["api.base"].value as? String, "https://generativelanguage.googleapis.com/v1beta")
+        let base = app.textFields["api.base"]
+        reveal(base, in: app)
+        XCTAssertEqual(base.value as? String, "https://generativelanguage.googleapis.com/v1beta")
         XCTAssertTrue(app.staticTexts["Gemini 原生"].exists)
         let models = app.buttons["api.models"]
+        reveal(models, in: app)
         XCTAssertTrue(models.exists)
         XCTAssertFalse(models.isEnabled) // No credential entered; no real call is sent.
+        reveal(provider, in: app)
         provider.tap()
         app.buttons["阿里云百炼 / 通义千问"].tap()
-        XCTAssertEqual(app.textFields["api.base"].value as? String, "HTTPS 接口地址")
+        reveal(base, in: app)
+        XCTAssertEqual(base.value as? String, "HTTPS 接口地址")
+        reveal(models, in: app)
         XCTAssertFalse(models.isEnabled)
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.lifetime = .keepAlways
@@ -402,4 +424,26 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch.exists)
     }
 
+}
+
+extension XCTestCase {
+    /// 列表/表单页面只渲染可见区域；页面变长后需要先滑到元素处再断言，否则不是功能缺陷而是查找失败。
+    /// 用短距离拖动代替整屏 swipe：整屏 swipeDown 会把以 sheet 弹出的页面直接关掉。
+    @MainActor
+    func reveal(_ element: XCUIElement, in app: XCUIApplication, upSwipes: Int = 6, downSwipes: Int = 8, file: StaticString = #filePath, line: UInt = #line) {
+        func visible() -> Bool { element.exists && element.isHittable }
+        if visible() { return }
+        func nudge(contentUp: Bool) {
+            let container: XCUIElement
+            if app.collectionViews.firstMatch.exists { container = app.collectionViews.firstMatch }
+            else if app.scrollViews.firstMatch.exists { container = app.scrollViews.firstMatch }
+            else { container = app.windows.firstMatch }
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: contentUp ? 0.72 : 0.38))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: contentUp ? 0.38 : 0.72))
+            from.press(forDuration: 0.05, thenDragTo: to)
+        }
+        for _ in 0..<upSwipes where !visible() { nudge(contentUp: true) }
+        for _ in 0..<downSwipes where !visible() { nudge(contentUp: false) }
+        XCTAssertTrue(element.waitForExistence(timeout: 3), "未能滑动到元素：\(element)", file: file, line: line)
+    }
 }

@@ -15,7 +15,7 @@ struct NexusStorageView: View {
                         LabeledContent("当前使用预算", value: size(snapshot.budget))
                         LabeledContent("预算内可增长空间", value: size(snapshot.remaining))
                     }
-                    Text("iSH文件会按需占用手机存储，不预先分配整块磁盘。提高预算可允许继续增长，但不会增加手机的物理容量。")
+                    Text("内置执行环境的文件会按需占用手机存储，不预先分配整块磁盘。提高预算可允许继续增长，但不会增加手机的物理容量。")
                         .font(.caption).foregroundStyle(.secondary)
                     Button(loading ? "正在读取…" : "刷新空间") { refresh() }.disabled(loading)
                 }

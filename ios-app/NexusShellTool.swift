@@ -8,7 +8,7 @@ struct NexusShellTool: NexusTool {
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         NexusToolResult(
             callID: call.id,
-            output: "当前 iOS 客户端不提供 shell 执行环境。尚未接入 iSH/Linux 或远程执行后端。",
+            output: "当前客户端未启用内置执行环境或远程执行后端。",
             succeeded: false
         )
     }

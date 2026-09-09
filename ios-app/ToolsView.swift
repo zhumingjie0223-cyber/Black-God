@@ -141,7 +141,7 @@ struct NexusTerminalView: View {
                         }.font(.caption)
                     }
                 }
-                Text("运行环境来源：iSH / OpenMinis（GPLv3）与 Alpine Linux。源码与许可证见项目 THIRD_PARTY.md。")
+                Text("运行环境由 Black God 内置提供。所含开源组件、源码与许可证见「开源许可」页。")
                     .font(.caption).foregroundStyle(Color.bgTextSecondary)
             }.padding(16).padding(.bottom, 100)
         }

@@ -132,7 +132,10 @@ extension NexusToolRegistry {
             ("causal_model", NexusCausalTool().usage, ["model": "线性结构模型JSON"], ["model"]),
             ("dependency_plan", NexusDependencyTool().usage, ["tasks": "任务依赖JSON数组"], ["tasks"]),
             ("self_reflect", "记录公开自评摘要，不是事实验证或授权", ["assessment": "简短判断，最多800字", "uncertainty": "不确定事项，最多400字", "next_step": "建议下一步，最多400字"], ["assessment", "uncertainty", "next_step"]),
-            ("knowledge_propose", "提交知识候选，必须经用户核对后才可启用；不改变权限", ["topic": "主题", "statement": "内容，区分推断与观测", "source": "可核对的来源"], ["topic", "statement", "source"])
+            ("knowledge_propose", "提交知识候选，必须经用户核对后才可启用；不改变权限", ["topic": "主题", "statement": "内容，区分推断与观测", "source": "可核对的来源"], ["topic", "statement", "source"]),
+            ("self_decision_proposal", "提交可复审的自我改进草案，不执行改写。risk 支持 low/medium/high 或中文低/中/高风险。", ["scope": "改进范围", "issue": "问题与瓶颈", "proposal": "改进提案", "expected_gain": "可量化收益", "risk": "low/medium/high 或低/中/高风险", "run_id": "可选；当前任务留空"], ["scope", "issue", "proposal", "expected_gain", "risk"]),
+            ("self_decision_review", "复审草案并标记通过或驳回；approve 只允许 true/false。", ["decision_id": "草案UUID", "approve": "true 或 false", "notes": "复审说明，最多800字"], ["decision_id", "approve", "notes"]),
+            ("self_decision_publish", "发布已复审草案（仅记录发布闭环）；不执行任何外部改动。", ["decision_id": "草案UUID", "notes": "发布说明，最多600字"], ["decision_id", "notes"])
         ]
         return definitions.filter { contains($0.0) }.map {
             NexusToolDefinition(name: $0.0, description: $0.1,
