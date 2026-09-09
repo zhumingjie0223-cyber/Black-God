@@ -174,10 +174,13 @@ final class ChatViewModel: ObservableObject {
             ? "当前长期记忆清单为空。历史资料中的旧记忆条目不能视为仍有效的偏好或约束；以本次用户要求为准。"
             : NexusMemoryStore.context(memorySnapshot) + "\n历史中的同名旧记忆已失效，以这份当前清单为准。"
         let skillSnapshot = skills.available
-        let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context + "\n" + cognitive.continuity.context
+        let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context + "\n" + cognitive.governanceContext + "\n" + cognitive.continuity.context
         var tools = NexusToolRegistry(control: cognitive)
         tools.register(NexusCausalTool()); tools.register(NexusDependencyTool())
         tools.register(NexusKnowledgeProposalTool(control: cognitive))
+        tools.register(NexusSelfDecisionProposalTool(control: cognitive))
+        tools.register(NexusSelfDecisionReviewTool(control: cognitive))
+        tools.register(NexusSelfDecisionPublishTool(control: cognitive))
         tools.register(NexusSelfReflectionTool(stream: cognitive.continuity, run: id))
         if !skillSnapshot.isEmpty {
             tools.register(NexusSkillSearchTool(items: skillSnapshot))
@@ -243,6 +246,7 @@ final class ChatViewModel: ObservableObject {
                     saved.updatedAt = Date()
                     self.taskCheckpoint = try self.checkpointStore.save(saved, redacting: key)
                 }
+                if let traces = engine.executor?.toolTraces { self.emitAutoSelfDecisions(traces: traces, run: id) }
                 self.messages.append(message)
                 self.persist()
                 self.runtime.append(.text(reply))
@@ -265,6 +269,7 @@ final class ChatViewModel: ObservableObject {
                     do { self.taskCheckpoint = try self.checkpointStore.save(saved, redacting: key) }
                     catch { self.lastError = "保存失败状态失败：" + error.localizedDescription }
                 }
+                if let traces = engine.executor?.toolTraces { self.emitAutoSelfDecisions(traces: traces, run: id) }
                 self.cognitive.continuity.finish(run: id, kind: .failed, summary: error.localizedDescription)
                 self.live.finish(.failed, message: error.localizedDescription)
                 self.runtime.fail(error.localizedDescription)
@@ -278,6 +283,15 @@ final class ChatViewModel: ObservableObject {
     private func persist() -> Bool {
         do { try store.save(messages); return true }
         catch { lastError = "保存历史记录失败：\(error.localizedDescription)"; return false }
+    }
+
+    private func emitAutoSelfDecisions(traces: [NexusToolTrace], run: UUID) {
+        do {
+            let ids = try cognitive.generateSelfDecisionsFromToolFailures(traces, runID: run.uuidString, maxSuggestions: 2)
+            if !ids.isEmpty { statusHint = "已自动生成 \(ids.count) 条自我改进提案，需复审后发布。" }
+        } catch {
+            runtime.append(.status("自我闭环提案生成失败：\(error.localizedDescription)"))
+        }
     }
 
     func cancel() {

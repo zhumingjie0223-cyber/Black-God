@@ -48,10 +48,18 @@ struct NexusCognitiveView: View {
                 Section("待核对 \(control.candidates.count)") {
                     ForEach(control.candidates) { item in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(item.topic).font(.headline); Text(item.statement); Text("来源：" + item.source).font(.caption)
-                            let existing = control.active.first { $0.topic.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX")) == item.topic.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX")) }
-                            if let existing { Text("将替换：" + existing.statement).foregroundStyle(.orange) }
-                            Button(existing == nil ? "已核对来源，启用资料" : "已核对，替换上述旧资料") { perform { try control.confirm(item.id, replacing: existing?.id) } }
+                            Text(item.topic).font(.headline)
+                            Text(item.statement)
+                            Text("来源：" + item.source).font(.caption)
+                            let existing = control.candidateConflict(for: item.topic)
+                            let replacementText = existing?.statement ?? ""
+                            if let existing {
+                                Text("将替换：" + replacementText)
+                                    .foregroundStyle(.orange)
+                                Button("已核对，替换上述旧资料") { perform { try control.confirm(item.id, replacing: existing.id) } }
+                            } else {
+                                Button("已核对来源，启用资料") { perform { try control.confirm(item.id) } }
+                            }
                             Button("撤回候选") { perform { try control.withdraw(item.id) } }
                         }
                     }
@@ -61,6 +69,35 @@ struct NexusCognitiveView: View {
                         VStack(alignment: .leading) {
                             Text(item.topic).font(.headline); Text(item.statement); Text(item.source).font(.caption)
                             Button("撤回此资料") { perform { try control.withdraw(item.id) } }
+                        }
+                    }
+                }
+                Section("自我决策 \(control.state.selfDecisions.count)") {
+                    Toggle("开启自我改进治理", isOn: Binding(
+                        get: { control.state.governanceEnabled },
+                        set: { value in
+                            do { try control.setGovernanceEnabled(value) }
+                            catch let error { message = error.localizedDescription }
+                        }
+                    ))
+                    Text("提案→复审→发布为闭环；不会执行工具调用、改写模型权重或权限。")
+                    if control.state.selfDecisions.isEmpty {
+                        Text("暂无自我决策。")
+                    } else {
+                        ForEach(control.state.selfDecisions.suffix(20).reversed()) { decision in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("决策 \(decision.id.uuidString.prefix(8))")
+                                    .font(.headline)
+                                Text("状态：\(decision.status.rawValue)")
+                                Text("范围：\(decision.scope)")
+                                Text("问题：\(decision.issue)")
+                                Text("提案：\(decision.proposal)")
+                                Text("预期收益：\(decision.expectedGain)")
+                                Text("风险：\(decision.risk)")
+                                Text("归属任务：\(decision.run.uuidString)")
+                                if let note = decision.reviewNote { Text("复审：\(note)").font(.caption) }
+                                if let note = decision.publishNote { Text("发布：\(note)").font(.caption) }
+                            }
                         }
                     }
                 }

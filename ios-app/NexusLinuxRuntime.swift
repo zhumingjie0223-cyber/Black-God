@@ -109,7 +109,12 @@ final class NexusLinuxRuntime {
         }
         ISHKernel.shared.nextRoot = root
         let result = try await runCommand(command: "umask 077\ncd /workspace || exit 125\n" + command, timeout: timeout, onOutput: onOutput)
-        try journal.finish(recordID, status: result.succeeded ? "completed" : "failed", exitCode: result.exitCode)
+        // 被系统（进入后台、空间不足）强制停止的命令记为“意外中断”，用户主动停止记为“已取消”；只有命令自身出错才记“失败”。
+        let status: String
+        if result.succeeded { status = "completed" }
+        else if result.exitCode < 0, let reason = cancellationReason { status = reason == "用户停止" ? "cancelled" : "interrupted" }
+        else { status = "failed" }
+        try journal.finish(recordID, status: status, exitCode: result.exitCode)
         return result
         } catch {
             try? journal.finish(recordID, status: Task.isCancelled ? "cancelled" : "failed")
