@@ -16,9 +16,11 @@ Apple 上传与 App Store 审核提交属 Mac + 权哥本人（2FA）环节，�
 - [x] 5. 云端 PR #114：main 已先行合入同等内容，本分支已合回 main，现仅剩 TODO 归档差异，**不要当发布 PR 合并**
 - [x] 6. 合并到 main + 打 tag v1.2.0（Mac 侧完成，e3568e8）
 - [x] 7. GitHub Release v1.2.0「Black God 1.2.0 (8)」正式版（非预发布），源码包 + SHA-256 清单两个资产
-- [ ] 8. 【Mac】归档 → App Store 导出 → 上传 1.2.0 (8) 到 App Store Connect
-- [ ] 9. 【权哥】App Store Connect 填版本信息 / 隐私标签 / 年龄分级 / 选构建 8 → 提交审核（网页此前反复 502，2FA 必须本人）
-- [ ] 10. 审核通过后：手动发布上架；把本文件归档到 docs/done/
+- [x] 8a. 云端：为绕开 ASC 网页 502，接入并扩展 `ios-app/AppStore/asc.py`（基于 PR #112）：新增 status / select-build / review-info / age-rating / submit；19 项桩测试通过；补 1.2.0 更新说明（中英）、审核备注、年龄分级模板；SUBMIT_GUIDE 加"API 快速通道"
+- [ ] 8b. 【Mac】归档 → App Store 导出 → 上传 1.2.0 (8) 到 App Store Connect
+- [ ] 9a. 【权哥】生成 ASC API 密钥（App Manager）→ 放 Cursor Secrets；填 `metadata/age_rating.json`；网页完成 App 隐私问卷 / 截图 / 类别 / 定价
+- [ ] 9b. 【云端】`asc.py check → push-metadata → select-build → review-info → age-rating → submit` 提交审核
+- [ ] 10. 审核通过后：后台点「发布此版本」上架；把本文件归档到 docs/done/
 
 ## 剩余事项说明
 
