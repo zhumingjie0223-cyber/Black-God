@@ -18,7 +18,7 @@ Mac 上那份 Codex 工作区（`~/Documents/Codex/2026-09-08/ke/work/Black-God`
 - [x] 2. 云端：`ios-app/project.yml` CURRENT_PROJECT_VERSION 7 → 8
 - [x] 3. 云端测试：枢语资源与权威源一致；JS 88 项通过；Python 37 项通过；源码打包工具 5 项通过
 - [x] 4. Codemagic：评估后**不改**——Codex 主线的 codemagic.yaml 已指向 BlackGod 工程；888 分支的 preflight.mjs 绑定该分支结构（本地化 URL 文件、共享检查等），套过来 8 项误报，不值得为它改仓结构
-- [ ] 5. 云端：提交、推送、开 PR（目标 main）；Codex 原 TODO.md（145 行）已归档到 docs/done/
+- [x] 5. 云端：三笔提交已推送，PR #114 已开（目标 main）；Codex 原 TODO.md（145 行）已归档到 docs/done/
 - [ ] 6. 【需回 Mac】提交那 365 行代码并推送；归档 → 导出 → 上传 1.2.0 (8)
 - [ ] 7. 【需权哥】App Store Connect 填版本信息 / 隐私标签 / 分级 / 选构建 → 提交审核（2FA 只能人做）
 - [ ] 8. GitHub Release v1.2.0-build8 正式版；合并 PR 到 main 并打 tag
