@@ -295,8 +295,8 @@ class ASC:
                 return None
             raise
 
-    def age_rating(self, version_id: str) -> dict | None:
-        return self.get(f"/appStoreVersions/{version_id}/ageRatingDeclaration").get("data")
+    def age_rating(self, app_info_id: str) -> dict | None:
+        return self.get(f"/appInfos/{app_info_id}/ageRatingDeclaration").get("data")
 
     def open_submission(self, app_id: str) -> dict | None:
         items = self.get(f"/apps/{app_id}/reviewSubmissions", **{
@@ -452,15 +452,23 @@ def cmd_push_metadata(args) -> int:
 AGE_RATING_FILE = META / "age_rating.json"
 REVIEW_NOTES_FILE = META / "review_notes.txt"
 
-# Apple 年龄分级问卷的全部字段；LEVEL 字段取 NONE / INFREQUENT_OR_MILD / FREQUENT_OR_INTENSE，BOOL 字段取 true/false
+# Apple 年龄分级问卷（2025 年新版，挂在 appInfo 而不是版本上）。
+# LEVEL 字段取 NONE / INFREQUENT_OR_MILD / FREQUENT_OR_INTENSE（个别题 Apple 也接受 INFREQUENT / FREQUENT）；BOOL 字段取 true/false。
 AGE_RATING_LEVEL_FIELDS = (
     "alcoholTobaccoOrDrugUseOrReferences", "contests", "gamblingSimulated", "horrorOrFearThemes",
     "matureOrSuggestiveThemes", "medicalOrTreatmentInformation", "profanityOrCrudeHumor",
     "sexualContentGraphicAndNudity", "sexualContentOrNudity", "violenceCartoonOrFantasy",
     "violenceRealistic", "violenceRealisticProlongedGraphicOrSadistic",
 )
-AGE_RATING_BOOL_FIELDS = ("gambling", "unrestrictedWebAccess")
-AGE_RATING_LEVELS = {"NONE", "INFREQUENT_OR_MILD", "FREQUENT_OR_INTENSE"}
+# 必答的是非题（新版问卷把聊天、用户生成内容、社交也列为必答）
+AGE_RATING_BOOL_FIELDS = ("gambling", "unrestrictedWebAccess", "messagingAndChat", "userGeneratedContent", "socialMedia")
+# 选答项：不填就不发
+AGE_RATING_OPTIONAL_BOOL_FIELDS = ("socialMediaAgeRestricted", "ageAssurance", "lootBox", "parentalControls")
+AGE_RATING_OPTIONAL_ENUM_FIELDS = {
+    "ageRatingOverrideV2": {"NONE", "NINE_PLUS", "THIRTEEN_PLUS", "SIXTEEN_PLUS", "EIGHTEEN_PLUS", "UNRATED"},
+    "koreaAgeRatingOverride": {"NONE", "FIFTEEN_PLUS", "NINETEEN_PLUS"},
+}
+AGE_RATING_LEVELS = {"NONE", "INFREQUENT_OR_MILD", "FREQUENT_OR_INTENSE", "INFREQUENT", "FREQUENT"}
 
 
 def _require_app(client: ASC, project: dict) -> dict:
@@ -621,7 +629,15 @@ def load_age_rating() -> dict:
     for f in AGE_RATING_BOOL_FIELDS:
         if not isinstance(data.get(f), bool):
             problems.append(f"{f} 必须是 true/false，当前 {data.get(f)!r}")
-    unknown = set(data) - set(AGE_RATING_LEVEL_FIELDS) - set(AGE_RATING_BOOL_FIELDS) - {"_comment"}
+    for f in AGE_RATING_OPTIONAL_BOOL_FIELDS:
+        if f in data and not isinstance(data[f], bool):
+            problems.append(f"{f} 必须是 true/false，当前 {data[f]!r}")
+    for f, allowed in AGE_RATING_OPTIONAL_ENUM_FIELDS.items():
+        if f in data and data[f] not in allowed:
+            problems.append(f"{f} 必须是 {'/'.join(sorted(allowed))}，当前 {data[f]!r}")
+    known = set(AGE_RATING_LEVEL_FIELDS) | set(AGE_RATING_BOOL_FIELDS) | set(AGE_RATING_OPTIONAL_BOOL_FIELDS) \
+        | set(AGE_RATING_OPTIONAL_ENUM_FIELDS) | {"_comment"}
+    unknown = set(data) - known
     if unknown:
         problems.append("未知字段：" + ", ".join(sorted(unknown)))
     if problems:
@@ -637,13 +653,15 @@ def cmd_age_rating(args) -> int:
     client = need_client(args)
     project = read_project()
     app = _require_app(client, project)
-    version = _require_editable_version(client, app["id"], project)
-    decl = client.age_rating(version["id"])
+    info_obj = client.editable_app_info(app["id"])
+    if not info_obj:
+        raise ASCError("拿不到可编辑的 appInfo，App 记录可能刚建还没初始化，稍后重试")
+    decl = client.age_rating(info_obj["id"])
     if not decl:
-        raise ASCError("拿不到该版本的 ageRatingDeclaration，版本可能刚建还没初始化，稍后重试")
+        raise ASCError("拿不到 ageRatingDeclaration，稍后重试")
     client.patch(f"/ageRatingDeclarations/{decl['id']}",
                  {"data": {"type": "ageRatingDeclarations", "id": decl["id"], "attributes": rating}})
-    print(f"✓ 已提交年龄分级问卷到版本 {version['attributes']['versionString']}；最终分级由 Apple 按问卷计算，请在后台核对")
+    print("✓ 已提交年龄分级问卷（挂在 App 信息层，对所有版本生效）；最终分级由 Apple 按问卷计算，请在后台核对")
     return 0
 
 

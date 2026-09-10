@@ -1,5 +1,5 @@
 {
-  "_comment": "复制为 age_rating.json 并由人按 App 实际内容逐项填写。等级字段取 NONE / INFREQUENT_OR_MILD / FREQUENT_OR_INTENSE；布尔字段取 true / false。工具不接受占位值，也不提供“全选无”的默认答案。unrestrictedWebAccess 指 App 是否内含可自由浏览任意网页的浏览器。",
+  "_comment": "复制为 age_rating.json 并由人按 App 实际内容逐项填写（Apple 2025 新版问卷，挂在 App 信息层）。等级字段取 NONE / INFREQUENT_OR_MILD / FREQUENT_OR_INTENSE；布尔字段取 true / false。工具拒绝占位值，也不提供“全选无”的默认答案。unrestrictedWebAccess＝是否内含可自由浏览任意网页的浏览器；messagingAndChat＝是否有用户之间的消息/聊天（只与 AI 对话不算人与人聊天，需自行判断）；userGeneratedContent＝是否有用户生成并可被他人看到的内容；socialMedia＝是否有社交功能。选答项（可删）：socialMediaAgeRestricted、ageAssurance、lootBox、parentalControls（布尔），ageRatingOverrideV2（NONE/NINE_PLUS/THIRTEEN_PLUS/SIXTEEN_PLUS/EIGHTEEN_PLUS/UNRATED）。",
   "alcoholTobaccoOrDrugUseOrReferences": "FILL_ME",
   "contests": "FILL_ME",
   "gamblingSimulated": "FILL_ME",
@@ -13,5 +13,8 @@
   "violenceRealistic": "FILL_ME",
   "violenceRealisticProlongedGraphicOrSadistic": "FILL_ME",
   "gambling": "FILL_ME",
-  "unrestrictedWebAccess": "FILL_ME"
+  "unrestrictedWebAccess": "FILL_ME",
+  "messagingAndChat": "FILL_ME",
+  "userGeneratedContent": "FILL_ME",
+  "socialMedia": "FILL_ME"
 }
