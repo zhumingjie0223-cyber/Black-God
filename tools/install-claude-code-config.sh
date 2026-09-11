@@ -62,6 +62,7 @@ allow.update([
 perms["allow"] = sorted(allow)
 perms.pop("disableAutoMode", None)
 cfg.pop("disableBypassPermissionsMode", None)
+cfg["model"] = "fable"
 with open(path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
