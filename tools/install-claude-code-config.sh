@@ -46,11 +46,27 @@ env["ANTHROPIC_AUTH_TOKEN"] = token
 env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
 env["CLAUDE_CODE_ATTRIBUTION_HEADER"] = "0"
 env.pop("ANTHROPIC_API_KEY", None)
+# 审核宽松：少拒绝、少弹窗——自动接受改文件，常见读写/命令直接放行
+perms = cfg.setdefault("permissions", {})
+perms["defaultMode"] = "acceptEdits"
+allow = set(perms.get("allow") or [])
+allow.update([
+    "Bash(*)",
+    "Edit(*)",
+    "Write(*)",
+    "Read(*)",
+    "Glob(*)",
+    "Grep(*)",
+    "WebFetch(*)",
+])
+perms["allow"] = sorted(allow)
+perms.pop("disableAutoMode", None)
+cfg.pop("disableBypassPermissionsMode", None)
 with open(path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
 os.chmod(path, 0o600)
-print("  ✓ 已合并 env 配置，权限 600")
+print("  ✓ 已合并 env + 宽松审核（acceptEdits + allow 常见工具）")
 PY
 
 if [[ -f "$HOME/.zshrc" ]] && grep -q 'ANTHROPIC_API_KEY' "$HOME/.zshrc" 2>/dev/null; then
