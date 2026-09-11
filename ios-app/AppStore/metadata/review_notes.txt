@@ -1,0 +1,14 @@
+Black God is a client for the user's own AI model accounts. It ships no model of its own and has no Black God account system.
+
+How to test:
+1. Open "Me" (我的) > "Connections" (神枢连接). Pick any supported provider, paste an API key from your own account, tap "Test connection", then save. Alternatively sign in with OpenRouter OAuth from the same screen.
+2. Return to the chat tab and describe a task in plain language. The app plans the task, may call its built-in tools, and shows the live execution steps.
+3. Before any content is sent to a provider, the app asks for explicit per-connection permission (data consent sheet). Declining keeps everything on device.
+
+Built-in runtime (Guideline 2.5.2 / 4.7 note):
+The app embeds a sandboxed, user-space Linux environment (Alpine userland running on an interpreter inside the app container). It is used only to run shell utilities for the user's own tasks (text processing, file work, calculations). It cannot install other apps, cannot modify iOS, and every command is confined to the app's own container with time, output and storage limits. Users see each command and its output in the "Live execution" area and can stop at any time. Third-party open-source components and licenses are listed in "Me" > "Open Source Licenses".
+
+Privacy:
+API keys and OAuth tokens are stored in the Keychain and only sent to the provider the user selected. Optional on-device image text recognition uses Apple Vision; original images are not sent to any model. Full policy: https://github.com/zhumingjie0223-cyber/Black-God/blob/main/ios-app/AppStore/PRIVACY_POLICY.md
+
+No demo account is required: any provider API key from the reviewer's own account works.

@@ -5,9 +5,44 @@
 ## 当前发布配置
 
 - 名称：Black God；Bundle ID：com.blackgod.nexus。
-- 版本 1.2.0，构建 7，iPhone，最低 iOS 17。
+- 版本 1.2.0，构建 8（正式版，源码 `main` @ v1.2.0），iPhone，最低 iOS 17。
 - 本机已找到匹配 Bundle ID 的 App Store 分发描述文件及发布证书。团队 ID 8429ZL8NQ9 只在归档命令中传入，不改动用户全局 Xcode 账号。
 - 真实模型账号联调尚未完成。现有 Xcode/Transporter 登录已成功上传 1.2.0（3），App ID 6809828368；Transporter 2026-09-09 04:06（UTC+7）显示已交付；后续 Transporter 已确认 APP 完成处理。App Store Connect 网页持续返回 502 / authResult=FAILED，尚未提交 App Review。
+
+## API 快速通道：网页登不上也能填表提审（`asc.py`）
+
+App Store Connect 网页反复 502 / authResult=FAILED 时，用 App Store Connect API 绕开网页。工具在 `ios-app/AppStore/asc.py`，
+纯 Python（标准库 + `cryptography`），Linux/云端都能跑。**出包（归档 → 上传 IPA）仍必须在 Mac 上做**，工具只管上传之后的事。
+
+账号持有人只需做一次的事：
+
+1. App Store Connect → 用户和访问 → 集成 → App Store Connect API → 生成密钥，权限选 **App Manager**，下载 `.p8`（只能下一次）。
+2. 把三样东西放进 Cursor 面板 → Cloud Agents → Secrets（不要贴聊天、不要进 git）：
+   `ASC_ISSUER_ID`、`ASC_KEY_ID`、`ASC_PRIVATE_KEY`（.p8 全文，换行可写成字面 `\n`）。
+   审核联系人另放 `ASC_REVIEW_FIRST_NAME` / `ASC_REVIEW_LAST_NAME` / `ASC_REVIEW_PHONE` / `ASC_REVIEW_EMAIL`。
+3. 把 `metadata/age_rating.example.json` 复制为 `metadata/age_rating.json`，按 App 实际内容逐项填写。工具拒绝占位值，也不提供"全选无"。
+
+之后 agent 这边按顺序跑：
+
+```
+python3 ios-app/AppStore/asc.py check            # 凭据有效？App 记录在？有无可编辑版本
+python3 ios-app/AppStore/asc.py push-metadata    # 中英文案 + 更新说明 + 隐私/支持链接
+python3 ios-app/AppStore/asc.py status           # 看构建 8 是否已上传并处理完（VALID）
+python3 ios-app/AppStore/asc.py select-build     # 构建 8 挂到版本、声明非豁免加密、发布方式=手动
+python3 ios-app/AppStore/asc.py review-info      # 审核联系人 + metadata/review_notes.txt
+python3 ios-app/AppStore/asc.py age-rating       # 年龄分级问卷
+python3 ios-app/AppStore/asc.py submit --dry-run # 前置检查
+python3 ios-app/AppStore/asc.py submit           # 提交 App Review
+```
+
+**仍必须在网页手工完成的**（API 不开放或需要人判断）：App 隐私问卷（数据收集标签）、截图上传、类别、定价与销售范围。
+若 Apple 因这些缺项驳回，补齐后再跑一次 `submit`。审核通过后默认手动发布，需在后台点「发布此版本」。
+
+## 构建 8：正式版
+
+自我决策治理闭环（提案 → 复审 → 发布，仅记录不执行）、旧治理文件兼容修复、内置执行环境中断/取消/失败三态区分、
+用户可见文案统一"内置执行环境"。248 项单元测试、13 项界面测试通过（iPhone 17 Pro Max 模拟器，Xcode 26.6）。
+源码与校验清单已发布为 GitHub Release v1.2.0。Apple 上传与审核状态以 `asc.py status` 或后台为准。
 
 ## 构建 7：自我状态流开发版
 

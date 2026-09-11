@@ -1,4 +1,6 @@
 # ── 环境变量与密钥（绝不上传）────────────────
+tools/claude-code.env.json
+.claude/settings.local.json
 .env
 .env.cloudflare
 *.env.cloudflare
