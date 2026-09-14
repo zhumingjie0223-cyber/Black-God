@@ -14,6 +14,8 @@ workflows:
         XCODE_SCHEME: BlackGod888
       xcode: latest
     scripts:
+      - name: 上架就绪自检(preflight)
+        script: node ios-app/AppStore/preflight.mjs
       - name: Install XcodeGen
         script: brew install xcodegen
       - name: Generate Xcode project
@@ -32,7 +34,10 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        submit_to_app_store: false
+        # 自动提交 App Store 审核。首次上架前必须先在 App Store Connect 建好 App 记录,
+        # 并把商店信息(描述/截图/隐私问卷/分级,材料见 ios-app/AppStore/)填好,否则提审会失败。
+        # 若只想先进 TestFlight、暂不自动提审,把下面改回 false 即可。
+        submit_to_app_store: true
       email:
         recipients:
           - "$CM_NOTIFY_EMAIL"

@@ -1,0 +1,13 @@
+# fastlane 应用标识
+app_identifier("com.blackgod.nexus")
+
+# 认证方式(二选一):
+# 【推荐】App Store Connect API Key —— 把下面三个值设成环境变量,别写进仓库:
+#   export ASC_KEY_ID=xxxxxxxxxx
+#   export ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+#   export ASC_KEY_P8=/绝对路径/AuthKey_xxxxxxxxxx.p8
+# 用 API Key 时无需在此填 Apple ID。
+#
+# 【备用】Apple ID 登录方式(会走双重认证),需要就解开下面两行并填:
+# apple_id("你的AppleID邮箱")
+# itc_team_id("你的 App Store Connect 团队ID(纯数字)")
