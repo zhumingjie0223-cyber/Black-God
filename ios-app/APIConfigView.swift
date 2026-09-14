@@ -179,8 +179,10 @@ struct APIConfigView: View {
                             if showKey { TextField("输入服务商密钥", text: $apiKey) }
                             else { SecureField("输入服务商密钥", text: $apiKey) }
                         }.autocorrectionDisabled().textInputAutocapitalization(.never)
+                        .accessibilityIdentifier("api.key")
                         Button { showKey.toggle() } label: { Image(systemName: showKey ? "eye.slash" : "eye") }
                             .accessibilityLabel(showKey ? "隐藏密钥" : "显示密钥")
+                            .accessibilityIdentifier("api.key.toggle")
                     }
                 } header: { Text("连接密钥") } footer: {
                     Text("密钥保存在本机钥匙串。请求会将相关对话与密钥发送到上方地址。修改地址或协议后请重新填入该接口的密钥。")
@@ -202,7 +204,7 @@ struct APIConfigView: View {
                             savedConnections = NexusKeychain.shared.savedConnections
                             selectedSavedID = connection.id
                         } catch { saveError = error.localizedDescription }
-                    }.disabled(!valid || isTesting || oauth.isRunning)
+                    }.disabled(!valid || isTesting || oauth.isRunning).accessibilityIdentifier("api.save")
                     Button(isTesting ? "取消连接测试" : "测试连接") {
                         if isTesting { testTask?.cancel(); return }
                         let entry = connection
@@ -218,7 +220,7 @@ struct APIConfigView: View {
                             } catch is CancellationError { diagnostic = "已取消测试。" }
                             catch { diagnostic = error.localizedDescription }
                         }
-                    }.disabled(oauth.isRunning || (!isTesting && (!sharingAllowed || !valid || apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)))
+                    }.disabled(oauth.isRunning || (!isTesting && (!sharingAllowed || !valid || apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))).accessibilityIdentifier("api.test")
                     Button("测试工具执行") {
                         let entry = connection
                         let key = apiKey

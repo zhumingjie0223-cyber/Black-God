@@ -19,11 +19,11 @@ settings:
   base:
     # App Store 版本号，语义化三段式；构建号每次上传 +1
     MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "8"
-    DEVELOPMENT_TEAM: ""
-    # Codemagic / Xcode 自动签名；无凭据时可通过命令行覆盖为 NO 做验证构建
-    CODE_SIGNING_STYLE: Automatic
-    CODE_SIGN_IDENTITY: "Apple Distribution"
+    CURRENT_PROJECT_VERSION: "9"
+    DEVELOPMENT_TEAM: "8429ZL8NQ9"
+    # App Store 归档使用手动签名（证书本机已安装）
+    CODE_SIGNING_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Distribution: PAXTON HANNAH ELIZABETH (8429ZL8NQ9)"
     SWIFT_EMIT_LOC_STRINGS: YES
 
 targets:

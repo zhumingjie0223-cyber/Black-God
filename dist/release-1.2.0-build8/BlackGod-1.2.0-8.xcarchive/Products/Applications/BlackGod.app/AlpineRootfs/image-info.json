@@ -1,0 +1,6 @@
+{
+  "id": "alpine-3.22.5-security1-arm64",
+  "alpineVersion": "3.22.5",
+  "branch": "v3.22",
+  "lockSha256": "7cc4ba21c4972f782dfa2a53b8dde2f63ead832670ef22fc4edf3e21845059fb"
+}

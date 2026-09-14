@@ -424,6 +424,50 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch.exists)
     }
 
+    /// App Review 2.1：从启动走完连接页、许可、开源许可和对话入口，便于同时录屏。
+    @MainActor
+    func testAppReviewDemoFlow() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        XCTAssertTrue(app.buttons["tab.0"].waitForExistence(timeout: 8))
+        Thread.sleep(forTimeInterval: 2)
+        app.buttons["tab.4"].tap()
+        Thread.sleep(forTimeInterval: 1.5)
+        let api = app.buttons["api.open"]
+        if api.waitForExistence(timeout: 5) {
+            reveal(api, in: app)
+            if api.isHittable { api.tap() }
+        }
+        Thread.sleep(forTimeInterval: 2)
+        if app.switches["api.data-consent"].waitForExistence(timeout: 4) {
+            reveal(app.switches["api.data-consent"], in: app)
+        }
+        Thread.sleep(forTimeInterval: 2)
+        if app.buttons["api.save"].exists { reveal(app.buttons["api.save"], in: app) }
+        Thread.sleep(forTimeInterval: 1.5)
+        app.swipeDown()
+        Thread.sleep(forTimeInterval: 1)
+        if !app.buttons["tab.4"].isHittable { app.swipeDown() }
+        app.buttons["tab.4"].tap()
+        Thread.sleep(forTimeInterval: 1)
+        let licenses = app.buttons["licenses.open"]
+        if licenses.waitForExistence(timeout: 5) {
+            reveal(licenses, in: app)
+            if licenses.isHittable { licenses.tap(); Thread.sleep(forTimeInterval: 2.5); app.swipeDown() }
+        }
+        Thread.sleep(forTimeInterval: 1)
+        app.buttons["tab.0"].tap()
+        Thread.sleep(forTimeInterval: 1.5)
+        let input = app.textFields["chat.input"].exists ? app.textFields["chat.input"] : app.textViews["chat.input"]
+        if input.waitForExistence(timeout: 5) {
+            input.tap()
+            input.typeText("你好")
+            if app.buttons["chat.send"].isEnabled { app.buttons["chat.send"].tap() }
+            Thread.sleep(forTimeInterval: 4)
+        }
+    }
+
 }
 
 extension XCTestCase {

@@ -178,11 +178,14 @@ cfg = json.load(open(path)) if os.path.exists(path) else {}
 env = cfg.setdefault("env", {})
 env.update({
     "ANTHROPIC_BASE_URL": base,
+    "ANTHROPIC_API_KEY": token,
     "ANTHROPIC_AUTH_TOKEN": token,
+    "ANTHROPIC_MODEL": os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8"),
+    "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "API_TIMEOUT_MS": "1200000",
 })
-env.pop("ANTHROPIC_API_KEY", None)
 perms = cfg.setdefault("permissions", {})
 perms["defaultMode"] = mode
 perms.pop("deny", None)

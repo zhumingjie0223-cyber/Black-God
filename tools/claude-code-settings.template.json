@@ -8,6 +8,7 @@
   "env": {
     "ANTHROPIC_BASE_URL": "https://apiclaude.cc",
     "ANTHROPIC_AUTH_TOKEN": "在此填入密钥，或运行 install-claude-code-config.sh 自动写入",
+    "ANTHROPIC_MODEL": "claude-fable-5-1",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
   },

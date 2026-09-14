@@ -1,16 +1,16 @@
-# TODO · Claude Code 权限改最松 + 发布收尾
+# TODO · 43 机 TG 不能断 + 自己学炒币并向喜子哥报备
 
-开工：2026-09-11
-诉求：权哥反馈 acceptEdits「还是很紧」→ 改 bypassPermissions（YOLO）
+开工：2026-09-13 晚
+权哥指令：Telegram 不能断；叫她自己去学合约/杠杆/alpha/期权/永续；在 TG 跟喜子哥报备。
 
 ## 步骤
 
-- [ ] 1. 更新 `tools/install-claude-code-config.sh`：defaultMode=bypassPermissions + skipDangerousModePermissionPrompt
-- [ ] 2. 同步 `tools/claude-code-settings.template.json`
-- [ ] 3. 脚本顺带清理 `~/.claude/settings.local.json` 里的 deny/ask 历史规则
-- [ ] 4. 提交推送，给权哥 Mac 一键命令
+- [x] 1. 查清 TG：现有私聊 6890552068，报备抬头写喜子哥；HOME_CHANNEL 已指向这条
+- [x] 2. 网关钉死：用户服务常驻 + 开机拉起 + 每 2 分钟看门狗，断了自动拉起并通知
+- [x] 3. 自学课表已挂：每 8 小时一课（合约→杠杆→永续→alpha→期权→秒买进出）
+- [x] 4. 每天 21:00 向喜子哥汇总；刚才已发报到，第一课「合约」已学完并写进笔记
+- [x] 5. 核对：网关 running/connected，看门狗 active，两条 cron 都是 active
 
-## 发布（原任务，未变）
+## 总结
 
-- [ ] 8b. Mac 上传 1.2.0 (8)
-- [ ] 9. ASC 密钥 + asc.py 提审链
+TG 线加了开机和两分钟巡检，不能靠人盯。她开始自己学，第一课合约已向喜子哥报备；之后每 8 小时一课，晚上 21 点再汇总。

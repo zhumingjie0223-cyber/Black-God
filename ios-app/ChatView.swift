@@ -100,6 +100,7 @@ struct ChatView: View {
         HStack(spacing: 10) {
             TextField("跟Black God AI说点什么…", text: $input, axis: .vertical)
                 .focused($inputFocused).font(.bgBody()).foregroundStyle(Color.bgTextPrimary).lineLimit(1...4)
+                .accessibilityIdentifier("chat.input")
                 .padding(.horizontal, 16).padding(.vertical, 10)
                 .background(RoundedRectangle(cornerRadius: 22).fill(Color.bgCardLight))
             Button {
@@ -113,6 +114,7 @@ struct ChatView: View {
                     .foregroundStyle(input.isEmpty ? AnyShapeStyle(Color.bgTextSecondary) : AnyShapeStyle(LinearGradient.goldGradient))
             }.disabled(!vm.isTyping && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .accessibilityLabel(vm.isTyping ? "停止回答" : "发送消息")
+            .accessibilityIdentifier("chat.send")
         }
         .padding(.horizontal, 16).padding(.vertical, 12).background(Color.bgDark.opacity(0.98))
     }

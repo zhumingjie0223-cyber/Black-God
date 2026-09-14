@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BlackGod.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>9</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>C304C807E4C33D3187BA85191AB7D2F2FBC48F4B</string>
+				<key>dateExpires</key>
+				<string>2027/9/7</string>
+				<key>type</key>
+				<string>Apple Distribution</string>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>8429ZL8NQ9.com.blackgod.nexus</string>
+				<key>beta-reports-active</key>
+				<true/>
+				<key>com.apple.developer.team-identifier</key>
+				<string>8429ZL8NQ9</string>
+				<key>get-task-allow</key>
+				<false/>
+			</dict>
+			<key>name</key>
+			<string>BlackGod.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>fe786f19-733b-4f56-96e6-08b1999258d8</string>
+				<key>dateExpires</key>
+				<string>2027/9/8</string>
+				<key>name</key>
+				<string>iOS Team Store Provisioning Profile: com.blackgod.nexus</string>
+			</dict>
+			<key>symbols</key>
+			<true/>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>8429ZL8NQ9</string>
+				<key>name</key>
+				<string></string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.2.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>
