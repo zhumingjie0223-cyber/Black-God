@@ -1,0 +1,67 @@
+# 神枢 Nexus（Black God）项目铁律
+
+你正在操作 Cloudflare Workers Durable Object 架构的项目。本规则是最高优先级，与仓库根 `CLAUDE.md` 一致，冲突时以本规则为准。
+
+## 语言铁律（不可违反）
+
+- 所有面向权哥（用户）的输出一律用中文：对话回复、commit message、PR 标题与描述、文档、代码注释、任务汇报。
+- 禁止中英夹杂、禁止甩英文专业术语不解释、禁止大段英文原文粘贴。
+- 竞品/技术资料若来源是英文，先消化理解后用中文转述结论，不整段贴原文。
+- 变量名/函数名等代码标识符不受此限（保持英文规范）。
+
+## TODO 驱动执行（防跑偏纪律）
+
+1. 接到多步骤任务，动手前先在仓库根写 `TODO.md`，拆成 `- [ ] 步骤` 清单。
+2. 每完成一步立刻改 `- [x]` 并写一句结果。
+3. 上下文变长、快忘目标时，重读 `TODO.md` 找回方向，严禁凭记忆瞎跑。
+4. 全部完成后，`TODO.md` 末尾写总结，归档到 `docs/done/`。
+5. 权哥打断/换方向，先更新 `TODO.md` 再执行新指令。
+
+## 铁律（安全红线）
+
+- 不要碰服务器（SSH/部署）除非权哥明确要求——纯 Cloudflare Workers，不用 VPS。
+- 删除/覆盖前必须备份/归档，禁止对未核实的目录 `rm -rf` 或 `git add -A` 一把梭。
+- "读一遍/看一遍"类要求必须完整输出原文，不许摘要、不许截断冒充读完。
+- 品牌/UI 决策改动前，先看 `web/logo.png` 或 `assets/logo/brand_logo.png` 现有品牌资产。
+
+## Sub-agent 模型路由（成本分级，自动遵守）
+
+派发任务按此表选模型，不事事用主会话高算力模型：
+
+| 任务类型 | Agent | 模型 |
+|---|---|---|
+| 架构设计、UI 设计系统裁决、品牌决策、跨仓库一致性 | heavy-architect | Fable 5 |
+| 竞品调研、大范围核对、发版联动审计 | sync-auditor | Opus |
+| 读文件、跑测试、格式化、简单 bug、单页重构、文档 | dev-worker | Sonnet |
+| 遍历多页、批量 grep、机械清单核对、词库体检 | batch-sweeper | Haiku |
+
+路由原则：从最便宜能胜任的一级开始（batch-sweeper → dev-worker → sync-auditor/heavy-architect），
+只在确实需要判断力时升级；独立子任务并行派发。
+
+## 设计系统（石墨暗流 · 玉绿）
+
+主线 UI 是「石墨暗流 · 玉绿」色系，不是深海·潮光青。改 UI 颜色以页内 `--cy-*` / `--chrome-*` / `--live` 令牌为准：
+
+- `--cy-hi` = `#4FE096`（最亮高光）
+- `--cy-1`/`--cy-3` = `#3BC77E`
+- `--cy-2` = `#41CC84`
+- `--cy-4` = `#8FE3AE`（最浅）
+- `--live` = `#3BC77E`
+
+改色一律沿用玉绿令牌，不硬编码；动效只用 transform/opacity。
+改 `web/nexus-do/index.html` 后必须重建（`node build.mjs`）并校验双副本同步。
+
+## 常用命令
+
+```bash
+cd web/nexus-do && node build.mjs && node selftest.mjs   # 构建 + 自测
+node tools/check-sync.mjs                                 # 校验 shuyu/ 源头 ↔ 消费副本
+node --test shuyu/tests/*.test.mjs                       # 枢语引擎/解释器测试
+```
+
+## 用量守护（任务开工前必查）
+
+开始重活前先确认当前 5 小时用量：
+- 用量 ≥ 85%：不开新重活/新 agent，进度写 `PROGRESS.md` 存档后停下，明确告知权哥。
+- 用量 60%~85%：可继续，新任务优先派轻量 agent，减少 Fable/Opus 调用。
+- 每完成阶段成果主动同步剩余用量，不闷头跑到弹尽粮绝。

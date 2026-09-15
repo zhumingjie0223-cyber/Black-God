@@ -1,0 +1,21 @@
+Guideline 2.1 Information Needed — Black God 1.2.0 (9)
+
+No Black God account. App Review login fields are empty on purpose.
+
+1) Recording
+Physical-device screen recording attached in Resolution Center (launch → Me → Connections → provider setup → data-consent → Chat). No account registration, no public UGC, no IAP.
+
+2) Purpose / audience
+iPhone client for the user's own AI accounts. Chat, skills, on-device memory, local tools. No bundled model, no Black God backend. For people who already have a provider key or OpenRouter account.
+
+3) How to review
+Me → 神枢连接. Paste a provider API key (Claude / OpenAI / Gemini / OpenAI-compatible), Test connection, Save; or OpenRouter OAuth. Accept the per-connection data-consent sheet. Chat: type a task in plain language. Stop is always available. Licenses: Me → Open Source Licenses.
+
+4) External services
+Only after the user adds a connection: Anthropic, OpenAI, Google Gemini, OpenRouter, optional OpenAI-compatible (Kimi / Grok / MiniMax). Optional on-device Vision OCR (images stay on device). Support/privacy on GitHub. No Black God server, payments, or analytics.
+
+5) Regions
+Same features worldwide. UI is primarily Simplified Chinese. Provider geo-policy is the provider's, not an app lock.
+
+6) Regulation / third-party material
+Not a regulated industry. Sandboxed user-space Linux (Alpine in-app) for the user's own shell tasks only; cannot install apps or modify iOS; time/output/storage limits; user can stop. Licenses listed in-app.
