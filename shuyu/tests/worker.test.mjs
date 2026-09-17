@@ -137,11 +137,22 @@ test('GET /compose 按义造词：成功 / 解析失败 400 / 空参 400', async
   assert.equal((await call(env, '/compose?foo=bar')).status, 400);
 });
 
+test('GET /analogy 五维类比与参数校验', async () => {
+  const env = mockEnv();
+  const origin = await (await call(env, `/analogy?a=${encodeURIComponent('奥形凝起')}&b=${encodeURIComponent('奥形凝起')}&c=${encodeURIComponent('奥形凝起')}`)).json();
+  assert.equal(origin.id, 0);
+  const shifted = await (await call(env, '/analogy?a=0&b=1&c=7')).json();
+  assert.equal(typeof shifted.id, 'number');
+  assert.equal((await call(env, '/analogy')).status, 400);
+  assert.equal((await call(env, '/analogy?a=x&b=y&c=z')).status, 400);
+});
+
 test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   const root = await (await call(mockEnv(), '/')).json();
   assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
   assert.ok(root.endpoints.some(e => e.startsWith('/search')));
   assert.ok(root.endpoints.some(e => e.startsWith('/compose')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/analogy')));
   const st = await (await call(mockEnv(), '/status')).json();
   assert.deepEqual(st.axes, root.axes);
 });

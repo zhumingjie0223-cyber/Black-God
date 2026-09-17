@@ -7,6 +7,8 @@ import SwiftUI
 extension Color {
     static let bgGold = Color(red: 0.25, green: 0.48, blue: 0.35)
     static let bgGoldLight = Color(red: 0.31, green: 0.78, blue: 0.48)
+    static let bgJade = Color(red: 0.25, green: 0.48, blue: 0.35)
+    static let bgJadeHi = Color(red: 0.31, green: 0.78, blue: 0.48)
     static let bgDark = Color(red: 0.043, green: 0.082, blue: 0.055)
     static let bgCard = Color(red: 0.078, green: 0.129, blue: 0.098)
     static let bgCardLight = Color(red: 0.118, green: 0.188, blue: 0.141)

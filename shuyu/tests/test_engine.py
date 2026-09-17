@@ -230,6 +230,15 @@ class TestSearchCompose(unittest.TestCase):
             with self.assertRaises(ValueError, msg=f"compose({bad!r}) 应抛 ValueError"):
                 e.compose(bad)
 
+    def test_analogy_identity_and_inverse(self):
+        origin = e.decode(0)
+        self.assertEqual(e.analogy(origin["汉"], origin["汉"], origin["汉"])["id"], origin["id"])
+        a, b, c = e.decode(120), e.decode(240), e.decode(7)
+        d = e.analogy(a["词"], b["汉"], c["id"])
+        self.assertEqual(e.analogy(b["汉"], a["词"], d["汉"])["id"], c["id"])
+        with self.assertRaises(ValueError):
+            e.analogy("绝不存在", origin["汉"], origin["汉"])
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):

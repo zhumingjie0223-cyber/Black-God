@@ -100,7 +100,7 @@ final class NexusReasoningEngine {
         目标：\(goal)
         可用工具：\(tools.manifest)
         对闲聊、简单解释或缺少关键条件的请求，直接回答或提出一个必要问题，返回 {"answer":"给用户的内容"}。
-        对计算、时间查询、需要回忆历史或多步骤任务，返回 {"steps":["具体步骤，最多4步"],"successCriteria":["能检查的完成条件"]}。
+        对计算、时间查询、需要回忆历史或多步骤任务，返回 {"steps":["具体步骤，最多8步"],"successCriteria":["能检查的完成条件"]}。
         步骤必须服务于用户目标，不要固定套用“理解、生成、验证”。只能使用上述已注册的工具；如果有 shell_execute，可在应用的 Linux 工作区运行脚本与操作文件。不要声称拥有未提供的设备控制或外部文件访问能力。
         对可使用现有工具完成的任务，由你生成必要的参数或脚本并调用工具，不要把命令交给用户要求其手动执行。只有缺少必要资料时才提问。最终用用户能理解的语言说明结果；未执行或执行失败不能声称已经完成。
         数学结果优先用计算工具核对。因果分析应区分观测、干预和假设；causal_model只计算给定结构，不证明现实因果。
@@ -118,7 +118,7 @@ final class NexusReasoningEngine {
         }
         let titles = Array((decoded?.steps ?? ["完成用户目标"])
             .map { String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300)) }
-            .filter { !$0.isEmpty }.prefix(4))
+            .filter { !$0.isEmpty }.prefix(8))
         let criteria = Array((decoded?.successCriteria ?? ["回答用户提出的目标", "只依据实际工具结果描述执行情况"])
             .map { String($0.prefix(500)) }.prefix(6))
         guard !titles.isEmpty else { throw NexusReasoningError.execution("计划为空，请重试。") }

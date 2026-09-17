@@ -15,14 +15,16 @@ body='\n'.join(parts)
 body+='''
 function invoke(operation, input) {
   switch(operation) {
-    case '容量': return {version: '4.1', capacity: CAPACITY, axes: AXES};
+    case '容量': return {version: '4.2', capacity: CAPACITY, axes: AXES};
     case '解码': { if (!/^(0|[1-9][0-9]*)$/.test(input)) throw Error('编号必须是非负整数'); return decode(Number(input)); }
     case '拉丁编号': { const n=encode(input); if(n<0) throw Error('无效枢语词'); return n; }
     case '汉译编号': { const n=encodeHan(input); if(n<0) throw Error('无效枢语汉译'); return n; }
     case '检索': return search(input).slice(0,20);
     case '造词': return autoCoin(input);
     case '组合': return compose(JSON.parse(input));
+    case '类比': { const parts=JSON.parse(input); if(!Array.isArray(parts)||parts.length!==3) throw Error('类比需要三个词'); return analogy(parts[0],parts[1],parts[2]); }
     case '编译': return compileTask(input);
+    case '规划': return describePlan(compileTask(input));
     case '往返': { const word=autoCoin(input); return encode(word.词) === word.id && encodeHan(word.汉) === word.id; }
     case '质数': return primes(input);
     default: throw Error('未知枢语操作');

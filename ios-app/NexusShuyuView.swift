@@ -15,6 +15,7 @@ struct NexusShuyuView: View {
                     Button("生成并核对枢语词") { generate() }.accessibilityIdentifier("shuyu.generate")
                     Text("相同种子生成相同词，用于稳定寻址；它不是把种子文字翻译成枢语。")
                         .font(.caption).foregroundStyle(.secondary)
+                    Button("用「奥形凝起」做恒等类比") { analogize() }.accessibilityIdentifier("shuyu.analogy")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -32,7 +33,7 @@ struct NexusShuyuView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .tint(Color.bgCyan)
+            .tint(Color.bgJadeHi)
             .navigationTitle("枢语")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
         }
@@ -46,6 +47,16 @@ struct NexusShuyuView: View {
             let latinID = try NexusShuyuEngine.shared.invoke("拉丁编号", input: form)
             let hanID = try NexusShuyuEngine.shared.invoke("汉译编号", input: han)
             verified = latinID == id.stringValue && hanID == id.stringValue
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func analogize() {
+        do {
+            let value = try NexusShuyuEngine.shared.invoke("类比", input: #"["奥形凝起","奥形凝起","奥形凝起"]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String else { throw NexusError.invalidResponse }
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": object["义"] as? String ?? ""]
+            verified = id.intValue == 0 && han == "奥形凝起"
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }
     }

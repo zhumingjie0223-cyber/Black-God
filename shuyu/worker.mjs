@@ -17,7 +17,7 @@
 //   POST /broadcast   万网散播（sovereignControl 全流程）
 
 import {
-  CAPACITY, AXES, decode, encode, encodeHan, search, compose,
+  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy,
   coinWord, autoCoin, coinFromState, loadCapabilities,
 } from './lexicon.js';
 import { interpret, applyToSoul, compile } from './nexuslang.js';
@@ -88,6 +88,20 @@ async function handleSearch(url) {
   if (axis && !AXIS_NAMES.includes(axis)) return badRequest(`参数 axis 只能是 ${AXIS_NAMES.join('/')}`);
   const hits = search(q, axis);
   return json({ q, axis: axis ?? null, count: hits.length, hits });
+}
+
+async function handleAnalogy(url) {
+  const a = url.searchParams.get('a');
+  const b = url.searchParams.get('b');
+  const c = url.searchParams.get('c');
+  if (a == null || b == null || c == null || !String(a).trim() || !String(b).trim() || !String(c).trim()) {
+    return badRequest('缺少参数 a、b、c（类比：A:B :: C:?）');
+  }
+  try {
+    return json({ a, b, c, ...analogy(a, b, c) });
+  } catch (err) {
+    return badRequest(String(err?.message ?? err));
+  }
 }
 
 async function handleCompose(url) {
@@ -165,7 +179,7 @@ export default {
           copyright: COPYRIGHT,
           capacity: CAPACITY,
           axes: AXES,
-          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/compose?核=&映=&态=&标=&相=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
+          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
         });
       }
       if (path === '/status' && req.method === 'GET') return handleStatus(env);
@@ -173,6 +187,7 @@ export default {
       if (path === '/encode' && req.method === 'GET') return handleEncode(url);
       if (path === '/search' && req.method === 'GET') return handleSearch(url);
       if (path === '/compose' && req.method === 'GET') return handleCompose(url);
+      if (path === '/analogy' && req.method === 'GET') return handleAnalogy(url);
       if (path === '/coin' && req.method === 'GET') return handleCoin(url, env);
       if ((path === '/talk' || path === '/interpret') && req.method === 'POST') {
         return handleTalk(req, env);

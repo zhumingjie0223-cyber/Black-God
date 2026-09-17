@@ -92,6 +92,7 @@ final class NexusSkillPractice: ObservableObject {
             var tools = override ?? NexusToolRegistry()
             if override == nil {
                 tools.register(NexusCalculatorTool()); tools.register(NexusShuyuTool())
+                tools.register(NexusPlanTool()); tools.register(NexusVerifyTool())
                 if NexusLinuxTool.enabled { tools.register(NexusLinuxTool(workspace: NexusWorkspaceIdentity.id(for: "skill-practice"), onStart: { [weak self] in self?.live.append(.command, $0) }, onOutput: { [weak self] line, error in self?.live.append(error ? .error : .output, line) })) }
             }
             let runner = NexusShuyuRunTool(tools: tools, onTrace: { [weak self] in self?.live.observe([$0]) })
