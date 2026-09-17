@@ -357,6 +357,20 @@ test('compose 不许造错词: 解析失败必须抛错而非静默落到别的�
   }
 });
 
+test('analogy 五维类比: 恒等、可逆、与 Python 同构', () => {
+  const origin = engine.decode(0);
+  assert.equal(engine.analogy(origin.汉, origin.汉, origin.汉).id, origin.id);
+  const a = engine.decode(120);
+  const b = engine.decode(240);
+  const c = engine.decode(7);
+  const d = engine.analogy(a.词, b.汉, c.id);
+  assert.equal(engine.analogy(b.汉, a.词, d.汉).id, c.id);
+  const triples = [[0, 1, 7], [120, 240, 8], ['奥形凝起', '尼形凝起', '奥形凝映']];
+  const pyIds = py('print(json.dumps([e.analogy(*t)["id"] for t in arg]))', triples);
+  triples.forEach((t, i) => assert.equal(engine.analogy(...t).id, pyIds[i], `analogy(${JSON.stringify(t)}) 分叉`));
+  assert.throws(() => engine.analogy('绝不存在', origin.汉, origin.汉), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);

@@ -27,7 +27,7 @@ v4.1（2026-09）新能力：
 - search / compose：按语义关键词检索词根、按义造词
 - auto_coin / coin_from_coord / coin_word / coin_from_state：与 JS 造词族逐位一致
 """
-import json, sys, argparse, hashlib
+import json, sys, argparse, hashlib, re
 
 # ══════ 1. 内驱核心 (拉丁, 汉, 义) — 20基 ══════
 _CORE_BASE = [
@@ -301,6 +301,31 @@ def compose(spec):
     idx = [_resolve_axis(ai, norm.get(name)) for ai,name in enumerate(_AXIS_NAMES)]
     return decode(_id_of(*idx))
 
+def _resolve_word(value):
+    if isinstance(value, bool) or value is None:
+        raise ValueError("类比词必须是编号或枢语词")
+    if isinstance(value, int):
+        return decode(value)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("类比词必须是编号或枢语词")
+    s = value.strip()
+    if re.fullmatch(r"0|[1-9][0-9]*", s):
+        return decode(int(s))
+    nid = encode(s)
+    if nid < 0:
+        nid = encode_han(s)
+    if nid < 0:
+        raise ValueError(f"类比找不到「{value}」")
+    return decode(nid)
+
+def analogy(a, b, c):
+    """五维类比造词：A:B :: C:?  →  C + (B − A) 按轴取模，与 lexicon.js analogy 同构。"""
+    A, B, C = _resolve_word(a), _resolve_word(b), _resolve_word(c)
+    sizes = (NC, NM, NS, NK, NP)
+    keys = ("c", "m", "s", "k", "p")
+    idx = [((C["坐标"][k] + B["坐标"][k] - A["坐标"][k]) % sizes[i] + sizes[i]) % sizes[i] for i, k in enumerate(keys)]
+    return decode(_id_of(*idx))
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -376,6 +401,7 @@ def main(argv=None):
     ap.add_argument("--han",default="",help="汉译 → 编号（如 奥形凝起）")
     ap.add_argument("--search",default="",help="语义关键词 → 命中的词根（5 轴）")
     ap.add_argument("--compose",default="",help="按义造词，如 核=毁灭,映=光,态=爆,标=溯,相=起")
+    ap.add_argument("--analogy",nargs=3,metavar=("A","B","C"),help="五维类比造词：A:B :: C:?")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -399,6 +425,12 @@ def main(argv=None):
         try:
             out(compose(_parse_compose_arg(a.compose)))
         except ValueError as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.analogy:
+        try:
+            out(analogy(*a.analogy))
+        except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return
     if a.coin is not None:

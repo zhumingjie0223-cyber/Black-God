@@ -187,6 +187,8 @@ final class ChatViewModel: ObservableObject {
             tools.register(NexusSkillReadTool(items: skillSnapshot))
         }
         tools.register(NexusShuyuTool())
+        tools.register(NexusPlanTool())
+        tools.register(NexusVerifyTool())
         tools.register(NexusClockTool())
         tools.register(NexusCalculatorTool())
         if NexusLinuxTool.enabled {

@@ -8,7 +8,7 @@ struct NexusLiveExecutionView: View {
         if live.visible {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Circle().fill(live.state == .running ? Color.green : Color.gray).frame(width: 7, height: 7)
+                    Circle().fill(live.state == .running ? Color.bgJadeHi : Color.bgTextSecondary).frame(width: 7, height: 7)
                     Text("操作直播").font(.caption.bold())
                     Text(live.state == .running ? "进行中" : "已结束").font(.caption2).foregroundStyle(Color.bgTextSecondary)
                     Spacer()
@@ -35,7 +35,7 @@ struct NexusLiveExecutionView: View {
                                     }.id(entry.id)
                                 }
                             }.padding(10)
-                        }.frame(height: 150).background(Color.black.opacity(0.5)).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }.frame(height: 150).background(Color.bgDark.opacity(0.72)).clipShape(RoundedRectangle(cornerRadius: 8))
                         .accessibilityIdentifier("live.screen")
                         .onChange(of: live.entries.last?.id) { _, id in
                             if let id { proxy.scrollTo(id, anchor: .bottom) }
@@ -45,9 +45,9 @@ struct NexusLiveExecutionView: View {
                         .font(.system(size: 10)).foregroundStyle(Color.bgTextSecondary)
                 }
             }
-            .tint(Color.bgCyan)
+            .tint(Color.bgJadeHi)
             .padding(12).background(Color.bgCard).clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.bgCyan.opacity(0.3)))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.bgJade.opacity(0.3)))
             .onChange(of: live.state) { _, state in expanded = state == .running }
         }
     }

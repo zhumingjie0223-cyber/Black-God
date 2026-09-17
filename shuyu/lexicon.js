@@ -8,6 +8,7 @@
  *   encodeHan  汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
  *   search     语义关键词 → 命中的词根（5 轴）
  *   compose    按义造词：每轴给 下标/拉丁根/汉译/语义关键词 任一种 → 唯一编号
+ *   analogy    五维坐标类比：A:B :: C:? ，按轴模运算，不改编号空间
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -251,6 +252,29 @@ export function compose(spec){
   return decode(idOf(...idx));
 }
 
+function resolveWord(input){
+  if(typeof input === 'number'){
+    if(!Number.isInteger(input)) throw new RangeError('类比词必须是编号或枢语词');
+    return decode(input);
+  }
+  if(typeof input !== 'string' || !input.trim()) throw new RangeError('类比词必须是编号或枢语词');
+  const s = input.trim();
+  if(/^(0|[1-9][0-9]*)$/.test(s)) return decode(Number(s));
+  let id = encode(s);
+  if(id < 0) id = encodeHan(s);
+  if(id < 0) throw new RangeError(`类比找不到「${input}」`);
+  return decode(id);
+}
+
+// ══════ 五维类比造词：A:B :: C:?  →  C + (B − A) 按轴取模 ══════
+export function analogy(a, b, c){
+  const A = resolveWord(a), B = resolveWord(b), C = resolveWord(c);
+  const sizes = [NC, NM, NS, NK, NP];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const idx = keys.map((key, i) => ((C.坐标[key] + B.坐标[key] - A.坐标[key]) % sizes[i] + sizes[i]) % sizes[i]);
+  return decode(idOf(...idx));
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -411,4 +435,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };

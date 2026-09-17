@@ -21,7 +21,7 @@ final class NexusShuyuTests: XCTestCase {
     func testGrammarHandlesEscapesAndRejectsUnsupportedOrPartialProgram() throws {
         let program = try NexusShuyuEngine.shared.compile(#"行：执行("printf \"a,b)→c\"")"#)
         XCTAssertEqual(program.actions[0].arguments["command"], "printf \"a,b)→c\"")
-        for bad in ["", "行：计算(1)", "do: missing(\"x\")", "行：计算(\"1\")\nBAD", String(repeating: "行：计算(\"1\")\n", count: 5), "行：计算(\"1\") → true"] {
+        for bad in ["", "行：计算(1)", "do: missing(\"x\")", "行：计算(\"1\")\nBAD", String(repeating: "行：计算(\"1\")\n", count: 9), "行：计算(\"1\") → true"] {
             XCTAssertThrowsError(try NexusShuyuEngine.shared.compile(bad))
         }
     }
@@ -57,5 +57,24 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode([NexusShuyuStepResult].self, from: Data(result.output.utf8)).count, 2)
         tools.register(tool)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "shuyu_execute" })
+    }
+    func testPlanSearchAndAnalogyStayBounded() async throws {
+        var tools = NexusToolRegistry()
+        tools.register(NexusCalculatorTool()); tools.register(NexusShuyuTool())
+        tools.register(NexusPlanTool()); tools.register(NexusVerifyTool())
+        let program = try NexusShuyuEngine.shared.compile("行：规划(\"拆目标\")\n行：检索(\"锚点\")\n行：核对(\"可检查\")")
+        XCTAssertEqual(program.version, 2)
+        XCTAssertEqual(program.actions.count, 3)
+        XCTAssertEqual(program.actions[0].id, "s1")
+        let runner = NexusShuyuRunTool(tools: tools)
+        let result = await runner.execute(NexusToolCall(id: UUID(), name: runner.name, arguments: ["program": "行：规划(\"拆目标\")\n行：核对(\"可检查\")"]))
+        XCTAssertTrue(result.succeeded)
+        let identity = try JSONSerialization.jsonObject(with: Data(NexusShuyuEngine.shared.invoke("类比", input: #"["奥形凝起","奥形凝起","奥形凝起"]"#).utf8)) as? [String: Any]
+        XCTAssertEqual((identity?["id"] as? NSNumber)?.intValue, 0)
+        let plan = try JSONDecoder().decode([[String: String]].self, from: Data(try NexusShuyuEngine.shared.invoke("规划", input: "行：规划(\"拆目标\")").utf8))
+        XCTAssertEqual(plan.first?["title"], "拆目标")
+        XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "plan" })
+        tools.register(runner)
+        XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "verify" })
     }
 }

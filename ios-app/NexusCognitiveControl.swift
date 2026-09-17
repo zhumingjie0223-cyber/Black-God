@@ -257,7 +257,7 @@ final class NexusCognitiveControl: ObservableObject {
         catch { writable = false; self.error = "权限保存失败，受管工具保持停止。"; throw error }
     }
     func begin(_ call: NexusToolCall, now: Date = Date()) throws -> Int {
-        let readOnly: Set<String> = ["echo", "calc", "clock", "shuyu", "shuyu_execute", "skill_search", "skill_read", "memory_search", "causal_model", "dependency_plan"]
+        let readOnly: Set<String> = ["echo", "calc", "clock", "shuyu", "shuyu_execute", "plan", "verify", "skill_search", "skill_read", "memory_search", "causal_model", "dependency_plan"]
         let governanceTools: Set<String> = ["knowledge_propose", "self_reflect", "self_decision_proposal", "self_decision_review", "self_decision_publish"]
         let isGovernance = governanceTools.contains(call.name)
         let allowed = !state.stopped && (readOnly.contains(call.name) || (isGovernance && state.governanceEnabled) || (call.name == "shell_execute" && (state.workspaceUntil.map { $0 > now } ?? false)))

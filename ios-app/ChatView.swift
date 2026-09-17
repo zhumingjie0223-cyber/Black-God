@@ -17,12 +17,14 @@ struct ChatView: View {
         VStack(spacing: 0) {
             chatHeader
             NexusActivityPanel(chat: vm, practice: vm.practice).padding(.horizontal, 16).padding(.bottom, 8)
+            if let plan = vm.currentPlan, !plan.steps.isEmpty, vm.isTyping || vm.canResume {
+                NexusPlanStrip(plan: plan).padding(.horizontal, 16).padding(.bottom, 8)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 14) {
                         if vm.messages.isEmpty {
-                            Text("直接说出你要完成的事。Black God 会按需使用内置工具执行并核对结果，无需你输入代码。")
-                                .foregroundStyle(Color.bgTextSecondary).padding(.vertical, 32)
+                            ChatEmptyState { input = $0; inputFocused = true }
                         }
                         ForEach(vm.messages) { msg in
                             MessageBubble(message: msg).id(msg.id).contextMenu {
@@ -84,7 +86,7 @@ struct ChatView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
                 HStack(spacing: 4) {
-                    Circle().fill(Color.green).frame(width: 6, height: 6)
+                    Circle().fill(Color.bgJadeHi).frame(width: 6, height: 6)
                     Text(vm.currentMood).font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
                 }
             }
@@ -97,24 +99,46 @@ struct ChatView: View {
     }
 
     var inputBar: some View {
-        HStack(spacing: 10) {
-            TextField("跟Black God AI说点什么…", text: $input, axis: .vertical)
-                .focused($inputFocused).font(.bgBody()).foregroundStyle(Color.bgTextPrimary).lineLimit(1...4)
-                .padding(.horizontal, 16).padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 22).fill(Color.bgCardLight))
-            Button {
-                if vm.isTyping { vm.cancel(); return }
-                guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                appState.haptic(.medium)
-                vm.send(input)
-                if vm.isTyping { input = "" }
-            } label: {
-                Image(systemName: vm.isTyping ? "stop.circle.fill" : "arrow.up.circle.fill").font(.system(size: 34))
-                    .foregroundStyle(input.isEmpty ? AnyShapeStyle(Color.bgTextSecondary) : AnyShapeStyle(LinearGradient.goldGradient))
-            }.disabled(!vm.isTyping && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityLabel(vm.isTyping ? "停止回答" : "发送消息")
+        VStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ChatComposerChip.all, id: \.title) { chip in
+                        Button(chip.title) { input = chip.prompt; inputFocused = true }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.bgJadeHi)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Capsule().fill(Color.bgCardLight))
+                            .overlay(Capsule().stroke(Color.bgJade.opacity(0.35), lineWidth: 0.5))
+                            .accessibilityIdentifier(chip.accessibilityID)
+                    }
+                }
+            }
+            HStack(spacing: 10) {
+                TextField("跟Black God AI说点什么…", text: $input, axis: .vertical)
+                    .focused($inputFocused).font(.bgBody()).foregroundStyle(Color.bgTextPrimary).lineLimit(1...4)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 22).fill(Color.bgCardLight))
+                    .submitLabel(.send)
+                    .onSubmit { sendCurrent() }
+                Button {
+                    sendCurrent()
+                } label: {
+                    Image(systemName: vm.isTyping ? "stop.circle.fill" : "arrow.up.circle.fill").font(.system(size: 34))
+                        .foregroundStyle(input.isEmpty ? AnyShapeStyle(Color.bgTextSecondary) : AnyShapeStyle(LinearGradient.goldGradient))
+                }.disabled(!vm.isTyping && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .keyboardShortcut(.return, modifiers: .command)
+                .accessibilityLabel(vm.isTyping ? "停止回答" : "发送消息")
+            }
         }
         .padding(.horizontal, 16).padding(.vertical, 12).background(Color.bgDark.opacity(0.98))
+    }
+
+    private func sendCurrent() {
+        if vm.isTyping { vm.cancel(); return }
+        guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        appState.haptic(.medium)
+        vm.send(input)
+        if vm.isTyping { input = "" }
     }
 }
 
@@ -140,7 +164,7 @@ struct TypingIndicator: View {
         HStack {
             HStack(spacing: 4) {
                 ForEach(0..<3) { i in
-                    Circle().fill(Color.bgGold).frame(width: 7, height: 7)
+                    Circle().fill(Color.bgJadeHi).frame(width: 7, height: 7)
                         .opacity(phase == Double(i) ? 1 : 0.3)
                 }
             }
@@ -149,5 +173,74 @@ struct TypingIndicator: View {
             Spacer()
         }
         .onAppear { withAnimation(.easeInOut(duration: 0.6).repeatForever()) { phase = 2 } }
+    }
+}
+
+struct ChatComposerChip {
+    let title: String
+    let prompt: String
+    let accessibilityID: String
+    static let all = [
+        ChatComposerChip(title: "计算", prompt: "帮我计算并核对结果：", accessibilityID: "chat.chip.calc"),
+        ChatComposerChip(title: "规划", prompt: "把这件事拆成可检查的步骤：", accessibilityID: "chat.chip.plan"),
+        ChatComposerChip(title: "枢语", prompt: "用枢语检索并造一个词：", accessibilityID: "chat.chip.shuyu")
+    ]
+}
+
+struct ChatEmptyState: View {
+    let use: (String) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("直接说出你要完成的事。Black God 会按需使用内置工具执行并核对结果，无需你输入代码。")
+                .foregroundStyle(Color.bgTextSecondary)
+            ForEach(["计算 12 个月每月存 500 元的累计金额，并核对结果。", "用枢语造一个关于「锚点」的词，并核对编号。", "把整理账单拆成可检查的三步计划。"], id: \.self) { sample in
+                Button(sample) { use(sample) }
+                    .font(.subheadline).foregroundStyle(Color.bgTextPrimary).multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12).background(Color.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.bgJade.opacity(0.2), lineWidth: 0.5))
+            }
+        }.padding(.vertical, 12).accessibilityIdentifier("chat.empty")
+    }
+}
+
+struct NexusPlanStrip: View {
+    let plan: NexusTaskPlan
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("当前计划").font(.caption.bold()).foregroundStyle(Color.bgJadeHi)
+            ForEach(Array(plan.steps.enumerated()), id: \.element.id) { index, step in
+                HStack(spacing: 8) {
+                    Circle().fill(color(step.status)).frame(width: 7, height: 7)
+                    Text("\(index + 1). \(step.title)")
+                        .font(.caption).foregroundStyle(Color.bgTextPrimary).lineLimit(1)
+                    Spacer()
+                    Text(label(step.status)).font(.caption2).foregroundStyle(Color.bgTextSecondary)
+                }
+            }
+        }
+        .padding(12).background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
+        .accessibilityIdentifier("chat.plan")
+    }
+    private func color(_ status: NexusStepStatus) -> Color {
+        switch status {
+        case .running: return Color.bgJadeHi
+        case .passed: return Color.bgJade
+        case .failed: return Color.orange
+        case .skipped: return Color.bgTextSecondary
+        case .pending: return Color.bgTextSecondary.opacity(0.6)
+        }
+    }
+    private func label(_ status: NexusStepStatus) -> String {
+        switch status {
+        case .pending: return "待做"
+        case .running: return "进行中"
+        case .passed: return "完成"
+        case .failed: return "失败"
+        case .skipped: return "跳过"
+        }
     }
 }

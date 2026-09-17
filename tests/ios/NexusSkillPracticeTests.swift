@@ -19,6 +19,7 @@ final class NexusSkillPracticeTests: XCTestCase {
     private var url: URL { folder.appendingPathComponent("practice.json") }
     private func tools() -> NexusToolRegistry {
         var tools = NexusToolRegistry(); tools.register(NexusCalculatorTool()); tools.register(NexusShuyuTool())
+        tools.register(NexusPlanTool()); tools.register(NexusVerifyTool())
         tools.register(NexusLinuxTool(workspace: NexusWorkspaceIdentity.id(for: "tests-practice"), isEnabled: { true }))
         return tools
     }

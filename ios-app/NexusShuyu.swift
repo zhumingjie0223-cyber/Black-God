@@ -3,6 +3,7 @@ import JavaScriptCore
 
 struct NexusShuyuProgram: Decodable {
     struct Action: Decodable {
+        let id: String?
         let tool: String
         let arguments: [String: String]
         let expected: String?
@@ -40,7 +41,7 @@ final class NexusShuyuEngine {
     func compile(_ source: String) throws -> NexusShuyuProgram {
         let data = Data(try invoke("编译", input: source).utf8)
         let program = try JSONDecoder().decode(NexusShuyuProgram.self, from: data)
-        guard program.version == 1, (1...4).contains(program.actions.count) else { throw NexusError.invalidResponse }
+        guard program.version == 2, (1...8).contains(program.actions.count) else { throw NexusError.invalidResponse }
         return program
     }
 }
@@ -48,7 +49,7 @@ final class NexusShuyuEngine {
 struct NexusShuyuTool: NexusTool {
     let name = "shuyu"
     let canReuseResult = true
-    let usage = "Black God内置枢语。operation可选容量、解码、拉丁编号、汉译编号、检索、造词、组合、编译、往返、质数；input为对应字符串。返回实际计算结果。词汇容量不是智能能力数量。"
+    let usage = "Black God内置枢语。operation可选容量、解码、拉丁编号、汉译编号、检索、造词、组合、类比、编译、规划、往返、质数；input为对应字符串。类比输入为JSON数组[词A,词B,词C]。词汇容量不是智能能力数量。"
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         do {
             let value = try await NexusShuyuEngine.shared.invoke(call.arguments["operation"] ?? "", input: call.arguments["input"] ?? "")
@@ -67,14 +68,14 @@ struct NexusShuyuStepResult: Codable {
 /// 有界执行，不暴露JavaScript或宿主对象；每个子工具仍检查当前权限。
 struct NexusShuyuRunTool: NexusTool {
     let name = "shuyu_execute"
-    let usage = "执行最多4行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语(operation,input)、执行(shell脚本)。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
+    let usage = "执行最多8行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语、检索、规划、核对、执行。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
     let tools: NexusToolRegistry
     var onTrace: (@MainActor (NexusToolTrace) -> Void)? = nil
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         var results: [NexusShuyuStepResult] = []
         do {
             let program = try await NexusShuyuEngine.shared.compile(call.arguments["program"] ?? "")
-            guard program.actions.allSatisfy({ tools.contains($0.tool) && ["calc", "shuyu", "shell_execute"].contains($0.tool) }) else {
+            guard program.actions.allSatisfy({ tools.contains($0.tool) && ["calc", "shuyu", "shell_execute", "plan", "verify"].contains($0.tool) }) else {
                 throw NexusReasoningError.execution("枢语程序包含当前未开放的工具，尚未执行")
             }
             for action in program.actions {
@@ -94,5 +95,27 @@ struct NexusShuyuRunTool: NexusTool {
             let prefix = (try? JSONEncoder().encode(results)).map { String(decoding: $0, as: UTF8.self) } ?? "[]"
             return NexusToolResult(callID: call.id, output: prefix + "\n" + error.localizedDescription, succeeded: false)
         }
+    }
+}
+
+struct NexusPlanTool: NexusTool {
+    let name = "plan"
+    let canReuseResult = true
+    let usage = "记录一个可检查的任务步骤标题，不执行外部操作。"
+    func execute(_ call: NexusToolCall) async -> NexusToolResult {
+        let title = call.arguments["title"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !title.isEmpty else { return NexusToolResult(callID: call.id, output: "缺少 title", succeeded: false) }
+        return NexusToolResult(callID: call.id, output: title, succeeded: true)
+    }
+}
+
+struct NexusVerifyTool: NexusTool {
+    let name = "verify"
+    let canReuseResult = true
+    let usage = "记录一条可检查的验收条件，不把模型自评当作已验证事实。"
+    func execute(_ call: NexusToolCall) async -> NexusToolResult {
+        let criterion = call.arguments["criterion"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !criterion.isEmpty else { return NexusToolResult(callID: call.id, output: "缺少 criterion", succeeded: false) }
+        return NexusToolResult(callID: call.id, output: criterion, succeeded: true)
     }
 }

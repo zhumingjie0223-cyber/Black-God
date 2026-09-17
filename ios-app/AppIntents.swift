@@ -23,6 +23,8 @@ enum NexusIntentAPI {
         var tools = NexusToolRegistry(control: .shared)
         tools.register(NexusCausalTool()); tools.register(NexusDependencyTool())
         tools.register(NexusShuyuTool())
+        tools.register(NexusPlanTool())
+        tools.register(NexusVerifyTool())
         tools.register(NexusClockTool())
         tools.register(NexusCalculatorTool())
         if NexusLinuxTool.enabled { tools.register(NexusLinuxTool(workspace: NexusWorkspaceIdentity.id(for: "shortcuts"))) }

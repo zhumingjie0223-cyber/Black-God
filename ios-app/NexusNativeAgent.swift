@@ -122,8 +122,10 @@ extension NexusToolRegistry {
     var nativeDefinitions: [NexusToolDefinition] {
         let definitions: [(String, String, [String: String], [String])] = [
             ("shell_execute", "在独立文件工作区的 Alpine Linux 中执行脚本，返回 stdout、stderr 和退出码；不能访问宿主凭据，不支持持续后台进程", ["command": "shell 脚本", "timeout": "可选秒数字符串，默认30，最多120"], ["command"]),
-            ("shuyu", "查询、编解码与检验Black God自己的枢语", ["operation": "容量/解码/拉丁编号/汉译编号/检索/造词/组合/编译/往返/质数", "input": "操作输入字符串；容量可为空"], ["operation"]),
-            ("shuyu_execute", "执行枢语方言：最多4行，未知工具预先拒绝，失败停止", ["program": "例如 行：计算(\"12*3\") → \"36\""], ["program"]),
+            ("shuyu", "查询、编解码、类比与检验Black God自己的枢语", ["operation": "容量/解码/拉丁编号/汉译编号/检索/造词/组合/类比/编译/规划/往返/质数", "input": "操作输入字符串；容量可为空；类比为JSON数组"], ["operation"]),
+            ("shuyu_execute", "执行枢语方言：最多8行，未知工具预先拒绝，失败停止", ["program": "例如 行：计算(\"12*3\") → \"36\""], ["program"]),
+            ("plan", "记录一个可检查的任务步骤标题", ["title": "步骤标题"], ["title"]),
+            ("verify", "记录一条可检查的验收条件，不是已完成证明", ["criterion": "验收条件"], ["criterion"]),
             ("clock", "查询当前日期时间", ["timezone": "可选 IANA 时区，如 Asia/Shanghai"], []),
             ("calc", "计算四则运算表达式", ["expression": "数学表达式，例如 (3+4)*2"], ["expression"]),
             ("skill_search", "检索用户保存的任务技能目录；只返回名称和条件摘要，不执行步骤", ["query": "任务关键词"], ["query"]),

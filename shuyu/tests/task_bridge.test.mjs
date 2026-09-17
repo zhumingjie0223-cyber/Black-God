@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import {compileTask,primes} from '../task_bridge.js';
+import {compileTask,describePlan,primes} from '../task_bridge.js';
 import {decode,encode,encodeHan,autoCoin,CAPACITY} from '../lexicon.js';
 const valid = ['行：计算("12*3") → "36"', 'do: calc("3+4") → "7"', '行：执行("printf \\\"a,b)→c\\\"")', '-- 注释\n行：枢语("往返","神枢🌱") → "true"'];
-const invalid = ['', 'do: unknown("x")', '行：计算(2)', '行：计算("1", "2")', '行：计算("1") → true', '行：计算("1"); attack()', '行：计算("1)', '行：执行("x")\n错误', Array(5).fill('行：计算("1")').join('\n'), '行：计算("1") → "a" extra', '行：__proto__("x")'];
+const invalid = ['', 'do: unknown("x")', '行：计算(2)', '行：计算("1", "2")', '行：计算("1") → true', '行：计算("1"); attack()', '行：计算("1)', '行：执行("x")\n错误', Array(9).fill('行：计算("1")').join('\n'), '行：计算("1") → "a" extra', '行：__proto__("x")'];
 test('枢语中英执行方言、转义与箭头解析',()=>{
   assert.equal(compileTask(valid[0]).actions[0].arguments.expression,'12*3');
   assert.equal(compileTask(valid[2]).actions[0].arguments.command,'printf "a,b)→c"');
@@ -39,4 +39,25 @@ test('标准质数原语两侧一致并拒绝越界',()=>{
     assert.deepEqual(primes(input),JSON.parse(py));
   }
   for(const input of ['10001','-1','1.5','NaN',true]) assert.throws(()=>primes(input));
+});
+test('规划与核对编译为有界工具，八步内合法，九步拒绝',()=>{
+  const program=compileTask('行：规划("拆目标")\n行：检索("锚点")\n行：核对("结果可检查")');
+  assert.equal(program.version,2);
+  assert.equal(program.actions[0].id,'s1');
+  assert.equal(program.actions[0].tool,'plan');
+  assert.equal(program.actions[1].arguments.operation,'检索');
+  assert.equal(program.actions[1].arguments.input,'锚点');
+  assert.equal(program.actions[2].tool,'verify');
+  assert.deepEqual(describePlan(program).map(x=>x.title),['拆目标','锚点','结果可检查']);
+  const eight=Array.from({length:8},(_,i)=>`行：计算("${i+1}")`).join('\n');
+  assert.equal(compileTask(eight).actions.length,8);
+  assert.throws(()=>compileTask(eight+'\n行：计算("9")'));
+});
+test('规划描述 JS 与 Python 一致',()=>{
+  const source='行：规划("先算")\n行：计算("1+1") → "2"';
+  const py=`import json,sys; from task_bridge import compile_task,describe_plan; p=compile_task(sys.stdin.read()); print(json.dumps({"program":p,"plan":describe_plan(p)},ensure_ascii=False))`;
+  const expected=JSON.parse(execFileSync('python3',['-c',py],{input:source,encoding:'utf8'}));
+  const program=compileTask(source);
+  assert.deepEqual(program,expected.program);
+  assert.deepEqual(describePlan(program),expected.plan);
 });
