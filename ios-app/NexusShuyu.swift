@@ -44,12 +44,15 @@ final class NexusShuyuEngine {
         guard program.version == 2, (1...8).contains(program.actions.count) else { throw NexusError.invalidResponse }
         return program
     }
+    func prepare() {
+        _ = try? invoke("容量", input: "")
+    }
 }
 
 struct NexusShuyuTool: NexusTool {
     let name = "shuyu"
     let canReuseResult = true
-    let usage = "Black God内置枢语。operation可选容量、解码、拉丁编号、汉译编号、检索、造词、组合、类比、编译、规划、往返、质数；input为对应字符串。类比输入为JSON数组[词A,词B,词C]。词汇容量不是智能能力数量。"
+    let usage = "Black God内置枢语。operation可选容量、解码、拉丁编号、汉译编号、检索、造词、组合、类比、邻近、编译、规划、往返、质数；input为对应字符串。类比输入为JSON数组[词A,词B,词C]；邻近为词或JSON数组[词,数量]。词汇容量不是智能能力数量。"
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         do {
             let value = try await NexusShuyuEngine.shared.invoke(call.arguments["operation"] ?? "", input: call.arguments["input"] ?? "")
@@ -59,6 +62,7 @@ struct NexusShuyuTool: NexusTool {
 }
 
 struct NexusShuyuStepResult: Codable {
+    let id: String?
     let tool: String
     let output: String
     let succeeded: Bool
@@ -68,14 +72,14 @@ struct NexusShuyuStepResult: Codable {
 /// 有界执行，不暴露JavaScript或宿主对象；每个子工具仍检查当前权限。
 struct NexusShuyuRunTool: NexusTool {
     let name = "shuyu_execute"
-    let usage = "执行最多8行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语、检索、规划、核对、执行。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
+    let usage = "执行最多8行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语、检索、邻近、规划、核对、时间、执行。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
     let tools: NexusToolRegistry
     var onTrace: (@MainActor (NexusToolTrace) -> Void)? = nil
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         var results: [NexusShuyuStepResult] = []
         do {
             let program = try await NexusShuyuEngine.shared.compile(call.arguments["program"] ?? "")
-            guard program.actions.allSatisfy({ tools.contains($0.tool) && ["calc", "shuyu", "shell_execute", "plan", "verify"].contains($0.tool) }) else {
+            guard program.actions.allSatisfy({ tools.contains($0.tool) && ["calc", "shuyu", "shell_execute", "plan", "verify", "clock"].contains($0.tool) }) else {
                 throw NexusReasoningError.execution("枢语程序包含当前未开放的工具，尚未执行")
             }
             for action in program.actions {
@@ -84,7 +88,7 @@ struct NexusShuyuRunTool: NexusTool {
                 let value = await tools.execute(inner)
                 try Task.checkCancellation()
                 let matched = action.expected.map { value.output.trimmingCharacters(in: .whitespacesAndNewlines) == $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                results.append(NexusShuyuStepResult(tool: action.tool, output: NexusEvidence.preview(value.output, limit: 3000), succeeded: value.succeeded, matched: matched))
+                results.append(NexusShuyuStepResult(id: action.id, tool: action.tool, output: NexusEvidence.preview(value.output, limit: 3000), succeeded: value.succeeded, matched: matched))
                 await onTrace?(NexusToolTrace(stepID: call.id, round: results.count, call: inner, result: value.output, succeeded: value.succeeded, timestamp: Date()))
                 if !value.succeeded || matched == false { break }
             }

@@ -48,6 +48,7 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertFalse(result.succeeded); XCTAssertEqual(calls, 1)
         let evidence = try JSONDecoder().decode([NexusShuyuStepResult].self, from: Data(result.output.utf8))
         XCTAssertEqual(evidence.first?.matched, false)
+        XCTAssertEqual(evidence.first?.id, "s1")
     }
     func testRealCalculationAndLanguageComposeThroughSameTools() async throws {
         var tools = NexusToolRegistry(); tools.register(NexusCalculatorTool()); tools.register(NexusShuyuTool())
@@ -76,5 +77,25 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "plan" })
         tools.register(runner)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "verify" })
+    }
+    func testNearClockAndRankedSearchStayBounded() async throws {
+        var tools = NexusToolRegistry()
+        tools.register(NexusCalculatorTool()); tools.register(NexusShuyuTool())
+        tools.register(NexusClockTool())
+        let program = try NexusShuyuEngine.shared.compile("行：邻近(\"奥形凝起\")\n行：时间(\"Asia/Shanghai\")")
+        XCTAssertEqual(program.actions[0].arguments["operation"], "邻近")
+        XCTAssertEqual(program.actions[1].tool, "clock")
+        let runner = NexusShuyuRunTool(tools: tools)
+        let result = await runner.execute(NexusToolCall(id: UUID(), name: runner.name, arguments: ["program": "行：邻近(\"奥形凝起\")"]))
+        XCTAssertTrue(result.succeeded)
+        let evidence = try JSONDecoder().decode([NexusShuyuStepResult].self, from: Data(result.output.utf8))
+        XCTAssertEqual(evidence.first?.id, "s1")
+        let neighbors = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("邻近", input: "0").utf8)) as? [[String: Any]]
+        XCTAssertEqual(neighbors?.count, 5)
+        XCTAssertFalse(neighbors?.contains { ($0["id"] as? NSNumber)?.intValue == 0 } == true)
+        let hits = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("检索", input: "光").utf8)) as? [[String: Any]]
+        XCTAssertEqual(hits?.first?["拉丁"] as? String, "ryl")
+        tools.register(runner)
+        XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "clock" })
     }
 }

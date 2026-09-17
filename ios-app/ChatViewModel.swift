@@ -94,6 +94,7 @@ final class ChatViewModel: ObservableObject {
     var currentPlan: NexusTaskPlan? { activeEngine?.plan ?? runtime.currentPlan }
     var canResume: Bool { !isTyping && taskCheckpoint?.canResume == true }
     var canRetry: Bool { canResume && lastPrompt != nil && lastError != nil }
+    var canRegenerate: Bool { !isTyping && lastPrompt != nil && messages.last?.role == "assistant" && taskCheckpoint?.canResume != true }
 
     func send(_ text: String) {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,6 +105,15 @@ final class ChatViewModel: ObservableObject {
     func retry() {
         guard canRetry, let prompt = lastPrompt else { return }
         if canResume { resume() } else { start(prompt, appendUser: false) }
+    }
+
+    func regenerate() {
+        guard canRegenerate, let prompt = lastPrompt else { return }
+        if messages.last?.role == "assistant" {
+            messages.removeLast()
+            guard persist() else { return }
+        }
+        start(prompt, appendUser: false)
     }
 
     func resume() {
@@ -240,7 +250,8 @@ final class ChatViewModel: ObservableObject {
                 self.activeTask = nil
                 let reply = outcome.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !reply.isEmpty else { throw NexusError.invalidResponse }
-                let message = ChatMessage(role: "assistant", content: reply)
+                let chips = NexusEvidence.chips(engine.executor?.toolTraces ?? [])
+                let message = ChatMessage(role: "assistant", content: reply, evidence: chips.isEmpty ? nil : chips)
                 if var saved = self.taskCheckpoint {
                     saved.state = outcome.warning == nil ? .answered : .failed
                     saved.finalMessage = message

@@ -147,12 +147,23 @@ test('GET /analogy 五维类比与参数校验', async () => {
   assert.equal((await call(env, '/analogy?a=x&b=y&c=z')).status, 400);
 });
 
+test('GET /near 邻近词与参数校验', async () => {
+  const env = mockEnv();
+  const r = await (await call(env, '/near?word=0')).json();
+  assert.equal(r.neighbors.length, 5);
+  assert.ok(r.neighbors.every(item => item.距 === 1 && item.id !== 0));
+  assert.equal((await call(env, '/near')).status, 400);
+  assert.equal((await call(env, '/near?word=绝不存在')).status, 400);
+  assert.equal((await call(env, '/near?word=0&n=99')).status, 400);
+});
+
 test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   const root = await (await call(mockEnv(), '/')).json();
   assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
   assert.ok(root.endpoints.some(e => e.startsWith('/search')));
   assert.ok(root.endpoints.some(e => e.startsWith('/compose')));
   assert.ok(root.endpoints.some(e => e.startsWith('/analogy')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/near')));
   const st = await (await call(mockEnv(), '/status')).json();
   assert.deepEqual(st.axes, root.axes);
 });

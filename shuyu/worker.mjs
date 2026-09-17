@@ -11,13 +11,14 @@
 //   GET  /decode?id=N         编号 → 枢语词
 //   GET  /encode?word=W       枢语词 → 编号（拉丁词形或纯中文汉译都认，亦可用 ?han=）
 //   GET  /search?q=K&axis=A   语义检索：关键词命中 5 轴任一词根（axis 可限定 核/映/态/标/相）
+//   GET  /near?word=W&n=N     五维邻近词（L1=1，不环绕；n 默认 8，最多 16）
 //   GET  /compose?核=&映=&态=&标=&相=   按义造词（每轴给 下标/拉丁根/汉译/语义关键词，缺省取 0）
 //   GET  /coin?seed=S&layer=L 造词（有 seed 可复现，无 seed 按层随机）
 //   POST /talk        {code} 枢语意识流 → 解释 + 编译（别名 /interpret）
 //   POST /broadcast   万网散播（sovereignControl 全流程）
 
 import {
-  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy,
+  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near,
   coinWord, autoCoin, coinFromState, loadCapabilities,
 } from './lexicon.js';
 import { interpret, applyToSoul, compile } from './nexuslang.js';
@@ -88,6 +89,19 @@ async function handleSearch(url) {
   if (axis && !AXIS_NAMES.includes(axis)) return badRequest(`参数 axis 只能是 ${AXIS_NAMES.join('/')}`);
   const hits = search(q, axis);
   return json({ q, axis: axis ?? null, count: hits.length, hits });
+}
+
+async function handleNear(url) {
+  const word = url.searchParams.get('word') ?? url.searchParams.get('w');
+  if (word == null || !String(word).trim()) return badRequest('缺少参数 word（枢语词或编号）');
+  const raw = url.searchParams.get('n');
+  const n = raw == null || raw === '' ? 8 : Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 16) return badRequest('参数 n 必须是 1 至 16 的整数');
+  try {
+    return json({ word, n, neighbors: near(word, n) });
+  } catch (err) {
+    return badRequest(String(err?.message ?? err));
+  }
 }
 
 async function handleAnalogy(url) {
@@ -179,13 +193,14 @@ export default {
           copyright: COPYRIGHT,
           capacity: CAPACITY,
           axes: AXES,
-          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
+          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
         });
       }
       if (path === '/status' && req.method === 'GET') return handleStatus(env);
       if (path === '/decode' && req.method === 'GET') return handleDecode(url);
       if (path === '/encode' && req.method === 'GET') return handleEncode(url);
       if (path === '/search' && req.method === 'GET') return handleSearch(url);
+      if (path === '/near' && req.method === 'GET') return handleNear(url);
       if (path === '/compose' && req.method === 'GET') return handleCompose(url);
       if (path === '/analogy' && req.method === 'GET') return handleAnalogy(url);
       if (path === '/coin' && req.method === 'GET') return handleCoin(url, env);

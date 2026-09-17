@@ -11,6 +11,9 @@ _MAPPING = {
     '核对': {'tool': 'verify', 'keys': ['criterion']}, 'verify': {'tool': 'verify', 'keys': ['criterion']},
     '检索': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '检索'}},
     'search': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '检索'}},
+    '邻近': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '邻近'}},
+    'near': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '邻近'}},
+    '时间': {'tool': 'clock', 'keys': ['timezone']}, 'clock': {'tool': 'clock', 'keys': ['timezone']},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:
@@ -65,7 +68,7 @@ def describe_plan(program):
     out = []
     for action in program['actions']:
         args = action.get('arguments') or {}
-        title = args.get('title') or args.get('criterion') or args.get('expression') or args.get('command') or args.get('input') or action.get('tool')
+        title = args.get('title') or args.get('criterion') or args.get('expression') or args.get('command') or args.get('input') or args.get('timezone') or action.get('tool')
         out.append(dict(id=action.get('id'), tool=action.get('tool'), title=title))
     return out
 

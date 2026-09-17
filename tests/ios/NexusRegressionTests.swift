@@ -108,6 +108,28 @@ final class NexusRegressionTests: XCTestCase {
     }
 
     @MainActor
+    func testRegenerateReplacesLastAssistantMessage() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        var attempts = 0
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in true }, completion: { _, _ in
+            attempts += 1
+            return attempts == 1 ? "第一版" : "第二版"
+        })
+        vm.send("改写")
+        for _ in 0..<100 where vm.isTyping { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(vm.canRegenerate)
+        XCTAssertEqual(vm.messages.last?.content, "第一版")
+        vm.regenerate()
+        for _ in 0..<100 where vm.isTyping { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(vm.messages.filter { $0.role == "user" }.count, 1)
+        XCTAssertEqual(vm.messages.filter { $0.role == "assistant" }.count, 1)
+        XCTAssertEqual(vm.messages.last?.content, "第二版")
+        XCTAssertFalse(vm.canRetry)
+    }
+
+    @MainActor
     func testFollowUpIncludesPreviousConversation() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }

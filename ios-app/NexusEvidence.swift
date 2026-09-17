@@ -15,6 +15,9 @@ enum NexusEvidence {
             "工具 \($0.call.name)，参数 \(preview(String(describing: $0.call.arguments), limit: 300))，成功=\($0.succeeded)，实际结果：\(preview($0.result, limit: 900))"
         }.joined(separator: "\n")
     }
+    static func chips(_ traces: [NexusToolTrace], limit: Int = 6) -> [String] {
+        traces.suffix(limit).map { "\($0.call.name)\($0.succeeded ? "通过" : "失败")" }
+    }
     static func unresolvedFailures(_ traces: [NexusToolTrace]) -> [String] {
         var latest: [String: Bool] = [:]
         for trace in traces { latest[trace.call.name] = trace.succeeded }

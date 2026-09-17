@@ -11,6 +11,7 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.chip.calc"].exists)
         XCTAssertTrue(app.buttons["chat.chip.shuyu"].exists)
         app.buttons["chat.chip.plan"].tap()
+        XCTAssertFalse(app.buttons["chat.regenerate"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "对话快捷芯片"; shot.lifetime = .keepAlways; add(shot)
     }
 
@@ -185,6 +186,8 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["词形与汉译反查一致"].exists)
         app.buttons["shuyu.analogy"].tap()
         XCTAssertTrue(app.staticTexts["词形与汉译反查一致"].waitForExistence(timeout: 5))
+        app.buttons["shuyu.near"].tap()
+        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.buttons["完成"].tap()
         app.buttons["storage.open"].tap()

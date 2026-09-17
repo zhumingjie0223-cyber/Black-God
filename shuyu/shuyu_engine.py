@@ -21,6 +21,7 @@
 - 可落盘分片，也可纯寻址零占用
 - 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
   compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
+- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居
 
 v4.1（2026-09）新能力：
 - encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
@@ -244,11 +245,23 @@ def encode_han(han):
     return found[0] if len(found) == 1 else -1
 
 # ══════ 语义检索：关键词 → 命中的词根（5 轴基表级，不展开阶）══════
+def _hit_score(kw, kwl, lat, han, sem):
+    latl = (lat or "").lower()
+    if kwl and kwl == latl: return 400
+    if han and han == kw: return 380
+    if sem and kw in sem.split("·"): return 300
+    if han and han.startswith(kw): return 240
+    if han and kw in han: return 200
+    if sem and kw in sem: return 160
+    if latl and len(kwl) >= 2 and kwl in latl: return 100
+    return 0
+
 def search(keyword, axis=None):
-    """在 5 轴基表的 拉丁/汉/义 里找关键词（拉丁不分大小写），返回命中列表。
+    """在 5 轴基表的 拉丁/汉/义 里找关键词（拉丁不分大小写），返回按相关度排序的命中。
 
     每项：{"轴","下标","拉丁","汉","义"}，下标是**展开后**轴内下标（基表下标 × 阶数，即 0 阶），
     可直接喂给 compose / coin_from_coord。axis 可限定 核/映/态/标/相 之一。
+    排序：精确拉丁/汉 > 义段整词 > 前缀/包含；同分按轴序、下标。不改命中集合。
     """
     if not isinstance(keyword, str) or not keyword.strip():
         return []
@@ -258,8 +271,9 @@ def search(keyword, axis=None):
         if axis and axis != name: continue
         for bi,(lat,han,sem) in enumerate(base):
             if not lat and not han: continue   # 标轴首项是空阶，没有可检索内容
-            if kwl == lat.lower() or (han and kw in han) or (sem and kw in sem) or (lat and kwl in lat.lower() and len(kwl) >= 2):
+            if _hit_score(kw, kwl, lat, han, sem) > 0:
                 out.append({"轴":name,"下标":bi*tl,"拉丁":lat,"汉":han,"义":sem})
+    out.sort(key=lambda h: (-_hit_score(kw, kwl, h["拉丁"], h["汉"], h["义"]), _AXIS_NAMES.index(h["轴"]), h["下标"]))
     return out
 
 def _resolve_axis(ai, val):
@@ -325,6 +339,29 @@ def analogy(a, b, c):
     keys = ("c", "m", "s", "k", "p")
     idx = [((C["坐标"][k] + B["坐标"][k] - A["坐标"][k]) % sizes[i] + sizes[i]) % sizes[i] for i, k in enumerate(keys)]
     return decode(_id_of(*idx))
+
+def near(value, limit=8):
+    """五维 L1=1 邻近词，不环绕；与 lexicon.js near 同构。编号空间不变。"""
+    try:
+        n = int(limit)
+    except (TypeError, ValueError):
+        n = 8
+    n = 16 if n > 16 else (1 if n < 1 else n)
+    word = _resolve_word(value)
+    sizes = (NC, NM, NS, NK, NP)
+    keys = ("c", "m", "s", "k", "p")
+    origin = [word["坐标"][k] for k in keys]
+    out = []
+    for i, name in enumerate(_AXIS_NAMES):
+        for delta in (-1, 1):
+            nxt = origin[i] + delta
+            if nxt < 0 or nxt >= sizes[i]:
+                continue
+            idx = list(origin)
+            idx[i] = nxt
+            w = decode(_id_of(*idx))
+            out.append({"距": 1, "轴": name, "id": w["id"], "词": w["词"], "汉": w["汉"], "义": w["义"], "坐标": w["坐标"]})
+    return out[:n]
 
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
@@ -402,6 +439,7 @@ def main(argv=None):
     ap.add_argument("--search",default="",help="语义关键词 → 命中的词根（5 轴）")
     ap.add_argument("--compose",default="",help="按义造词，如 核=毁灭,映=光,态=爆,标=溯,相=起")
     ap.add_argument("--analogy",nargs=3,metavar=("A","B","C"),help="五维类比造词：A:B :: C:?")
+    ap.add_argument("--near",default="",help="五维邻近词（L1=1，不环绕）")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -430,6 +468,12 @@ def main(argv=None):
     if a.analogy:
         try:
             out(analogy(*a.analogy))
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.near:
+        try:
+            out({"word":a.near,"neighbors":near(a.near)})
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return
