@@ -53,6 +53,14 @@ test('规划与核对编译为有界工具，八步内合法，九步拒绝',()=
   assert.equal(compileTask(eight).actions.length,8);
   assert.throws(()=>compileTask(eight+'\n行：计算("9")'));
 });
+test('邻近与时间编译为有界工具，规划标题用时区',()=>{
+  const program=compileTask('行：邻近("奥形凝起")\n行：时间("Asia/Shanghai")');
+  assert.equal(program.actions[0].arguments.operation,'邻近');
+  assert.equal(program.actions[0].arguments.input,'奥形凝起');
+  assert.equal(program.actions[1].tool,'clock');
+  assert.equal(program.actions[1].arguments.timezone,'Asia/Shanghai');
+  assert.deepEqual(describePlan(program).map(x=>x.title),['奥形凝起','Asia/Shanghai']);
+});
 test('规划描述 JS 与 Python 一致',()=>{
   const source='行：规划("先算")\n行：计算("1+1") → "2"';
   const py=`import json,sys; from task_bridge import compile_task,describe_plan; p=compile_task(sys.stdin.read()); print(json.dumps({"program":p,"plan":describe_plan(p)},ensure_ascii=False))`;

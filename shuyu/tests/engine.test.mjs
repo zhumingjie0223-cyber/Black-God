@@ -328,6 +328,9 @@ test('search 语义检索: 汉/义/拉丁三通道命中，下标可直接喂 co
   assert.deepEqual(engine.search('GAL', '标').map(h => h.汉), ['时光']);
   // 单字汉可多命中（熵：核 Ent / 映 flx / 标 flx）
   assert.deepEqual(engine.search('熵').map(h => `${h.轴}:${h.拉丁}`), ['核:Ent', '映:flx', '标:flx']);
+  // 精确汉译排在仅义包含之前（「光」精确命中映轴 ryl，核轴「曜」只是义里带光）
+  assert.equal(engine.search('光')[0].拉丁, 'ryl');
+  assert.equal(engine.search('光')[0].轴, '映');
   // 空/非法输入安全返回空数组
   assert.deepEqual(engine.search(''), []);
   assert.deepEqual(engine.search('   '), []);
@@ -369,6 +372,21 @@ test('analogy 五维类比: 恒等、可逆、与 Python 同构', () => {
   const pyIds = py('print(json.dumps([e.analogy(*t)["id"] for t in arg]))', triples);
   triples.forEach((t, i) => assert.equal(engine.analogy(...t).id, pyIds[i], `analogy(${JSON.stringify(t)}) 分叉`));
   assert.throws(() => engine.analogy('绝不存在', origin.汉, origin.汉), RangeError);
+});
+
+test('near 五维邻近: L1=1 不环绕，不含自身，与 Python 同构', () => {
+  const origin = engine.near(0);
+  assert.equal(origin.length, 5);
+  assert.ok(origin.every(item => item.距 === 1 && item.id !== 0));
+  assert.deepEqual(origin.map(item => item.轴), ['核', '映', '态', '标', '相']);
+  assert.equal(new Set(origin.map(item => item.id)).size, origin.length);
+  const mid = engine.decode(888888888);
+  const neighbors = engine.near(mid.汉, 8);
+  assert.equal(neighbors.length, 8);
+  assert.ok(!neighbors.some(item => item.id === mid.id));
+  const pyHits = py('print(json.dumps(e.near(arg[0], arg[1]), ensure_ascii=False))', [mid.汉, 8]);
+  assert.deepEqual(neighbors, pyHits);
+  assert.throws(() => engine.near('绝不存在'), RangeError);
 });
 
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {

@@ -6,9 +6,10 @@
  *
  * v4.1（2026-09）新能力（两侧同构，tests/engine.test.mjs 跨实现用例看住）：
  *   encodeHan  汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
- *   search     语义关键词 → 命中的词根（5 轴）
+ *   search     语义关键词 → 命中的词根（5 轴），按相关度排序
  *   compose    按义造词：每轴给 下标/拉丁根/汉译/语义关键词 任一种 → 唯一编号
  *   analogy    五维坐标类比：A:B :: C:? ，按轴模运算，不改编号空间
+ *   near       五维 L1=1 邻近词（不环绕），编号空间不变
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -198,6 +199,18 @@ export function encodeHan(han){
 
 // ══════ 语义检索：关键词 → 命中的词根（5 轴基表级，不展开阶）══════
 // 每项 {轴,下标,拉丁,汉,义}，下标是**展开后**轴内下标（基表下标×阶数，即 0 阶），可直接喂给 compose / coinFromCoord。
+function hitScore(kw, kwl, lat, han, sem){
+  const latl = lat ? lat.toLowerCase() : '';
+  if(kwl && kwl === latl) return 400;
+  if(han && han === kw) return 380;
+  if(sem && sem.split('·').includes(kw)) return 300;
+  if(han && han.startsWith(kw)) return 240;
+  if(han && han.includes(kw)) return 200;
+  if(sem && sem.includes(kw)) return 160;
+  if(latl && kwl.length >= 2 && latl.includes(kwl)) return 100;
+  return 0;
+}
+
 export function search(keyword, axis){
   if(typeof keyword !== 'string' || !keyword.trim()) return [];
   const kw = keyword.trim(), kwl = kw.toLowerCase();
@@ -209,12 +222,15 @@ export function search(keyword, axis){
     for(let bi=0; bi<base.length; bi++){
       const [lat, han, sem] = base[bi];
       if(!lat && !han) continue;             // 标轴首项是空阶，没有可检索内容
-      if(kwl === lat.toLowerCase() || (han && han.includes(kw)) || (sem && sem.includes(kw)) ||
-         (lat && kwl.length >= 2 && lat.toLowerCase().includes(kwl))){
+      if(hitScore(kw, kwl, lat, han, sem) > 0){
         out.push({ 轴:name, 下标:bi*tl, 拉丁:lat, 汉:han, 义:sem });
       }
     }
   }
+  out.sort((a, b) => {
+    const ds = hitScore(kw, kwl, b.拉丁, b.汉, b.义) - hitScore(kw, kwl, a.拉丁, a.汉, a.义);
+    return ds || (AXIS_NAMES.indexOf(a.轴) - AXIS_NAMES.indexOf(b.轴)) || (a.下标 - b.下标);
+  });
   return out;
 }
 
@@ -273,6 +289,27 @@ export function analogy(a, b, c){
   const keys = ['c', 'm', 's', 'k', 'p'];
   const idx = keys.map((key, i) => ((C.坐标[key] + B.坐标[key] - A.坐标[key]) % sizes[i] + sizes[i]) % sizes[i]);
   return decode(idOf(...idx));
+}
+
+// ══════ 五维邻近词：只取 L1=1 且不环绕的邻居，编号空间不变 ══════
+export function near(input, limit){
+  const n = Math.min(16, Math.max(1, Number(limit) || 8));
+  const word = resolveWord(input);
+  const sizes = [NC, NM, NS, NK, NP];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const origin = keys.map(key => word.坐标[key]);
+  const out = [];
+  for(let i = 0; i < 5; i++){
+    for(const delta of [-1, 1]){
+      const next = origin[i] + delta;
+      if(next < 0 || next >= sizes[i]) continue;
+      const idx = origin.slice();
+      idx[i] = next;
+      const w = decode(idOf(...idx));
+      out.push({ 距: 1, 轴: AXIS_NAMES[i], id: w.id, 词: w.词, 汉: w.汉, 义: w.义, 坐标: w.坐标 });
+    }
+  }
+  return out.slice(0, n);
 }
 
 // ══════ 解释器接口：按意图取词 ══════
@@ -435,4 +472,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };

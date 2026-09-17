@@ -45,12 +45,14 @@ python3 shuyu_engine.py --coin 神枢
 | 编号 → 词 | `decode(n)` | `decode(n)` | 返回 `id/词/汉/层/义/根/坐标{c,m,s,k,p}`，O(1) |
 | 拉丁词形 → 编号 | `encode(word)` | `encode(word)` | 严格单射，畸形词 -1 |
 | **汉译 → 编号** | `encode_han(han)` | `encodeHan(han)` | 纯中文反向寻址，解不唯一 -1 |
-| **语义检索** | `search(kw, axis=None)` | `search(kw, axis)` | 命中 5 轴基表的 拉丁/汉/义 |
+| **语义检索** | `search(kw, axis=None)` | `search(kw, axis)` | 命中 5 轴基表的 拉丁/汉/义，按相关度排序 |
 | **按义造词** | `compose(spec)` | `compose(spec)` | `{核,映,态,标,相}` 每轴四种写法任选，失败抛错不造错词 |
 | 种子造词 | `auto_coin(seed)` | `autoCoin(seed)` | FNV-1a·32 + xorshift，同种子同词 |
 | 坐标造词 | `coin_from_coord(c)` | `coinFromCoord(c)` | 越界坐标夹回 |
 | 按层随机造词 | `coin_word(layer, rng)` | `coinWord(layer)` | 层名不存在则全空间随机 |
 | 按状态造词 | `coin_from_state(soul, seed)` | `coinFromState(soul, seed)` | 心绪/想念决定核心层 |
+| 五维类比 | `analogy(a,b,c)` | `analogy(a,b,c)` | A:B :: C:? 按轴取模 |
+| 五维邻近 | `near(word, limit=8)` | `near(word, limit)` | L1=1 不环绕的邻居 |
 | 轴尺寸 | `AXES` / `NC NM NS NK NP` | `AXES` | `{核:1040,映:180,态:80,标:64,相:8}` |
 
 汉译为什么能反查：汉译 = 核汉(1~2字)+映汉(1~2字)+态汉(1~2字)+标汉(0~3字)+相汉(1字)，
@@ -63,8 +65,10 @@ python3 shuyu_engine.py --coin 神枢
 |---|---|
 | `GET /decode?id=N` | 编号 → 词 |
 | `GET /encode?word=W` | 拉丁词形**或**纯中文汉译 → 编号（返回 `form` 标明识别为哪种） |
-| `GET /search?q=K&axis=A` | 语义检索（axis 可限定 核/映/态/标/相） |
+| `GET /search?q=K&axis=A` | 语义检索（axis 可限定 核/映/态/标/相），命中按相关度排序 |
+| `GET /near?word=W&n=N` | 五维邻近词（L1=1，不环绕；n 默认 8） |
 | `GET /compose?核=&映=&态=&标=&相=` | 按义造词（也接受 c/m/s/k/p） |
+| `GET /analogy?a=&b=&c=` | 五维类比造词（A:B :: C:?） |
 | `GET /coin?seed=S&layer=L` | 造词 |
 | `POST /talk` | 枢语意识流 → 解释 + 编译 |
 | `POST /broadcast` | 万网散播 |
@@ -100,6 +104,6 @@ python3 shuyu_engine.py --coin 神枢
 行：规划("拆成可检查的步骤")
 ```
 
-`行：`与旧`do:`兼容，参数使用JSON字符串；支持计算/calc、枢语/shuyu、检索/search、规划/plan、核对/verify、执行/shell，最多8行和8192字符。箭头之后是独立预期字符串，可省略但不算已有结果校验。中文/拉丁词形的编号不变。`task_bridge.py`提供同构 `compile_task`、`describe_plan` 与有界 `primes` 原语；词汇引擎增加五维类比造词。原有 `nexuslang.js` 六回路解释器保留；本轮未把情绪状态或文字描述作为真实意识、记忆学习或执行能力。
+`行：`与旧`do:`兼容，参数使用JSON字符串；支持计算/calc、枢语/shuyu、检索/search、邻近/near、规划/plan、核对/verify、时间/clock、执行/shell，最多8行和8192字符。箭头之后是独立预期字符串，可省略但不算已有结果校验。中文/拉丁词形的编号不变。`task_bridge.py`提供同构 `compile_task`、`describe_plan` 与有界 `primes` 原语；词汇引擎增加五维类比造词与邻近词，检索按相关度排序。原有 `nexuslang.js` 六回路解释器保留；本轮未把情绪状态或文字描述作为真实意识、记忆学习或执行能力。
 
 神枢先编译完整程序，再检查已注册工具，然后执行；shell仍受iSH权限、时间、输出与空间预算约束。当前执行方言不是通用编程语言，也不能凭词汇编码触发未开放的手机权限。

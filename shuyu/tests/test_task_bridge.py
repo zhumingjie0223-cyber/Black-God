@@ -27,3 +27,9 @@ class TaskBridgeTests(unittest.TestCase):
         self.assertEqual(len(compile_task(eight)['actions']),8)
         with self.assertRaises(ValueError):
             compile_task(eight+'\n行：计算("8")')
+
+    def test_near_and_clock_compile(self):
+        program=compile_task('行：邻近("奥形凝起")\n行：时间("Asia/Shanghai")')
+        self.assertEqual(program['actions'][0]['arguments'],{'operation':'邻近','input':'奥形凝起'})
+        self.assertEqual(program['actions'][1]['tool'],'clock')
+        self.assertEqual(describe_plan(program)[1]['title'],'Asia/Shanghai')

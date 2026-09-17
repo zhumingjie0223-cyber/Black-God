@@ -10,12 +10,14 @@ struct ChatMessage: Identifiable, Codable {
     var role: String   // "user" | "assistant"
     var content: String
     var createdAt: Date
+    var evidence: [String]?
 
-    init(id: UUID = UUID(), role: String, content: String) {
+    init(id: UUID = UUID(), role: String, content: String, evidence: [String]? = nil) {
         self.id = id
         self.role = role
         self.content = content
         self.createdAt = Date()
+        self.evidence = evidence
     }
 }
 

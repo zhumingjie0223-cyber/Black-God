@@ -3,6 +3,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ChatView: View {
     @EnvironmentObject var appState: AppState
@@ -28,8 +29,12 @@ struct ChatView: View {
                         }
                         ForEach(vm.messages) { msg in
                             MessageBubble(message: msg).id(msg.id).contextMenu {
+                                Button("复制") { UIPasteboard.general.string = msg.content }
                                 if msg.role == "user" {
                                     Button("保存为长期记忆") { memoryMessage = msg }
+                                }
+                                if msg.role == "assistant", vm.canRegenerate, vm.messages.last?.id == msg.id {
+                                    Button("重新生成") { vm.regenerate() }
                                 }
                             }
                         }
@@ -69,9 +74,18 @@ struct ChatView: View {
                     if !vm.apiKeyConfigured { Button("配置连接") { showConnection = true }.accessibilityIdentifier("api.open") }
                 }.padding(.horizontal, 16).padding(.vertical, 8)
             }
+            if vm.canRegenerate {
+                HStack {
+                    Spacer()
+                    Button("重新生成上一则") { vm.regenerate() }
+                        .font(.caption.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
+                        .accessibilityIdentifier("chat.regenerate")
+                }.padding(.horizontal, 16).padding(.bottom, 4)
+            }
             inputBar
         }
         .padding(.top, 50)
+        .onAppear { NexusShuyuEngine.shared.prepare() }
         .sheet(item: $skillDraft) { draft in NexusSkillEditor(store: vm.skills, draft: draft) }
         .sheet(item: $memoryMessage) { msg in NexusMemoryEditor(memory: vm.memory, initialText: msg.content) }
         .sheet(isPresented: $showConnection) { APIConfigView() }
@@ -148,11 +162,28 @@ struct MessageBubble: View {
     var body: some View {
         HStack {
             if isUser { Spacer(minLength: 50) }
-            Text(message.content).font(.bgBody()).textSelection(.enabled)
-                .foregroundStyle(isUser ? Color.bgDark : Color.bgTextPrimary)
-                .padding(.horizontal, 16).padding(.vertical, 11)
-                .background(isUser ? AnyShapeStyle(LinearGradient.goldGradient) : AnyShapeStyle(Color.bgCard))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
+                Text(message.content).font(.bgBody()).textSelection(.enabled)
+                    .foregroundStyle(isUser ? Color.bgDark : Color.bgTextPrimary)
+                    .padding(.horizontal, 16).padding(.vertical, 11)
+                    .background(isUser ? AnyShapeStyle(LinearGradient.goldGradient) : AnyShapeStyle(Color.bgCard))
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                if !isUser, let evidence = message.evidence, !evidence.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(evidence.enumerated()), id: \.offset) { _, chip in
+                                Text(chip)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Color.bgJadeHi)
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .background(Capsule().fill(Color.bgCardLight))
+                                    .overlay(Capsule().stroke(Color.bgJade.opacity(0.35), lineWidth: 0.5))
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("chat.evidence")
+                }
+            }
             if !isUser { Spacer(minLength: 50) }
         }
     }

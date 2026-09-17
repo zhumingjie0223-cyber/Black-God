@@ -16,6 +16,7 @@ struct NexusShuyuView: View {
                     Text("相同种子生成相同词，用于稳定寻址；它不是把种子文字翻译成枢语。")
                         .font(.caption).foregroundStyle(.secondary)
                     Button("用「奥形凝起」做恒等类比") { analogize() }.accessibilityIdentifier("shuyu.analogy")
+                    Button("查看「奥形凝起」的邻近词") { neighbors() }.accessibilityIdentifier("shuyu.near")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -57,6 +58,17 @@ struct NexusShuyuView: View {
                   let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String else { throw NexusError.invalidResponse }
             word = ["id": id.stringValue, "汉": han, "词": form, "义": object["义"] as? String ?? ""]
             verified = id.intValue == 0 && han == "奥形凝起"
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func neighbors() {
+        do {
+            let value = try NexusShuyuEngine.shared.invoke("邻近", input: "奥形凝起")
+            guard let items = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [[String: Any]],
+                  let first = items.first, let id = first["id"] as? NSNumber, let han = first["汉"] as? String, let form = first["词"] as? String else { throw NexusError.invalidResponse }
+            let names = items.compactMap { $0["汉"] as? String }.joined(separator: "、")
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "邻近 \(items.count) 个：\(names)"]
+            verified = items.count == 5 && !(items.contains { ($0["id"] as? NSNumber)?.intValue == 0 })
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }
     }

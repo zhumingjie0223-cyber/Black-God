@@ -1,3 +1,12 @@
+# 2026-09-17 第2轮前沿升级
+
+- [x] 1. 独立 worktree 基于 PR 115 分支 — `/Users/aquan/.cursor/worktrees/black-god-upgrade-r2`，分支 `cursor/frontier-upgrade-r2-589e`
+- [x] 2. 枢语：检索按相关度排序 + 五维邻近词（容量不变） — lexicon.js / shuyu_engine.py / worker GET /near
+- [x] 3. 任务/工具：方言接时间与邻近；步骤结果带 s1… 编号 — task_bridge 与 shuyu_execute
+- [x] 4. 操作/质感：复制、重新生成、玉绿工具痕迹；预热引擎 — ChatView / ChatViewModel
+- [ ] 5. 同步 iOS 消费副本并跑本机测试
+- [ ] 6. 写第2轮结论并归档 TODO
+
 # Black God 全量测试与 API 接入
 
 - [x] 已核对 OpenAI、Anthropic、DeepSeek 官方协议与现有路由。

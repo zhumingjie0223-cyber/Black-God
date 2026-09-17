@@ -208,6 +208,8 @@ class TestSearchCompose(unittest.TestCase):
         self.assertEqual([h["轴"] for h in e.search("gal")], ["映", "标"])
         self.assertEqual([h["汉"] for h in e.search("GAL", "标")], ["时光"])
         self.assertEqual([f'{h["轴"]}:{h["拉丁"]}' for h in e.search("熵")], ["核:Ent", "映:flx", "标:flx"])
+        self.assertEqual(e.search("光")[0]["拉丁"], "ryl")
+        self.assertEqual(e.search("光")[0]["轴"], "映")
         for empty in ["", "   ", None, "绝不存在的词根"]:
             self.assertEqual(e.search(empty), [])
 
@@ -238,6 +240,18 @@ class TestSearchCompose(unittest.TestCase):
         self.assertEqual(e.analogy(b["汉"], a["词"], d["汉"])["id"], c["id"])
         with self.assertRaises(ValueError):
             e.analogy("绝不存在", origin["汉"], origin["汉"])
+
+    def test_near_neighbors_are_l1_and_exclude_self(self):
+        origin = e.near(0)
+        self.assertEqual(len(origin), 5)
+        self.assertTrue(all(item["距"] == 1 and item["id"] != 0 for item in origin))
+        self.assertEqual([item["轴"] for item in origin], ["核", "映", "态", "标", "相"])
+        mid = e.decode(888888888)
+        neighbors = e.near(mid["汉"], 8)
+        self.assertEqual(len(neighbors), 8)
+        self.assertTrue(all(item["id"] != mid["id"] for item in neighbors))
+        with self.assertRaises(ValueError):
+            e.near("绝不存在")
 
 
 class TestCoinFamily(unittest.TestCase):

@@ -8,7 +8,10 @@ const mapping = Object.freeze({
   '规划': { tool: 'plan', keys: ['title'] }, 'plan': { tool: 'plan', keys: ['title'] },
   '核对': { tool: 'verify', keys: ['criterion'] }, 'verify': { tool: 'verify', keys: ['criterion'] },
   '检索': { tool: 'shuyu', keys: ['input'], preset: { operation: '检索' } },
-  'search': { tool: 'shuyu', keys: ['input'], preset: { operation: '检索' } }
+  'search': { tool: 'shuyu', keys: ['input'], preset: { operation: '检索' } },
+  '邻近': { tool: 'shuyu', keys: ['input'], preset: { operation: '邻近' } },
+  'near': { tool: 'shuyu', keys: ['input'], preset: { operation: '邻近' } },
+  '时间': { tool: 'clock', keys: ['timezone'] }, 'clock': { tool: 'clock', keys: ['timezone'] }
 });
 export function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -50,7 +53,7 @@ export function describePlan(program) {
   return program.actions.map(action => ({
     id: action.id,
     tool: action.tool,
-    title: action.arguments.title || action.arguments.criterion || action.arguments.expression || action.arguments.command || action.arguments.input || action.tool
+    title: action.arguments.title || action.arguments.criterion || action.arguments.expression || action.arguments.command || action.arguments.input || action.arguments.timezone || action.tool
   }));
 }
 
