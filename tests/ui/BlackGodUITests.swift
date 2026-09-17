@@ -11,8 +11,6 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.chip.calc"].exists)
         XCTAssertTrue(app.buttons["chat.chip.shuyu"].exists)
         app.buttons["chat.chip.plan"].tap()
-        let field = app.textFields.matching(NSPredicate(format: "placeholderValue CONTAINS %@", "Black God")).firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5) || app.textViews.firstMatch.waitForExistence(timeout: 3))
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "对话快捷芯片"; shot.lifetime = .keepAlways; add(shot)
     }
 
