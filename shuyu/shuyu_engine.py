@@ -21,7 +21,7 @@
 - 可落盘分片，也可纯寻址零占用
 - 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
   compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
-- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格；echo 沿末步反向弹回；sway 按分钟在弹回词与末步之间摇摆
+- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格；echo 沿末步反向弹回；sway 按分钟在弹回词与末步之间摇摆；land 按四分钟窗落地偏停在弹回词
 
 v4.1（2026-09）新能力：
 - encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
@@ -538,6 +538,35 @@ def sway(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def land(seed, at, n=3):
+    """落息：摇息后按四分钟窗落地，偏停在弹回词，不环绕；与 lexicon.js land 同构。"""
+    rest = echo(seed, at, n)
+    last = rest["迹"][-1]
+    if isinstance(at, str):
+        t = int(at)
+    else:
+        t = int(at)
+    phase = (t // 60) % 4
+    rest_pose = _compact_pose(rest, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": rest["轴"], "向": rest["向"], "动": rest["回"]})
+    lean = last
+    can_land = rest["id"] != last["id"]
+    airborne = can_land and phase == 0
+    pose = lean if airborne else rest_pose
+    return {
+        "息": rest["息"],
+        "种": rest["种"],
+        "步": rest["步"],
+        "迹": rest["迹"],
+        "回": rest["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": not airborne,
+        "侧": 1 if airborne else 0,
+        "着": rest_pose if airborne else lean,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -619,8 +648,9 @@ def main(argv=None):
     ap.add_argument("--trail",nargs="?",const="",default=None,help="余息种子（编号或词，缺省为0）")
     ap.add_argument("--echo",nargs="?",const="",default=None,help="回息种子（编号或词，缺省为0）")
     ap.add_argument("--sway",nargs="?",const="",default=None,help="摇息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息步数，2至4")
+    ap.add_argument("--land",nargs="?",const="",default=None,help="落息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -655,6 +685,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.land is not None and a.at >= 0:
+        try:
+            out(land(a.land, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return

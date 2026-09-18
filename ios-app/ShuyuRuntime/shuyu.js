@@ -17,6 +17,7 @@
  *   trail      余息：从一词连续呼吸 2–4 格（每步 +60 秒，不环绕、不改容量）
  *   echo       回息：余息走完后沿末步反向弹一格（不环绕、不改容量）
  *   sway       摇息：回息后按分钟在弹回词与末步之间摇摆（不环绕、不改容量）
+ *   land       落息：摇息后按四分钟窗落地，偏停在弹回词（不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -457,6 +458,32 @@ function sway(seed, at, n){
   };
 }
 
+// ══════ 落息：摇息后按四分钟窗落地，偏停在弹回词；不环绕、不改编号空间 ══════
+function land(seed, at, n){
+  const rest = echo(seed, at, n);
+  const last = rest.迹[rest.迹.length - 1];
+  const t = Number(at);
+  const phase = Math.floor(t / 60) % 4;
+  const restPose = compactPose(rest, { 息: last.息, 时: last.时, 分: last.分, 轴: rest.轴, 向: rest.向, 动: rest.回 });
+  const lean = last;
+  const canLand = rest.id !== last.id;
+  const airborne = canLand && phase === 0;
+  const pose = airborne ? lean : restPose;
+  return {
+    息: rest.息,
+    种: rest.种,
+    步: rest.步,
+    迹: rest.迹,
+    回: rest.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: !airborne,
+    侧: airborne ? 1 : 0,
+    着: airborne ? restPose : lean,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -639,7 +666,9 @@ const mapping = Object.freeze({
   '回息': { tool: 'shuyu', keys: ['input'], preset: { operation: '回息' } },
   'echo': { tool: 'shuyu', keys: ['input'], preset: { operation: '回息' } },
   '摇息': { tool: 'shuyu', keys: ['input'], preset: { operation: '摇息' } },
-  'sway': { tool: 'shuyu', keys: ['input'], preset: { operation: '摇息' } }
+  'sway': { tool: 'shuyu', keys: ['input'], preset: { operation: '摇息' } },
+  '落息': { tool: 'shuyu', keys: ['input'], preset: { operation: '落息' } },
+  'land': { tool: 'shuyu', keys: ['input'], preset: { operation: '落息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -788,6 +817,23 @@ function invoke(operation, input) {
         if(obj.n != null) n=obj.n;
       } else at=trimmed;
       return sway(seed, at, n);
+    }
+    case '落息': {
+      let seed=0, at=null, n=3;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('落息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else if(parts.length===2){ seed=parts[0]; at=parts[1]; }
+        else { seed=parts[0]; at=parts[1]; n=parts[2]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+        if(obj.n != null) n=obj.n;
+      } else at=trimmed;
+      return land(seed, at, n);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

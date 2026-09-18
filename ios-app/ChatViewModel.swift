@@ -42,6 +42,8 @@ final class ChatViewModel: ObservableObject {
     private var lastPrompt: String?
     private var wasAway = false
     private var noticedAt: Date?
+    private var heardAt: Date?
+    private var hitchTask: Task<Void, Never>?
 
     init(store: NexusConversationStore = NexusConversationStore(),
          memory: NexusMemoryStore? = nil,
@@ -118,6 +120,7 @@ final class ChatViewModel: ObservableObject {
             now: presenceTick,
             draft: composerDraft,
             attending: attending,
+            heardAt: heardAt,
             noticedAt: noticedAt,
             pulseNote: pulseNote
         )
@@ -185,15 +188,35 @@ final class ChatViewModel: ObservableObject {
         awaken(now: now)
     }
 
-    func attend(_ on: Bool) {
+    func attend(_ on: Bool, now: Date = Date()) {
         guard attending != on else { return }
         attending = on
+        if on, !composerDraft.isEmpty {
+            heardAt = now
+            presenceTick = now
+            scheduleHitch()
+        } else {
+            presenceTick = now
+        }
     }
 
-    func hear(_ text: String) {
+    func hear(_ text: String, now: Date = Date()) {
         let next = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard composerDraft != next else { return }
         composerDraft = next
+        heardAt = next.isEmpty ? nil : now
+        presenceTick = now
+        scheduleHitch()
+    }
+
+    private func scheduleHitch() {
+        hitchTask?.cancel()
+        guard !composerDraft.isEmpty else { return }
+        hitchTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(NexusPresence.hitchHold))
+            guard !Task.isCancelled, let self else { return }
+            self.presenceTick = Date()
+        }
     }
 
     func refreshPulse(now: Date = Date()) {
@@ -203,21 +226,21 @@ final class ChatViewModel: ObservableObject {
         for seed in seeds {
             let payload: [Any] = seed == "0" ? [0, at, 3] : [seed, at, 3]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
-                  let value = try? NexusShuyuEngine.shared.invoke("摇息", input: String(decoding: data, as: UTF8.self)),
+                  let value = try? NexusShuyuEngine.shared.invoke("落息", input: String(decoding: data, as: UTF8.self)),
                   let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
                   let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
             let origin = (object["种"] as? [String: Any])?["汉"] as? String ?? seed
             let lastHan = ((object["迹"] as? [Any])?.last as? [String: Any])?["汉"] as? String ?? han
             let echoed = (object["回"] as? NSNumber)?.boolValue ?? (object["回"] as? Bool ?? false)
-            let swaying = (object["摇"] as? NSNumber)?.boolValue ?? (object["摇"] as? Bool ?? false)
+            let landed = (object["落"] as? NSNumber)?.boolValue ?? (object["落"] as? Bool ?? true)
             let side = (object["侧"] as? NSNumber)?.intValue ?? 0
-            let swing = (object["摆"] as? [String: Any])?["汉"] as? String
-            let restHan = (swaying && side == 1) ? (swing ?? han) : han
-            let leanHan = (swaying && side == 1) ? han : (swing ?? lastHan)
+            let ground = (object["着"] as? [String: Any])?["汉"] as? String
+            let restHan = (!landed && side == 1) ? (ground ?? han) : han
+            let leanHan = (!landed && side == 1) ? han : (ground ?? lastHan)
             if origin == restHan {
                 pulseNote = "\(phase) · \(restHan)"
-            } else if swaying, leanHan != restHan, side == 1 {
-                pulseNote = "\(phase) · \(origin) → \(restHan) ⇌ \(leanHan)"
+            } else if !landed, leanHan != restHan, side == 1 {
+                pulseNote = "\(phase) · \(origin) → \(leanHan) ⤵ \(restHan)"
             } else if echoed, lastHan != restHan {
                 pulseNote = "\(phase) · \(origin) → \(lastHan) ↩ \(restHan)"
             } else {

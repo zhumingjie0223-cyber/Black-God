@@ -22,6 +22,8 @@ _MAPPING = {
     'echo': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '回息'}},
     '摇息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '摇息'}},
     'sway': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '摇息'}},
+    '落息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '落息'}},
+    'land': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '落息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:
