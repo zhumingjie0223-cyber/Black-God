@@ -114,6 +114,7 @@ struct ChatView: View {
                 .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 2))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
+                    .accessibilityIdentifier("chat.title")
                 HStack(spacing: 4) {
                     PresenceDot(duration: vm.presence.breath)
                     Text(vm.currentMood).font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)

@@ -22,7 +22,7 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["chat.mood"].label, "在听")
         expectation(for: NSPredicate(format: "label == %@", "顿笔"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 3)
-        app.staticTexts["Black God AI"].tap()
+        app.descendants(matching: .any)["chat.title"].tap()
         expectation(for: NSPredicate(format: "label == %@", "惦记"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 3)
         XCTAssertFalse(app.buttons["chat.regenerate"].exists)

@@ -205,7 +205,8 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(vm.presence.mood, "在听")
         XCTAssertEqual(vm.presence.nextWork, "你正在说")
         vm.hear("")
-        XCTAssertNotEqual(vm.presence.mood, "在听")
+        XCTAssertEqual(vm.presence.mood, "看着")
+        vm.attend(false)
         XCTAssertTrue(["在场", "该练"].contains(vm.presence.mood))
     }
 
@@ -268,13 +269,14 @@ final class NexusPresenceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
         vm.leave()
-        vm.notice(now: Date(timeIntervalSince1970: 1_700_000_000))
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        vm.notice(now: t0)
         XCTAssertEqual(vm.presence.mood, "还在")
         XCTAssertEqual(vm.presence.stance, "noticing")
         XCTAssertTrue(vm.presence.nextWork.contains("你回来了"))
-        vm.attend(true)
+        vm.attend(true, now: t0)
         XCTAssertEqual(vm.presence.mood, "看着")
-        vm.attend(false)
+        vm.attend(false, now: t0.addingTimeInterval(1))
         XCTAssertEqual(vm.presence.mood, "还在")
     }
 
