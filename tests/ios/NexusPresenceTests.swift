@@ -275,3 +275,4 @@ final class NexusPresenceTests: XCTestCase {
         vm.attend(false)
         XCTAssertEqual(vm.presence.mood, "还在")
     }
+}
