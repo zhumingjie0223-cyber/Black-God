@@ -46,7 +46,8 @@ enum NexusPresence {
                 action: practiceRunning ? .none : .practice, breath: 1.2
             )
         }
-        if let last = clip(lastUser), !last.isEmpty {
+        let last = clip(lastUser)
+        if !last.isEmpty {
             return NexusPresenceSnapshot(
                 mood: "在场", stance: "present", thread: last,
                 nextWork: pulseNote.map { "接着上次 · \($0)" } ?? "接着上次",
