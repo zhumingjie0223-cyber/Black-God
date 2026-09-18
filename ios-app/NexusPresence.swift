@@ -1,7 +1,7 @@
 import Foundation
 
 enum NexusPresenceAction: String, Equatable {
-    case none, resume, practice, continueLast, pulse
+    case none, resume, practice, continueLast, pulse, followUp
 }
 
 struct NexusPresenceSnapshot: Equatable {
@@ -14,7 +14,7 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：按任务、演练、上次话头和一息决定下一步，不自动扩权。
+/// 打开就要在场：做事时露出步骤，停了还在，答完刚歇，不自动扩权。
 enum NexusPresence {
     static func snapshot(
         isTyping: Bool,
@@ -23,19 +23,23 @@ enum NexusPresence {
         practiceDue: Bool,
         practiceRunning: Bool,
         lastUser: String?,
+        lastReply: String? = nil,
+        liveStatus: String? = nil,
+        answered: Bool = false,
         pulseNote: String?
     ) -> NexusPresenceSnapshot {
         if isTyping {
+            let step = clip(liveStatus)
             return NexusPresenceSnapshot(
                 mood: "处理中", stance: "working", thread: clip(resumeGoal ?? lastUser),
-                nextWork: "正在做事", actionTitle: "", action: .none, breath: 0.9
+                nextWork: step.isEmpty ? "正在做事" : step, actionTitle: "", action: .none, breath: 0.9
             )
         }
         if canResume {
             let goal = clip(resumeGoal)
             return NexusPresenceSnapshot(
                 mood: "可续", stance: "recoverable", thread: goal,
-                nextWork: "未完成任务还在", actionTitle: "继续未完成", action: .resume, breath: 1.6
+                nextWork: "刚停，进度还在", actionTitle: "继续未完成", action: .resume, breath: 1.6
             )
         }
         if practiceRunning || practiceDue {
@@ -44,6 +48,13 @@ enum NexusPresence {
                 nextWork: practiceRunning ? "演练进行中" : "到点该练技能",
                 actionTitle: practiceRunning ? "" : "开始演练",
                 action: practiceRunning ? .none : .practice, breath: 1.2
+            )
+        }
+        if answered {
+            return NexusPresenceSnapshot(
+                mood: "刚歇", stance: "settled", thread: clip(lastReply ?? resumeGoal ?? lastUser),
+                nextWork: pulseNote.map { "还在 · \($0)" } ?? "还在，可接着问",
+                actionTitle: "接着问", action: .followUp, breath: 3.2
             )
         }
         let last = clip(lastUser)

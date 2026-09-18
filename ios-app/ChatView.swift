@@ -202,20 +202,22 @@ struct MessageBubble: View {
 }
 
 struct TypingIndicator: View {
-    @State private var phase = 0.0
+    @State private var on = false
     var body: some View {
         HStack {
             HStack(spacing: 4) {
                 ForEach(0..<3) { i in
                     Circle().fill(Color.bgJadeHi).frame(width: 7, height: 7)
-                        .opacity(phase == Double(i) ? 1 : 0.3)
+                        .scaleEffect(on ? 1.18 : 0.86)
+                        .opacity(on ? (i == 1 ? 1 : 0.58) : 0.28)
+                        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true).delay(Double(i) * 0.12), value: on)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 12).background(Color.bgCard)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             Spacer()
         }
-        .onAppear { withAnimation(.easeInOut(duration: 0.6).repeatForever()) { phase = 2 } }
+        .onAppear { on = true }
     }
 }
 
@@ -251,6 +253,7 @@ struct PresenceDot: View {
 struct PresenceStrip: View {
     let snapshot: NexusPresenceSnapshot
     let act: () -> Void
+    @State private var on = false
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(snapshot.nextWork).font(.caption.bold()).foregroundStyle(Color.bgJadeHi)
@@ -266,7 +269,15 @@ struct PresenceStrip: View {
         .padding(12).background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
+        .opacity(snapshot.stance == "working" ? (on ? 1 : 0.72) : 1)
         .accessibilityIdentifier("chat.presence")
+        .onAppear { breathe(snapshot.stance) }
+        .onChange(of: snapshot.stance) { _, value in breathe(value) }
+    }
+    private func breathe(_ stance: String) {
+        guard stance == "working" else { on = false; return }
+        on = false
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { on = true }
     }
 }
 

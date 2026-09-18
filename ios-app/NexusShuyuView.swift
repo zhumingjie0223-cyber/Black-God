@@ -18,6 +18,7 @@ struct NexusShuyuView: View {
                     Button("用「奥形凝起」做恒等类比") { analogize() }.accessibilityIdentifier("shuyu.analogy")
                     Button("查看「奥形凝起」的邻近词") { neighbors() }.accessibilityIdentifier("shuyu.near")
                     Button("看「奥形凝起」此刻一息") { pulse() }.accessibilityIdentifier("shuyu.pulse")
+                    Button("看「奥形凝起」余息三格") { trail() }.accessibilityIdentifier("shuyu.trail")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -82,6 +83,19 @@ struct NexusShuyuView: View {
                   let phase = object["息"] as? String else { throw NexusError.invalidResponse }
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "一息 \(phase)"]
             verified = ["晨", "昼", "昏", "夜"].contains(phase)
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func trail() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("余息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "余息 \(count.intValue) 格：\(names)"]
+            verified = count.intValue == steps.count && (2...4).contains(count.intValue)
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }
     }

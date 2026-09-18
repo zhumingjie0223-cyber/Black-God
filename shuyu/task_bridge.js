@@ -13,7 +13,9 @@ const mapping = Object.freeze({
   'near': { tool: 'shuyu', keys: ['input'], preset: { operation: '邻近' } },
   '时间': { tool: 'clock', keys: ['timezone'] }, 'clock': { tool: 'clock', keys: ['timezone'] },
   '一息': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
-  'pulse': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } }
+  'pulse': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
+  '余息': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } },
+  'trail': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } }
 });
 export function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');

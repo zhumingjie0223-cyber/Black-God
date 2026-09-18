@@ -25,8 +25,10 @@ final class ChatViewModel: ObservableObject {
     @Published var modelRegistry = NexusModelRegistry()
     @Published private(set) var taskCheckpoint: NexusAgentCheckpoint?
     @Published private(set) var pulseNote: String?
+    @Published private(set) var pulseWord: String?
     @Published private(set) var presenceTick = Date()
     @Published var composerPrefill: String?
+    private var liveSubscription: AnyCancellable?
     private let checkpointStore: NexusAgentCheckpointStore
     private let store: NexusConversationStore
     private let completion: Completion?
@@ -90,6 +92,9 @@ final class ChatViewModel: ObservableObject {
             self.cancel()
             self.statusHint = "长期记忆已更新，当前任务已停止；继续时会使用新记录。"
         }
+        liveSubscription = live.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     var apiKeyConfigured: Bool { configured(NexusKeychain.shared.selectedModel) }
@@ -102,6 +107,9 @@ final class ChatViewModel: ObservableObject {
             practiceDue: practice.due,
             practiceRunning: practice.isRunning,
             lastUser: messages.last(where: { $0.role == "user" })?.content,
+            lastReply: messages.last(where: { $0.role == "assistant" })?.content,
+            liveStatus: live.status,
+            answered: taskCheckpoint?.state == .answered,
             pulseNote: pulseNote
         )
     }
@@ -159,17 +167,16 @@ final class ChatViewModel: ObservableObject {
     func refreshPulse(now: Date = Date()) {
         let at = String(Int(now.timeIntervalSince1970))
         let last = messages.last(where: { $0.role == "user" })?.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        let seeds = [last.map { String($0.prefix(24)) }, "0"].compactMap { $0 }.filter { !$0.isEmpty }
+        let seeds = [pulseWord, last.map { String($0.prefix(24)) }, "0"].compactMap { $0 }.filter { !$0.isEmpty }
         for seed in seeds {
-            let input: String
-            if seed == "0" { input = at }
-            else if let data = try? JSONSerialization.data(withJSONObject: [seed, at]) {
-                input = String(decoding: data, as: UTF8.self)
-            } else { continue }
-            guard let value = try? NexusShuyuEngine.shared.invoke("一息", input: input),
+            let payload: [Any] = seed == "0" ? [0, at, 3] : [seed, at, 3]
+            guard let data = try? JSONSerialization.data(withJSONObject: payload),
+                  let value = try? NexusShuyuEngine.shared.invoke("余息", input: String(decoding: data, as: UTF8.self)),
                   let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
                   let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
-            pulseNote = phase + " · " + han
+            let origin = (object["种"] as? [String: Any])?["汉"] as? String ?? seed
+            pulseNote = origin == han ? "\(phase) · \(han)" : "\(phase) · \(origin) → \(han)"
+            pulseWord = han
             return
         }
     }
@@ -186,6 +193,8 @@ final class ChatViewModel: ObservableObject {
         case .pulse:
             refreshPulse()
             composerPrefill = "用枢语一息看现在："
+        case .followUp:
+            composerPrefill = ""
         }
     }
 
@@ -378,8 +387,7 @@ final class ChatViewModel: ObservableObject {
         activeTask = nil
         activeEngine = nil
         isTyping = false
-        statusHint = "已停止"
-        if lastError == nil { lastError = "任务已停止，可从保存的进度继续。" }
+        statusHint = "已停止，进度还在"
         runtime.cancel()
     }
 }
