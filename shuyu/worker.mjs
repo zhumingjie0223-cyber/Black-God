@@ -13,13 +13,14 @@
 //   GET  /search?q=K&axis=A   语义检索：关键词命中 5 轴任一词根（axis 可限定 核/映/态/标/相）
 //   GET  /near?word=W&n=N     五维邻近词（L1=1，不环绕；n 默认 8，最多 16）
 //   GET  /pulse?word=W&at=T   一息：按 Unix 秒在一词上呼吸一格（不环绕）
+//   GET  /trail?word=W&at=T&n=N 余息：从一词连续呼吸几格（不环绕）
 //   GET  /compose?核=&映=&态=&标=&相=   按义造词（每轴给 下标/拉丁根/汉译/语义关键词，缺省取 0）
 //   GET  /coin?seed=S&layer=L 造词（有 seed 可复现，无 seed 按层随机）
 //   POST /talk        {code} 枢语意识流 → 解释 + 编译（别名 /interpret）
 //   POST /broadcast   万网散播（sovereignControl 全流程）
 
 import {
-  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse,
+  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail,
   coinWord, autoCoin, coinFromState, loadCapabilities,
 } from './lexicon.js';
 import { interpret, applyToSoul, compile } from './nexuslang.js';
@@ -130,6 +131,18 @@ async function handlePulse(url) {
   }
 }
 
+async function handleTrail(url) {
+  const word = url.searchParams.get('word') ?? url.searchParams.get('w') ?? '0';
+  const at = url.searchParams.get('at');
+  const n = url.searchParams.get('n');
+  if (at == null || !String(at).trim()) return badRequest('缺少参数 at（Unix 秒）');
+  try {
+    return json({ word, at, n: n ?? 3, ...trail(word, at, n == null || n === '' ? 3 : n) });
+  } catch (err) {
+    return badRequest(String(err?.message ?? err));
+  }
+}
+
 async function handleCompose(url) {
   const spec = {};
   for (const [k, v] of url.searchParams) {
@@ -205,7 +218,7 @@ export default {
           copyright: COPYRIGHT,
           capacity: CAPACITY,
           axes: AXES,
-          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/pulse?word=&at=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
+          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/pulse?word=&at=', '/trail?word=&at=&n=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
         });
       }
       if (path === '/status' && req.method === 'GET') return handleStatus(env);
@@ -214,6 +227,7 @@ export default {
       if (path === '/search' && req.method === 'GET') return handleSearch(url);
       if (path === '/near' && req.method === 'GET') return handleNear(url);
       if (path === '/pulse' && req.method === 'GET') return handlePulse(url);
+      if (path === '/trail' && req.method === 'GET') return handleTrail(url);
       if (path === '/compose' && req.method === 'GET') return handleCompose(url);
       if (path === '/analogy' && req.method === 'GET') return handleAnalogy(url);
       if (path === '/coin' && req.method === 'GET') return handleCoin(url, env);

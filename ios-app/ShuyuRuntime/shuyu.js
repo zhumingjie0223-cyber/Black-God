@@ -14,6 +14,7 @@
  *   analogy    五维坐标类比：A:B :: C:? ，按轴模运算，不改编号空间
  *   near       五维 L1=1 邻近词（不环绕），编号空间不变
  *   pulse      一息：按显式 Unix 秒在一词上呼吸一格（不环绕、不读墙上时钟）
+ *   trail      余息：从一词连续呼吸 2–4 格（每步 +60 秒，不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -359,6 +360,41 @@ function pulse(seed, at){
   };
 }
 
+function parseTrailN(n){
+  if(n == null || n === '') return 3;
+  const v = Number(n);
+  if(!Number.isInteger(v) || v < 2 || v > 4) throw new RangeError('余息步数必须是2至4');
+  return v;
+}
+
+function compactPulse(p){
+  return { 息: p.息, 时: p.时, 分: p.分, 轴: p.轴, 向: p.向, 动: p.动, id: p.id, 词: p.词, 汉: p.汉, 义: p.义, 坐标: p.坐标 };
+}
+
+// ══════ 余息：从一词连续呼吸几格；每步 +60 秒，不环绕、不改编号空间 ══════
+function trail(seed, at, n){
+  const count = parseTrailN(n);
+  const origin = pulse(seed, at);
+  const start = Number(at);
+  const steps = [compactPulse(origin)];
+  let current = origin.id;
+  for(let i = 1; i < count; i++){
+    const stepAt = start + i * 60;
+    if(stepAt > PULSE_MAX_AT) break;
+    const next = pulse(current, stepAt);
+    steps.push(compactPulse(next));
+    current = next.id;
+  }
+  const last = steps[steps.length - 1];
+  return {
+    息: steps[0].息,
+    种: origin.种,
+    步: steps.length,
+    迹: steps,
+    id: last.id, 词: last.词, 汉: last.汉, 义: last.义, 坐标: last.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -535,7 +571,9 @@ const mapping = Object.freeze({
   'near': { tool: 'shuyu', keys: ['input'], preset: { operation: '邻近' } },
   '时间': { tool: 'clock', keys: ['timezone'] }, 'clock': { tool: 'clock', keys: ['timezone'] },
   '一息': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
-  'pulse': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } }
+  'pulse': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
+  '余息': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } },
+  'trail': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -633,6 +671,23 @@ function invoke(operation, input) {
         at=obj.at ?? obj.时;
       } else at=trimmed;
       return pulse(seed, at);
+    }
+    case '余息': {
+      let seed=0, at=null, n=3;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('余息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else if(parts.length===2){ seed=parts[0]; at=parts[1]; }
+        else { seed=parts[0]; at=parts[1]; n=parts[2]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+        if(obj.n != null) n=obj.n;
+      } else at=trimmed;
+      return trail(seed, at, n);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

@@ -272,6 +272,25 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.pulse("绝不存在", 0)
 
+    def test_trail_walks_without_wrap(self):
+        walk = e.trail(0, 1700000000, 3)
+        self.assertEqual(walk["步"], 3)
+        self.assertEqual(len(walk["迹"]), 3)
+        self.assertEqual(walk["种"]["id"], 0)
+        self.assertEqual(walk["迹"][0]["id"], e.pulse(0, 1700000000)["id"])
+        self.assertEqual(walk["迹"][1]["id"], e.pulse(walk["迹"][0]["id"], 1700000060)["id"])
+        self.assertEqual(walk["id"], walk["迹"][2]["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay = e.trail(edge["汉"], 0, 2)
+        self.assertTrue(all(step["动"] is False for step in stay["迹"]))
+        self.assertEqual(stay["id"], edge["id"])
+        clipped = e.trail(0, 4102444800, 4)
+        self.assertEqual(clipped["步"], 1)
+        with self.assertRaises(ValueError):
+            e.trail(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.trail(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):
@@ -349,3 +368,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self._json_tail(out)["息"], "夜")
         self.assertEqual(self._json_tail(out)["轴"], "态")
+        rc, out = self.run_cli("--trail", "0", "--at", "1700000000", "--n", "3")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._json_tail(out)["步"], 3)
+        self.assertEqual(len(self._json_tail(out)["迹"]), 3)

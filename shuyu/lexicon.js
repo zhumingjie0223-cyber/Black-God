@@ -11,6 +11,7 @@
  *   analogy    五维坐标类比：A:B :: C:? ，按轴模运算，不改编号空间
  *   near       五维 L1=1 邻近词（不环绕），编号空间不变
  *   pulse      一息：按显式 Unix 秒在一词上呼吸一格（不环绕、不读墙上时钟）
+ *   trail      余息：从一词连续呼吸 2–4 格（每步 +60 秒，不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -356,6 +357,41 @@ export function pulse(seed, at){
   };
 }
 
+function parseTrailN(n){
+  if(n == null || n === '') return 3;
+  const v = Number(n);
+  if(!Number.isInteger(v) || v < 2 || v > 4) throw new RangeError('余息步数必须是2至4');
+  return v;
+}
+
+function compactPulse(p){
+  return { 息: p.息, 时: p.时, 分: p.分, 轴: p.轴, 向: p.向, 动: p.动, id: p.id, 词: p.词, 汉: p.汉, 义: p.义, 坐标: p.坐标 };
+}
+
+// ══════ 余息：从一词连续呼吸几格；每步 +60 秒，不环绕、不改编号空间 ══════
+export function trail(seed, at, n){
+  const count = parseTrailN(n);
+  const origin = pulse(seed, at);
+  const start = Number(at);
+  const steps = [compactPulse(origin)];
+  let current = origin.id;
+  for(let i = 1; i < count; i++){
+    const stepAt = start + i * 60;
+    if(stepAt > PULSE_MAX_AT) break;
+    const next = pulse(current, stepAt);
+    steps.push(compactPulse(next));
+    current = next.id;
+  }
+  const last = steps[steps.length - 1];
+  return {
+    息: steps[0].息,
+    种: origin.种,
+    步: steps.length,
+    迹: steps,
+    id: last.id, 词: last.词, 汉: last.汉, 义: last.义, 坐标: last.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -516,4 +552,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };

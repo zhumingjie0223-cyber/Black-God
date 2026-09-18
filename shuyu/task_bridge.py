@@ -16,6 +16,8 @@ _MAPPING = {
     '时间': {'tool': 'clock', 'keys': ['timezone']}, 'clock': {'tool': 'clock', 'keys': ['timezone']},
     '一息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '一息'}},
     'pulse': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '一息'}},
+    '余息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '余息'}},
+    'trail': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '余息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:

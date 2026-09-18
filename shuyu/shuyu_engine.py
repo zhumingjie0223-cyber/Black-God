@@ -21,7 +21,7 @@
 - 可落盘分片，也可纯寻址零占用
 - 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
   compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
-- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格
+- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格
 
 v4.1（2026-09）新能力：
 - encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
@@ -421,6 +421,61 @@ def pulse(seed, at):
         "id": out["id"], "词": out["词"], "汉": out["汉"], "义": out["义"], "坐标": out["坐标"],
     }
 
+
+def _parse_trail_n(n):
+    if n is None or n == "":
+        return 3
+    if isinstance(n, bool):
+        raise ValueError("余息步数必须是2至4")
+    if isinstance(n, str):
+        if not re.fullmatch(r"[1-9][0-9]*", n):
+            raise ValueError("余息步数必须是2至4")
+        value = int(n)
+    else:
+        try:
+            value = int(n)
+        except (TypeError, ValueError):
+            raise ValueError("余息步数必须是2至4")
+        if value != n:
+            raise ValueError("余息步数必须是2至4")
+    if value < 2 or value > 4:
+        raise ValueError("余息步数必须是2至4")
+    return value
+
+
+def _compact_pulse(p):
+    return {
+        "息": p["息"], "时": p["时"], "分": p["分"], "轴": p["轴"], "向": p["向"], "动": p["动"],
+        "id": p["id"], "词": p["词"], "汉": p["汉"], "义": p["义"], "坐标": p["坐标"],
+    }
+
+
+def trail(seed, at, n=3):
+    """余息：从一词连续呼吸几格，每步 +60 秒，不环绕；与 lexicon.js trail 同构。"""
+    count = _parse_trail_n(n)
+    origin = pulse(seed, at)
+    if isinstance(at, str):
+        start = int(at)
+    else:
+        start = int(at)
+    steps = [_compact_pulse(origin)]
+    current = origin["id"]
+    for i in range(1, count):
+        step_at = start + i * 60
+        if step_at > _PULSE_MAX_AT:
+            break
+        nxt = pulse(current, step_at)
+        steps.append(_compact_pulse(nxt))
+        current = nxt["id"]
+    last = steps[-1]
+    return {
+        "息": steps[0]["息"],
+        "种": origin["种"],
+        "步": len(steps),
+        "迹": steps,
+        "id": last["id"], "词": last["词"], "汉": last["汉"], "义": last["义"], "坐标": last["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -499,7 +554,9 @@ def main(argv=None):
     ap.add_argument("--analogy",nargs=3,metavar=("A","B","C"),help="五维类比造词：A:B :: C:?")
     ap.add_argument("--near",default="",help="五维邻近词（L1=1，不环绕）")
     ap.add_argument("--pulse",default="",help="一息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息 Unix 秒（UTC）")
+    ap.add_argument("--trail",nargs="?",const="",default=None,help="余息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -534,6 +591,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.trail is not None and a.at >= 0:
+        try:
+            out(trail(a.trail, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return

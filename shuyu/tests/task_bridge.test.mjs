@@ -54,14 +54,15 @@ test('规划与核对编译为有界工具，八步内合法，九步拒绝',()=
   assert.throws(()=>compileTask(eight+'\n行：计算("9")'));
 });
 test('邻近、时间与一息编译为有界工具，规划标题用时区',()=>{
-  const program=compileTask('行：邻近("奥形凝起")\n行：时间("Asia/Shanghai")\n行：一息("1700000000")');
+  const program=compileTask('行：邻近("奥形凝起")\n行：时间("Asia/Shanghai")\n行：一息("1700000000")\n行：余息("1700000000")');
   assert.equal(program.actions[0].arguments.operation,'邻近');
   assert.equal(program.actions[0].arguments.input,'奥形凝起');
   assert.equal(program.actions[1].tool,'clock');
   assert.equal(program.actions[1].arguments.timezone,'Asia/Shanghai');
   assert.equal(program.actions[2].arguments.operation,'一息');
   assert.equal(program.actions[2].arguments.input,'1700000000');
-  assert.deepEqual(describePlan(program).map(x=>x.title),['奥形凝起','Asia/Shanghai','1700000000']);
+  assert.equal(program.actions[3].arguments.operation,'余息');
+  assert.deepEqual(describePlan(program).map(x=>x.title),['奥形凝起','Asia/Shanghai','1700000000','1700000000']);
 });
 test('规划描述 JS 与 Python 一致',()=>{
   const source='行：规划("先算")\n行：计算("1+1") → "2"';

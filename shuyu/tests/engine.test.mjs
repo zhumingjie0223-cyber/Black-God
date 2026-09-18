@@ -413,6 +413,31 @@ test('pulse 一息: 显式时刻呼吸一格，不环绕，与 Python 同构', (
   assert.throws(() => engine.pulse('绝不存在', 0), RangeError);
 });
 
+test('trail 余息: 连续呼吸几格，不环绕，与 Python 同构', () => {
+  const walk = engine.trail(0, 1700000000, 3);
+  assert.equal(walk.步, 3);
+  assert.equal(walk.迹.length, 3);
+  assert.equal(walk.种.id, 0);
+  assert.equal(walk.迹[0].id, engine.pulse(0, 1700000000).id);
+  assert.equal(walk.迹[1].id, engine.pulse(walk.迹[0].id, 1700000060).id);
+  assert.equal(walk.迹[2].id, engine.pulse(walk.迹[1].id, 1700000120).id);
+  assert.equal(walk.id, walk.迹[2].id);
+  const pyWalk = py('print(json.dumps(e.trail(arg[0], arg[1], arg[2]), ensure_ascii=False))', [0, 1700000000, 3]);
+  assert.deepEqual(walk, pyWalk);
+  const samples = [[0, 0, 2], ['奥形凝起', 28800, 4], [7, 61200, 3]];
+  const pyHits = py('print(json.dumps([e.trail(*t) for t in arg], ensure_ascii=False))', samples);
+  samples.forEach((t, i) => assert.deepEqual(engine.trail(...t), pyHits[i], `trail(${JSON.stringify(t)}) 分叉`));
+  const edge = engine.decode(CAP_EXPECTED - 1);
+  const stay = engine.trail(edge.汉, 0, 2);
+  assert.equal(stay.迹.every(step => step.动 === false), true);
+  assert.equal(stay.id, edge.id);
+  const clipped = engine.trail(0, 4102444800, 4);
+  assert.equal(clipped.步, 1);
+  assert.throws(() => engine.trail(0, 1700000000, 1), RangeError);
+  assert.throws(() => engine.trail(0, 1700000000, 5), RangeError);
+  assert.throws(() => engine.trail(0, -1, 3), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);
