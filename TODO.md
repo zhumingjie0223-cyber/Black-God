@@ -1,3 +1,15 @@
+# 2026-09-18 活的体态
+
+方向：死物件 → 活的体态。在场、会动、连续、自己找事做。不绑人物，对外仍是 Black God AI。基于 PR #116。
+
+- [x] 1. 独立 worktree 基于 PR 116 — `/Users/aquan/.cursor/worktrees/black-god-upgrade-alive`，分支 `cursor/frontier-upgrade-alive-6c31`
+- [x] 2. 枢语一息：按显式时刻在词空间呼吸一格（不环绕、不改容量）
+- [x] 3. 方言/工具接一息；iOS 在场层（续跑/演练/接着上次/一息）
+- [x] 4. 对话页呼吸点、在场条、一息芯片；动效只用 transform/opacity
+- [ ] 5. 同步 iOS 消费副本并跑本机测试
+- [ ] 6. 写本轮结论到项目 store，归档 TODO
+
+
 # 2026-09-17 第2轮前沿升级
 
 - [x] 1. 独立 worktree 基于 PR 115 分支 — `/Users/aquan/.cursor/worktrees/black-god-upgrade-r2`，分支 `cursor/frontier-upgrade-r2-589e`

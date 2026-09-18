@@ -17,6 +17,7 @@ struct NexusShuyuView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Button("用「奥形凝起」做恒等类比") { analogize() }.accessibilityIdentifier("shuyu.analogy")
                     Button("查看「奥形凝起」的邻近词") { neighbors() }.accessibilityIdentifier("shuyu.near")
+                    Button("看「奥形凝起」此刻一息") { pulse() }.accessibilityIdentifier("shuyu.pulse")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -69,6 +70,18 @@ struct NexusShuyuView: View {
             let names = items.compactMap { $0["汉"] as? String }.joined(separator: "、")
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "邻近 \(items.count) 个：\(names)"]
             verified = items.count == 5 && !(items.contains { ($0["id"] as? NSNumber)?.intValue == 0 })
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func pulse() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("一息", input: #"["奥形凝起","\#(at)"]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let phase = object["息"] as? String else { throw NexusError.invalidResponse }
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "一息 \(phase)"]
+            verified = ["晨", "昼", "昏", "夜"].contains(phase)
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }
     }

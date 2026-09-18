@@ -17,6 +17,8 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             chatHeader
+            PresenceStrip(snapshot: vm.presence) { vm.actOnPresence() }
+                .padding(.horizontal, 16).padding(.bottom, 8)
             NexusActivityPanel(chat: vm, practice: vm.practice).padding(.horizontal, 16).padding(.bottom, 8)
             if let plan = vm.currentPlan, !plan.steps.isEmpty, vm.isTyping || vm.canResume {
                 NexusPlanStrip(plan: plan).padding(.horizontal, 16).padding(.bottom, 8)
@@ -25,7 +27,7 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 14) {
                         if vm.messages.isEmpty {
-                            ChatEmptyState { input = $0; inputFocused = true }
+                            ChatEmptyState(pulseNote: vm.pulseNote) { input = $0; inputFocused = true }
                         }
                         ForEach(vm.messages) { msg in
                             MessageBubble(message: msg).id(msg.id).contextMenu {
@@ -85,7 +87,16 @@ struct ChatView: View {
             inputBar
         }
         .padding(.top, 50)
-        .onAppear { NexusShuyuEngine.shared.prepare() }
+        .onAppear {
+            NexusShuyuEngine.shared.prepare()
+            vm.awaken()
+        }
+        .onChange(of: vm.composerPrefill) { _, text in
+            guard let text else { return }
+            input = text
+            vm.composerPrefill = nil
+            inputFocused = true
+        }
         .sheet(item: $skillDraft) { draft in NexusSkillEditor(store: vm.skills, draft: draft) }
         .sheet(item: $memoryMessage) { msg in NexusMemoryEditor(memory: vm.memory, initialText: msg.content) }
         .sheet(isPresented: $showConnection) { APIConfigView() }
@@ -100,8 +111,9 @@ struct ChatView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
                 HStack(spacing: 4) {
-                    Circle().fill(Color.bgJadeHi).frame(width: 6, height: 6)
+                    PresenceDot(duration: vm.presence.breath)
                     Text(vm.currentMood).font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
+                        .accessibilityIdentifier("chat.mood")
                 }
             }
             Spacer()
@@ -214,15 +226,56 @@ struct ChatComposerChip {
     static let all = [
         ChatComposerChip(title: "计算", prompt: "帮我计算并核对结果：", accessibilityID: "chat.chip.calc"),
         ChatComposerChip(title: "规划", prompt: "把这件事拆成可检查的步骤：", accessibilityID: "chat.chip.plan"),
-        ChatComposerChip(title: "枢语", prompt: "用枢语检索并造一个词：", accessibilityID: "chat.chip.shuyu")
+        ChatComposerChip(title: "枢语", prompt: "用枢语检索并造一个词：", accessibilityID: "chat.chip.shuyu"),
+        ChatComposerChip(title: "一息", prompt: "用枢语一息看现在：", accessibilityID: "chat.chip.pulse")
     ]
 }
 
+struct PresenceDot: View {
+    let duration: Double
+    @State private var on = false
+    var body: some View {
+        Circle().fill(Color.bgJadeHi).frame(width: 7, height: 7)
+            .scaleEffect(on ? 1.28 : 0.92)
+            .opacity(on ? 1 : 0.42)
+            .accessibilityIdentifier("chat.breath")
+            .onAppear { breathe(duration) }
+            .onChange(of: duration) { _, value in breathe(value) }
+    }
+    private func breathe(_ value: Double) {
+        on = false
+        withAnimation(.easeInOut(duration: max(0.6, value)).repeatForever(autoreverses: true)) { on = true }
+    }
+}
+
+struct PresenceStrip: View {
+    let snapshot: NexusPresenceSnapshot
+    let act: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(snapshot.nextWork).font(.caption.bold()).foregroundStyle(Color.bgJadeHi)
+            if !snapshot.thread.isEmpty {
+                Text(snapshot.thread).font(.caption).foregroundStyle(Color.bgTextPrimary).lineLimit(2)
+            }
+            if snapshot.action != .none {
+                Button(snapshot.actionTitle, action: act)
+                    .font(.caption.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
+                    .accessibilityIdentifier("chat.act")
+            }
+        }
+        .padding(12).background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
+        .accessibilityIdentifier("chat.presence")
+    }
+}
+
 struct ChatEmptyState: View {
+    var pulseNote: String? = nil
     let use: (String) -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("直接说出你要完成的事。Black God 会按需使用内置工具执行并核对结果，无需你输入代码。")
+            Text(pulseNote.map { "Black God AI 在场 · \($0)" } ?? "Black God AI 在场。直接说出你要完成的事，它会按需使用内置工具执行并核对结果。")
                 .foregroundStyle(Color.bgTextSecondary)
             ForEach(["计算 12 个月每月存 500 元的累计金额，并核对结果。", "用枢语造一个关于「锚点」的词，并核对编号。", "把整理账单拆成可检查的三步计划。"], id: \.self) { sample in
                 Button(sample) { use(sample) }

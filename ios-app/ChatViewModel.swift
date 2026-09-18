@@ -24,6 +24,9 @@ final class ChatViewModel: ObservableObject {
     private var activeRecoveryAttempt = false
     @Published var modelRegistry = NexusModelRegistry()
     @Published private(set) var taskCheckpoint: NexusAgentCheckpoint?
+    @Published private(set) var pulseNote: String?
+    @Published private(set) var presenceTick = Date()
+    @Published var composerPrefill: String?
     private let checkpointStore: NexusAgentCheckpointStore
     private let store: NexusConversationStore
     private let completion: Completion?
@@ -90,7 +93,19 @@ final class ChatViewModel: ObservableObject {
     }
 
     var apiKeyConfigured: Bool { configured(NexusKeychain.shared.selectedModel) }
-    var currentMood: String { isTyping ? "处理中" : "就绪" }
+    var presence: NexusPresenceSnapshot {
+        _ = presenceTick
+        return NexusPresence.snapshot(
+            isTyping: isTyping,
+            canResume: canResume,
+            resumeGoal: taskCheckpoint?.goal,
+            practiceDue: practice.due,
+            practiceRunning: practice.isRunning,
+            lastUser: messages.last(where: { $0.role == "user" })?.content,
+            pulseNote: pulseNote
+        )
+    }
+    var currentMood: String { presence.mood }
     var currentPlan: NexusTaskPlan? { activeEngine?.plan ?? runtime.currentPlan }
     var canResume: Bool { !isTyping && taskCheckpoint?.canResume == true }
     var canRetry: Bool { canResume && lastPrompt != nil && lastError != nil }
@@ -134,6 +149,44 @@ final class ChatViewModel: ObservableObject {
         saved.state = .discarded
         do { taskCheckpoint = try checkpointStore.save(saved); lastPrompt = nil; lastError = nil }
         catch { lastError = "保存任务状态失败：" + error.localizedDescription }
+    }
+
+    func awaken(now: Date = Date()) {
+        presenceTick = now
+        refreshPulse(now: now)
+    }
+
+    func refreshPulse(now: Date = Date()) {
+        let at = String(Int(now.timeIntervalSince1970))
+        let last = messages.last(where: { $0.role == "user" })?.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let seeds = [last.map { String($0.prefix(24)) }, "0"].compactMap { $0 }.filter { !$0.isEmpty }
+        for seed in seeds {
+            let input: String
+            if seed == "0" { input = at }
+            else if let data = try? JSONSerialization.data(withJSONObject: [seed, at]) {
+                input = String(decoding: data, as: UTF8.self)
+            } else { continue }
+            guard let value = try? NexusShuyuEngine.shared.invoke("一息", input: input),
+                  let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
+            pulseNote = phase + " · " + han
+            return
+        }
+    }
+
+    func actOnPresence() {
+        switch presence.action {
+        case .none: return
+        case .resume: resume()
+        case .practice: practice.start()
+        case .continueLast:
+            let text = presence.thread.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return }
+            composerPrefill = text
+        case .pulse:
+            refreshPulse()
+            composerPrefill = "用枢语一息看现在："
+        }
     }
 
     private func start(_ prompt: String, appendUser: Bool, recovering: NexusAgentCheckpoint? = nil) {
