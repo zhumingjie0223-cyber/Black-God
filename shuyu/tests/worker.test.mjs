@@ -157,6 +157,17 @@ test('GET /near 邻近词与参数校验', async () => {
   assert.equal((await call(env, '/near?word=0&n=99')).status, 400);
 });
 
+test('GET /pulse 一息与参数校验', async () => {
+  const env = mockEnv();
+  const r = await (await call(env, '/pulse?word=0&at=1700000000')).json();
+  assert.equal(r.息, '夜');
+  assert.equal(r.轴, '态');
+  assert.equal(r.动, true);
+  assert.equal((await call(env, '/pulse')).status, 400);
+  assert.equal((await call(env, '/pulse?word=0&at=-1')).status, 400);
+  assert.equal((await call(env, '/pulse?word=绝不存在&at=0')).status, 400);
+});
+
 test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   const root = await (await call(mockEnv(), '/')).json();
   assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
@@ -164,6 +175,7 @@ test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   assert.ok(root.endpoints.some(e => e.startsWith('/compose')));
   assert.ok(root.endpoints.some(e => e.startsWith('/analogy')));
   assert.ok(root.endpoints.some(e => e.startsWith('/near')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/pulse')));
   const st = await (await call(mockEnv(), '/status')).json();
   assert.deepEqual(st.axes, root.axes);
 });

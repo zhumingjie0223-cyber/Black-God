@@ -21,7 +21,7 @@
 - 可落盘分片，也可纯寻址零占用
 - 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
   compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
-- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居
+- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格
 
 v4.1（2026-09）新能力：
 - encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
@@ -363,6 +363,64 @@ def near(value, limit=8):
             out.append({"距": 1, "轴": name, "id": w["id"], "词": w["词"], "汉": w["汉"], "义": w["义"], "坐标": w["坐标"]})
     return out[:n]
 
+
+_PULSE_MAX_AT = 4102444800
+
+
+def _pulse_phase(hour):
+    if 5 <= hour <= 7:
+        return "晨"
+    if 8 <= hour <= 16:
+        return "昼"
+    if 17 <= hour <= 19:
+        return "昏"
+    return "夜"
+
+
+def pulse(seed, at):
+    """一息：按显式 Unix 秒沿一轴呼吸一格，不环绕；与 lexicon.js pulse 同构。"""
+    if isinstance(at, bool):
+        raise ValueError("一息时刻必须是0至4102444800的Unix秒")
+    if isinstance(at, str):
+        if not re.fullmatch(r"0|[1-9][0-9]*", at):
+            raise ValueError("一息时刻必须是0至4102444800的Unix秒")
+        t = int(at)
+    else:
+        try:
+            t = int(at)
+        except (TypeError, ValueError):
+            raise ValueError("一息时刻必须是0至4102444800的Unix秒")
+        if t != at:
+            raise ValueError("一息时刻必须是0至4102444800的Unix秒")
+    if t < 0 or t > _PULSE_MAX_AT:
+        raise ValueError("一息时刻必须是0至4102444800的Unix秒")
+    word = _resolve_word(0 if seed is None or seed == "" else seed)
+    day = ((t % 86400) + 86400) % 86400
+    hour = day // 3600
+    minute = (day % 3600) // 60
+    sizes = (NC, NM, NS, NK, NP)
+    keys = ("c", "m", "s", "k", "p")
+    origin = [word["坐标"][k] for k in keys]
+    axis = hour % 5
+    direction = 1 if minute < 30 else -1
+    nxt = list(origin)
+    candidate = nxt[axis] + direction
+    moved = False
+    if 0 <= candidate < sizes[axis]:
+        nxt[axis] = candidate
+        moved = True
+    out = decode(_id_of(*nxt))
+    return {
+        "息": _pulse_phase(hour),
+        "时": hour,
+        "分": minute,
+        "轴": _AXIS_NAMES[axis],
+        "向": direction,
+        "动": moved,
+        "种": {"id": word["id"], "词": word["词"], "汉": word["汉"]},
+        "id": out["id"], "词": out["词"], "汉": out["汉"], "义": out["义"], "坐标": out["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -440,6 +498,8 @@ def main(argv=None):
     ap.add_argument("--compose",default="",help="按义造词，如 核=毁灭,映=光,态=爆,标=溯,相=起")
     ap.add_argument("--analogy",nargs=3,metavar=("A","B","C"),help="五维类比造词：A:B :: C:?")
     ap.add_argument("--near",default="",help="五维邻近词（L1=1，不环绕）")
+    ap.add_argument("--pulse",default="",help="一息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息 Unix 秒（UTC）")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -474,6 +534,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.at >= 0:
+        try:
+            out(pulse(a.pulse, a.at))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return

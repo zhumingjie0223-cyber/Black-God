@@ -253,6 +253,25 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.near("绝不存在")
 
+    def test_pulse_breathes_one_axis_without_wrap(self):
+        night = e.pulse(0, 1700000000)
+        self.assertEqual(night["息"], "夜")
+        self.assertEqual(night["时"], 22)
+        self.assertEqual(night["分"], 13)
+        self.assertEqual(night["轴"], "态")
+        self.assertEqual(night["向"], 1)
+        self.assertTrue(night["动"])
+        self.assertEqual(night["种"]["id"], 0)
+        self.assertNotEqual(night["id"], 0)
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay = e.pulse(edge["汉"], 0)
+        self.assertFalse(stay["动"])
+        self.assertEqual(stay["id"], edge["id"])
+        with self.assertRaises(ValueError):
+            e.pulse(0, -1)
+        with self.assertRaises(ValueError):
+            e.pulse("绝不存在", 0)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):
@@ -326,3 +345,7 @@ class TestCLI(unittest.TestCase):
         self.assertIn("核轴找不到", out)
         rc, out = self.run_cli("--coin", "神枢")
         self.assertEqual(self._json_tail(out)["id"], 780009883)
+        rc, out = self.run_cli("--pulse", "0", "--at", "1700000000")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._json_tail(out)["息"], "夜")
+        self.assertEqual(self._json_tail(out)["轴"], "态")

@@ -13,6 +13,7 @@
  *   compose    按义造词：每轴给 下标/拉丁根/汉译/语义关键词 任一种 → 唯一编号
  *   analogy    五维坐标类比：A:B :: C:? ，按轴模运算，不改编号空间
  *   near       五维 L1=1 邻近词（不环绕），编号空间不变
+ *   pulse      一息：按显式 Unix 秒在一词上呼吸一格（不环绕、不读墙上时钟）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -315,6 +316,49 @@ function near(input, limit){
   return out.slice(0, n);
 }
 
+const PULSE_MAX_AT = 4102444800; // 2100-01-01 UTC，有界时刻，避免两侧时钟分叉
+
+function pulsePhase(hour){
+  if(hour >= 5 && hour <= 7) return '晨';
+  if(hour >= 8 && hour <= 16) return '昼';
+  if(hour >= 17 && hour <= 19) return '昏';
+  return '夜';
+}
+
+// ══════ 一息：给定 UTC 时刻，沿一轴呼吸一格；不环绕、不改编号空间 ══════
+function pulse(seed, at){
+  if(at == null || at === '') throw new RangeError('一息时刻必须是0至4102444800的Unix秒');
+  const t = Number(at);
+  if(!Number.isInteger(t) || t < 0 || t > PULSE_MAX_AT) throw new RangeError('一息时刻必须是0至4102444800的Unix秒');
+  const word = resolveWord(seed == null || seed === '' ? 0 : seed);
+  const day = ((t % 86400) + 86400) % 86400;
+  const hour = Math.floor(day / 3600);
+  const minute = Math.floor((day % 3600) / 60);
+  const sizes = [NC, NM, NS, NK, NP];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const origin = keys.map(key => word.坐标[key]);
+  const axis = hour % 5;
+  const direction = minute < 30 ? 1 : -1;
+  const next = origin.slice();
+  const candidate = next[axis] + direction;
+  let moved = false;
+  if(candidate >= 0 && candidate < sizes[axis]){
+    next[axis] = candidate;
+    moved = true;
+  }
+  const out = decode(idOf(...next));
+  return {
+    息: pulsePhase(hour),
+    时: hour,
+    分: minute,
+    轴: AXIS_NAMES[axis],
+    向: direction,
+    动: moved,
+    种: { id: word.id, 词: word.词, 汉: word.汉 },
+    id: out.id, 词: out.词, 汉: out.汉, 义: out.义, 坐标: out.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -489,7 +533,9 @@ const mapping = Object.freeze({
   'search': { tool: 'shuyu', keys: ['input'], preset: { operation: '检索' } },
   '邻近': { tool: 'shuyu', keys: ['input'], preset: { operation: '邻近' } },
   'near': { tool: 'shuyu', keys: ['input'], preset: { operation: '邻近' } },
-  '时间': { tool: 'clock', keys: ['timezone'] }, 'clock': { tool: 'clock', keys: ['timezone'] }
+  '时间': { tool: 'clock', keys: ['timezone'] }, 'clock': { tool: 'clock', keys: ['timezone'] },
+  '一息': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
+  'pulse': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -572,6 +618,21 @@ function invoke(operation, input) {
         if(parts[1]!=null) n=Number(parts[1]);
       }
       return near(word, n);
+    }
+    case '一息': {
+      let seed=0, at=null;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('一息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else { seed=parts[0]; at=parts[1]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+      } else at=trimmed;
+      return pulse(seed, at);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

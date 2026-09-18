@@ -24,15 +24,20 @@ struct RootView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { CustomTabBar() }
         .task {
+            chatModel.awaken()
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                chatModel.awaken()
                 if scenePhase == .active, appState.currentTab == .chat, !chatModel.isTyping,
                    !NexusLinuxRuntime.shared.isExecuting, chatModel.practice.due {
                     chatModel.practice.start()
                 }
             }
         }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { chatModel.practice.stop() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { chatModel.practice.stop() }
+            else { chatModel.awaken() }
+        }
         .onChange(of: appState.currentTab) { _, tab in if tab != .chat { chatModel.practice.stop() } }
     }
 }

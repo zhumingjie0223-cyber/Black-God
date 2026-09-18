@@ -34,6 +34,21 @@ function invoke(operation, input) {
       }
       return near(word, n);
     }
+    case '一息': {
+      let seed=0, at=null;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('一息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else { seed=parts[0]; at=parts[1]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+      } else at=trimmed;
+      return pulse(seed, at);
+    }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));
     case '往返': { const word=autoCoin(input); return encode(word.词) === word.id && encodeHan(word.汉) === word.id; }

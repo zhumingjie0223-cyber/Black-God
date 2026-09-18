@@ -95,7 +95,24 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertFalse(neighbors?.contains { ($0["id"] as? NSNumber)?.intValue == 0 } == true)
         let hits = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("检索", input: "光").utf8)) as? [[String: Any]]
         XCTAssertEqual(hits?.first?["拉丁"] as? String, "ryl")
+        let pulse = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("一息", input: "1700000000").utf8)) as? [String: Any]
+        XCTAssertEqual(pulse?["息"] as? String, "夜")
+        XCTAssertEqual(pulse?["轴"] as? String, "态")
+        XCTAssertEqual((pulse?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
+        XCTAssertNotEqual((pulse?["id"] as? NSNumber)?.intValue, 0)
+        let pulseProgram = try NexusShuyuEngine.shared.compile("行：一息(\"1700000000\")")
+        XCTAssertEqual(pulseProgram.actions[0].arguments["operation"], "一息")
         tools.register(runner)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "clock" })
+    }
+    func testAwakenWritesPulseNoteWithoutWaitingForPrompt() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
+        vm.awaken(now: Date(timeIntervalSince1970: 1_700_000_000))
+        XCTAssertNotNil(vm.pulseNote)
+        XCTAssertTrue(vm.pulseNote?.contains(" · ") == true)
+        XCTAssertTrue(["在场", "该练"].contains(vm.currentMood))
+        XCTAssertNotEqual(vm.currentMood, "就绪")
     }
 }

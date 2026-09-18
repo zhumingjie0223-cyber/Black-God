@@ -8,7 +8,7 @@ struct NexusLiveExecutionView: View {
         if live.visible {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Circle().fill(live.state == .running ? Color.bgJadeHi : Color.bgTextSecondary).frame(width: 7, height: 7)
+                    PresenceDot(duration: live.state == .running ? 0.9 : 2.4)
                     Text("操作直播").font(.caption.bold())
                     Text(live.state == .running ? "进行中" : "已结束").font(.caption2).foregroundStyle(Color.bgTextSecondary)
                     Spacer()
