@@ -35,8 +35,8 @@ struct RootView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { chatModel.practice.stop() }
-            else { chatModel.awaken() }
+            if phase != .active { chatModel.practice.stop(); chatModel.leave() }
+            else { chatModel.notice() }
         }
         .onChange(of: appState.currentTab) { _, tab in if tab != .chat { chatModel.practice.stop() } }
     }

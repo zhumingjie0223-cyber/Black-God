@@ -461,6 +461,32 @@ test('echo 回息: 余息走完后反向弹一格，不环绕，与 Python 同�
   assert.throws(() => engine.echo(0, -1, 3), RangeError);
 });
 
+test('sway 摇息: 回息后按分钟摇摆，不环绕，与 Python 同构', () => {
+  const rest = engine.echo(0, 1700000000, 3);
+  const last = rest.迹[rest.迹.length - 1];
+  const lean = engine.sway(0, 1700000000, 3);
+  assert.equal(lean.摇, true);
+  assert.equal(lean.侧, 1);
+  assert.equal(lean.id, last.id);
+  assert.equal(lean.摆.id, rest.id);
+  const settled = engine.sway(0, 1700000060, 3);
+  assert.equal(settled.摇, true);
+  assert.equal(settled.侧, 0);
+  assert.equal(settled.id, engine.echo(0, 1700000060, 3).id);
+  assert.equal(settled.摆.id, engine.trail(0, 1700000060, 3).id);
+  const pyLean = py('print(json.dumps(e.sway(arg[0], arg[1], arg[2]), ensure_ascii=False))', [0, 1700000000, 3]);
+  assert.deepEqual(lean, pyLean);
+  const samples = [[0, 0, 2], ['奥形凝起', 28800, 4], [7, 61200, 3]];
+  const pyHits = py('print(json.dumps([e.sway(*t) for t in arg], ensure_ascii=False))', samples);
+  samples.forEach((t, i) => assert.deepEqual(engine.sway(...t), pyHits[i], `sway(${JSON.stringify(t)}) 分叉`));
+  const edge = engine.decode(CAP_EXPECTED - 1);
+  const stay = engine.sway(edge.汉, 0, 2);
+  assert.equal(stay.摇, true);
+  assert.equal(stay.侧, 0);
+  assert.throws(() => engine.sway(0, 1700000000, 1), RangeError);
+  assert.throws(() => engine.sway(0, -1, 3), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);
