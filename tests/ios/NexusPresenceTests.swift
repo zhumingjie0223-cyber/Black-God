@@ -95,6 +95,70 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(snap.action, .resume)
     }
 
+    func testDraftIsListeningBreath() {
+        let snap = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: false, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, draft: "接着问账单", pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(snap.mood, "在听")
+        XCTAssertEqual(snap.stance, "listening")
+        XCTAssertEqual(snap.nextWork, "你正在说")
+        XCTAssertEqual(snap.thread, "接着问账单")
+        XCTAssertEqual(snap.action, .none)
+        XCTAssertEqual(snap.breath, 1.1)
+    }
+
+    func testUnfinishedBeatsListening() {
+        let snap = NexusPresence.snapshot(
+            isTyping: false, canResume: true, resumeGoal: "未完成",
+            practiceDue: false, practiceRunning: false, lastUser: "未完成",
+            draft: "新的话", pulseNote: nil
+        )
+        XCTAssertEqual(snap.mood, "可续")
+        XCTAssertEqual(snap.action, .resume)
+    }
+
+    func testAfterglowFadesToEchoThenPresence() {
+        let answeredAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let echo = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(200), pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(echo.mood, "余韵")
+        XCTAssertEqual(echo.stance, "echoing")
+        XCTAssertEqual(echo.action, .followUp)
+        XCTAssertEqual(echo.nextWork, "余音 · 夜 · 奥形凝起")
+        XCTAssertEqual(echo.breath, 2.2)
+        let faded = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(1000), pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(faded.mood, "在场")
+        XCTAssertEqual(faded.action, .continueLast)
+        let practiced = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: true, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(1000), pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(practiced.mood, "该练")
+    }
+
+    func testFreshAnswerBeatsPractice() {
+        let snap = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: true, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, pulseNote: nil
+        )
+        XCTAssertEqual(snap.mood, "刚歇")
+        XCTAssertEqual(snap.action, .followUp)
+    }
+
     @MainActor
     func testUserStopDoesNotPretendToBeAnError() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
@@ -112,5 +176,34 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertTrue(vm.canResume)
         XCTAssertEqual(vm.presence.mood, "可续")
         XCTAssertEqual(vm.presence.nextWork, "刚停，进度还在")
+    }
+
+    @MainActor
+    func testFollowUpKeepsLastTalk() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in true }, completion: { _, _ in "先列出科目" })
+        vm.send("把账单拆成三步")
+        for _ in 0..<100 where vm.isTyping { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(vm.presence.mood, "刚歇")
+        vm.actOnPresence()
+        XCTAssertEqual(vm.composerPrefill, "接着「把账单拆成三步」：")
+    }
+
+    @MainActor
+    func testHearAndFollowUpKeepTheThread() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
+        vm.messages = [
+            ChatMessage(role: "user", content: "把账单拆成三步"),
+            ChatMessage(role: "assistant", content: "先列出科目")
+        ]
+        vm.hear("接着问")
+        XCTAssertEqual(vm.presence.mood, "在听")
+        XCTAssertEqual(vm.presence.nextWork, "你正在说")
+        vm.hear("")
+        XCTAssertNotEqual(vm.presence.mood, "在听")
+        XCTAssertTrue(["在场", "该练"].contains(vm.presence.mood))
     }
 }
