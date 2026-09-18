@@ -91,8 +91,10 @@ struct ChatView: View {
             NexusShuyuEngine.shared.prepare()
             vm.awaken()
             vm.hear(input)
+            vm.attend(inputFocused)
         }
         .onChange(of: input) { _, text in vm.hear(text) }
+        .onChange(of: inputFocused) { _, on in vm.attend(on) }
         .onChange(of: vm.composerPrefill) { _, text in
             guard let text else { return }
             input = text
@@ -147,6 +149,7 @@ struct ChatView: View {
                     .padding(.horizontal, 16).padding(.vertical, 10)
                     .background(RoundedRectangle(cornerRadius: 22).fill(Color.bgCardLight))
                     .submitLabel(.send)
+                    .accessibilityIdentifier("chat.input")
                     .onSubmit { sendCurrent() }
                 Button {
                     sendCurrent()
@@ -271,13 +274,17 @@ struct PresenceStrip: View {
         .padding(12).background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
+        .scaleEffect(leaning(snapshot.stance) ? (on ? 1.0 : 0.98) : 1)
         .opacity(breathing(snapshot.stance) ? (on ? 1 : 0.72) : 1)
         .accessibilityIdentifier("chat.presence")
         .onAppear { breathe(snapshot.stance) }
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
     private func breathing(_ stance: String) -> Bool {
-        ["working", "listening", "settled", "echoing"].contains(stance)
+        ["working", "listening", "watching", "noticing", "settled", "echoing"].contains(stance)
+    }
+    private func leaning(_ stance: String) -> Bool {
+        ["watching", "noticing"].contains(stance)
     }
     private func breathe(_ stance: String) {
         guard breathing(stance) else { on = false; return }
@@ -286,6 +293,8 @@ struct PresenceStrip: View {
         switch stance {
         case "working": duration = 0.9
         case "listening": duration = 1.1
+        case "watching": duration = 1.4
+        case "noticing": duration = 1.8
         case "echoing": duration = 2.2
         default: duration = 3.2
         }

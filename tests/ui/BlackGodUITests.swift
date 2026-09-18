@@ -13,7 +13,11 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.chip.pulse"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["chat.presence"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["chat.breath"].exists)
-        XCTAssertTrue(["在场", "该练", "可续", "处理中", "刚歇", "在听", "余韵"].contains(app.staticTexts["chat.mood"].label))
+        XCTAssertTrue(["在场", "该练", "可续", "处理中", "刚歇", "在听", "余韵", "看着", "还在"].contains(app.staticTexts["chat.mood"].label))
+        let field = app.descendants(matching: .any)["chat.input"]
+        XCTAssertTrue(field.waitForExistence(timeout: 4))
+        field.tap()
+        XCTAssertEqual(app.staticTexts["chat.mood"].label, "看着")
         app.buttons["chat.chip.plan"].tap()
         XCTAssertEqual(app.staticTexts["chat.mood"].label, "在听")
         XCTAssertFalse(app.buttons["chat.regenerate"].exists)
@@ -207,6 +211,10 @@ final class BlackGodUITests: XCTestCase {
         let echo = app.buttons["shuyu.echo"]
         reveal(echo, in: app)
         echo.tap()
+        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        let sway = app.buttons["shuyu.sway"]
+        reveal(sway, in: app)
+        sway.tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.buttons["完成"].tap()

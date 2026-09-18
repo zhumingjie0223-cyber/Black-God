@@ -20,6 +20,8 @@ _MAPPING = {
     'trail': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '余息'}},
     '回息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '回息'}},
     'echo': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '回息'}},
+    '摇息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '摇息'}},
+    'sway': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '摇息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:

@@ -13,6 +13,7 @@
  *   pulse      一息：按显式 Unix 秒在一词上呼吸一格（不环绕、不读墙上时钟）
  *   trail      余息：从一词连续呼吸 2–4 格（每步 +60 秒，不环绕、不改容量）
  *   echo       回息：余息走完后沿末步反向弹一格（不环绕、不改容量）
+ *   sway       摇息：回息后按分钟在弹回词与末步之间摇摆（不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -421,6 +422,38 @@ export function echo(seed, at, n){
   };
 }
 
+function compactPose(word, meta){
+  return {
+    息: meta.息, 时: meta.时, 分: meta.分, 轴: meta.轴, 向: meta.向, 动: meta.动,
+    id: word.id, 词: word.词, 汉: word.汉, 义: word.义, 坐标: word.坐标
+  };
+}
+
+// ══════ 摇息：回息后按分钟在弹回词与末步之间摇摆；不环绕、不改编号空间 ══════
+export function sway(seed, at, n){
+  const rest = echo(seed, at, n);
+  const last = rest.迹[rest.迹.length - 1];
+  const t = Number(at);
+  const side = Math.floor(t / 60) % 2;
+  const restPose = compactPose(rest, { 息: last.息, 时: last.时, 分: last.分, 轴: rest.轴, 向: rest.向, 动: rest.回 });
+  const lean = last;
+  const swaying = rest.id !== last.id;
+  const pose = (swaying && side === 1) ? lean : restPose;
+  return {
+    息: rest.息,
+    种: rest.种,
+    步: rest.步,
+    迹: rest.迹,
+    回: rest.回,
+    轴: pose.轴,
+    向: pose.向,
+    摇: swaying,
+    侧: swaying ? side : 0,
+    摆: swaying ? (side === 1 ? restPose : lean) : restPose,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -581,4 +614,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };

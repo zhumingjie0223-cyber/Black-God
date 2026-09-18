@@ -310,6 +310,27 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.echo(0, -1, 3)
 
+    def test_sway_oscillates_without_wrap(self):
+        rest = e.echo(0, 1700000000, 3)
+        last = rest["迹"][-1]
+        lean = e.sway(0, 1700000000, 3)
+        self.assertTrue(lean["摇"])
+        self.assertEqual(lean["侧"], 1)
+        self.assertEqual(lean["id"], last["id"])
+        self.assertEqual(lean["摆"]["id"], rest["id"])
+        settled = e.sway(0, 1700000060, 3)
+        self.assertTrue(settled["摇"])
+        self.assertEqual(settled["侧"], 0)
+        self.assertEqual(settled["id"], e.echo(0, 1700000060, 3)["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay = e.sway(edge["汉"], 0, 2)
+        self.assertTrue(stay["摇"])
+        self.assertEqual(stay["侧"], 0)
+        with self.assertRaises(ValueError):
+            e.sway(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.sway(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):
@@ -395,3 +416,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertTrue(self._json_tail(out)["回"])
         self.assertEqual(self._json_tail(out)["步"], 3)
+        rc, out = self.run_cli("--sway", "0", "--at", "1700000000", "--n", "3")
+        self.assertEqual(rc, 0)
+        self.assertTrue(self._json_tail(out)["摇"])
+        self.assertEqual(self._json_tail(out)["侧"], 1)

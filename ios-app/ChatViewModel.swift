@@ -28,6 +28,7 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var pulseWord: String?
     @Published private(set) var presenceTick = Date()
     @Published private(set) var composerDraft = ""
+    @Published private(set) var attending = false
     @Published var composerPrefill: String?
     private var liveSubscription: AnyCancellable?
     private let checkpointStore: NexusAgentCheckpointStore
@@ -39,6 +40,8 @@ final class ChatViewModel: ObservableObject {
     private var activeTask: Task<Void, Never>?
     private var runID = UUID()
     private var lastPrompt: String?
+    private var wasAway = false
+    private var noticedAt: Date?
 
     init(store: NexusConversationStore = NexusConversationStore(),
          memory: NexusMemoryStore? = nil,
@@ -114,6 +117,8 @@ final class ChatViewModel: ObservableObject {
             answeredAt: taskCheckpoint?.state == .answered ? taskCheckpoint?.updatedAt : nil,
             now: presenceTick,
             draft: composerDraft,
+            attending: attending,
+            noticedAt: noticedAt,
             pulseNote: pulseNote
         )
     }
@@ -168,6 +173,23 @@ final class ChatViewModel: ObservableObject {
         refreshPulse(now: now)
     }
 
+    func leave() {
+        wasAway = true
+    }
+
+    func notice(now: Date = Date()) {
+        if wasAway {
+            noticedAt = now
+            wasAway = false
+        }
+        awaken(now: now)
+    }
+
+    func attend(_ on: Bool) {
+        guard attending != on else { return }
+        attending = on
+    }
+
     func hear(_ text: String) {
         let next = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard composerDraft != next else { return }
@@ -181,20 +203,27 @@ final class ChatViewModel: ObservableObject {
         for seed in seeds {
             let payload: [Any] = seed == "0" ? [0, at, 3] : [seed, at, 3]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
-                  let value = try? NexusShuyuEngine.shared.invoke("回息", input: String(decoding: data, as: UTF8.self)),
+                  let value = try? NexusShuyuEngine.shared.invoke("摇息", input: String(decoding: data, as: UTF8.self)),
                   let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
                   let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
             let origin = (object["种"] as? [String: Any])?["汉"] as? String ?? seed
             let lastHan = ((object["迹"] as? [Any])?.last as? [String: Any])?["汉"] as? String ?? han
             let echoed = (object["回"] as? NSNumber)?.boolValue ?? (object["回"] as? Bool ?? false)
-            if origin == han {
-                pulseNote = "\(phase) · \(han)"
-            } else if echoed, lastHan != han {
-                pulseNote = "\(phase) · \(origin) → \(lastHan) ↩ \(han)"
+            let swaying = (object["摇"] as? NSNumber)?.boolValue ?? (object["摇"] as? Bool ?? false)
+            let side = (object["侧"] as? NSNumber)?.intValue ?? 0
+            let swing = (object["摆"] as? [String: Any])?["汉"] as? String
+            let restHan = (swaying && side == 1) ? (swing ?? han) : han
+            let leanHan = (swaying && side == 1) ? han : (swing ?? lastHan)
+            if origin == restHan {
+                pulseNote = "\(phase) · \(restHan)"
+            } else if swaying, leanHan != restHan, side == 1 {
+                pulseNote = "\(phase) · \(origin) → \(restHan) ⇌ \(leanHan)"
+            } else if echoed, lastHan != restHan {
+                pulseNote = "\(phase) · \(origin) → \(lastHan) ↩ \(restHan)"
             } else {
-                pulseNote = "\(phase) · \(origin) → \(han)"
+                pulseNote = "\(phase) · \(origin) → \(restHan)"
             }
-            pulseWord = han
+            pulseWord = restHan
             return
         }
     }

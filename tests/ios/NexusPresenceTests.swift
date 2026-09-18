@@ -206,4 +206,73 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertNotEqual(vm.presence.mood, "在听")
         XCTAssertTrue(["在场", "该练"].contains(vm.presence.mood))
     }
+
+    func testAttendingEmptyIsWatching() {
+        let snap = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, attending: true, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(snap.mood, "看着")
+        XCTAssertEqual(snap.stance, "watching")
+        XCTAssertEqual(snap.nextWork, "等你开口 · 夜 · 奥形凝起")
+        XCTAssertEqual(snap.action, .none)
+        XCTAssertEqual(snap.breath, 1.4)
+    }
+
+    func testDraftBeatsWatching() {
+        let snap = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: false, practiceRunning: false, lastUser: "上次",
+            draft: "新的话", attending: true, pulseNote: nil
+        )
+        XCTAssertEqual(snap.mood, "在听")
+        XCTAssertEqual(snap.action, .none)
+    }
+
+    func testNoticingBeatsAfterglowButNotUnfinished() {
+        let answeredAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let back = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: true, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(4), noticedAt: answeredAt.addingTimeInterval(3),
+            pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(back.mood, "还在")
+        XCTAssertEqual(back.stance, "noticing")
+        XCTAssertEqual(back.nextWork, "你回来了 · 夜 · 奥形凝起")
+        XCTAssertEqual(back.action, .followUp)
+        XCTAssertEqual(back.breath, 1.8)
+        let unfinished = NexusPresence.snapshot(
+            isTyping: false, canResume: true, resumeGoal: "未完成",
+            practiceDue: false, practiceRunning: false, lastUser: "未完成",
+            now: answeredAt.addingTimeInterval(2), noticedAt: answeredAt, pulseNote: nil
+        )
+        XCTAssertEqual(unfinished.mood, "可续")
+        let faded = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(20), noticedAt: answeredAt,
+            pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(faded.mood, "刚歇")
+    }
+
+    @MainActor
+    func testNoticeAfterLeaveKeepsBody() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
+        vm.leave()
+        vm.notice(now: Date(timeIntervalSince1970: 1_700_000_000))
+        XCTAssertEqual(vm.presence.mood, "还在")
+        XCTAssertEqual(vm.presence.stance, "noticing")
+        XCTAssertTrue(vm.presence.nextWork.contains("你回来了"))
+        vm.attend(true)
+        XCTAssertEqual(vm.presence.mood, "看着")
+        vm.attend(false)
+        XCTAssertEqual(vm.presence.mood, "还在")
+    }
 }
