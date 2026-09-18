@@ -14,11 +14,12 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：空着会看，回来还在，说话时在听，刚歇会褪，停了还在，不自动扩权。
+/// 打开就要在场：空着会看，写着会顿，草稿还惦记，回来还在，说话时在听，刚歇会褪，停了还在，不自动扩权。
 enum NexusPresence {
     static let afterglow: TimeInterval = 180
     static let echoFade: TimeInterval = 900
     static let noticeHold: TimeInterval = 12
+    static let hitchHold: TimeInterval = 1.6
 
     static func snapshot(
         isTyping: Bool,
@@ -34,6 +35,7 @@ enum NexusPresence {
         now: Date = Date(),
         draft: String? = nil,
         attending: Bool = false,
+        heardAt: Date? = nil,
         noticedAt: Date? = nil,
         pulseNote: String?
     ) -> NexusPresenceSnapshot {
@@ -53,9 +55,21 @@ enum NexusPresence {
         }
         let spoken = clip(draft)
         if !spoken.isEmpty {
+            if attending {
+                if let heard = heardAt, now.timeIntervalSince(heard) >= hitchHold {
+                    return NexusPresenceSnapshot(
+                        mood: "顿笔", stance: "hitching", thread: spoken,
+                        nextWork: "等你写完", actionTitle: "", action: .none, breath: 1.5
+                    )
+                }
+                return NexusPresenceSnapshot(
+                    mood: "在听", stance: "listening", thread: spoken,
+                    nextWork: "你正在说", actionTitle: "", action: .none, breath: 1.1
+                )
+            }
             return NexusPresenceSnapshot(
-                mood: "在听", stance: "listening", thread: spoken,
-                nextWork: "你正在说", actionTitle: "", action: .none, breath: 1.1
+                mood: "惦记", stance: "holding", thread: spoken,
+                nextWork: "你写到这儿了", actionTitle: "", action: .none, breath: 2.0
             )
         }
         if attending {

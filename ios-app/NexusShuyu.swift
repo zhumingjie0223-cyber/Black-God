@@ -52,7 +52,7 @@ final class NexusShuyuEngine {
 struct NexusShuyuTool: NexusTool {
     let name = "shuyu"
     let canReuseResult = true
-    let usage = "Black God内置枢语。operation可选容量、解码、拉丁编号、汉译编号、检索、造词、组合、类比、邻近、一息、余息、回息、摇息、编译、规划、往返、质数；input为对应字符串。类比输入为JSON数组[词A,词B,词C]；邻近为词或JSON数组[词,数量]；一息为Unix秒或JSON数组[词,Unix秒]；余息、回息与摇息为Unix秒或JSON数组[词,Unix秒,步数]。词汇容量不是智能能力数量。"
+    let usage = "Black God内置枢语。operation可选容量、解码、拉丁编号、汉译编号、检索、造词、组合、类比、邻近、一息、余息、回息、摇息、落息、编译、规划、往返、质数；input为对应字符串。类比输入为JSON数组[词A,词B,词C]；邻近为词或JSON数组[词,数量]；一息为Unix秒或JSON数组[词,Unix秒]；余息、回息、摇息与落息为Unix秒或JSON数组[词,Unix秒,步数]。词汇容量不是智能能力数量。"
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         do {
             let value = try await NexusShuyuEngine.shared.invoke(call.arguments["operation"] ?? "", input: call.arguments["input"] ?? "")
@@ -72,7 +72,7 @@ struct NexusShuyuStepResult: Codable {
 /// 有界执行，不暴露JavaScript或宿主对象；每个子工具仍检查当前权限。
 struct NexusShuyuRunTool: NexusTool {
     let name = "shuyu_execute"
-    let usage = "执行最多8行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语、检索、邻近、一息、余息、回息、摇息、规划、核对、时间、执行。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
+    let usage = "执行最多8行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语、检索、邻近、一息、余息、回息、摇息、落息、规划、核对、时间、执行。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
     let tools: NexusToolRegistry
     var onTrace: (@MainActor (NexusToolTrace) -> Void)? = nil
     func execute(_ call: NexusToolCall) async -> NexusToolResult {

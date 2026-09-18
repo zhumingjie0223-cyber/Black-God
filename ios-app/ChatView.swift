@@ -114,6 +114,7 @@ struct ChatView: View {
                 .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 2))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
+                    .accessibilityIdentifier("chat.title")
                 HStack(spacing: 4) {
                     PresenceDot(duration: vm.presence.breath)
                     Text(vm.currentMood).font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
@@ -126,6 +127,8 @@ struct ChatView: View {
             }
         }
         .padding(.horizontal, 16).padding(.bottom, 12).background(Color.bgDark.opacity(0.95))
+        .contentShape(Rectangle())
+        .onTapGesture { inputFocused = false }
     }
 
     var inputBar: some View {
@@ -281,10 +284,10 @@ struct PresenceStrip: View {
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
     private func breathing(_ stance: String) -> Bool {
-        ["working", "listening", "watching", "noticing", "settled", "echoing"].contains(stance)
+        ["working", "listening", "hitching", "holding", "watching", "noticing", "settled", "echoing"].contains(stance)
     }
     private func leaning(_ stance: String) -> Bool {
-        ["watching", "noticing"].contains(stance)
+        ["hitching", "watching", "noticing"].contains(stance)
     }
     private func breathe(_ stance: String) {
         guard breathing(stance) else { on = false; return }
@@ -293,8 +296,10 @@ struct PresenceStrip: View {
         switch stance {
         case "working": duration = 0.9
         case "listening": duration = 1.1
+        case "hitching": duration = 1.5
         case "watching": duration = 1.4
         case "noticing": duration = 1.8
+        case "holding": duration = 2.0
         case "echoing": duration = 2.2
         default: duration = 3.2
         }

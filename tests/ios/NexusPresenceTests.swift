@@ -99,7 +99,8 @@ final class NexusPresenceTests: XCTestCase {
         let snap = NexusPresence.snapshot(
             isTyping: false, canResume: false, resumeGoal: nil,
             practiceDue: false, practiceRunning: false, lastUser: "上次",
-            lastReply: "刚答完", answered: true, draft: "接着问账单", pulseNote: "夜 · 奥形凝起"
+            lastReply: "刚答完", answered: true, draft: "接着问账单", attending: true,
+            pulseNote: "夜 · 奥形凝起"
         )
         XCTAssertEqual(snap.mood, "在听")
         XCTAssertEqual(snap.stance, "listening")
@@ -200,10 +201,12 @@ final class NexusPresenceTests: XCTestCase {
             ChatMessage(role: "assistant", content: "先列出科目")
         ]
         vm.hear("接着问")
+        vm.attend(true)
         XCTAssertEqual(vm.presence.mood, "在听")
         XCTAssertEqual(vm.presence.nextWork, "你正在说")
         vm.hear("")
-        XCTAssertNotEqual(vm.presence.mood, "在听")
+        XCTAssertEqual(vm.presence.mood, "看着")
+        vm.attend(false)
         XCTAssertTrue(["在场", "该练"].contains(vm.presence.mood))
     }
 
@@ -266,13 +269,72 @@ final class NexusPresenceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
         vm.leave()
-        vm.notice(now: Date(timeIntervalSince1970: 1_700_000_000))
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        vm.notice(now: t0)
         XCTAssertEqual(vm.presence.mood, "还在")
         XCTAssertEqual(vm.presence.stance, "noticing")
         XCTAssertTrue(vm.presence.nextWork.contains("你回来了"))
-        vm.attend(true)
+        vm.attend(true, now: t0)
         XCTAssertEqual(vm.presence.mood, "看着")
-        vm.attend(false)
+        vm.attend(false, now: t0.addingTimeInterval(1))
         XCTAssertEqual(vm.presence.mood, "还在")
+    }
+
+    func testPausedDraftIsHitchThenHold() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let listening = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, now: t0, draft: "接着问账单",
+            attending: true, heardAt: t0, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(listening.mood, "在听")
+        let hitch = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(2),
+            draft: "接着问账单", attending: true, heardAt: t0, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(hitch.mood, "顿笔")
+        XCTAssertEqual(hitch.stance, "hitching")
+        XCTAssertEqual(hitch.nextWork, "等你写完")
+        XCTAssertEqual(hitch.thread, "接着问账单")
+        XCTAssertEqual(hitch.action, .none)
+        XCTAssertEqual(hitch.breath, 1.5)
+        let hold = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(2),
+            draft: "接着问账单", attending: false, heardAt: t0, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(hold.mood, "惦记")
+        XCTAssertEqual(hold.stance, "holding")
+        XCTAssertEqual(hold.nextWork, "你写到这儿了")
+        XCTAssertEqual(hold.breath, 2.0)
+        let unfinished = NexusPresence.snapshot(
+            isTyping: false, canResume: true, resumeGoal: "未完成",
+            practiceDue: false, practiceRunning: false, lastUser: "未完成",
+            now: t0.addingTimeInterval(2), draft: "新的话", attending: false, heardAt: t0,
+            pulseNote: nil
+        )
+        XCTAssertEqual(unfinished.mood, "可续")
+    }
+
+    @MainActor
+    func testHearPauseAndLeaveKeepsDraft() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        vm.hear("接着问", now: t0)
+        XCTAssertEqual(vm.presence.mood, "惦记")
+        XCTAssertEqual(vm.presence.nextWork, "你写到这儿了")
+        vm.attend(true, now: t0)
+        XCTAssertEqual(vm.presence.mood, "在听")
+        vm.awaken(now: t0.addingTimeInterval(2))
+        XCTAssertEqual(vm.presence.mood, "顿笔")
+        XCTAssertEqual(vm.presence.nextWork, "等你写完")
+        vm.attend(false, now: t0.addingTimeInterval(3))
+        XCTAssertEqual(vm.presence.mood, "惦记")
     }
 }
