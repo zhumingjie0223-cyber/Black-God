@@ -247,7 +247,7 @@ final class NexusPresenceTests: XCTestCase {
         let unfinished = NexusPresence.snapshot(
             isTyping: false, canResume: true, resumeGoal: "未完成",
             practiceDue: false, practiceRunning: false, lastUser: "未完成",
-            noticedAt: answeredAt, now: answeredAt.addingTimeInterval(2), pulseNote: nil
+            now: answeredAt.addingTimeInterval(2), noticedAt: answeredAt, pulseNote: nil
         )
         XCTAssertEqual(unfinished.mood, "可续")
         let faded = NexusPresence.snapshot(
