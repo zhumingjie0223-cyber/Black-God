@@ -179,6 +179,17 @@ test('GET /trail 余息与参数校验', async () => {
   assert.equal((await call(env, '/trail?word=绝不存在&at=0')).status, 400);
 });
 
+test('GET /echo 回息与参数校验', async () => {
+  const env = mockEnv();
+  const r = await (await call(env, '/echo?word=0&at=1700000000&n=3')).json();
+  assert.equal(r.步, 3);
+  assert.equal(r.回, true);
+  assert.equal(r.种.id, 0);
+  assert.equal((await call(env, '/echo')).status, 400);
+  assert.equal((await call(env, '/echo?word=0&at=1700000000&n=1')).status, 400);
+  assert.equal((await call(env, '/echo?word=绝不存在&at=0')).status, 400);
+});
+
 test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   const root = await (await call(mockEnv(), '/')).json();
   assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
@@ -188,6 +199,7 @@ test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   assert.ok(root.endpoints.some(e => e.startsWith('/near')));
   assert.ok(root.endpoints.some(e => e.startsWith('/pulse')));
   assert.ok(root.endpoints.some(e => e.startsWith('/trail')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/echo')));
   const st = await (await call(mockEnv(), '/status')).json();
   assert.deepEqual(st.axes, root.axes);
 });

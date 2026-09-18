@@ -14,8 +14,11 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：做事时露出步骤，停了还在，答完刚歇，不自动扩权。
+/// 打开就要在场：说话时在听，刚歇会褪，停了还在，不自动扩权。
 enum NexusPresence {
+    static let afterglow: TimeInterval = 180
+    static let echoFade: TimeInterval = 900
+
     static func snapshot(
         isTyping: Bool,
         canResume: Bool,
@@ -26,6 +29,9 @@ enum NexusPresence {
         lastReply: String? = nil,
         liveStatus: String? = nil,
         answered: Bool = false,
+        answeredAt: Date? = nil,
+        now: Date = Date(),
+        draft: String? = nil,
         pulseNote: String?
     ) -> NexusPresenceSnapshot {
         if isTyping {
@@ -42,19 +48,36 @@ enum NexusPresence {
                 nextWork: "刚停，进度还在", actionTitle: "继续未完成", action: .resume, breath: 1.6
             )
         }
+        let spoken = clip(draft)
+        if !spoken.isEmpty {
+            return NexusPresenceSnapshot(
+                mood: "在听", stance: "listening", thread: spoken,
+                nextWork: "你正在说", actionTitle: "", action: .none, breath: 1.1
+            )
+        }
+        if answered {
+            let age = answeredAt.map { now.timeIntervalSince($0) }
+            if age == nil || age! < afterglow {
+                return NexusPresenceSnapshot(
+                    mood: "刚歇", stance: "settled", thread: clip(lastReply ?? resumeGoal ?? lastUser),
+                    nextWork: pulseNote.map { "还在 · \($0)" } ?? "还在，可接着问",
+                    actionTitle: "接着问", action: .followUp, breath: 3.2
+                )
+            }
+            if age! < echoFade {
+                return NexusPresenceSnapshot(
+                    mood: "余韵", stance: "echoing", thread: clip(lastReply ?? lastUser),
+                    nextWork: pulseNote.map { "余音 · \($0)" } ?? "刚才说过，还在",
+                    actionTitle: "接着问", action: .followUp, breath: 2.2
+                )
+            }
+        }
         if practiceRunning || practiceDue {
             return NexusPresenceSnapshot(
                 mood: "该练", stance: "practice", thread: clip(pulseNote),
                 nextWork: practiceRunning ? "演练进行中" : "到点该练技能",
                 actionTitle: practiceRunning ? "" : "开始演练",
                 action: practiceRunning ? .none : .practice, breath: 1.2
-            )
-        }
-        if answered {
-            return NexusPresenceSnapshot(
-                mood: "刚歇", stance: "settled", thread: clip(lastReply ?? resumeGoal ?? lastUser),
-                nextWork: pulseNote.map { "还在 · \($0)" } ?? "还在，可接着问",
-                actionTitle: "接着问", action: .followUp, breath: 3.2
             )
         }
         let last = clip(lastUser)
@@ -72,9 +95,9 @@ enum NexusPresence {
         )
     }
 
-    private static func clip(_ text: String?) -> String {
+    private static func clip(_ text: String?, limit: Int = 48) -> String {
         let value = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !value.isEmpty else { return "" }
-        return value.count > 48 ? String(value.prefix(48)) : value
+        return value.count > limit ? String(value.prefix(limit)) : value
     }
 }

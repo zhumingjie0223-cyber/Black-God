@@ -18,6 +18,8 @@ _MAPPING = {
     'pulse': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '一息'}},
     '余息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '余息'}},
     'trail': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '余息'}},
+    '回息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '回息'}},
+    'echo': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '回息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:

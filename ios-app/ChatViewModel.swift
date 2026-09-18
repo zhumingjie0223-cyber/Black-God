@@ -27,6 +27,7 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var pulseNote: String?
     @Published private(set) var pulseWord: String?
     @Published private(set) var presenceTick = Date()
+    @Published private(set) var composerDraft = ""
     @Published var composerPrefill: String?
     private var liveSubscription: AnyCancellable?
     private let checkpointStore: NexusAgentCheckpointStore
@@ -110,6 +111,9 @@ final class ChatViewModel: ObservableObject {
             lastReply: messages.last(where: { $0.role == "assistant" })?.content,
             liveStatus: live.status,
             answered: taskCheckpoint?.state == .answered,
+            answeredAt: taskCheckpoint?.state == .answered ? taskCheckpoint?.updatedAt : nil,
+            now: presenceTick,
+            draft: composerDraft,
             pulseNote: pulseNote
         )
     }
@@ -164,6 +168,12 @@ final class ChatViewModel: ObservableObject {
         refreshPulse(now: now)
     }
 
+    func hear(_ text: String) {
+        let next = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard composerDraft != next else { return }
+        composerDraft = next
+    }
+
     func refreshPulse(now: Date = Date()) {
         let at = String(Int(now.timeIntervalSince1970))
         let last = messages.last(where: { $0.role == "user" })?.content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -171,11 +181,19 @@ final class ChatViewModel: ObservableObject {
         for seed in seeds {
             let payload: [Any] = seed == "0" ? [0, at, 3] : [seed, at, 3]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
-                  let value = try? NexusShuyuEngine.shared.invoke("余息", input: String(decoding: data, as: UTF8.self)),
+                  let value = try? NexusShuyuEngine.shared.invoke("回息", input: String(decoding: data, as: UTF8.self)),
                   let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
                   let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
             let origin = (object["种"] as? [String: Any])?["汉"] as? String ?? seed
-            pulseNote = origin == han ? "\(phase) · \(han)" : "\(phase) · \(origin) → \(han)"
+            let lastHan = ((object["迹"] as? [Any])?.last as? [String: Any])?["汉"] as? String ?? han
+            let echoed = (object["回"] as? NSNumber)?.boolValue ?? (object["回"] as? Bool ?? false)
+            if origin == han {
+                pulseNote = "\(phase) · \(han)"
+            } else if echoed, lastHan != han {
+                pulseNote = "\(phase) · \(origin) → \(lastHan) ↩ \(han)"
+            } else {
+                pulseNote = "\(phase) · \(origin) → \(han)"
+            }
             pulseWord = han
             return
         }
@@ -194,7 +212,10 @@ final class ChatViewModel: ObservableObject {
             refreshPulse()
             composerPrefill = "用枢语一息看现在："
         case .followUp:
-            composerPrefill = ""
+            let last = messages.last(where: { $0.role == "user" })?.content.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !last.isEmpty else { composerPrefill = ""; return }
+            let clipped = last.count > 24 ? String(last.prefix(24)) : last
+            composerPrefill = "接着「\(clipped)」："
         }
     }
 

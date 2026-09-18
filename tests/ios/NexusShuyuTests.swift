@@ -108,6 +108,12 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertEqual((trail?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
         let trailProgram = try NexusShuyuEngine.shared.compile("行：余息(\"1700000000\")")
         XCTAssertEqual(trailProgram.actions[0].arguments["operation"], "余息")
+        let echo = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("回息", input: #"[0,"1700000000",3]"#).utf8)) as? [String: Any]
+        XCTAssertEqual((echo?["步"] as? NSNumber)?.intValue, 3)
+        XCTAssertEqual((echo?["回"] as? NSNumber)?.boolValue, true)
+        XCTAssertEqual((echo?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
+        let echoProgram = try NexusShuyuEngine.shared.compile("行：回息(\"1700000000\")")
+        XCTAssertEqual(echoProgram.actions[0].arguments["operation"], "回息")
         tools.register(runner)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "clock" })
     }
@@ -119,6 +125,7 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertNotNil(vm.pulseNote)
         XCTAssertTrue(vm.pulseNote?.contains(" · ") == true)
         XCTAssertTrue(vm.pulseNote?.contains(" → ") == true)
+        XCTAssertTrue(vm.pulseNote?.contains("↩") == true)
         XCTAssertNotNil(vm.pulseWord)
         XCTAssertTrue(["在场", "该练"].contains(vm.currentMood))
         XCTAssertNotEqual(vm.currentMood, "就绪")

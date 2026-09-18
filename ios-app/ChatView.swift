@@ -90,7 +90,9 @@ struct ChatView: View {
         .onAppear {
             NexusShuyuEngine.shared.prepare()
             vm.awaken()
+            vm.hear(input)
         }
+        .onChange(of: input) { _, text in vm.hear(text) }
         .onChange(of: vm.composerPrefill) { _, text in
             guard let text else { return }
             input = text
@@ -269,15 +271,25 @@ struct PresenceStrip: View {
         .padding(12).background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
-        .opacity(snapshot.stance == "working" ? (on ? 1 : 0.72) : 1)
+        .opacity(breathing(snapshot.stance) ? (on ? 1 : 0.72) : 1)
         .accessibilityIdentifier("chat.presence")
         .onAppear { breathe(snapshot.stance) }
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
+    private func breathing(_ stance: String) -> Bool {
+        ["working", "listening", "settled", "echoing"].contains(stance)
+    }
     private func breathe(_ stance: String) {
-        guard stance == "working" else { on = false; return }
+        guard breathing(stance) else { on = false; return }
         on = false
-        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { on = true }
+        let duration: Double
+        switch stance {
+        case "working": duration = 0.9
+        case "listening": duration = 1.1
+        case "echoing": duration = 2.2
+        default: duration = 3.2
+        }
+        withAnimation(.easeInOut(duration: duration).repeatForever(autoreverses: true)) { on = true }
     }
 }
 

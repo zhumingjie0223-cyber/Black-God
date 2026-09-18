@@ -291,6 +291,25 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.trail(0, -1, 3)
 
+    def test_echo_rebounds_last_step_without_wrap(self):
+        walk = e.trail(0, 1700000000, 3)
+        rebound = e.echo(0, 1700000000, 3)
+        self.assertEqual(rebound["步"], 3)
+        self.assertEqual(len(rebound["迹"]), 3)
+        self.assertEqual(rebound["种"]["id"], 0)
+        self.assertEqual(rebound["轴"], walk["迹"][2]["轴"])
+        self.assertEqual(rebound["向"], -walk["迹"][2]["向"])
+        self.assertTrue(rebound["回"])
+        self.assertNotEqual(rebound["id"], walk["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay = e.echo(edge["汉"], 0, 2)
+        self.assertTrue(stay["回"])
+        self.assertNotEqual(stay["id"], edge["id"])
+        with self.assertRaises(ValueError):
+            e.echo(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.echo(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):
@@ -372,3 +391,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self._json_tail(out)["步"], 3)
         self.assertEqual(len(self._json_tail(out)["迹"]), 3)
+        rc, out = self.run_cli("--echo", "0", "--at", "1700000000", "--n", "3")
+        self.assertEqual(rc, 0)
+        self.assertTrue(self._json_tail(out)["回"])
+        self.assertEqual(self._json_tail(out)["步"], 3)

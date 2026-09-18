@@ -19,6 +19,7 @@ struct NexusShuyuView: View {
                     Button("查看「奥形凝起」的邻近词") { neighbors() }.accessibilityIdentifier("shuyu.near")
                     Button("看「奥形凝起」此刻一息") { pulse() }.accessibilityIdentifier("shuyu.pulse")
                     Button("看「奥形凝起」余息三格") { trail() }.accessibilityIdentifier("shuyu.trail")
+                    Button("看「奥形凝起」回息弹回") { echo() }.accessibilityIdentifier("shuyu.echo")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -96,6 +97,20 @@ struct NexusShuyuView: View {
             let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "余息 \(count.intValue) 格：\(names)"]
             verified = count.intValue == steps.count && (2...4).contains(count.intValue)
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func echo() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("回息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            let bounced = (object["回"] as? NSNumber)?.boolValue ?? (object["回"] as? Bool ?? false)
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "回息 \(count.intValue) 格\(bounced ? "弹回" : "")：\(names) ↩ \(han)"]
+            verified = bounced && count.intValue == steps.count
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }
     }

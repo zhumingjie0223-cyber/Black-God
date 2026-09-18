@@ -15,6 +15,7 @@
  *   near       五维 L1=1 邻近词（不环绕），编号空间不变
  *   pulse      一息：按显式 Unix 秒在一词上呼吸一格（不环绕、不读墙上时钟）
  *   trail      余息：从一词连续呼吸 2–4 格（每步 +60 秒，不环绕、不改容量）
+ *   echo       回息：余息走完后沿末步反向弹一格（不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -395,6 +396,34 @@ function trail(seed, at, n){
   };
 }
 
+// ══════ 回息：余息走完后沿末步反向弹一格；不环绕、不改编号空间 ══════
+function echo(seed, at, n){
+  const walk = trail(seed, at, n);
+  const last = walk.迹[walk.迹.length - 1];
+  const sizes = [NC, NM, NS, NK, NP];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const axis = AXIS_NAMES.indexOf(last.轴);
+  const rebound = keys.map(key => last.坐标[key]);
+  const back = -last.向;
+  const candidate = rebound[axis] + back;
+  let echoed = false;
+  if(candidate >= 0 && candidate < sizes[axis]){
+    rebound[axis] = candidate;
+    echoed = true;
+  }
+  const out = decode(idOf(...rebound));
+  return {
+    息: last.息,
+    种: walk.种,
+    步: walk.步,
+    迹: walk.迹,
+    回: echoed,
+    轴: last.轴,
+    向: back,
+    id: out.id, 词: out.词, 汉: out.汉, 义: out.义, 坐标: out.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -573,7 +602,9 @@ const mapping = Object.freeze({
   '一息': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
   'pulse': { tool: 'shuyu', keys: ['input'], preset: { operation: '一息' } },
   '余息': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } },
-  'trail': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } }
+  'trail': { tool: 'shuyu', keys: ['input'], preset: { operation: '余息' } },
+  '回息': { tool: 'shuyu', keys: ['input'], preset: { operation: '回息' } },
+  'echo': { tool: 'shuyu', keys: ['input'], preset: { operation: '回息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -688,6 +719,23 @@ function invoke(operation, input) {
         if(obj.n != null) n=obj.n;
       } else at=trimmed;
       return trail(seed, at, n);
+    }
+    case '回息': {
+      let seed=0, at=null, n=3;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('回息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else if(parts.length===2){ seed=parts[0]; at=parts[1]; }
+        else { seed=parts[0]; at=parts[1]; n=parts[2]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+        if(obj.n != null) n=obj.n;
+      } else at=trimmed;
+      return echo(seed, at, n);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

@@ -21,7 +21,7 @@
 - 可落盘分片，也可纯寻址零占用
 - 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
   compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
-- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格
+- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格；echo 沿末步反向弹回
 
 v4.1（2026-09）新能力：
 - encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
@@ -476,6 +476,33 @@ def trail(seed, at, n=3):
         "id": last["id"], "词": last["词"], "汉": last["汉"], "义": last["义"], "坐标": last["坐标"],
     }
 
+
+def echo(seed, at, n=3):
+    """回息：余息走完后沿末步反向弹一格，不环绕；与 lexicon.js echo 同构。"""
+    walk = trail(seed, at, n)
+    last = walk["迹"][-1]
+    sizes = (NC, NM, NS, NK, NP)
+    keys = ("c", "m", "s", "k", "p")
+    axis = _AXIS_NAMES.index(last["轴"])
+    rebound = [last["坐标"][k] for k in keys]
+    back = -last["向"]
+    candidate = rebound[axis] + back
+    echoed = False
+    if 0 <= candidate < sizes[axis]:
+        rebound[axis] = candidate
+        echoed = True
+    out = decode(_id_of(*rebound))
+    return {
+        "息": last["息"],
+        "种": walk["种"],
+        "步": walk["步"],
+        "迹": walk["迹"],
+        "回": echoed,
+        "轴": last["轴"],
+        "向": back,
+        "id": out["id"], "词": out["词"], "汉": out["汉"], "义": out["义"], "坐标": out["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -555,8 +582,9 @@ def main(argv=None):
     ap.add_argument("--near",default="",help="五维邻近词（L1=1，不环绕）")
     ap.add_argument("--pulse",default="",help="一息种子（编号或词，缺省为0）")
     ap.add_argument("--trail",nargs="?",const="",default=None,help="余息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息步数，2至4")
+    ap.add_argument("--echo",nargs="?",const="",default=None,help="回息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -591,6 +619,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.echo is not None and a.at >= 0:
+        try:
+            out(echo(a.echo, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return

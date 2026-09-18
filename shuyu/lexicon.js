@@ -12,6 +12,7 @@
  *   near       五维 L1=1 邻近词（不环绕），编号空间不变
  *   pulse      一息：按显式 Unix 秒在一词上呼吸一格（不环绕、不读墙上时钟）
  *   trail      余息：从一词连续呼吸 2–4 格（每步 +60 秒，不环绕、不改容量）
+ *   echo       回息：余息走完后沿末步反向弹一格（不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -392,6 +393,34 @@ export function trail(seed, at, n){
   };
 }
 
+// ══════ 回息：余息走完后沿末步反向弹一格；不环绕、不改编号空间 ══════
+export function echo(seed, at, n){
+  const walk = trail(seed, at, n);
+  const last = walk.迹[walk.迹.length - 1];
+  const sizes = [NC, NM, NS, NK, NP];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const axis = AXIS_NAMES.indexOf(last.轴);
+  const rebound = keys.map(key => last.坐标[key]);
+  const back = -last.向;
+  const candidate = rebound[axis] + back;
+  let echoed = false;
+  if(candidate >= 0 && candidate < sizes[axis]){
+    rebound[axis] = candidate;
+    echoed = true;
+  }
+  const out = decode(idOf(...rebound));
+  return {
+    息: last.息,
+    种: walk.种,
+    步: walk.步,
+    迹: walk.迹,
+    回: echoed,
+    轴: last.轴,
+    向: back,
+    id: out.id, 词: out.词, 汉: out.汉, 义: out.义, 坐标: out.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -552,4 +581,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
