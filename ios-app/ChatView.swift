@@ -284,18 +284,20 @@ struct PresenceStrip: View {
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
     private func breathing(_ stance: String) -> Bool {
-        ["working", "listening", "hitching", "holding", "watching", "noticing", "settled", "echoing"].contains(stance)
+        ["working", "speaking", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing"].contains(stance)
     }
     private func leaning(_ stance: String) -> Bool {
-        ["hitching", "watching", "noticing"].contains(stance)
+        ["speaking", "hitching", "retracting", "watching", "noticing"].contains(stance)
     }
     private func breathe(_ stance: String) {
         guard breathing(stance) else { on = false; return }
         on = false
         let duration: Double
         switch stance {
+        case "speaking": duration = 0.7
         case "working": duration = 0.9
         case "listening": duration = 1.1
+        case "retracting": duration = 1.3
         case "hitching": duration = 1.5
         case "watching": duration = 1.4
         case "noticing": duration = 1.8

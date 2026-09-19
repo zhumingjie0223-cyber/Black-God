@@ -24,6 +24,20 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(snap.thread, "算账")
     }
 
+    func testSpeakingSurfacesLiveSpeech() {
+        let snap = NexusPresence.snapshot(
+            isTyping: true, canResume: false, resumeGoal: "算账",
+            practiceDue: false, practiceRunning: false, lastUser: "算账",
+            liveStatus: "正在调用计算", liveSpeech: "先列出科目", pulseNote: nil
+        )
+        XCTAssertEqual(snap.mood, "开口")
+        XCTAssertEqual(snap.stance, "speaking")
+        XCTAssertEqual(snap.nextWork, "先列出科目")
+        XCTAssertEqual(snap.thread, "算账")
+        XCTAssertEqual(snap.breath, 0.7)
+        XCTAssertEqual(snap.action, .none)
+    }
+
     func testUnfinishedTaskBeatsPracticeAndHistory() {
         let snap = NexusPresence.snapshot(
             isTyping: false, canResume: true, resumeGoal: "把账单拆成三步",
@@ -205,9 +219,10 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(vm.presence.mood, "在听")
         XCTAssertEqual(vm.presence.nextWork, "你正在说")
         vm.hear("")
-        XCTAssertEqual(vm.presence.mood, "看着")
+        XCTAssertEqual(vm.presence.mood, "收笔")
+        XCTAssertEqual(vm.presence.nextWork, "你收回去了")
         vm.attend(false)
-        XCTAssertTrue(["在场", "该练"].contains(vm.presence.mood))
+        XCTAssertEqual(vm.presence.mood, "收笔")
     }
 
     func testAttendingEmptyIsWatching() {
@@ -336,5 +351,72 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(vm.presence.nextWork, "等你写完")
         vm.attend(false, now: t0.addingTimeInterval(3))
         XCTAssertEqual(vm.presence.mood, "惦记")
+    }
+
+    func testClearedDraftRetractsThenWatches() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let retract = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(1),
+            attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(retract.mood, "收笔")
+        XCTAssertEqual(retract.stance, "retracting")
+        XCTAssertEqual(retract.nextWork, "你收回去了")
+        XCTAssertEqual(retract.action, .none)
+        XCTAssertEqual(retract.breath, 1.3)
+        let watching = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(5),
+            attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(watching.mood, "看着")
+        let unfinished = NexusPresence.snapshot(
+            isTyping: false, canResume: true, resumeGoal: "未完成",
+            practiceDue: false, practiceRunning: false, lastUser: "未完成",
+            now: t0.addingTimeInterval(1), retractedAt: t0, pulseNote: nil
+        )
+        XCTAssertEqual(unfinished.mood, "可续")
+        let typing = NexusPresence.snapshot(
+            isTyping: true, canResume: false, resumeGoal: "算账",
+            practiceDue: false, practiceRunning: false, lastUser: "算账",
+            now: t0.addingTimeInterval(1), retractedAt: t0, pulseNote: nil
+        )
+        XCTAssertEqual(typing.mood, "处理中")
+    }
+
+    @MainActor
+    func testHearClearRetractsWithoutSending() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in false })
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        vm.hear("接着问", now: t0)
+        vm.attend(true, now: t0)
+        vm.hear("", now: t0.addingTimeInterval(1))
+        XCTAssertEqual(vm.presence.mood, "收笔")
+        XCTAssertEqual(vm.presence.nextWork, "你收回去了")
+        vm.awaken(now: t0.addingTimeInterval(6))
+        XCTAssertEqual(vm.presence.mood, "看着")
+    }
+
+    @MainActor
+    func testSpeakingFollowsLiveOutput() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("chat.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in true }, completion: { _, _ in
+            try await Task.sleep(for: .seconds(5))
+            return "不该出现"
+        })
+        vm.send("先说")
+        await Task.yield()
+        XCTAssertEqual(vm.presence.mood, "处理中")
+        vm.live.append(.output, "先列出科目")
+        XCTAssertEqual(vm.presence.mood, "开口")
+        XCTAssertEqual(vm.presence.nextWork, "先列出科目")
+        vm.cancel()
+        XCTAssertEqual(vm.presence.mood, "可续")
     }
 }

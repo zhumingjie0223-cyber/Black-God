@@ -14,12 +14,13 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：空着会看，写着会顿，草稿还惦记，回来还在，说话时在听，刚歇会褪，停了还在，不自动扩权。
+/// 打开就要在场：空着会看，写着会顿，草稿还惦记，收回去会收笔，开口会说，回来还在，说话时在听，刚歇会褪，停了还在，不自动扩权。
 enum NexusPresence {
     static let afterglow: TimeInterval = 180
     static let echoFade: TimeInterval = 900
     static let noticeHold: TimeInterval = 12
     static let hitchHold: TimeInterval = 1.6
+    static let retractHold: TimeInterval = 4
 
     static func snapshot(
         isTyping: Bool,
@@ -30,6 +31,7 @@ enum NexusPresence {
         lastUser: String?,
         lastReply: String? = nil,
         liveStatus: String? = nil,
+        liveSpeech: String? = nil,
         answered: Bool = false,
         answeredAt: Date? = nil,
         now: Date = Date(),
@@ -37,9 +39,17 @@ enum NexusPresence {
         attending: Bool = false,
         heardAt: Date? = nil,
         noticedAt: Date? = nil,
+        retractedAt: Date? = nil,
         pulseNote: String?
     ) -> NexusPresenceSnapshot {
         if isTyping {
+            let spoken = clip(liveSpeech)
+            if !spoken.isEmpty {
+                return NexusPresenceSnapshot(
+                    mood: "开口", stance: "speaking", thread: clip(resumeGoal ?? lastUser),
+                    nextWork: spoken, actionTitle: "", action: .none, breath: 0.7
+                )
+            }
             let step = clip(liveStatus)
             return NexusPresenceSnapshot(
                 mood: "处理中", stance: "working", thread: clip(resumeGoal ?? lastUser),
@@ -71,6 +81,15 @@ enum NexusPresence {
                 mood: "惦记", stance: "holding", thread: spoken,
                 nextWork: "你写到这儿了", actionTitle: "", action: .none, breath: 2.0
             )
+        }
+        if let retracted = retractedAt {
+            let ago = now.timeIntervalSince(retracted)
+            if ago >= 0, ago < retractHold {
+                return NexusPresenceSnapshot(
+                    mood: "收笔", stance: "retracting", thread: clip(pulseNote ?? lastReply ?? lastUser),
+                    nextWork: "你收回去了", actionTitle: "", action: .none, breath: 1.3
+                )
+            }
         }
         if attending {
             return NexusPresenceSnapshot(
