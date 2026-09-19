@@ -266,7 +266,7 @@ final class ChatViewModel: ObservableObject {
             guard !Task.isCancelled, let self else { return }
             self.presenceTick = Date()
             try? await Task.sleep(for: .seconds(NexusPresence.waitHold))
-            guard !Task.isCancelled, let self else { return }
+            guard !Task.isCancelled else { return }
             self.presenceTick = Date()
         }
     }
