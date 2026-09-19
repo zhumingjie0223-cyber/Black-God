@@ -46,6 +46,7 @@ final class ChatViewModel: ObservableObject {
     private var hitchTask: Task<Void, Never>?
     private var retractedAt: Date?
     private var retractedDraft = ""
+    private var keptDraft = ""
     private var retractTask: Task<Void, Never>?
     private var settleTask: Task<Void, Never>?
 
@@ -216,7 +217,7 @@ final class ChatViewModel: ObservableObject {
         if next.isEmpty {
             heardAt = nil
             if hadDraft, !isTyping {
-                retractedDraft = previous
+                retractedDraft = keptDraft.isEmpty ? previous : keptDraft
                 retractedAt = now
                 scheduleRetract()
             } else {
@@ -225,6 +226,9 @@ final class ChatViewModel: ObservableObject {
                 retractTask?.cancel()
             }
         } else {
+            if next.count >= previous.count || !previous.hasPrefix(next) {
+                keptDraft = next
+            }
             retractedAt = nil
             retractedDraft = ""
             retractTask?.cancel()
@@ -364,6 +368,8 @@ final class ChatViewModel: ObservableObject {
         lastError = nil
         statusHint = "正在思考…"
         settleTask?.cancel()
+        keptDraft = ""
+        retractedDraft = ""
         cognitive.continuity.begin(run: id, goal: prompt, redacting: key)
         live.begin(goal: prompt, redacting: key)
         runtime.begin(prompt: prompt)

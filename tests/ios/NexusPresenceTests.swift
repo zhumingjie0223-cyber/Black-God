@@ -427,6 +427,8 @@ final class NexusPresenceTests: XCTestCase {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         vm.hear("接着问", now: t0)
         vm.attend(true, now: t0)
+        vm.hear("接着", now: t0.addingTimeInterval(0.4))
+        vm.hear("接", now: t0.addingTimeInterval(0.8))
         vm.hear("", now: t0.addingTimeInterval(1))
         XCTAssertEqual(vm.presence.mood, "收笔")
         XCTAssertEqual(vm.presence.nextWork, "你收回去了")
