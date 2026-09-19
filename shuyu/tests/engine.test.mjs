@@ -658,6 +658,51 @@ test('gaze 顾息: 转头后再沿转轴把目光探一格，不环绕，与 Pyt
   assert.throws(() => engine.gaze(0, -1, 3), RangeError);
 });
 
+test('incline 倾息: 望出去后再沿望轴倾近一格，不环绕，与 Python 同构', () => {
+  const air = engine.incline(0, 0, 3);
+  const gazed = engine.gaze(0, 60, 3);
+  const leaned = engine.incline(0, 60, 3);
+  const held = engine.incline(0, 3840, 3);
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  assert.equal(air.倾, false);
+  assert.equal(air.顾, false);
+  assert.equal(air.id, engine.gaze(0, 0, 3).id);
+  assert.equal(air.顾处.id, air.id);
+  assert.equal(leaned.顾, gazed.顾);
+  assert.equal(leaned.顾处.id, gazed.id);
+  if (gazed.顾 && Math.floor(60 / 3840) % 2 === 0) {
+    assert.equal(leaned.倾, true);
+    const axis = ['核', '映', '态', '标', '相'].indexOf(gazed.轴);
+    const sizes = [1040, 180, 80, 64, 8];
+    const next = gazed.坐标[keys[axis]] + gazed.向;
+    if (next >= 0 && next < sizes[axis]) {
+      assert.notEqual(leaned.id, gazed.id);
+      assert.equal(leaned.坐标[keys[axis]], next);
+      assert.equal(leaned.轴, gazed.轴);
+    } else {
+      assert.equal(leaned.id, gazed.id);
+    }
+  } else {
+    assert.equal(leaned.倾, false);
+    assert.equal(leaned.id, gazed.id);
+  }
+  assert.equal(held.顾, engine.gaze(0, 3840, 3).顾);
+  assert.equal(held.倾, false);
+  assert.equal(held.id, engine.gaze(0, 3840, 3).id);
+  const pyAir = py('print(json.dumps(e.incline(arg[0], arg[1], arg[2]), ensure_ascii=False))', [0, 0, 3]);
+  assert.deepEqual(air, pyAir);
+  const samples = [[0, 0, 2], ['奥形凝起', 28800, 4], [7, 61200, 3], [0, 3840, 3], [0, 1700000000, 3]];
+  const pyHits = py('print(json.dumps([e.incline(*t) for t in arg], ensure_ascii=False))', samples);
+  samples.forEach((t, i) => assert.deepEqual(engine.incline(...t), pyHits[i], `incline(${JSON.stringify(t)}) 分叉`));
+  const edge = engine.decode(CAP_EXPECTED - 1);
+  const stayAir = engine.incline(edge.汉, 0, 2);
+  assert.equal(stayAir.倾, false);
+  const stayDown = engine.incline(edge.汉, 60, 2);
+  assert.equal(stayDown.顾处.id, engine.gaze(edge.汉, 60, 2).id);
+  assert.throws(() => engine.incline(0, 1700000000, 1), RangeError);
+  assert.throws(() => engine.incline(0, -1, 3), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);

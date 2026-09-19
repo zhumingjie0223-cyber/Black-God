@@ -721,6 +721,52 @@ def gaze(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def incline(seed, at, n=3):
+    """倾息：望出去后再沿望轴倾近一格，未顾不倾，六十四分钟窗才倾，越界停在望处；与 lexicon.js incline 同构。"""
+    gazed = gaze(seed, at, n)
+    last = gazed["迹"][-1]
+    if isinstance(at, str):
+        t = int(at)
+    else:
+        t = int(at)
+    look = _compact_pose(gazed, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": gazed["轴"], "向": gazed["向"], "动": gazed["顾"]})
+    keys = ("c", "m", "s", "k", "p")
+    pose = look
+    inclining = False
+    if gazed["顾"] and (t // 3840) % 2 == 0:
+        inclining = True
+        sizes = [NC, NM, NS, NK, NP]
+        axis = _AXIS_NAMES.index(gazed["轴"])
+        coord = [gazed["坐标"][key] for key in keys]
+        nxt = coord[axis] + gazed["向"]
+        if 0 <= nxt < sizes[axis]:
+            coord[axis] = nxt
+            pose = _compact_pose(decode(_id_of(*coord)), {"息": last["息"], "时": last["时"], "分": last["分"], "轴": gazed["轴"], "向": gazed["向"], "动": True})
+    return {
+        "息": gazed["息"],
+        "种": gazed["种"],
+        "步": gazed["步"],
+        "迹": gazed["迹"],
+        "回": gazed["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": gazed["落"],
+        "侧": gazed["侧"],
+        "着": gazed["着"],
+        "起": gazed["起"],
+        "由": gazed["由"],
+        "起处": gazed["起处"],
+        "栖": gazed["栖"],
+        "栖处": gazed["栖处"],
+        "转": gazed["转"],
+        "转处": gazed["转处"],
+        "顾": gazed["顾"],
+        "顾处": look,
+        "倾": inclining,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -807,8 +853,9 @@ def main(argv=None):
     ap.add_argument("--perch",nargs="?",const="",default=None,help="栖息种子（编号或词，缺省为0）")
     ap.add_argument("--turn",nargs="?",const="",default=None,help="转息种子（编号或词，缺省为0）")
     ap.add_argument("--gaze",nargs="?",const="",default=None,help="顾息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息步数，2至4")
+    ap.add_argument("--incline",nargs="?",const="",default=None,help="倾息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -843,6 +890,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.incline is not None and a.at >= 0:
+        try:
+            out(incline(a.incline, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return
