@@ -411,6 +411,35 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.perch(0, -1, 3)
 
+    def test_turn_looks_aside_without_wrap(self):
+        air = e.turn(0, 0, 3)
+        nested = e.perch(0, 60, 3)
+        looked = e.turn(0, 60, 3)
+        sides = [word for word in e.near(nested["id"], 16) if word["轴"] != nested["轴"]]
+        self.assertFalse(air["转"])
+        self.assertFalse(air["栖"])
+        self.assertEqual(air["id"], e.perch(0, 0, 3)["id"])
+        self.assertEqual(air["栖处"]["id"], air["id"])
+        self.assertTrue(looked["栖"])
+        self.assertEqual(looked["栖处"]["id"], nested["id"])
+        if sides:
+            self.assertTrue(looked["转"])
+            self.assertEqual(looked["id"], sides[(60 // 960) % len(sides)]["id"])
+            self.assertNotEqual(looked["轴"], nested["轴"])
+        else:
+            self.assertFalse(looked["转"])
+            self.assertEqual(looked["id"], nested["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay_air = e.turn(edge["汉"], 0, 2)
+        self.assertFalse(stay_air["转"])
+        stay_down = e.turn(edge["汉"], 60, 2)
+        self.assertTrue(stay_down["栖"])
+        self.assertEqual(stay_down["栖处"]["id"], e.perch(edge["汉"], 60, 2)["id"])
+        with self.assertRaises(ValueError):
+            e.turn(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.turn(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):

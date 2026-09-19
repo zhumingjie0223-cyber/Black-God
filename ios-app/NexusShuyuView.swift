@@ -33,6 +33,7 @@ struct NexusShuyuView: View {
                             .accessibilityIdentifier("shuyu.verified")
                         Button("看「奥形凝起」起息起身") { stir() }.accessibilityIdentifier("shuyu.stir")
                         Button("看「奥形凝起」栖息再蹲") { perch() }.accessibilityIdentifier("shuyu.perch")
+                        Button("看「奥形凝起」转息转头") { turn() }.accessibilityIdentifier("shuyu.turn")
                     }.textSelection(.enabled)
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
@@ -173,6 +174,21 @@ struct NexusShuyuView: View {
             let nested = (object["栖"] as? NSNumber)?.boolValue ?? (object["栖"] as? Bool ?? false)
             let rise = (object["起处"] as? [String: Any])?["汉"] as? String ?? han
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "栖息 \(count.intValue) 格\(nested ? "蹲住" : "未栖")：\(names) ↘ \(rise)"]
+            verified = count.intValue == steps.count
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func turn() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("转息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            let turned = (object["转"] as? NSNumber)?.boolValue ?? (object["转"] as? Bool ?? false)
+            let nest = (object["栖处"] as? [String: Any])?["汉"] as? String ?? han
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "转息 \(count.intValue) 格\(turned ? "转头" : "未转")：\(names) ↷ \(nest)"]
             verified = count.intValue == steps.count
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }

@@ -28,6 +28,8 @@ _MAPPING = {
     'stir': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '起息'}},
     '栖息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '栖息'}},
     'perch': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '栖息'}},
+    '转息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '转息'}},
+    'turn': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '转息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:

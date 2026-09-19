@@ -13,7 +13,7 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.chip.pulse"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["chat.presence"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["chat.breath"].exists)
-        XCTAssertTrue(["在场", "该练", "可续", "处理中", "开口", "刚歇", "在听", "余韵", "看着", "还在", "顿笔", "惦记", "收笔", "落定"].contains(app.staticTexts["chat.mood"].label))
+        XCTAssertTrue(["在场", "该练", "可续", "处理中", "开口", "刚歇", "在听", "余韵", "看着", "还在", "顿笔", "惦记", "收笔", "落定", "应声", "衔着"].contains(app.staticTexts["chat.mood"].label))
         let field = app.descendants(matching: .any)["chat.input"]
         XCTAssertTrue(field.waitForExistence(timeout: 4))
         field.tap()
@@ -245,6 +245,10 @@ final class BlackGodUITests: XCTestCase {
         let perch = app.buttons["shuyu.perch"]
         reveal(perch, in: app)
         perch.tap()
+        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        let turn = app.buttons["shuyu.turn"]
+        reveal(turn, in: app)
+        turn.tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.buttons["完成"].tap()
