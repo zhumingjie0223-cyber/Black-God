@@ -14,7 +14,7 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：空着会看，写着会顿，草稿还惦记，收回去会收笔还能还给你，开口会说，说完会落定，回来还在，刚接话会应声，落定后还衔着刚才，说话时在听，刚歇会褪，停了还在，不自动扩权。
+/// 打开就要在场：空着会看，写着会顿，草稿还惦记，收回去会收笔还能还给你，开口会说，说完会落定再等下文，回来还在，刚接话会应声，落定后还衔着刚才，接着写会跟上，说话时在听，刚歇会褪，停了还在，不自动扩权。
 enum NexusPresence {
     static let afterglow: TimeInterval = 180
     static let echoFade: TimeInterval = 900
@@ -22,6 +22,7 @@ enum NexusPresence {
     static let hitchHold: TimeInterval = 1.6
     static let retractHold: TimeInterval = 4
     static let settleHold: TimeInterval = 6
+    static let waitHold: TimeInterval = 8
     static let hearHold: TimeInterval = 0.8
 
     static func snapshot(
@@ -82,6 +83,15 @@ enum NexusPresence {
                         mood: "顿笔", stance: "hitching", thread: spoken,
                         nextWork: "等你写完", actionTitle: "", action: .none, breath: 1.5
                     )
+                }
+                if answered {
+                    let age = answeredAt.map { now.timeIntervalSince($0) }
+                    if age == nil || age! < echoFade {
+                        return NexusPresenceSnapshot(
+                            mood: "跟上", stance: "following", thread: spoken,
+                            nextWork: "你接着说", actionTitle: "", action: .none, breath: 1.05
+                        )
+                    }
                 }
                 return NexusPresenceSnapshot(
                     mood: "在听", stance: "listening", thread: spoken,
@@ -149,6 +159,14 @@ enum NexusPresence {
         }
         if answered {
             let age = answeredAt.map { now.timeIntervalSince($0) }
+            if age != nil, age! >= settleHold, age! < settleHold + waitHold {
+                let spoken = clip(lastReply)
+                return NexusPresenceSnapshot(
+                    mood: "等下文", stance: "awaiting", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
+                    nextWork: "还等你接下句",
+                    actionTitle: "接着问", action: .followUp, breath: 1.6
+                )
+            }
             if age == nil || age! < afterglow {
                 return NexusPresenceSnapshot(
                     mood: "刚歇", stance: "settled", thread: clip(lastReply ?? resumeGoal ?? lastUser),

@@ -617,6 +617,47 @@ test('turn 转息: 栖息后再朝侧邻转头，不环绕，与 Python 同构',
   assert.throws(() => engine.turn(0, -1, 3), RangeError);
 });
 
+test('gaze 顾息: 转头后再沿转轴把目光探一格，不环绕，与 Python 同构', () => {
+  const air = engine.gaze(0, 0, 3);
+  const looked = engine.turn(0, 60, 3);
+  const gazed = engine.gaze(0, 60, 3);
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  assert.equal(air.顾, false);
+  assert.equal(air.转, false);
+  assert.equal(air.id, engine.turn(0, 0, 3).id);
+  assert.equal(air.转处.id, air.id);
+  assert.equal(gazed.转, looked.转);
+  assert.equal(gazed.转处.id, looked.id);
+  if (looked.转 && Math.floor(60 / 1920) % 2 === 0) {
+    assert.equal(gazed.顾, true);
+    const axis = ['核', '映', '态', '标', '相'].indexOf(looked.轴);
+    const sizes = [1040, 180, 80, 64, 8];
+    const next = looked.坐标[keys[axis]] + looked.向;
+    if (next >= 0 && next < sizes[axis]) {
+      assert.notEqual(gazed.id, looked.id);
+      assert.equal(gazed.坐标[keys[axis]], next);
+      assert.equal(gazed.轴, looked.轴);
+    } else {
+      assert.equal(gazed.id, looked.id);
+    }
+  } else {
+    assert.equal(gazed.顾, false);
+    assert.equal(gazed.id, looked.id);
+  }
+  const pyAir = py('print(json.dumps(e.gaze(arg[0], arg[1], arg[2]), ensure_ascii=False))', [0, 0, 3]);
+  assert.deepEqual(air, pyAir);
+  const samples = [[0, 0, 2], ['奥形凝起', 28800, 4], [7, 61200, 3], [0, 1700000000, 3]];
+  const pyHits = py('print(json.dumps([e.gaze(*t) for t in arg], ensure_ascii=False))', samples);
+  samples.forEach((t, i) => assert.deepEqual(engine.gaze(...t), pyHits[i], `gaze(${JSON.stringify(t)}) 分叉`));
+  const edge = engine.decode(CAP_EXPECTED - 1);
+  const stayAir = engine.gaze(edge.汉, 0, 2);
+  assert.equal(stayAir.顾, false);
+  const stayDown = engine.gaze(edge.汉, 60, 2);
+  assert.equal(stayDown.转处.id, engine.turn(edge.汉, 60, 2).id);
+  assert.throws(() => engine.gaze(0, 1700000000, 1), RangeError);
+  assert.throws(() => engine.gaze(0, -1, 3), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);

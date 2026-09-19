@@ -265,6 +265,9 @@ final class ChatViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(NexusPresence.settleHold))
             guard !Task.isCancelled, let self else { return }
             self.presenceTick = Date()
+            try? await Task.sleep(for: .seconds(NexusPresence.waitHold))
+            guard !Task.isCancelled else { return }
+            self.presenceTick = Date()
         }
     }
 
@@ -284,7 +287,7 @@ final class ChatViewModel: ObservableObject {
         for seed in seeds {
             let payload: [Any] = seed == "0" ? [0, at, 3] : [seed, at, 3]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
-                  let value = try? NexusShuyuEngine.shared.invoke("转息", input: String(decoding: data, as: UTF8.self)),
+                  let value = try? NexusShuyuEngine.shared.invoke("顾息", input: String(decoding: data, as: UTF8.self)),
                   let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
                   let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
             let origin = (object["种"] as? [String: Any])?["汉"] as? String ?? seed
@@ -294,14 +297,19 @@ final class ChatViewModel: ObservableObject {
             let risen = (object["起"] as? NSNumber)?.boolValue ?? (object["起"] as? Bool ?? false)
             let nested = (object["栖"] as? NSNumber)?.boolValue ?? (object["栖"] as? Bool ?? false)
             let turned = (object["转"] as? NSNumber)?.boolValue ?? (object["转"] as? Bool ?? false)
+            let gazed = (object["顾"] as? NSNumber)?.boolValue ?? (object["顾"] as? Bool ?? false)
             let side = (object["侧"] as? NSNumber)?.intValue ?? 0
             let ground = (object["着"] as? [String: Any])?["汉"] as? String
             let fromHan = (object["由"] as? [String: Any])?["汉"] as? String
             let riseHan = (object["起处"] as? [String: Any])?["汉"] as? String
             let nestHan = (object["栖处"] as? [String: Any])?["汉"] as? String
+            let faceHan = (object["转处"] as? [String: Any])?["汉"] as? String
             let restHan = (!landed && side == 1) ? (ground ?? han) : han
             let leanHan = (!landed && side == 1) ? han : (ground ?? lastHan)
-            if turned, let nestHan, nestHan != han {
+            if gazed, let faceHan, faceHan != han {
+                pulseNote = "\(phase) · \(origin) → \(faceHan) ⊙ \(han)"
+                pulseWord = han
+            } else if turned, let nestHan, nestHan != han {
                 pulseNote = "\(phase) · \(origin) → \(nestHan) ↷ \(han)"
                 pulseWord = han
             } else if nested, let riseHan, riseHan != han {

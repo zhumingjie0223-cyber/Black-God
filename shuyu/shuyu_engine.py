@@ -677,6 +677,50 @@ def turn(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def gaze(seed, at, n=3):
+    """顾息：转头后再沿转轴把目光探一格，未转不顾，三十二分钟窗才探，越界停在转处；与 lexicon.js gaze 同构。"""
+    looked = turn(seed, at, n)
+    last = looked["迹"][-1]
+    if isinstance(at, str):
+        t = int(at)
+    else:
+        t = int(at)
+    face = _compact_pose(looked, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": looked["轴"], "向": looked["向"], "动": looked["转"]})
+    keys = ("c", "m", "s", "k", "p")
+    pose = face
+    gazing = False
+    if looked["转"] and (t // 1920) % 2 == 0:
+        gazing = True
+        sizes = [NC, NM, NS, NK, NP]
+        axis = _AXIS_NAMES.index(looked["轴"])
+        coord = [looked["坐标"][key] for key in keys]
+        nxt = coord[axis] + looked["向"]
+        if 0 <= nxt < sizes[axis]:
+            coord[axis] = nxt
+            pose = _compact_pose(decode(_id_of(*coord)), {"息": last["息"], "时": last["时"], "分": last["分"], "轴": looked["轴"], "向": looked["向"], "动": True})
+    return {
+        "息": looked["息"],
+        "种": looked["种"],
+        "步": looked["步"],
+        "迹": looked["迹"],
+        "回": looked["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": looked["落"],
+        "侧": looked["侧"],
+        "着": looked["着"],
+        "起": looked["起"],
+        "由": looked["由"],
+        "起处": looked["起处"],
+        "栖": looked["栖"],
+        "栖处": looked["栖处"],
+        "转": looked["转"],
+        "转处": face,
+        "顾": gazing,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -762,8 +806,9 @@ def main(argv=None):
     ap.add_argument("--stir",nargs="?",const="",default=None,help="起息种子（编号或词，缺省为0）")
     ap.add_argument("--perch",nargs="?",const="",default=None,help="栖息种子（编号或词，缺省为0）")
     ap.add_argument("--turn",nargs="?",const="",default=None,help="转息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息步数，2至4")
+    ap.add_argument("--gaze",nargs="?",const="",default=None,help="顾息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -798,6 +843,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.gaze is not None and a.at >= 0:
+        try:
+            out(gaze(a.gaze, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return
