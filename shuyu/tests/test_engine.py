@@ -379,6 +379,38 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.stir(0, -1, 3)
 
+    def test_perch_nests_without_wrap(self):
+        air = e.perch(0, 0, 3)
+        rose = e.stir(0, 60, 3)
+        nested = e.perch(0, 60, 3)
+        sizes = (e.NC, e.NM, e.NS, e.NK, e.NP)
+        keys = ("c", "m", "s", "k", "p")
+        axis = e._AXIS_NAMES.index(rose["轴"])
+        coord = [rose["坐标"][k] for k in keys]
+        nxt = coord[axis] + rose["向"]
+        self.assertFalse(air["栖"])
+        self.assertFalse(air["起"])
+        self.assertEqual(air["id"], e.stir(0, 0, 3)["id"])
+        self.assertEqual(air["起处"]["id"], air["id"])
+        self.assertTrue(nested["栖"])
+        self.assertTrue(nested["起"])
+        self.assertEqual(nested["起处"]["id"], rose["id"])
+        if 0 <= nxt < sizes[axis]:
+            self.assertNotEqual(nested["id"], rose["id"])
+            self.assertEqual(nested["坐标"][keys[axis]], nxt)
+        else:
+            self.assertEqual(nested["id"], rose["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay_air = e.perch(edge["汉"], 0, 2)
+        self.assertFalse(stay_air["栖"])
+        stay_down = e.perch(edge["汉"], 60, 2)
+        self.assertTrue(stay_down["栖"])
+        self.assertEqual(stay_down["起处"]["id"], e.stir(edge["汉"], 60, 2)["id"])
+        with self.assertRaises(ValueError):
+            e.perch(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.perch(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):

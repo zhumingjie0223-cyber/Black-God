@@ -90,13 +90,24 @@ final class NexusPresenceTests: XCTestCase {
             practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
             lastReply: "结果是 36", answered: true, pulseNote: "夜 · 奥形凝起"
         )
-        XCTAssertEqual(snap.mood, "刚歇")
+        XCTAssertEqual(snap.mood, "落定")
+        XCTAssertEqual(snap.stance, "exhaling")
         XCTAssertEqual(snap.action, .followUp)
         XCTAssertEqual(snap.actionTitle, "接着问")
         XCTAssertEqual(snap.thread, "结果是 36")
-        XCTAssertEqual(snap.nextWork, "还在 · 夜 · 奥形凝起")
-        XCTAssertEqual(snap.breath, 3.2)
+        XCTAssertEqual(snap.nextWork, "刚说到这儿")
+        XCTAssertEqual(snap.breath, 1.0)
         XCTAssertNotEqual(snap.mood, "就绪")
+        let answeredAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let rest = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(7), pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(rest.mood, "刚歇")
+        XCTAssertEqual(rest.nextWork, "还在 · 夜 · 奥形凝起")
+        XCTAssertEqual(rest.breath, 3.2)
     }
 
     func testUnfinishedBeatsAfterglow() {
@@ -170,7 +181,7 @@ final class NexusPresenceTests: XCTestCase {
             practiceDue: true, practiceRunning: false, lastUser: "算 12*3",
             lastReply: "结果是 36", answered: true, pulseNote: nil
         )
-        XCTAssertEqual(snap.mood, "刚歇")
+        XCTAssertEqual(snap.mood, "落定")
         XCTAssertEqual(snap.action, .followUp)
     }
 
@@ -200,7 +211,7 @@ final class NexusPresenceTests: XCTestCase {
         let vm = ChatViewModel(store: NexusConversationStore(url: url), configured: { _ in true }, completion: { _, _ in "先列出科目" })
         vm.send("把账单拆成三步")
         for _ in 0..<100 where vm.isTyping { try await Task.sleep(for: .milliseconds(10)) }
-        XCTAssertEqual(vm.presence.mood, "刚歇")
+        XCTAssertEqual(vm.presence.mood, "落定")
         vm.actOnPresence()
         XCTAssertEqual(vm.composerPrefill, "接着「把账单拆成三步」：")
     }
@@ -226,10 +237,12 @@ final class NexusPresenceTests: XCTestCase {
     }
 
     func testAttendingEmptyIsWatching() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let snap = NexusPresence.snapshot(
             isTyping: false, canResume: false, resumeGoal: nil,
             practiceDue: true, practiceRunning: false, lastUser: "上次",
-            lastReply: "刚答完", answered: true, attending: true, pulseNote: "夜 · 奥形凝起"
+            lastReply: "刚答完", answered: true, answeredAt: t0,
+            now: t0.addingTimeInterval(10), attending: true, pulseNote: "夜 · 奥形凝起"
         )
         XCTAssertEqual(snap.mood, "看着")
         XCTAssertEqual(snap.stance, "watching")
@@ -257,11 +270,20 @@ final class NexusPresenceTests: XCTestCase {
             now: answeredAt.addingTimeInterval(4), noticedAt: answeredAt.addingTimeInterval(3),
             pulseNote: "夜 · 奥形凝起"
         )
-        XCTAssertEqual(back.mood, "还在")
-        XCTAssertEqual(back.stance, "noticing")
-        XCTAssertEqual(back.nextWork, "你回来了 · 夜 · 奥形凝起")
+        XCTAssertEqual(back.mood, "落定")
+        XCTAssertEqual(back.stance, "exhaling")
+        XCTAssertEqual(back.nextWork, "刚说到这儿")
         XCTAssertEqual(back.action, .followUp)
-        XCTAssertEqual(back.breath, 1.8)
+        XCTAssertEqual(back.breath, 1.0)
+        let notice = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: true, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(10), noticedAt: answeredAt.addingTimeInterval(9),
+            pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(notice.mood, "还在")
+        XCTAssertEqual(notice.nextWork, "你回来了 · 夜 · 奥形凝起")
         let unfinished = NexusPresence.snapshot(
             isTyping: false, canResume: true, resumeGoal: "未完成",
             practiceDue: false, practiceRunning: false, lastUser: "未完成",
@@ -366,11 +388,21 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(retract.nextWork, "你收回去了")
         XCTAssertEqual(retract.action, .none)
         XCTAssertEqual(retract.breath, 1.3)
+        let restore = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(1),
+            attending: true, retractedAt: t0, retractedDraft: "接着问账单", pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(restore.mood, "收笔")
+        XCTAssertEqual(restore.action, .restoreDraft)
+        XCTAssertEqual(restore.actionTitle, "还给你")
+        XCTAssertEqual(restore.thread, "接着问账单")
         let watching = NexusPresence.snapshot(
             isTyping: false, canResume: false, resumeGoal: nil,
             practiceDue: true, practiceRunning: false, lastUser: "上次",
-            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(5),
-            attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
+            lastReply: "刚答完", answered: true, answeredAt: t0.addingTimeInterval(-10),
+            now: t0.addingTimeInterval(5), attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
         )
         XCTAssertEqual(watching.mood, "看着")
         let unfinished = NexusPresence.snapshot(
@@ -395,10 +427,18 @@ final class NexusPresenceTests: XCTestCase {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         vm.hear("接着问", now: t0)
         vm.attend(true, now: t0)
+        vm.hear("接着", now: t0.addingTimeInterval(0.4))
+        vm.hear("接", now: t0.addingTimeInterval(0.8))
         vm.hear("", now: t0.addingTimeInterval(1))
         XCTAssertEqual(vm.presence.mood, "收笔")
         XCTAssertEqual(vm.presence.nextWork, "你收回去了")
-        vm.awaken(now: t0.addingTimeInterval(6))
+        XCTAssertEqual(vm.presence.action, .restoreDraft)
+        vm.actOnPresence()
+        XCTAssertEqual(vm.composerPrefill, "接着问")
+        vm.hear("接着问", now: t0.addingTimeInterval(1.5))
+        XCTAssertEqual(vm.presence.mood, "在听")
+        vm.hear("", now: t0.addingTimeInterval(2))
+        vm.awaken(now: t0.addingTimeInterval(7))
         XCTAssertEqual(vm.presence.mood, "看着")
     }
 
@@ -418,5 +458,24 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(vm.presence.nextWork, "先列出科目")
         vm.cancel()
         XCTAssertEqual(vm.presence.mood, "可续")
+    }
+
+    func testSettleBeatsWatchingThenFades() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let snap = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算账",
+            practiceDue: true, practiceRunning: false, lastUser: "算账",
+            lastReply: "先列出科目", answered: true, answeredAt: t0,
+            now: t0.addingTimeInterval(2), attending: true, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(snap.mood, "落定")
+        XCTAssertEqual(snap.nextWork, "刚说到这儿")
+        let watching = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算账",
+            practiceDue: true, practiceRunning: false, lastUser: "算账",
+            lastReply: "先列出科目", answered: true, answeredAt: t0,
+            now: t0.addingTimeInterval(7), attending: true, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(watching.mood, "看着")
     }
 }

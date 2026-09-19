@@ -544,6 +544,45 @@ test('stir 起息: 落地后按八分钟窗朝邻格起身，不环绕，与 Pyt
   assert.throws(() => engine.stir(0, -1, 3), RangeError);
 });
 
+test('perch 栖息: 起身后沿起身轴再蹲一格，不环绕，与 Python 同构', () => {
+  const air = engine.perch(0, 0, 3);
+  const rose = engine.stir(0, 60, 3);
+  const nested = engine.perch(0, 60, 3);
+  const sizes = [1040, 180, 80, 64, 8];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const axis = ['核', '映', '态', '标', '相'].indexOf(rose.轴);
+  const coord = keys.map(key => rose.坐标[key]);
+  const next = coord[axis] + rose.向;
+  const canStep = next >= 0 && next < sizes[axis];
+  assert.equal(air.栖, false);
+  assert.equal(air.起, false);
+  assert.equal(air.id, engine.stir(0, 0, 3).id);
+  assert.equal(air.起处.id, air.id);
+  assert.equal(nested.栖, true);
+  assert.equal(nested.起, true);
+  assert.equal(nested.起处.id, rose.id);
+  if (canStep) {
+    coord[axis] = next;
+    assert.notEqual(nested.id, rose.id);
+    assert.equal(nested.坐标[keys[axis]], next);
+  } else {
+    assert.equal(nested.id, rose.id);
+  }
+  const pyAir = py('print(json.dumps(e.perch(arg[0], arg[1], arg[2]), ensure_ascii=False))', [0, 0, 3]);
+  assert.deepEqual(air, pyAir);
+  const samples = [[0, 0, 2], ['奥形凝起', 28800, 4], [7, 61200, 3], [0, 1700000000, 3]];
+  const pyHits = py('print(json.dumps([e.perch(*t) for t in arg], ensure_ascii=False))', samples);
+  samples.forEach((t, i) => assert.deepEqual(engine.perch(...t), pyHits[i], `perch(${JSON.stringify(t)}) 分叉`));
+  const edge = engine.decode(CAP_EXPECTED - 1);
+  const stayAir = engine.perch(edge.汉, 0, 2);
+  assert.equal(stayAir.栖, false);
+  const stayDown = engine.perch(edge.汉, 60, 2);
+  assert.equal(stayDown.栖, true);
+  assert.equal(stayDown.起处.id, engine.stir(edge.汉, 60, 2).id);
+  assert.throws(() => engine.perch(0, 1700000000, 1), RangeError);
+  assert.throws(() => engine.perch(0, -1, 3), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);

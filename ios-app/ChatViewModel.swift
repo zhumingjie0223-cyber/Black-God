@@ -45,7 +45,10 @@ final class ChatViewModel: ObservableObject {
     private var heardAt: Date?
     private var hitchTask: Task<Void, Never>?
     private var retractedAt: Date?
+    private var retractedDraft = ""
+    private var keptDraft = ""
     private var retractTask: Task<Void, Never>?
+    private var settleTask: Task<Void, Never>?
 
     init(store: NexusConversationStore = NexusConversationStore(),
          memory: NexusMemoryStore? = nil,
@@ -126,6 +129,7 @@ final class ChatViewModel: ObservableObject {
             heardAt: heardAt,
             noticedAt: noticedAt,
             retractedAt: retractedAt,
+            retractedDraft: retractedDraft,
             pulseNote: pulseNote
         )
     }
@@ -208,18 +212,25 @@ final class ChatViewModel: ObservableObject {
         let next = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard composerDraft != next else { return }
         let hadDraft = !composerDraft.isEmpty
+        let previous = composerDraft
         composerDraft = next
         if next.isEmpty {
             heardAt = nil
             if hadDraft, !isTyping {
+                retractedDraft = keptDraft.isEmpty ? previous : keptDraft
                 retractedAt = now
                 scheduleRetract()
             } else {
                 retractedAt = nil
+                retractedDraft = ""
                 retractTask?.cancel()
             }
         } else {
+            if next.count >= previous.count || !previous.hasPrefix(next) {
+                keptDraft = next
+            }
             retractedAt = nil
+            retractedDraft = ""
             retractTask?.cancel()
             heardAt = now
             scheduleHitch()
@@ -246,6 +257,15 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    private func scheduleSettle() {
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(NexusPresence.settleHold))
+            guard !Task.isCancelled, let self else { return }
+            self.presenceTick = Date()
+        }
+    }
+
     func refreshPulse(now: Date = Date()) {
         let at = String(Int(now.timeIntervalSince1970))
         let last = messages.last(where: { $0.role == "user" })?.content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -253,7 +273,7 @@ final class ChatViewModel: ObservableObject {
         for seed in seeds {
             let payload: [Any] = seed == "0" ? [0, at, 3] : [seed, at, 3]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
-                  let value = try? NexusShuyuEngine.shared.invoke("起息", input: String(decoding: data, as: UTF8.self)),
+                  let value = try? NexusShuyuEngine.shared.invoke("栖息", input: String(decoding: data, as: UTF8.self)),
                   let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
                   let phase = object["息"] as? String, let han = object["汉"] as? String else { continue }
             let origin = (object["种"] as? [String: Any])?["汉"] as? String ?? seed
@@ -261,12 +281,17 @@ final class ChatViewModel: ObservableObject {
             let echoed = (object["回"] as? NSNumber)?.boolValue ?? (object["回"] as? Bool ?? false)
             let landed = (object["落"] as? NSNumber)?.boolValue ?? (object["落"] as? Bool ?? true)
             let risen = (object["起"] as? NSNumber)?.boolValue ?? (object["起"] as? Bool ?? false)
+            let nested = (object["栖"] as? NSNumber)?.boolValue ?? (object["栖"] as? Bool ?? false)
             let side = (object["侧"] as? NSNumber)?.intValue ?? 0
             let ground = (object["着"] as? [String: Any])?["汉"] as? String
             let fromHan = (object["由"] as? [String: Any])?["汉"] as? String
+            let riseHan = (object["起处"] as? [String: Any])?["汉"] as? String
             let restHan = (!landed && side == 1) ? (ground ?? han) : han
             let leanHan = (!landed && side == 1) ? han : (ground ?? lastHan)
-            if risen, let fromHan, fromHan != han {
+            if nested, let riseHan, riseHan != han {
+                pulseNote = "\(phase) · \(origin) → \(riseHan) ↘ \(han)"
+                pulseWord = han
+            } else if risen, let fromHan, fromHan != han {
                 pulseNote = "\(phase) · \(origin) → \(fromHan) ↗ \(han)"
                 pulseWord = han
             } else if origin == restHan {
@@ -303,6 +328,10 @@ final class ChatViewModel: ObservableObject {
             guard !last.isEmpty else { composerPrefill = ""; return }
             let clipped = last.count > 24 ? String(last.prefix(24)) : last
             composerPrefill = "接着「\(clipped)」："
+        case .restoreDraft:
+            let kept = retractedDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !kept.isEmpty else { return }
+            composerPrefill = kept
         }
     }
 
@@ -338,6 +367,9 @@ final class ChatViewModel: ObservableObject {
         isTyping = true
         lastError = nil
         statusHint = "正在思考…"
+        settleTask?.cancel()
+        keptDraft = ""
+        retractedDraft = ""
         cognitive.continuity.begin(run: id, goal: prompt, redacting: key)
         live.begin(goal: prompt, redacting: key)
         runtime.begin(prompt: prompt)
@@ -439,6 +471,10 @@ final class ChatViewModel: ObservableObject {
                 self.evaluations.record(task: prompt, success: outcome.warning == nil, recovered: !appendUser && outcome.warning == nil,
                     verified: outcome.reviewPassed, latency: Date().timeIntervalSince(startedAt), recoveryAttempt: !appendUser)
                 self.activeStartedAt = nil
+                if outcome.warning == nil {
+                    self.presenceTick = Date()
+                    self.scheduleSettle()
+                }
             } catch {
                 guard let self, self.runID == id, !Task.isCancelled else { return }
                 self.isTyping = false
@@ -495,6 +531,7 @@ final class ChatViewModel: ObservableObject {
         activeTask = nil
         activeEngine = nil
         isTyping = false
+        settleTask?.cancel()
         statusHint = "已停止，进度还在"
         runtime.cancel()
     }

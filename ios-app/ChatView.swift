@@ -279,15 +279,16 @@ struct PresenceStrip: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
         .scaleEffect(leaning(snapshot.stance) ? (on ? 1.0 : 0.98) : 1)
         .opacity(breathing(snapshot.stance) ? (on ? 1 : 0.72) : 1)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.presence")
         .onAppear { breathe(snapshot.stance) }
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
     private func breathing(_ stance: String) -> Bool {
-        ["working", "speaking", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing"].contains(stance)
+        ["working", "speaking", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling"].contains(stance)
     }
     private func leaning(_ stance: String) -> Bool {
-        ["speaking", "hitching", "retracting", "watching", "noticing"].contains(stance)
+        ["speaking", "hitching", "retracting", "watching", "noticing", "exhaling"].contains(stance)
     }
     private func breathe(_ stance: String) {
         guard breathing(stance) else { on = false; return }
@@ -296,6 +297,7 @@ struct PresenceStrip: View {
         switch stance {
         case "speaking": duration = 0.7
         case "working": duration = 0.9
+        case "exhaling": duration = 1.0
         case "listening": duration = 1.1
         case "retracting": duration = 1.3
         case "hitching": duration = 1.5
