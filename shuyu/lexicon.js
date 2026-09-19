@@ -16,6 +16,7 @@
  *   sway       摇息：回息后按分钟在弹回词与末步之间摇摆（不环绕、不改容量）
  *   land       落息：摇息后按四分钟窗落地，偏停在弹回词（不环绕、不改容量）
  *   stir       起息：落息落地后按八分钟窗从着地点朝邻格起身（不环绕、不改容量）
+ *   perch      栖息：起息起身后沿起身轴再蹲一格（越界则蹲在起身词上；未起不栖）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -515,6 +516,44 @@ export function stir(seed, at, n){
   };
 }
 
+// ══════ 栖息：起息起身后沿起身轴再蹲一格；越界则蹲在起身词上；未起不栖 ══════
+export function perch(seed, at, n){
+  const up = stir(seed, at, n);
+  const last = up.迹[up.迹.length - 1];
+  const sizes = [NC, NM, NS, NK, NP];
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const rise = compactPose(up, { 息: last.息, 时: last.时, 分: last.分, 轴: up.轴, 向: up.向, 动: up.起 });
+  let pose = rise;
+  let nested = false;
+  if(up.起){
+    nested = true;
+    const axis = AXIS_NAMES.indexOf(up.轴);
+    const coord = keys.map(key => up.坐标[key]);
+    const next = coord[axis] + up.向;
+    if(next >= 0 && next < sizes[axis]){
+      coord[axis] = next;
+      pose = compactPose(decode(idOf(...coord)), { 息: last.息, 时: last.时, 分: last.分, 轴: up.轴, 向: up.向, 动: true });
+    }
+  }
+  return {
+    息: up.息,
+    种: up.种,
+    步: up.步,
+    迹: up.迹,
+    回: up.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: up.落,
+    侧: up.侧,
+    着: up.着,
+    起: up.起,
+    由: up.由,
+    起处: rise,
+    栖: nested,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -675,4 +714,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };

@@ -13,7 +13,7 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.chip.pulse"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["chat.presence"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["chat.breath"].exists)
-        XCTAssertTrue(["在场", "该练", "可续", "处理中", "开口", "刚歇", "在听", "余韵", "看着", "还在", "顿笔", "惦记", "收笔"].contains(app.staticTexts["chat.mood"].label))
+        XCTAssertTrue(["在场", "该练", "可续", "处理中", "开口", "刚歇", "在听", "余韵", "看着", "还在", "顿笔", "惦记", "收笔", "落定"].contains(app.staticTexts["chat.mood"].label))
         let field = app.descendants(matching: .any)["chat.input"]
         XCTAssertTrue(field.waitForExistence(timeout: 4))
         field.tap()
@@ -31,6 +31,11 @@ final class BlackGodUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: prompt.count + 4))
         expectation(for: NSPredicate(format: "label == %@", "收笔"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 6)
+        XCTAssertEqual(app.buttons["chat.act"].label, "还给你")
+        app.buttons["chat.act"].tap()
+        expectation(for: NSPredicate(format: "label == %@", "在听"), evaluatedWith: app.staticTexts["chat.mood"])
+        waitForExpectations(timeout: 3)
+        XCTAssertEqual(field.value as? String, prompt)
         XCTAssertFalse(app.buttons["chat.regenerate"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "对话快捷芯片"; shot.lifetime = .keepAlways; add(shot)
     }
@@ -234,6 +239,10 @@ final class BlackGodUITests: XCTestCase {
         let stir = app.buttons["shuyu.stir"]
         reveal(stir, in: app)
         stir.tap()
+        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        let perch = app.buttons["shuyu.perch"]
+        reveal(perch, in: app)
+        perch.tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.buttons["完成"].tap()

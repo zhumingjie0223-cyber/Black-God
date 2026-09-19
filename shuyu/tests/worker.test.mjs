@@ -223,6 +223,17 @@ test('GET /stir 起息与参数校验', async () => {
   assert.equal((await call(env, '/stir?word=绝不存在&at=0')).status, 400);
 });
 
+test('GET /perch 栖息与参数校验', async () => {
+  const env = mockEnv();
+  const r = await (await call(env, '/perch?word=0&at=60&n=3')).json();
+  assert.equal(r.栖, true);
+  assert.equal(r.起, true);
+  assert.equal(r.种.id, 0);
+  assert.equal((await call(env, '/perch')).status, 400);
+  assert.equal((await call(env, '/perch?word=0&at=1700000000&n=1')).status, 400);
+  assert.equal((await call(env, '/perch?word=绝不存在&at=0')).status, 400);
+});
+
 test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   const root = await (await call(mockEnv(), '/')).json();
   assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
@@ -236,6 +247,7 @@ test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   assert.ok(root.endpoints.some(e => e.startsWith('/sway')));
   assert.ok(root.endpoints.some(e => e.startsWith('/land')));
   assert.ok(root.endpoints.some(e => e.startsWith('/stir')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/perch')));
   const st = await (await call(mockEnv(), '/status')).json();
   assert.deepEqual(st.axes, root.axes);
 });

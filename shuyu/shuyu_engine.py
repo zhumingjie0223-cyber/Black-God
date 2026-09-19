@@ -21,7 +21,7 @@
 - 可落盘分片，也可纯寻址零占用
 - 与 lexicon.js 双实现同构：同一编号解出同一个词；encode / encode_han / auto_coin /
   compose / search 两侧结果逐一相等（tests/engine.test.mjs 跨实现用例看住）
-- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格；echo 沿末步反向弹回；sway 按分钟在弹回词与末步之间摇摆；land 按四分钟窗落地偏停在弹回词
+- search 按相关度排序；near 给出 L1=1 不环绕的五维邻居；pulse 按显式时刻呼吸一格；trail 从一词连续呼吸几格；echo 沿末步反向弹回；sway 按分钟在弹回词与末步之间摇摆；land 按四分钟窗落地偏停在弹回词；stir 落地后朝邻格起身；perch 起身后再沿起身轴蹲一格
 
 v4.1（2026-09）新能力：
 - encode_han：汉译（纯中文）→ 编号，枢语从"单向产出"变成"双向可寻址"
@@ -602,6 +602,42 @@ def stir(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def perch(seed, at, n=3):
+    """栖息：起息起身后沿起身轴再蹲一格，越界则蹲在起身词上，未起不栖；与 lexicon.js perch 同构。"""
+    up = stir(seed, at, n)
+    last = up["迹"][-1]
+    sizes = (NC, NM, NS, NK, NP)
+    keys = ("c", "m", "s", "k", "p")
+    rise = _compact_pose(up, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": up["轴"], "向": up["向"], "动": up["起"]})
+    pose = rise
+    nested = False
+    if up["起"]:
+        nested = True
+        axis = _AXIS_NAMES.index(up["轴"])
+        coord = [up["坐标"][k] for k in keys]
+        nxt = coord[axis] + up["向"]
+        if 0 <= nxt < sizes[axis]:
+            coord[axis] = nxt
+            pose = _compact_pose(decode(_id_of(*coord)), {"息": last["息"], "时": last["时"], "分": last["分"], "轴": up["轴"], "向": up["向"], "动": True})
+    return {
+        "息": up["息"],
+        "种": up["种"],
+        "步": up["步"],
+        "迹": up["迹"],
+        "回": up["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": up["落"],
+        "侧": up["侧"],
+        "着": up["着"],
+        "起": up["起"],
+        "由": up["由"],
+        "起处": rise,
+        "栖": nested,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -685,8 +721,9 @@ def main(argv=None):
     ap.add_argument("--sway",nargs="?",const="",default=None,help="摇息种子（编号或词，缺省为0）")
     ap.add_argument("--land",nargs="?",const="",default=None,help="落息种子（编号或词，缺省为0）")
     ap.add_argument("--stir",nargs="?",const="",default=None,help="起息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息步数，2至4")
+    ap.add_argument("--perch",nargs="?",const="",default=None,help="栖息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -721,6 +758,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.perch is not None and a.at >= 0:
+        try:
+            out(perch(a.perch, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return

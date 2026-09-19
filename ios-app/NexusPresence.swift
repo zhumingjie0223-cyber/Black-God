@@ -1,7 +1,7 @@
 import Foundation
 
 enum NexusPresenceAction: String, Equatable {
-    case none, resume, practice, continueLast, pulse, followUp
+    case none, resume, practice, continueLast, pulse, followUp, restoreDraft
 }
 
 struct NexusPresenceSnapshot: Equatable {
@@ -14,13 +14,14 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：空着会看，写着会顿，草稿还惦记，收回去会收笔，开口会说，回来还在，说话时在听，刚歇会褪，停了还在，不自动扩权。
+/// 打开就要在场：空着会看，写着会顿，草稿还惦记，收回去会收笔还能还给你，开口会说，说完会落定，回来还在，说话时在听，刚歇会褪，停了还在，不自动扩权。
 enum NexusPresence {
     static let afterglow: TimeInterval = 180
     static let echoFade: TimeInterval = 900
     static let noticeHold: TimeInterval = 12
     static let hitchHold: TimeInterval = 1.6
     static let retractHold: TimeInterval = 4
+    static let settleHold: TimeInterval = 6
 
     static func snapshot(
         isTyping: Bool,
@@ -40,6 +41,7 @@ enum NexusPresence {
         heardAt: Date? = nil,
         noticedAt: Date? = nil,
         retractedAt: Date? = nil,
+        retractedDraft: String? = nil,
         pulseNote: String?
     ) -> NexusPresenceSnapshot {
         if isTyping {
@@ -85,9 +87,23 @@ enum NexusPresence {
         if let retracted = retractedAt {
             let ago = now.timeIntervalSince(retracted)
             if ago >= 0, ago < retractHold {
+                let kept = clip(retractedDraft)
                 return NexusPresenceSnapshot(
-                    mood: "收笔", stance: "retracting", thread: clip(pulseNote ?? lastReply ?? lastUser),
-                    nextWork: "你收回去了", actionTitle: "", action: .none, breath: 1.3
+                    mood: "收笔", stance: "retracting", thread: kept.isEmpty ? clip(pulseNote ?? lastReply ?? lastUser) : kept,
+                    nextWork: "你收回去了",
+                    actionTitle: kept.isEmpty ? "" : "还给你",
+                    action: kept.isEmpty ? .none : .restoreDraft, breath: 1.3
+                )
+            }
+        }
+        if answered {
+            let age = answeredAt.map { now.timeIntervalSince($0) }
+            if age == nil || age! < settleHold {
+                let spoken = clip(lastReply)
+                return NexusPresenceSnapshot(
+                    mood: "落定", stance: "exhaling", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
+                    nextWork: "刚说到这儿",
+                    actionTitle: "接着问", action: .followUp, breath: 1.0
                 )
             }
         }
