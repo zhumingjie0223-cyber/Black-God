@@ -40,4 +40,6 @@ class TaskBridgeTests(unittest.TestCase):
         self.assertEqual(program['actions'][7]['arguments'],{'operation':'起息','input':'1700000000'})
         nest=compile_task('行：栖息("1700000000")')
         self.assertEqual(nest['actions'][0]['arguments'],{'operation':'栖息','input':'1700000000'})
+        look=compile_task('行：转息("1700000000")')
+        self.assertEqual(look['actions'][0]['arguments'],{'operation':'转息','input':'1700000000'})
         self.assertEqual(describe_plan(program)[1]['title'],'Asia/Shanghai')

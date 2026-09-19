@@ -138,6 +138,11 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertEqual((perch?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
         let perchProgram = try NexusShuyuEngine.shared.compile("行：栖息(\"1700000000\")")
         XCTAssertEqual(perchProgram.actions[0].arguments["operation"], "栖息")
+        let turn = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("转息", input: #"[0,"60",3]"#).utf8)) as? [String: Any]
+        XCTAssertEqual((turn?["栖"] as? NSNumber)?.boolValue, true)
+        XCTAssertEqual((turn?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
+        let turnProgram = try NexusShuyuEngine.shared.compile("行：转息(\"1700000000\")")
+        XCTAssertEqual(turnProgram.actions[0].arguments["operation"], "转息")
         tools.register(runner)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "clock" })
     }

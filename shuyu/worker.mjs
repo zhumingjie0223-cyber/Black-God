@@ -19,13 +19,14 @@
 //   GET  /land?word=W&at=T&n=N  落息：摇息后按四分钟窗落地，偏停在弹回词（不环绕）
 //   GET  /stir?word=W&at=T&n=N  起息：落地后按八分钟窗从着地点朝邻格起身（不环绕）
 //   GET  /perch?word=W&at=T&n=N 栖息：起身后再沿起身轴蹲一格（不环绕）
+//   GET  /turn?word=W&at=T&n=N  转息：栖息后再朝侧邻转头（不环绕）
 //   GET  /compose?核=&映=&态=&标=&相=   按义造词（每轴给 下标/拉丁根/汉译/语义关键词，缺省取 0）
 //   GET  /coin?seed=S&layer=L 造词（有 seed 可复现，无 seed 按层随机）
 //   POST /talk        {code} 枢语意识流 → 解释 + 编译（别名 /interpret）
 //   POST /broadcast   万网散播（sovereignControl 全流程）
 
 import {
-  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch,
+  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, turn,
   coinWord, autoCoin, coinFromState, loadCapabilities,
 } from './lexicon.js';
 import { interpret, applyToSoul, compile } from './nexuslang.js';
@@ -208,6 +209,18 @@ async function handlePerch(url) {
   }
 }
 
+async function handleTurn(url) {
+  const word = url.searchParams.get('word') ?? url.searchParams.get('w') ?? '0';
+  const at = url.searchParams.get('at');
+  const n = url.searchParams.get('n');
+  if (at == null || !String(at).trim()) return badRequest('缺少参数 at（Unix 秒）');
+  try {
+    return json({ word, at, n: n ?? 3, ...turn(word, at, n == null || n === '' ? 3 : n) });
+  } catch (err) {
+    return badRequest(String(err?.message ?? err));
+  }
+}
+
 async function handleCompose(url) {
   const spec = {};
   for (const [k, v] of url.searchParams) {
@@ -283,7 +296,7 @@ export default {
           copyright: COPYRIGHT,
           capacity: CAPACITY,
           axes: AXES,
-          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/pulse?word=&at=', '/trail?word=&at=&n=', '/echo?word=&at=&n=', '/sway?word=&at=&n=', '/land?word=&at=&n=', '/stir?word=&at=&n=', '/perch?word=&at=&n=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
+          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/pulse?word=&at=', '/trail?word=&at=&n=', '/echo?word=&at=&n=', '/sway?word=&at=&n=', '/land?word=&at=&n=', '/stir?word=&at=&n=', '/perch?word=&at=&n=', '/turn?word=&at=&n=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
         });
       }
       if (path === '/status' && req.method === 'GET') return handleStatus(env);
@@ -298,6 +311,7 @@ export default {
       if (path === '/land' && req.method === 'GET') return handleLand(url);
       if (path === '/stir' && req.method === 'GET') return handleStir(url);
       if (path === '/perch' && req.method === 'GET') return handlePerch(url);
+      if (path === '/turn' && req.method === 'GET') return handleTurn(url);
       if (path === '/compose' && req.method === 'GET') return handleCompose(url);
       if (path === '/analogy' && req.method === 'GET') return handleAnalogy(url);
       if (path === '/coin' && req.method === 'GET') return handleCoin(url, env);

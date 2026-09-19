@@ -68,6 +68,8 @@ test('邻近、时间与一息编译为有界工具，规划标题用时区',()=
   assert.equal(program.actions[7].arguments.operation,'起息');
   const nest=compileTask('行：栖息("1700000000")');
   assert.equal(nest.actions[0].arguments.operation,'栖息');
+  const look=compileTask('行：转息("1700000000")');
+  assert.equal(look.actions[0].arguments.operation,'转息');
   assert.deepEqual(describePlan(program).map(x=>x.title),['奥形凝起','Asia/Shanghai','1700000000','1700000000','1700000000','1700000000','1700000000','1700000000']);
 });
 test('规划描述 JS 与 Python 一致',()=>{

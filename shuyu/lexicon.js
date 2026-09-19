@@ -17,6 +17,7 @@
  *   land       落息：摇息后按四分钟窗落地，偏停在弹回词（不环绕、不改容量）
  *   stir       起息：落息落地后按八分钟窗从着地点朝邻格起身（不环绕、不改容量）
  *   perch      栖息：起息起身后沿起身轴再蹲一格（越界则蹲在起身词上；未起不栖）
+ *   turn       转息：栖息后再朝侧邻转头（未栖不转；无侧邻则停在栖处）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -554,6 +555,43 @@ export function perch(seed, at, n){
   };
 }
 
+// ══════ 转息：栖息后再朝侧邻转头；未栖不转；无侧邻则停在栖处 ══════
+export function turn(seed, at, n){
+  const nest = perch(seed, at, n);
+  const last = nest.迹[nest.迹.length - 1];
+  const t = Number(at);
+  const sit = compactPose(nest, { 息: last.息, 时: last.时, 分: last.分, 轴: nest.轴, 向: nest.向, 动: nest.栖 });
+  const neighbors = near(nest.id, 16).filter(word => word.轴 !== nest.轴);
+  const turning = nest.栖 === true && neighbors.length > 0;
+  const pick = turning ? neighbors[Math.floor(t / 960) % neighbors.length] : null;
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  let pose = sit;
+  if(pick){
+    const axis = AXIS_NAMES.indexOf(pick.轴);
+    const direction = pick.坐标[keys[axis]] > nest.坐标[keys[axis]] ? 1 : -1;
+    pose = compactPose(pick, { 息: last.息, 时: last.时, 分: last.分, 轴: pick.轴, 向: direction, 动: true });
+  }
+  return {
+    息: nest.息,
+    种: nest.种,
+    步: nest.步,
+    迹: nest.迹,
+    回: nest.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: nest.落,
+    侧: nest.侧,
+    着: nest.着,
+    起: nest.起,
+    由: nest.由,
+    起处: nest.起处,
+    栖: nest.栖,
+    栖处: sit,
+    转: !!pick,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -714,4 +752,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, turn, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
