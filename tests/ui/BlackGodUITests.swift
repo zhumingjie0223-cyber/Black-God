@@ -200,10 +200,16 @@ final class BlackGodUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.1"].tap(); app.swipeUp()
+        if app.keyboards.firstMatch.exists { app.swipeDown() }
         XCTAssertTrue(app.buttons["shuyu.open"].waitForExistence(timeout: 8))
+        reveal(app.buttons["shuyu.open"], in: app)
         app.buttons["shuyu.open"].tap()
-        XCTAssertTrue(app.buttons["shuyu.generate"].waitForExistence(timeout: 8))
-        app.buttons["shuyu.generate"].tap()
+        XCTAssertTrue(app.navigationBars["枢语"].waitForExistence(timeout: 8))
+        if app.keyboards.firstMatch.exists { app.navigationBars["枢语"].tap() }
+        let generate = app.buttons["shuyu.generate"]
+        reveal(generate, in: app)
+        generate.tap()
+        if !app.staticTexts["shuyu.word"].waitForExistence(timeout: 6) { generate.tap() }
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 15))
         let verified = app.staticTexts["词形与汉译反查一致"]
         reveal(verified, in: app)

@@ -43,6 +43,7 @@ struct NexusShuyuView: View {
             .tint(Color.bgJadeHi)
             .navigationTitle("枢语")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+            .onAppear { NexusShuyuEngine.shared.prepare() }
         }
     }
     private func generate() {
