@@ -122,11 +122,22 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(snap.breath, 1.0)
         XCTAssertNotEqual(snap.mood, "就绪")
         let answeredAt = Date(timeIntervalSince1970: 1_700_000_000)
-        let rest = NexusPresence.snapshot(
+        let waiting = NexusPresence.snapshot(
             isTyping: false, canResume: false, resumeGoal: "算 12*3",
             practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
             lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
             now: answeredAt.addingTimeInterval(7), pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(waiting.mood, "等下文")
+        XCTAssertEqual(waiting.stance, "awaiting")
+        XCTAssertEqual(waiting.nextWork, "还等你接下句")
+        XCTAssertEqual(waiting.action, .followUp)
+        XCTAssertEqual(waiting.breath, 1.6)
+        let rest = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算 12*3",
+            practiceDue: false, practiceRunning: false, lastUser: "算 12*3",
+            lastReply: "结果是 36", answered: true, answeredAt: answeredAt,
+            now: answeredAt.addingTimeInterval(15), pulseNote: "夜 · 奥形凝起"
         )
         XCTAssertEqual(rest.mood, "刚歇")
         XCTAssertEqual(rest.nextWork, "还在 · 夜 · 奥形凝起")
@@ -150,12 +161,12 @@ final class NexusPresenceTests: XCTestCase {
             lastReply: "刚答完", answered: true, draft: "接着问账单", attending: true,
             pulseNote: "夜 · 奥形凝起"
         )
-        XCTAssertEqual(snap.mood, "在听")
-        XCTAssertEqual(snap.stance, "listening")
-        XCTAssertEqual(snap.nextWork, "你正在说")
+        XCTAssertEqual(snap.mood, "跟上")
+        XCTAssertEqual(snap.stance, "following")
+        XCTAssertEqual(snap.nextWork, "你接着说")
         XCTAssertEqual(snap.thread, "接着问账单")
         XCTAssertEqual(snap.action, .none)
-        XCTAssertEqual(snap.breath, 1.1)
+        XCTAssertEqual(snap.breath, 1.05)
     }
 
     func testUnfinishedBeatsListening() {
@@ -363,7 +374,8 @@ final class NexusPresenceTests: XCTestCase {
             lastReply: "刚答完", answered: true, now: t0, draft: "接着问账单",
             attending: true, heardAt: t0, pulseNote: "夜 · 奥形凝起"
         )
-        XCTAssertEqual(listening.mood, "在听")
+        XCTAssertEqual(listening.mood, "跟上")
+        XCTAssertEqual(listening.nextWork, "你接着说")
         let hitch = NexusPresence.snapshot(
             isTyping: false, canResume: false, resumeGoal: nil,
             practiceDue: true, practiceRunning: false, lastUser: "上次",
@@ -532,5 +544,35 @@ final class NexusPresenceTests: XCTestCase {
             now: t0.addingTimeInterval(1000), attending: true, pulseNote: "夜 · 奥形凝起"
         )
         XCTAssertEqual(watching.mood, "看着")
+    }
+
+    func testFollowingKeepsTheThreadWhileDrafting() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let follow = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算账",
+            practiceDue: true, practiceRunning: false, lastUser: "算账",
+            lastReply: "先列出科目", answered: true, answeredAt: t0,
+            now: t0.addingTimeInterval(20), draft: "那下一步", attending: true, pulseNote: nil
+        )
+        XCTAssertEqual(follow.mood, "跟上")
+        XCTAssertEqual(follow.stance, "following")
+        XCTAssertEqual(follow.nextWork, "你接着说")
+        XCTAssertEqual(follow.thread, "那下一步")
+        XCTAssertEqual(follow.action, .none)
+        let listen = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: false, practiceRunning: false, lastUser: "上次",
+            draft: "新的话", attending: true, pulseNote: nil
+        )
+        XCTAssertEqual(listen.mood, "在听")
+        XCTAssertEqual(listen.nextWork, "你正在说")
+        let hitch = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: "算账",
+            practiceDue: false, practiceRunning: false, lastUser: "算账",
+            lastReply: "先列出科目", answered: true, answeredAt: t0,
+            now: t0.addingTimeInterval(20), draft: "那下一步", attending: true,
+            heardAt: t0.addingTimeInterval(18), pulseNote: nil
+        )
+        XCTAssertEqual(hitch.mood, "顿笔")
     }
 }
