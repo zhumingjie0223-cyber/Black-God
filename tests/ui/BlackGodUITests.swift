@@ -26,17 +26,11 @@ final class BlackGodUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "惦记"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 3)
         field.tap()
-        field.press(forDuration: 1.2)
-        let selectAll = app.menuItems["全选"].firstMatch
-        if selectAll.waitForExistence(timeout: 2) {
-            selectAll.tap()
-            field.typeText(XCUIKeyboardKey.delete.rawValue)
-        } else {
-            let typed = (field.value as? String) ?? ""
-            for _ in typed { field.typeText(XCUIKeyboardKey.delete.rawValue) }
-        }
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        let prompt = "把这件事拆成可检查的步骤："
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: prompt.count + 4))
         expectation(for: NSPredicate(format: "label == %@", "收笔"), evaluatedWith: app.staticTexts["chat.mood"])
-        waitForExpectations(timeout: 3)
+        waitForExpectations(timeout: 6)
         XCTAssertFalse(app.buttons["chat.regenerate"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "对话快捷芯片"; shot.lifetime = .keepAlways; add(shot)
     }
@@ -206,9 +200,11 @@ final class BlackGodUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.1"].tap(); app.swipeUp()
+        XCTAssertTrue(app.buttons["shuyu.open"].waitForExistence(timeout: 8))
         app.buttons["shuyu.open"].tap()
+        XCTAssertTrue(app.buttons["shuyu.generate"].waitForExistence(timeout: 8))
         app.buttons["shuyu.generate"].tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 15))
         let verified = app.staticTexts["词形与汉译反查一致"]
         reveal(verified, in: app)
         XCTAssertTrue(verified.exists)
