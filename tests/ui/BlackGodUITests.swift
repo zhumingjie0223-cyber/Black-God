@@ -31,8 +31,10 @@ final class BlackGodUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: prompt.count + 4))
         expectation(for: NSPredicate(format: "label == %@", "收笔"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 6)
-        XCTAssertEqual(app.buttons["chat.act"].label, "还给你")
-        app.buttons["chat.act"].tap()
+        let giveBack = app.buttons["chat.act"]
+        XCTAssertTrue(giveBack.waitForExistence(timeout: 2))
+        XCTAssertEqual(giveBack.label, "还给你")
+        giveBack.tap()
         expectation(for: NSPredicate(format: "label == %@", "在听"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 3)
         XCTAssertEqual(field.value as? String, prompt)

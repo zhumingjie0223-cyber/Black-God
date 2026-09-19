@@ -279,6 +279,7 @@ struct PresenceStrip: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
         .scaleEffect(leaning(snapshot.stance) ? (on ? 1.0 : 0.98) : 1)
         .opacity(breathing(snapshot.stance) ? (on ? 1 : 0.72) : 1)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.presence")
         .onAppear { breathe(snapshot.stance) }
         .onChange(of: snapshot.stance) { _, value in breathe(value) }

@@ -22,7 +22,6 @@ struct NexusShuyuView: View {
                     Button("看「奥形凝起」回息弹回") { echo() }.accessibilityIdentifier("shuyu.echo")
                     Button("看「奥形凝起」摇息摇摆") { sway() }.accessibilityIdentifier("shuyu.sway")
                     Button("看「奥形凝起」落息落地") { land() }.accessibilityIdentifier("shuyu.land")
-                    Button("看「奥形凝起」起息起身") { stir() }.accessibilityIdentifier("shuyu.stir")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -32,6 +31,7 @@ struct NexusShuyuView: View {
                         Text(word["义"] ?? "").font(.subheadline)
                         Label(verified ? "词形与汉译反查一致" : "反查未通过", systemImage: verified ? "checkmark.circle" : "exclamationmark.circle")
                             .accessibilityIdentifier("shuyu.verified")
+                        Button("看「奥形凝起」起息起身") { stir() }.accessibilityIdentifier("shuyu.stir")
                         Button("看「奥形凝起」栖息再蹲") { perch() }.accessibilityIdentifier("shuyu.perch")
                     }.textSelection(.enabled)
                 }

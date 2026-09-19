@@ -401,8 +401,8 @@ final class NexusPresenceTests: XCTestCase {
         let watching = NexusPresence.snapshot(
             isTyping: false, canResume: false, resumeGoal: nil,
             practiceDue: true, practiceRunning: false, lastUser: "上次",
-            lastReply: "刚答完", answered: true, now: t0.addingTimeInterval(5),
-            attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
+            lastReply: "刚答完", answered: true, answeredAt: t0.addingTimeInterval(-10),
+            now: t0.addingTimeInterval(5), attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
         )
         XCTAssertEqual(watching.mood, "看着")
         let unfinished = NexusPresence.snapshot(
