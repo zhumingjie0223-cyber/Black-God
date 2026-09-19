@@ -355,6 +355,30 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.land(0, -1, 3)
 
+    def test_stir_rises_without_wrap(self):
+        air = e.stir(0, 0, 3)
+        down = e.land(0, 60, 3)
+        neighbors = e.near(down["id"], 16)
+        rose = e.stir(0, 60, 3)
+        self.assertFalse(air["起"])
+        self.assertEqual(air["id"], e.land(0, 0, 3)["id"])
+        self.assertEqual(air["由"]["id"], air["id"])
+        self.assertTrue(rose["起"])
+        self.assertTrue(rose["落"])
+        self.assertEqual(rose["由"]["id"], down["id"])
+        self.assertEqual(rose["id"], neighbors[(60 // 480) % len(neighbors)]["id"])
+        self.assertNotEqual(rose["id"], down["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay_air = e.stir(edge["汉"], 0, 2)
+        self.assertFalse(stay_air["起"])
+        stay_down = e.stir(edge["汉"], 60, 2)
+        self.assertTrue(stay_down["起"])
+        self.assertNotEqual(stay_down["id"], e.land(edge["汉"], 60, 2)["id"])
+        with self.assertRaises(ValueError):
+            e.stir(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.stir(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):

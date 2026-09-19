@@ -29,7 +29,7 @@ class TaskBridgeTests(unittest.TestCase):
             compile_task(eight+'\n行：计算("8")')
 
     def test_near_clock_and_pulse_compile(self):
-        program=compile_task('行：邻近("奥形凝起")\n行：时间("Asia/Shanghai")\n行：一息("1700000000")\n行：余息("1700000000")\n行：回息("1700000000")\n行：摇息("1700000000")\n行：落息("1700000000")')
+        program=compile_task('行：邻近("奥形凝起")\n行：时间("Asia/Shanghai")\n行：一息("1700000000")\n行：余息("1700000000")\n行：回息("1700000000")\n行：摇息("1700000000")\n行：落息("1700000000")\n行：起息("1700000000")')
         self.assertEqual(program['actions'][0]['arguments'],{'operation':'邻近','input':'奥形凝起'})
         self.assertEqual(program['actions'][1]['tool'],'clock')
         self.assertEqual(program['actions'][2]['arguments'],{'operation':'一息','input':'1700000000'})
@@ -37,4 +37,5 @@ class TaskBridgeTests(unittest.TestCase):
         self.assertEqual(program['actions'][4]['arguments'],{'operation':'回息','input':'1700000000'})
         self.assertEqual(program['actions'][5]['arguments'],{'operation':'摇息','input':'1700000000'})
         self.assertEqual(program['actions'][6]['arguments'],{'operation':'落息','input':'1700000000'})
+        self.assertEqual(program['actions'][7]['arguments'],{'operation':'起息','input':'1700000000'})
         self.assertEqual(describe_plan(program)[1]['title'],'Asia/Shanghai')

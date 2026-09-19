@@ -22,6 +22,7 @@ struct NexusShuyuView: View {
                     Button("看「奥形凝起」回息弹回") { echo() }.accessibilityIdentifier("shuyu.echo")
                     Button("看「奥形凝起」摇息摇摆") { sway() }.accessibilityIdentifier("shuyu.sway")
                     Button("看「奥形凝起」落息落地") { land() }.accessibilityIdentifier("shuyu.land")
+                    Button("看「奥形凝起」起息起身") { stir() }.accessibilityIdentifier("shuyu.stir")
                 }
                 if !word.isEmpty {
                     Section("实际引擎结果") {
@@ -141,6 +142,21 @@ struct NexusShuyuView: View {
             let landed = (object["落"] as? NSNumber)?.boolValue ?? (object["落"] as? Bool ?? false)
             let ground = (object["着"] as? [String: Any])?["汉"] as? String ?? han
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "落息 \(count.intValue) 格\(landed ? "落地" : "未落")：\(names) ⤵ \(ground)"]
+            verified = count.intValue == steps.count
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func stir() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("起息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            let risen = (object["起"] as? NSNumber)?.boolValue ?? (object["起"] as? Bool ?? false)
+            let from = (object["由"] as? [String: Any])?["汉"] as? String ?? han
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "起息 \(count.intValue) 格\(risen ? "起身" : "未起")：\(names) ↗ \(from)"]
             verified = count.intValue == steps.count
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }

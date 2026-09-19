@@ -567,6 +567,41 @@ def land(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def stir(seed, at, n=3):
+    """起息：落息落地后按八分钟窗从着地点朝邻格起身，不环绕；与 lexicon.js stir 同构。"""
+    down = land(seed, at, n)
+    last = down["迹"][-1]
+    if isinstance(at, str):
+        t = int(at)
+    else:
+        t = int(at)
+    neighbors = near(down["id"], 16)
+    rising = bool(down["落"]) and len(neighbors) > 0
+    pick = neighbors[(t // 480) % len(neighbors)] if rising else None
+    keys = ("c", "m", "s", "k", "p")
+    sit = _compact_pose(down, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": down["轴"], "向": down["向"], "动": down["落"]})
+    pose = sit
+    if pick is not None:
+        axis = _AXIS_NAMES.index(pick["轴"])
+        direction = 1 if pick["坐标"][keys[axis]] > down["坐标"][keys[axis]] else -1
+        pose = _compact_pose(pick, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": pick["轴"], "向": direction, "动": True})
+    return {
+        "息": down["息"],
+        "种": down["种"],
+        "步": down["步"],
+        "迹": down["迹"],
+        "回": down["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": down["落"],
+        "侧": down["侧"],
+        "着": down["着"],
+        "起": pick is not None,
+        "由": sit,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -649,8 +684,9 @@ def main(argv=None):
     ap.add_argument("--echo",nargs="?",const="",default=None,help="回息种子（编号或词，缺省为0）")
     ap.add_argument("--sway",nargs="?",const="",default=None,help="摇息种子（编号或词，缺省为0）")
     ap.add_argument("--land",nargs="?",const="",default=None,help="落息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息步数，2至4")
+    ap.add_argument("--stir",nargs="?",const="",default=None,help="起息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -685,6 +721,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.stir is not None and a.at >= 0:
+        try:
+            out(stir(a.stir, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return

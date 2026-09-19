@@ -18,6 +18,7 @@
  *   echo       回息：余息走完后沿末步反向弹一格（不环绕、不改容量）
  *   sway       摇息：回息后按分钟在弹回词与末步之间摇摆（不环绕、不改容量）
  *   land       落息：摇息后按四分钟窗落地，偏停在弹回词（不环绕、不改容量）
+ *   stir       起息：落息落地后按八分钟窗从着地点朝邻格起身（不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -484,6 +485,39 @@ function land(seed, at, n){
   };
 }
 
+// ══════ 起息：落息落地后按八分钟窗从着地点朝邻格起身；不环绕、不改编号空间 ══════
+function stir(seed, at, n){
+  const down = land(seed, at, n);
+  const last = down.迹[down.迹.length - 1];
+  const t = Number(at);
+  const neighbors = near(down.id, 16);
+  const rising = down.落 === true && neighbors.length > 0;
+  const pick = rising ? neighbors[Math.floor(t / 480) % neighbors.length] : null;
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const sit = compactPose(down, { 息: last.息, 时: last.时, 分: last.分, 轴: down.轴, 向: down.向, 动: down.落 });
+  let pose = sit;
+  if(pick){
+    const axis = AXIS_NAMES.indexOf(pick.轴);
+    const direction = pick.坐标[keys[axis]] > down.坐标[keys[axis]] ? 1 : -1;
+    pose = compactPose(pick, { 息: last.息, 时: last.时, 分: last.分, 轴: pick.轴, 向: direction, 动: true });
+  }
+  return {
+    息: down.息,
+    种: down.种,
+    步: down.步,
+    迹: down.迹,
+    回: down.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: down.落,
+    侧: down.侧,
+    着: down.着,
+    起: !!pick,
+    由: sit,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -668,7 +702,9 @@ const mapping = Object.freeze({
   '摇息': { tool: 'shuyu', keys: ['input'], preset: { operation: '摇息' } },
   'sway': { tool: 'shuyu', keys: ['input'], preset: { operation: '摇息' } },
   '落息': { tool: 'shuyu', keys: ['input'], preset: { operation: '落息' } },
-  'land': { tool: 'shuyu', keys: ['input'], preset: { operation: '落息' } }
+  'land': { tool: 'shuyu', keys: ['input'], preset: { operation: '落息' } },
+  '起息': { tool: 'shuyu', keys: ['input'], preset: { operation: '起息' } },
+  'stir': { tool: 'shuyu', keys: ['input'], preset: { operation: '起息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -834,6 +870,23 @@ function invoke(operation, input) {
         if(obj.n != null) n=obj.n;
       } else at=trimmed;
       return land(seed, at, n);
+    }
+    case '起息': {
+      let seed=0, at=null, n=3;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('起息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else if(parts.length===2){ seed=parts[0]; at=parts[1]; }
+        else { seed=parts[0]; at=parts[1]; n=parts[2]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+        if(obj.n != null) n=obj.n;
+      } else at=trimmed;
+      return stir(seed, at, n);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

@@ -15,6 +15,7 @@
  *   echo       回息：余息走完后沿末步反向弹一格（不环绕、不改容量）
  *   sway       摇息：回息后按分钟在弹回词与末步之间摇摆（不环绕、不改容量）
  *   land       落息：摇息后按四分钟窗落地，偏停在弹回词（不环绕、不改容量）
+ *   stir       起息：落息落地后按八分钟窗从着地点朝邻格起身（不环绕、不改容量）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -481,6 +482,39 @@ export function land(seed, at, n){
   };
 }
 
+// ══════ 起息：落息落地后按八分钟窗从着地点朝邻格起身；不环绕、不改编号空间 ══════
+export function stir(seed, at, n){
+  const down = land(seed, at, n);
+  const last = down.迹[down.迹.length - 1];
+  const t = Number(at);
+  const neighbors = near(down.id, 16);
+  const rising = down.落 === true && neighbors.length > 0;
+  const pick = rising ? neighbors[Math.floor(t / 480) % neighbors.length] : null;
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const sit = compactPose(down, { 息: last.息, 时: last.时, 分: last.分, 轴: down.轴, 向: down.向, 动: down.落 });
+  let pose = sit;
+  if(pick){
+    const axis = AXIS_NAMES.indexOf(pick.轴);
+    const direction = pick.坐标[keys[axis]] > down.坐标[keys[axis]] ? 1 : -1;
+    pose = compactPose(pick, { 息: last.息, 时: last.时, 分: last.分, 轴: pick.轴, 向: direction, 动: true });
+  }
+  return {
+    息: down.息,
+    种: down.种,
+    步: down.步,
+    迹: down.迹,
+    回: down.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: down.落,
+    侧: down.侧,
+    着: down.着,
+    起: !!pick,
+    由: sit,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -641,4 +675,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
