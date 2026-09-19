@@ -35,6 +35,7 @@ struct NexusShuyuView: View {
                         Button("看「奥形凝起」栖息再蹲") { perch() }.accessibilityIdentifier("shuyu.perch")
                         Button("看「奥形凝起」转息转头") { turn() }.accessibilityIdentifier("shuyu.turn")
                         Button("看「奥形凝起」顾息再望") { gaze() }.accessibilityIdentifier("shuyu.gaze")
+                        Button("看「奥形凝起」倾息再近") { incline() }.accessibilityIdentifier("shuyu.incline")
                     }.textSelection(.enabled)
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
@@ -205,6 +206,21 @@ struct NexusShuyuView: View {
             let gazed = (object["顾"] as? NSNumber)?.boolValue ?? (object["顾"] as? Bool ?? false)
             let face = (object["转处"] as? [String: Any])?["汉"] as? String ?? han
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "顾息 \(count.intValue) 格\(gazed ? "望出去" : "未顾")：\(names) ⊙ \(face)"]
+            verified = count.intValue == steps.count
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func incline() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("倾息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            let inclined = (object["倾"] as? NSNumber)?.boolValue ?? (object["倾"] as? Bool ?? false)
+            let look = (object["顾处"] as? [String: Any])?["汉"] as? String ?? han
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "倾息 \(count.intValue) 格\(inclined ? "倾近" : "未倾")：\(names) ↝ \(look)"]
             verified = count.intValue == steps.count
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }

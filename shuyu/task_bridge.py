@@ -32,6 +32,8 @@ _MAPPING = {
     'turn': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '转息'}},
     '顾息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '顾息'}},
     'gaze': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '顾息'}},
+    '倾息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '倾息'}},
+    'incline': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '倾息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:
