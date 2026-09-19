@@ -49,6 +49,7 @@ final class ChatViewModel: ObservableObject {
     private var keptDraft = ""
     private var retractTask: Task<Void, Never>?
     private var settleTask: Task<Void, Never>?
+    private var hearTask: Task<Void, Never>?
 
     init(store: NexusConversationStore = NexusConversationStore(),
          memory: NexusMemoryStore? = nil,
@@ -130,6 +131,7 @@ final class ChatViewModel: ObservableObject {
             noticedAt: noticedAt,
             retractedAt: retractedAt,
             retractedDraft: retractedDraft,
+            typingAt: isTyping ? activeStartedAt : nil,
             pulseNote: pulseNote
         )
     }
@@ -266,6 +268,15 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    private func scheduleHear() {
+        hearTask?.cancel()
+        hearTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(NexusPresence.hearHold))
+            guard !Task.isCancelled, let self else { return }
+            self.presenceTick = Date()
+        }
+    }
+
     func refreshPulse(now: Date = Date()) {
         let at = String(Int(now.timeIntervalSince1970))
         let last = messages.last(where: { $0.role == "user" })?.content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -372,6 +383,8 @@ final class ChatViewModel: ObservableObject {
         isTyping = true
         lastError = nil
         statusHint = "正在思考…"
+        presenceTick = startedAt
+        scheduleHear()
         settleTask?.cancel()
         keptDraft = ""
         retractedDraft = ""
@@ -452,6 +465,7 @@ final class ChatViewModel: ObservableObject {
                 let outcome = try await engine.run(goal: prompt)
                 guard let self, self.runID == id, !Task.isCancelled else { return }
                 self.isTyping = false
+                self.hearTask?.cancel()
                 self.statusHint = outcome.warning
                 self.activeEngine = nil
                 self.activeTask = nil
@@ -483,6 +497,7 @@ final class ChatViewModel: ObservableObject {
             } catch {
                 guard let self, self.runID == id, !Task.isCancelled else { return }
                 self.isTyping = false
+                self.hearTask?.cancel()
                 self.statusHint = nil
                 self.activeEngine = nil
                 self.activeTask = nil
@@ -537,6 +552,7 @@ final class ChatViewModel: ObservableObject {
         activeEngine = nil
         isTyping = false
         settleTask?.cancel()
+        hearTask?.cancel()
         statusHint = "已停止，进度还在"
         runtime.cancel()
     }

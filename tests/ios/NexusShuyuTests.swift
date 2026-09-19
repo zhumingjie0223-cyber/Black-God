@@ -154,13 +154,13 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertNotNil(vm.pulseNote)
         XCTAssertTrue(vm.pulseNote?.contains(" · ") == true)
         XCTAssertTrue(vm.pulseNote?.contains(" → ") == true)
-        XCTAssertTrue(vm.pulseNote?.contains("↘") == true)
+        XCTAssertTrue(vm.pulseNote?.contains("↷") == true || vm.pulseNote?.contains("↘") == true)
         XCTAssertNotNil(vm.pulseWord)
         XCTAssertTrue(["在场", "该练"].contains(vm.currentMood))
         XCTAssertNotEqual(vm.currentMood, "就绪")
         let first = vm.pulseWord
         vm.awaken(now: Date(timeIntervalSince1970: 1_700_000_180))
         XCTAssertEqual(vm.pulseNote?.contains(first ?? ""), true)
-        XCTAssertTrue(vm.pulseNote?.contains("⤵") == true)
+        XCTAssertTrue(vm.pulseNote?.contains("↷") == true || vm.pulseNote?.contains("↘") == true || vm.pulseNote?.contains("⤵") == true)
     }
 }

@@ -22,6 +22,7 @@ enum NexusPresence {
     static let hitchHold: TimeInterval = 1.6
     static let retractHold: TimeInterval = 4
     static let settleHold: TimeInterval = 6
+    static let hearHold: TimeInterval = 0.8
 
     static func snapshot(
         isTyping: Bool,
@@ -42,6 +43,7 @@ enum NexusPresence {
         noticedAt: Date? = nil,
         retractedAt: Date? = nil,
         retractedDraft: String? = nil,
+        typingAt: Date? = nil,
         pulseNote: String?
     ) -> NexusPresenceSnapshot {
         if isTyping {
@@ -53,7 +55,8 @@ enum NexusPresence {
                 )
             }
             let step = clip(liveStatus)
-            if step.isEmpty || step == "正在理解任务" {
+            let heardAgo = typingAt.map { now.timeIntervalSince($0) }
+            if heardAgo.map({ $0 < hearHold }) == true || step.isEmpty || step == "正在理解任务" {
                 return NexusPresenceSnapshot(
                     mood: "应声", stance: "answering", thread: clip(resumeGoal ?? lastUser),
                     nextWork: "听见了", actionTitle: "", action: .none, breath: 0.6

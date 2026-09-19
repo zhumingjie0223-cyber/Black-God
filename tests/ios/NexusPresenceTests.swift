@@ -30,6 +30,21 @@ final class NexusPresenceTests: XCTestCase {
         XCTAssertEqual(snap.mood, "处理中")
         XCTAssertEqual(snap.nextWork, "正在调用计算")
         XCTAssertEqual(snap.thread, "算账")
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let hearing = NexusPresence.snapshot(
+            isTyping: true, canResume: false, resumeGoal: "算账",
+            practiceDue: false, practiceRunning: false, lastUser: "算账",
+            liveStatus: "正在调用计算", now: t0, typingAt: t0, pulseNote: nil
+        )
+        XCTAssertEqual(hearing.mood, "应声")
+        XCTAssertEqual(hearing.nextWork, "听见了")
+        let working = NexusPresence.snapshot(
+            isTyping: true, canResume: false, resumeGoal: "算账",
+            practiceDue: false, practiceRunning: false, lastUser: "算账",
+            liveStatus: "正在调用计算", now: t0.addingTimeInterval(1), typingAt: t0, pulseNote: nil
+        )
+        XCTAssertEqual(working.mood, "处理中")
+        XCTAssertEqual(working.nextWork, "正在调用计算")
     }
 
     func testSpeakingSurfacesLiveSpeech() {
@@ -427,7 +442,15 @@ final class NexusPresenceTests: XCTestCase {
             lastReply: "刚答完", answered: true, answeredAt: t0.addingTimeInterval(-10),
             now: t0.addingTimeInterval(5), attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
         )
-        XCTAssertEqual(watching.mood, "看着")
+        XCTAssertEqual(watching.mood, "衔着")
+        XCTAssertEqual(watching.nextWork, "还接着刚才")
+        let faded = NexusPresence.snapshot(
+            isTyping: false, canResume: false, resumeGoal: nil,
+            practiceDue: true, practiceRunning: false, lastUser: "上次",
+            lastReply: "刚答完", answered: true, answeredAt: t0.addingTimeInterval(-1000),
+            now: t0.addingTimeInterval(5), attending: true, retractedAt: t0, pulseNote: "夜 · 奥形凝起"
+        )
+        XCTAssertEqual(faded.mood, "看着")
         let unfinished = NexusPresence.snapshot(
             isTyping: false, canResume: true, resumeGoal: "未完成",
             practiceDue: false, practiceRunning: false, lastUser: "未完成",
