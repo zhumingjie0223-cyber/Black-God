@@ -552,6 +552,42 @@ class TestSearchCompose(unittest.TestCase):
             e.nestle(0, 1700000000, 1)
         with self.assertRaises(ValueError):
             e.nestle(0, -1, 3)
+    def test_hold_contains_without_wrap(self):
+        air = e.hold(0, 0, 3)
+        nestled = e.nestle(0, 60, 3)
+        held = e.hold(0, 60, 3)
+        closed = e.hold(0, 15360, 3)
+        keys = ("c", "m", "s", "k", "p")
+        sizes = [e.NC, e.NM, e.NS, e.NK, e.NP]
+        self.assertEqual(air["id"], e.nestle(0, 0, 3)["id"])
+        self.assertFalse(air["含"])
+        self.assertEqual(held["贴"], nestled["贴"])
+        self.assertEqual(held["贴处"]["id"], nestled["id"])
+        if nestled["贴"] and (60 // 15360) % 2 == 0:
+            self.assertTrue(held["含"])
+            axis = e._AXIS_NAMES.index(nestled["轴"])
+            nxt = nestled["坐标"][keys[axis]] + nestled["向"]
+            if 0 <= nxt < sizes[axis]:
+                self.assertNotEqual(held["id"], nestled["id"])
+                self.assertEqual(held["坐标"][keys[axis]], nxt)
+                self.assertEqual(held["轴"], nestled["轴"])
+            else:
+                self.assertEqual(held["id"], nestled["id"])
+        else:
+            self.assertFalse(held["含"])
+            self.assertEqual(held["id"], nestled["id"])
+        self.assertEqual(closed["贴"], e.nestle(0, 15360, 3)["贴"])
+        self.assertFalse(closed["含"])
+        self.assertEqual(closed["id"], e.nestle(0, 15360, 3)["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay_air = e.hold(edge["汉"], 0, 2)
+        self.assertFalse(stay_air["含"])
+        stay_down = e.hold(edge["汉"], 60, 2)
+        self.assertEqual(stay_down["贴处"]["id"], e.nestle(edge["汉"], 60, 2)["id"])
+        with self.assertRaises(ValueError):
+            e.hold(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.hold(0, -1, 3)
 
 
 class TestCoinFamily(unittest.TestCase):
@@ -658,3 +694,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self._json_tail(out)["种"]["id"], 0)
         self.assertIn("贴", self._json_tail(out))
+        rc, out = self.run_cli("--hold", "0", "--at", "60", "--n", "3")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._json_tail(out)["种"]["id"], 0)
+        self.assertIn("含", self._json_tail(out))
