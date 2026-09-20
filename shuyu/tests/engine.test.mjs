@@ -791,6 +791,49 @@ test('hold 含息: 贴住后再含住一格，不环绕，与 Python 同构', ()
   assert.throws(() => engine.hold(0, -1, 3), RangeError);
 });
 
+test('warm 温息: 含住后再温住一格，不环绕，与 Python 同构', () => {
+  const air = engine.warm(0, 0, 3);
+  const held = engine.hold(0, 60, 3);
+  const warmed = engine.warm(0, 60, 3);
+  const closed = engine.warm(0, 30720, 3);
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  const sizes = [1040, 180, 80, 64, 8];
+  assert.equal(air.id, engine.hold(0, 0, 3).id);
+  assert.equal(air.温, false);
+  assert.equal(warmed.含, held.含);
+  assert.equal(warmed.含处.id, held.id);
+  if (held.含 && Math.floor(60 / 30720) % 2 === 0) {
+    assert.equal(warmed.温, true);
+    const axis = ['核', '映', '态', '标', '相'].indexOf(held.轴);
+    const next = held.坐标[keys[axis]] + held.向;
+    if (next >= 0 && next < sizes[axis]) {
+      assert.notEqual(warmed.id, held.id);
+      assert.equal(warmed.坐标[keys[axis]], next);
+      assert.equal(warmed.轴, held.轴);
+    } else {
+      assert.equal(warmed.id, held.id);
+    }
+  } else {
+    assert.equal(warmed.温, false);
+    assert.equal(warmed.id, held.id);
+  }
+  assert.equal(closed.含, engine.hold(0, 30720, 3).含);
+  assert.equal(closed.温, false);
+  assert.equal(closed.id, engine.hold(0, 30720, 3).id);
+  const pyAir = py('print(json.dumps(e.warm(arg[0], arg[1], arg[2]), ensure_ascii=False))', [0, 0, 3]);
+  assert.deepEqual(air, pyAir);
+  const samples = [[0, 0, 2], ['奥形凝起', 28800, 4], [7, 61200, 3], [0, 30720, 3], [0, 1700000000, 3]];
+  const pyHits = py('print(json.dumps([e.warm(*t) for t in arg], ensure_ascii=False))', samples);
+  samples.forEach((t, i) => assert.deepEqual(engine.warm(...t), pyHits[i], `warm(${JSON.stringify(t)}) 分叉`));
+  const edge = engine.decode(CAP_EXPECTED - 1);
+  const stayAir = engine.warm(edge.汉, 0, 2);
+  assert.equal(stayAir.温, false);
+  const stayDown = engine.warm(edge.汉, 60, 2);
+  assert.equal(stayDown.含处.id, engine.hold(edge.汉, 60, 2).id);
+  assert.throws(() => engine.warm(0, 1700000000, 1), RangeError);
+  assert.throws(() => engine.warm(0, -1, 3), RangeError);
+});
+
 test('decode 输出对等: id/词/汉/层/义/根/坐标 七字段与 Python 逐一相等', () => {
   const ids = [0, 7, 888888888, 2949119999, 2949120000, CAP_EXPECTED - 1, ...lcg(91, 40)];
   const pw = py('print(json.dumps([e.decode(i) for i in arg], ensure_ascii=False))', ids);

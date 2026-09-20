@@ -38,6 +38,8 @@ _MAPPING = {
     'nestle': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '贴息'}},
     '含息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '含息'}},
     'hold': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '含息'}},
+    '温息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '温息'}},
+    'warm': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '温息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:
