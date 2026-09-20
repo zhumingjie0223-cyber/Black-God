@@ -270,6 +270,10 @@ final class BlackGodUITests: XCTestCase {
         reveal(warm, in: app)
         warm.tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        let rouse = app.buttons["shuyu.rouse"]
+        reveal(rouse, in: app)
+        rouse.tap()
+        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.buttons["完成"].tap()
         app.buttons["storage.open"].tap()

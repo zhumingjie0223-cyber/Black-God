@@ -26,6 +26,7 @@
  *   nestle     贴息：倾近后再贴住一格（未倾不贴；一百二十八分钟窗才贴；越界停在倾处）
  *   hold       含息：贴住后再含住一格（未贴不含；二百五十六分钟窗才含；越界停在贴处）
  *   warm       温息：含住后再温住一格（未含不温；五百一十二分钟窗才温；越界停在含处）
+ *   rouse      醒息：温住后再醒一格（未温不醒；一千零二十四分钟窗才醒；越界停在温处）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -835,6 +836,59 @@ function warm(seed, at, n){
   };
 }
 
+// ══════ 醒息：温住后再醒一格；未温不醒；一千零二十四分钟窗才醒；越界停在温处 ══════
+function rouse(seed, at, n){
+  const warmed = warm(seed, at, n);
+  const last = warmed.迹[warmed.迹.length - 1];
+  const t = Number(at);
+  const rest = compactPose(warmed, { 息: last.息, 时: last.时, 分: last.分, 轴: warmed.轴, 向: warmed.向, 动: warmed.温 });
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  let pose = rest;
+  let rousing = false;
+  if(warmed.温 === true && Math.floor(t / 61440) % 2 === 0){
+    rousing = true;
+    const sizes = [NC, NM, NS, NK, NP];
+    const axis = AXIS_NAMES.indexOf(warmed.轴);
+    const coord = keys.map(key => warmed.坐标[key]);
+    const next = coord[axis] + warmed.向;
+    if(next >= 0 && next < sizes[axis]){
+      coord[axis] = next;
+      pose = compactPose(decode(idOf(...coord)), { 息: last.息, 时: last.时, 分: last.分, 轴: warmed.轴, 向: warmed.向, 动: true });
+    }
+  }
+  return {
+    息: warmed.息,
+    种: warmed.种,
+    步: warmed.步,
+    迹: warmed.迹,
+    回: warmed.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: warmed.落,
+    侧: warmed.侧,
+    着: warmed.着,
+    起: warmed.起,
+    由: warmed.由,
+    起处: warmed.起处,
+    栖: warmed.栖,
+    栖处: warmed.栖处,
+    转: warmed.转,
+    转处: warmed.转处,
+    顾: warmed.顾,
+    顾处: warmed.顾处,
+    倾: warmed.倾,
+    倾处: warmed.倾处,
+    贴: warmed.贴,
+    贴处: warmed.贴处,
+    含: warmed.含,
+    含处: warmed.含处,
+    温: warmed.温,
+    温处: rest,
+    醒: rousing,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -1035,7 +1089,9 @@ const mapping = Object.freeze({
   '含息': { tool: 'shuyu', keys: ['input'], preset: { operation: '含息' } },
   'hold': { tool: 'shuyu', keys: ['input'], preset: { operation: '含息' } },
   '温息': { tool: 'shuyu', keys: ['input'], preset: { operation: '温息' } },
-  'warm': { tool: 'shuyu', keys: ['input'], preset: { operation: '温息' } }
+  'warm': { tool: 'shuyu', keys: ['input'], preset: { operation: '温息' } },
+  '醒息': { tool: 'shuyu', keys: ['input'], preset: { operation: '醒息' } },
+  'rouse': { tool: 'shuyu', keys: ['input'], preset: { operation: '醒息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -1337,6 +1393,23 @@ function invoke(operation, input) {
         if(obj.n != null) n=obj.n;
       } else at=trimmed;
       return warm(seed, at, n);
+    }
+    case '醒息': {
+      let seed=0, at=null, n=3;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('醒息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else if(parts.length===2){ seed=parts[0]; at=parts[1]; }
+        else { seed=parts[0]; at=parts[1]; n=parts[2]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+        if(obj.n != null) n=obj.n;
+      } else at=trimmed;
+      return rouse(seed, at, n);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

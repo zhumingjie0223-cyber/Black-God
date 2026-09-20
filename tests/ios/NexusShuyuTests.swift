@@ -168,6 +168,11 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertEqual((warm?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
         let warmProgram = try NexusShuyuEngine.shared.compile("行：温息(\"1700000000\")")
         XCTAssertEqual(warmProgram.actions[0].arguments["operation"], "温息")
+        let rouse = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("醒息", input: #"[0,"60",3]"#).utf8)) as? [String: Any]
+        XCTAssertEqual((rouse?["温"] as? NSNumber)?.boolValue, true)
+        XCTAssertEqual((rouse?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
+        let rouseProgram = try NexusShuyuEngine.shared.compile("行：醒息(\"1700000000\")")
+        XCTAssertEqual(rouseProgram.actions[0].arguments["operation"], "醒息")
         tools.register(runner)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "clock" })
     }
