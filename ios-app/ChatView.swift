@@ -285,10 +285,10 @@ struct PresenceStrip: View {
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
     private func breathing(_ stance: String) -> Bool {
-        ["working", "speaking", "answering", "following", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling", "carrying", "awaiting", "heeding", "yielding"].contains(stance)
+        ["working", "speaking", "answering", "following", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "yielding", "keeping"].contains(stance)
     }
     private func leaning(_ stance: String) -> Bool {
-        ["speaking", "answering", "following", "hitching", "retracting", "watching", "noticing", "exhaling", "carrying", "awaiting", "heeding", "yielding"].contains(stance)
+        ["speaking", "answering", "following", "hitching", "retracting", "watching", "noticing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "yielding", "keeping"].contains(stance)
     }
     private func breathe(_ stance: String) {
         guard breathing(stance) else { on = false; return }
@@ -303,11 +303,13 @@ struct PresenceStrip: View {
         case "listening": duration = 1.1
         case "carrying": duration = 1.2
         case "heeding": duration = 1.25
+        case "nestling": duration = 1.35
         case "retracting": duration = 1.3
         case "hitching": duration = 1.5
         case "watching": duration = 1.4
         case "awaiting": duration = 1.6
         case "yielding": duration = 1.7
+        case "keeping": duration = 1.85
         case "noticing": duration = 1.8
         case "holding": duration = 2.0
         case "echoing": duration = 2.2

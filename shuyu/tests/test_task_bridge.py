@@ -46,4 +46,6 @@ class TaskBridgeTests(unittest.TestCase):
         self.assertEqual(gaze['actions'][0]['arguments'],{'operation':'顾息','input':'1700000000'})
         lean=compile_task('行：倾息("1700000000")')
         self.assertEqual(lean['actions'][0]['arguments'],{'operation':'倾息','input':'1700000000'})
+        nestle=compile_task('行：贴息("1700000000")')
+        self.assertEqual(nestle['actions'][0]['arguments'],{'operation':'贴息','input':'1700000000'})
         self.assertEqual(describe_plan(program)[1]['title'],'Asia/Shanghai')
