@@ -514,6 +514,45 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.incline(0, -1, 3)
 
+    def test_nestle_closes_without_wrap(self):
+        air = e.nestle(0, 0, 3)
+        leaned = e.incline(0, 60, 3)
+        nestled = e.nestle(0, 60, 3)
+        held = e.nestle(0, 7680, 3)
+        keys = ("c", "m", "s", "k", "p")
+        self.assertFalse(air["贴"])
+        self.assertFalse(air["倾"])
+        self.assertEqual(air["id"], e.incline(0, 0, 3)["id"])
+        self.assertEqual(air["倾处"]["id"], air["id"])
+        self.assertEqual(nestled["倾"], leaned["倾"])
+        self.assertEqual(nestled["倾处"]["id"], leaned["id"])
+        if leaned["倾"] and (60 // 7680) % 2 == 0:
+            self.assertTrue(nestled["贴"])
+            axis = e._AXIS_NAMES.index(leaned["轴"])
+            sizes = [e.NC, e.NM, e.NS, e.NK, e.NP]
+            nxt = leaned["坐标"][keys[axis]] + leaned["向"]
+            if 0 <= nxt < sizes[axis]:
+                self.assertNotEqual(nestled["id"], leaned["id"])
+                self.assertEqual(nestled["坐标"][keys[axis]], nxt)
+                self.assertEqual(nestled["轴"], leaned["轴"])
+            else:
+                self.assertEqual(nestled["id"], leaned["id"])
+        else:
+            self.assertFalse(nestled["贴"])
+            self.assertEqual(nestled["id"], leaned["id"])
+        self.assertEqual(held["倾"], e.incline(0, 7680, 3)["倾"])
+        self.assertFalse(held["贴"])
+        self.assertEqual(held["id"], e.incline(0, 7680, 3)["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay_air = e.nestle(edge["汉"], 0, 2)
+        self.assertFalse(stay_air["贴"])
+        stay_down = e.nestle(edge["汉"], 60, 2)
+        self.assertEqual(stay_down["倾处"]["id"], e.incline(edge["汉"], 60, 2)["id"])
+        with self.assertRaises(ValueError):
+            e.nestle(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.nestle(0, -1, 3)
+
 
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):
@@ -615,3 +654,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self._json_tail(out)["种"]["id"], 0)
         self.assertIn("倾", self._json_tail(out))
+        rc, out = self.run_cli("--nestle", "0", "--at", "60", "--n", "3")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._json_tail(out)["种"]["id"], 0)
+        self.assertIn("贴", self._json_tail(out))

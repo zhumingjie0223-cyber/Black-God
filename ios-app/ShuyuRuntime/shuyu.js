@@ -23,6 +23,7 @@
  *   turn       转息：栖息后再朝侧邻转头（未栖不转；无侧邻则停在栖处）
  *   gaze       顾息：转头后再沿转轴把目光探一格（未转不顾；三十二分钟窗才探；越界停在转处）
  *   incline    倾息：望出去后再沿望轴倾近一格（未顾不倾；六十四分钟窗才倾；越界停在望处）
+ *   nestle     贴息：倾近后再贴住一格（未倾不贴；一百二十八分钟窗才贴；越界停在倾处）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -685,6 +686,53 @@ function incline(seed, at, n){
   };
 }
 
+// ══════ 贴息：倾近后再贴住一格；未倾不贴；一百二十八分钟窗才贴；越界停在倾处 ══════
+function nestle(seed, at, n){
+  const leaned = incline(seed, at, n);
+  const last = leaned.迹[leaned.迹.length - 1];
+  const t = Number(at);
+  const rest = compactPose(leaned, { 息: last.息, 时: last.时, 分: last.分, 轴: leaned.轴, 向: leaned.向, 动: leaned.倾 });
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  let pose = rest;
+  let nestling = false;
+  if(leaned.倾 === true && Math.floor(t / 7680) % 2 === 0){
+    nestling = true;
+    const sizes = [NC, NM, NS, NK, NP];
+    const axis = AXIS_NAMES.indexOf(leaned.轴);
+    const coord = keys.map(key => leaned.坐标[key]);
+    const next = coord[axis] + leaned.向;
+    if(next >= 0 && next < sizes[axis]){
+      coord[axis] = next;
+      pose = compactPose(decode(idOf(...coord)), { 息: last.息, 时: last.时, 分: last.分, 轴: leaned.轴, 向: leaned.向, 动: true });
+    }
+  }
+  return {
+    息: leaned.息,
+    种: leaned.种,
+    步: leaned.步,
+    迹: leaned.迹,
+    回: leaned.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: leaned.落,
+    侧: leaned.侧,
+    着: leaned.着,
+    起: leaned.起,
+    由: leaned.由,
+    起处: leaned.起处,
+    栖: leaned.栖,
+    栖处: leaned.栖处,
+    转: leaned.转,
+    转处: leaned.转处,
+    顾: leaned.顾,
+    顾处: leaned.顾处,
+    倾: leaned.倾,
+    倾处: rest,
+    贴: nestling,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -879,7 +927,9 @@ const mapping = Object.freeze({
   '顾息': { tool: 'shuyu', keys: ['input'], preset: { operation: '顾息' } },
   'gaze': { tool: 'shuyu', keys: ['input'], preset: { operation: '顾息' } },
   '倾息': { tool: 'shuyu', keys: ['input'], preset: { operation: '倾息' } },
-  'incline': { tool: 'shuyu', keys: ['input'], preset: { operation: '倾息' } }
+  'incline': { tool: 'shuyu', keys: ['input'], preset: { operation: '倾息' } },
+  '贴息': { tool: 'shuyu', keys: ['input'], preset: { operation: '贴息' } },
+  'nestle': { tool: 'shuyu', keys: ['input'], preset: { operation: '贴息' } }
 });
 function compileTask(source) {
   if (typeof source !== 'string' || source.length > 8192) throw new Error('枢语程序为空或超过8192字符');
@@ -1130,6 +1180,23 @@ function invoke(operation, input) {
         if(obj.n != null) n=obj.n;
       } else at=trimmed;
       return incline(seed, at, n);
+    }
+    case '贴息': {
+      let seed=0, at=null, n=3;
+      const trimmed=String(input||'').trim();
+      if(trimmed.startsWith('[')){
+        const parts=JSON.parse(trimmed);
+        if(!Array.isArray(parts)||!parts.length) throw Error('贴息需要时刻');
+        if(parts.length===1) at=parts[0];
+        else if(parts.length===2){ seed=parts[0]; at=parts[1]; }
+        else { seed=parts[0]; at=parts[1]; n=parts[2]; }
+      } else if(trimmed.startsWith('{')){
+        const obj=JSON.parse(trimmed);
+        seed=obj.seed ?? obj.种 ?? 0;
+        at=obj.at ?? obj.时;
+        if(obj.n != null) n=obj.n;
+      } else at=trimmed;
+      return nestle(seed, at, n);
     }
     case '编译': return compileTask(input);
     case '规划': return describePlan(compileTask(input));

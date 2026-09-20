@@ -767,6 +767,54 @@ def incline(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def nestle(seed, at, n=3):
+    """贴息：倾近后再贴住一格，未倾不贴，一百二十八分钟窗才贴，越界停在倾处；与 lexicon.js nestle 同构。"""
+    leaned = incline(seed, at, n)
+    last = leaned["迹"][-1]
+    if isinstance(at, str):
+        t = int(at)
+    else:
+        t = int(at)
+    rest = _compact_pose(leaned, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": leaned["轴"], "向": leaned["向"], "动": leaned["倾"]})
+    keys = ("c", "m", "s", "k", "p")
+    pose = rest
+    nestling = False
+    if leaned["倾"] and (t // 7680) % 2 == 0:
+        nestling = True
+        sizes = [NC, NM, NS, NK, NP]
+        axis = _AXIS_NAMES.index(leaned["轴"])
+        coord = [leaned["坐标"][key] for key in keys]
+        nxt = coord[axis] + leaned["向"]
+        if 0 <= nxt < sizes[axis]:
+            coord[axis] = nxt
+            pose = _compact_pose(decode(_id_of(*coord)), {"息": last["息"], "时": last["时"], "分": last["分"], "轴": leaned["轴"], "向": leaned["向"], "动": True})
+    return {
+        "息": leaned["息"],
+        "种": leaned["种"],
+        "步": leaned["步"],
+        "迹": leaned["迹"],
+        "回": leaned["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": leaned["落"],
+        "侧": leaned["侧"],
+        "着": leaned["着"],
+        "起": leaned["起"],
+        "由": leaned["由"],
+        "起处": leaned["起处"],
+        "栖": leaned["栖"],
+        "栖处": leaned["栖处"],
+        "转": leaned["转"],
+        "转处": leaned["转处"],
+        "顾": leaned["顾"],
+        "顾处": leaned["顾处"],
+        "倾": leaned["倾"],
+        "倾处": rest,
+        "贴": nestling,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -854,8 +902,9 @@ def main(argv=None):
     ap.add_argument("--turn",nargs="?",const="",default=None,help="转息种子（编号或词，缺省为0）")
     ap.add_argument("--gaze",nargs="?",const="",default=None,help="顾息种子（编号或词，缺省为0）")
     ap.add_argument("--incline",nargs="?",const="",default=None,help="倾息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息步数，2至4")
+    ap.add_argument("--nestle",nargs="?",const="",default=None,help="贴息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -890,6 +939,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.nestle is not None and a.at >= 0:
+        try:
+            out(nestle(a.nestle, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return
