@@ -22,6 +22,7 @@
  *   incline    倾息：望出去后再沿望轴倾近一格（未顾不倾；六十四分钟窗才倾；越界停在望处）
  *   nestle     贴息：倾近后再贴住一格（未倾不贴；一百二十八分钟窗才贴；越界停在倾处）
  *   hold       含息：贴住后再含住一格（未贴不含；二百五十六分钟窗才含；越界停在贴处）
+ *   warm       温息：含住后再温住一格（未含不温；五百一十二分钟窗才温；越界停在含处）
  *   decode     输出增加 根 / 坐标{c,m,s,k,p}，与 Python 字段对等
  */
 
@@ -780,6 +781,57 @@ export function hold(seed, at, n){
   };
 }
 
+// ══════ 温息：含住后再温住一格；未含不温；五百一十二分钟窗才温；越界停在含处 ══════
+export function warm(seed, at, n){
+  const held = hold(seed, at, n);
+  const last = held.迹[held.迹.length - 1];
+  const t = Number(at);
+  const rest = compactPose(held, { 息: last.息, 时: last.时, 分: last.分, 轴: held.轴, 向: held.向, 动: held.含 });
+  const keys = ['c', 'm', 's', 'k', 'p'];
+  let pose = rest;
+  let warming = false;
+  if(held.含 === true && Math.floor(t / 30720) % 2 === 0){
+    warming = true;
+    const sizes = [NC, NM, NS, NK, NP];
+    const axis = AXIS_NAMES.indexOf(held.轴);
+    const coord = keys.map(key => held.坐标[key]);
+    const next = coord[axis] + held.向;
+    if(next >= 0 && next < sizes[axis]){
+      coord[axis] = next;
+      pose = compactPose(decode(idOf(...coord)), { 息: last.息, 时: last.时, 分: last.分, 轴: held.轴, 向: held.向, 动: true });
+    }
+  }
+  return {
+    息: held.息,
+    种: held.种,
+    步: held.步,
+    迹: held.迹,
+    回: held.回,
+    轴: pose.轴,
+    向: pose.向,
+    落: held.落,
+    侧: held.侧,
+    着: held.着,
+    起: held.起,
+    由: held.由,
+    起处: held.起处,
+    栖: held.栖,
+    栖处: held.栖处,
+    转: held.转,
+    转处: held.转处,
+    顾: held.顾,
+    顾处: held.顾处,
+    倾: held.倾,
+    倾处: held.倾处,
+    贴: held.贴,
+    贴处: held.贴处,
+    含: held.含,
+    含处: rest,
+    温: warming,
+    id: pose.id, 词: pose.词, 汉: pose.汉, 义: pose.义, 坐标: pose.坐标
+  };
+}
+
 // ══════ 解释器接口：按意图取词 ══════
 // 解释器 nexuslang.js 需要 LEXICON 和 matchWord
 // LEXICON：核心情感/状态映射表（小而精，常驻）
@@ -940,4 +992,4 @@ export function coinFromState(soul, seed) {
   return { ...coinWord(layer), 层意图: layer };
 }
 
-export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, turn, gaze, incline, nestle, hold, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };
+export default { CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, turn, gaze, incline, nestle, hold, warm, LEXICON, matchWord, coinWord, coinFromCoord, autoCoin, coinFromState, loadCapabilities };

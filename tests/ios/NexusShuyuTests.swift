@@ -163,6 +163,11 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertEqual((hold?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
         let holdProgram = try NexusShuyuEngine.shared.compile("行：含息(\"1700000000\")")
         XCTAssertEqual(holdProgram.actions[0].arguments["operation"], "含息")
+        let warm = try JSONSerialization.jsonObject(with: Data(try NexusShuyuEngine.shared.invoke("温息", input: #"[0,"60",3]"#).utf8)) as? [String: Any]
+        XCTAssertEqual((warm?["含"] as? NSNumber)?.boolValue, true)
+        XCTAssertEqual((warm?["种"] as? [String: Any])?["id"] as? NSNumber, 0)
+        let warmProgram = try NexusShuyuEngine.shared.compile("行：温息(\"1700000000\")")
+        XCTAssertEqual(warmProgram.actions[0].arguments["operation"], "温息")
         tools.register(runner)
         XCTAssertTrue(tools.nativeDefinitions.contains { $0.name == "clock" })
     }
@@ -174,13 +179,13 @@ final class NexusShuyuTests: XCTestCase {
         XCTAssertNotNil(vm.pulseNote)
         XCTAssertTrue(vm.pulseNote?.contains(" · ") == true)
         XCTAssertTrue(vm.pulseNote?.contains(" → ") == true)
-        XCTAssertTrue(vm.pulseNote?.contains("↷") == true || vm.pulseNote?.contains("↘") == true || vm.pulseNote?.contains("⊙") == true || vm.pulseNote?.contains("↝") == true || vm.pulseNote?.contains("⊏") == true || vm.pulseNote?.contains("⊂") == true)
+        XCTAssertTrue(vm.pulseNote?.contains("↷") == true || vm.pulseNote?.contains("↘") == true || vm.pulseNote?.contains("⊙") == true || vm.pulseNote?.contains("↝") == true || vm.pulseNote?.contains("⊏") == true || vm.pulseNote?.contains("⊂") == true || vm.pulseNote?.contains("∿") == true)
         XCTAssertNotNil(vm.pulseWord)
         XCTAssertTrue(["在场", "该练"].contains(vm.currentMood))
         XCTAssertNotEqual(vm.currentMood, "就绪")
         let first = vm.pulseWord
         vm.awaken(now: Date(timeIntervalSince1970: 1_700_000_180))
         XCTAssertEqual(vm.pulseNote?.contains(first ?? ""), true)
-        XCTAssertTrue(vm.pulseNote?.contains("↷") == true || vm.pulseNote?.contains("↘") == true || vm.pulseNote?.contains("⊙") == true || vm.pulseNote?.contains("⤵") == true || vm.pulseNote?.contains("↝") == true || vm.pulseNote?.contains("⊏") == true || vm.pulseNote?.contains("⊂") == true)
+        XCTAssertTrue(vm.pulseNote?.contains("↷") == true || vm.pulseNote?.contains("↘") == true || vm.pulseNote?.contains("⊙") == true || vm.pulseNote?.contains("⤵") == true || vm.pulseNote?.contains("↝") == true || vm.pulseNote?.contains("⊏") == true || vm.pulseNote?.contains("⊂") == true || vm.pulseNote?.contains("∿") == true)
     }
 }

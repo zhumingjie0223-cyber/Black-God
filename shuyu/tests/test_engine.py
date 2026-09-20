@@ -588,6 +588,42 @@ class TestSearchCompose(unittest.TestCase):
             e.hold(0, 1700000000, 1)
         with self.assertRaises(ValueError):
             e.hold(0, -1, 3)
+    def test_warm_heats_without_wrap(self):
+        air = e.warm(0, 0, 3)
+        held = e.hold(0, 60, 3)
+        warmed = e.warm(0, 60, 3)
+        closed = e.warm(0, 30720, 3)
+        keys = ("c", "m", "s", "k", "p")
+        sizes = [1040, 180, 80, 64, 8]
+        self.assertEqual(air["id"], e.hold(0, 0, 3)["id"])
+        self.assertFalse(air["温"])
+        self.assertEqual(warmed["含"], held["含"])
+        self.assertEqual(warmed["含处"]["id"], held["id"])
+        if held["含"] and (60 // 30720) % 2 == 0:
+            self.assertTrue(warmed["温"])
+            axis = e._AXIS_NAMES.index(held["轴"])
+            nxt = held["坐标"][keys[axis]] + held["向"]
+            if 0 <= nxt < sizes[axis]:
+                self.assertNotEqual(warmed["id"], held["id"])
+                self.assertEqual(warmed["坐标"][keys[axis]], nxt)
+                self.assertEqual(warmed["轴"], held["轴"])
+            else:
+                self.assertEqual(warmed["id"], held["id"])
+        else:
+            self.assertFalse(warmed["温"])
+            self.assertEqual(warmed["id"], held["id"])
+        self.assertEqual(closed["含"], e.hold(0, 30720, 3)["含"])
+        self.assertFalse(closed["温"])
+        self.assertEqual(closed["id"], e.hold(0, 30720, 3)["id"])
+        edge = e.decode(CAP_EXPECTED - 1)
+        stay_air = e.warm(edge["汉"], 0, 2)
+        self.assertFalse(stay_air["温"])
+        stay_down = e.warm(edge["汉"], 60, 2)
+        self.assertEqual(stay_down["含处"]["id"], e.hold(edge["汉"], 60, 2)["id"])
+        with self.assertRaises(ValueError):
+            e.warm(0, 1700000000, 1)
+        with self.assertRaises(ValueError):
+            e.warm(0, -1, 3)
 
 
 class TestCoinFamily(unittest.TestCase):
@@ -698,3 +734,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self._json_tail(out)["种"]["id"], 0)
         self.assertIn("含", self._json_tail(out))
+        rc, out = self.run_cli("--warm", "0", "--at", "60", "--n", "3")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._json_tail(out)["种"]["id"], 0)
+        self.assertIn("温", self._json_tail(out))
