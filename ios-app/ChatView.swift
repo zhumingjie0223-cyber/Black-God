@@ -285,10 +285,10 @@ struct PresenceStrip: View {
         .onChange(of: snapshot.stance) { _, value in breathe(value) }
     }
     private func breathing(_ stance: String) -> Bool {
-        ["working", "speaking", "answering", "following", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "yielding", "keeping", "companying", "tending"].contains(stance)
+        ["working", "speaking", "answering", "following", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "resting", "yielding", "keeping", "companying", "tending", "waking"].contains(stance)
     }
     private func leaning(_ stance: String) -> Bool {
-        ["speaking", "answering", "following", "hitching", "retracting", "watching", "noticing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "yielding", "keeping", "companying", "tending"].contains(stance)
+        ["speaking", "answering", "following", "hitching", "retracting", "watching", "noticing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "resting", "yielding", "keeping", "companying", "tending", "waking"].contains(stance)
     }
     private func breathe(_ stance: String) {
         guard breathing(stance) else { on = false; return }
@@ -306,6 +306,7 @@ struct PresenceStrip: View {
         case "nestling": duration = 1.35
         case "nuzzling": duration = 1.45
         case "clinging": duration = 1.55
+        case "resting": duration = 1.65
         case "retracting": duration = 1.3
         case "hitching": duration = 1.5
         case "watching": duration = 1.4
@@ -314,6 +315,7 @@ struct PresenceStrip: View {
         case "keeping": duration = 1.85
         case "companying": duration = 1.95
         case "tending": duration = 2.05
+        case "waking": duration = 2.15
         case "noticing": duration = 1.8
         case "holding": duration = 2.0
         case "echoing": duration = 2.2

@@ -25,13 +25,14 @@
 //   GET  /nestle?word=W&at=T&n=N 贴息：倾近后再贴住一格（不环绕）
 //   GET  /hold?word=W&at=T&n=N 含息：贴住后再含住一格（不环绕）
 //   GET  /warm?word=W&at=T&n=N 温息：含住后再温住一格（不环绕）
+//   GET  /rouse?word=W&at=T&n=N 醒息：温住后再醒一格（不环绕）
 //   GET  /compose?核=&映=&态=&标=&相=   按义造词（每轴给 下标/拉丁根/汉译/语义关键词，缺省取 0）
 //   GET  /coin?seed=S&layer=L 造词（有 seed 可复现，无 seed 按层随机）
 //   POST /talk        {code} 枢语意识流 → 解释 + 编译（别名 /interpret）
 //   POST /broadcast   万网散播（sovereignControl 全流程）
 
 import {
-  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, turn, gaze, incline, nestle, hold, warm,
+  CAPACITY, AXES, decode, encode, encodeHan, search, compose, analogy, near, pulse, trail, echo, sway, land, stir, perch, turn, gaze, incline, nestle, hold, warm, rouse,
   coinWord, autoCoin, coinFromState, loadCapabilities,
 } from './lexicon.js';
 import { interpret, applyToSoul, compile } from './nexuslang.js';
@@ -286,6 +287,18 @@ async function handleWarm(url) {
   }
 }
 
+async function handleRouse(url) {
+  const word = url.searchParams.get('word') ?? url.searchParams.get('w') ?? '0';
+  const at = url.searchParams.get('at');
+  const n = url.searchParams.get('n');
+  if (at == null || !String(at).trim()) return badRequest('缺少参数 at（Unix 秒）');
+  try {
+    return json({ word, at, n: n ?? 3, ...rouse(word, at, n == null || n === '' ? 3 : n) });
+  } catch (err) {
+    return badRequest(String(err?.message ?? err));
+  }
+}
+
 async function handleCompose(url) {
   const spec = {};
   for (const [k, v] of url.searchParams) {
@@ -361,7 +374,7 @@ export default {
           copyright: COPYRIGHT,
           capacity: CAPACITY,
           axes: AXES,
-          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/pulse?word=&at=', '/trail?word=&at=&n=', '/echo?word=&at=&n=', '/sway?word=&at=&n=', '/land?word=&at=&n=', '/stir?word=&at=&n=', '/perch?word=&at=&n=', '/turn?word=&at=&n=', '/gaze?word=&at=&n=', '/incline?word=&at=&n=', '/nestle?word=&at=&n=', '/hold?word=&at=&n=', '/warm?word=&at=&n=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
+          endpoints: ['/status', '/decode?id=', '/encode?word=', '/search?q=&axis=', '/near?word=&n=', '/pulse?word=&at=', '/trail?word=&at=&n=', '/echo?word=&at=&n=', '/sway?word=&at=&n=', '/land?word=&at=&n=', '/stir?word=&at=&n=', '/perch?word=&at=&n=', '/turn?word=&at=&n=', '/gaze?word=&at=&n=', '/incline?word=&at=&n=', '/nestle?word=&at=&n=', '/hold?word=&at=&n=', '/warm?word=&at=&n=', '/rouse?word=&at=&n=', '/compose?核=&映=&态=&标=&相=', '/analogy?a=&b=&c=', '/coin?seed=&layer=', 'POST /talk', 'POST /broadcast'],
         });
       }
       if (path === '/status' && req.method === 'GET') return handleStatus(env);
@@ -382,6 +395,7 @@ export default {
       if (path === '/nestle' && req.method === 'GET') return handleNestle(url);
       if (path === '/hold' && req.method === 'GET') return handleHold(url);
       if (path === '/warm' && req.method === 'GET') return handleWarm(url);
+      if (path === '/rouse' && req.method === 'GET') return handleRouse(url);
       if (path === '/compose' && req.method === 'GET') return handleCompose(url);
       if (path === '/analogy' && req.method === 'GET') return handleAnalogy(url);
       if (path === '/coin' && req.method === 'GET') return handleCoin(url, env);

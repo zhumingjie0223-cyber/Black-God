@@ -52,4 +52,6 @@ class TaskBridgeTests(unittest.TestCase):
         self.assertEqual(hold['actions'][0]['arguments'],{'operation':'含息','input':'1700000000'})
         warm=compile_task('行：温息("1700000000")')
         self.assertEqual(warm['actions'][0]['arguments'],{'operation':'温息','input':'1700000000'})
+        rouse=compile_task('行：醒息("1700000000")')
+        self.assertEqual(rouse['actions'][0]['arguments'],{'operation':'醒息','input':'1700000000'})
         self.assertEqual(describe_plan(program)[1]['title'],'Asia/Shanghai')

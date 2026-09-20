@@ -39,6 +39,7 @@ struct NexusShuyuView: View {
                         Button("看「奥形凝起」贴息再贴") { nestle() }.accessibilityIdentifier("shuyu.nestle")
                         Button("看「奥形凝起」含息再含") { hold() }.accessibilityIdentifier("shuyu.hold")
                         Button("看「奥形凝起」温息再温") { warm() }.accessibilityIdentifier("shuyu.warm")
+                        Button("看「奥形凝起」醒息再醒") { rouse() }.accessibilityIdentifier("shuyu.rouse")
                     }.textSelection(.enabled)
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
@@ -269,6 +270,21 @@ struct NexusShuyuView: View {
             let warmed = (object["温"] as? NSNumber)?.boolValue ?? (object["温"] as? Bool ?? false)
             let rest = (object["含处"] as? [String: Any])?["汉"] as? String ?? han
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "温息 \(count.intValue) 格\(warmed ? "温住" : "未温")：\(names) ∿ \(rest)"]
+            verified = count.intValue == steps.count
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func rouse() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("醒息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            let roused = (object["醒"] as? NSNumber)?.boolValue ?? (object["醒"] as? Bool ?? false)
+            let rest = (object["温处"] as? [String: Any])?["汉"] as? String ?? han
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "醒息 \(count.intValue) 格\(roused ? "醒住" : "未醒")：\(names) ⋆ \(rest)"]
             verified = count.intValue == steps.count
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }

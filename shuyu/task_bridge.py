@@ -40,6 +40,8 @@ _MAPPING = {
     'hold': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '含息'}},
     '温息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '温息'}},
     'warm': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '温息'}},
+    '醒息': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '醒息'}},
+    'rouse': {'tool': 'shuyu', 'keys': ['input'], 'preset': {'operation': '醒息'}},
 }
 def compile_task(source):
     if not isinstance(source, str) or len(source.encode('utf-16-le')) // 2 > 8192:

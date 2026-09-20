@@ -917,6 +917,60 @@ def warm(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
+
+def rouse(seed, at, n=3):
+    """醒息：温住后再醒一格，未温不醒，一千零二十四分钟窗才醒，越界停在温处；与 lexicon.js rouse 同构。"""
+    warmed = warm(seed, at, n)
+    last = warmed["迹"][-1]
+    if isinstance(at, str):
+        t = int(at)
+    else:
+        t = int(at)
+    rest = _compact_pose(warmed, {"息": last["息"], "时": last["时"], "分": last["分"], "轴": warmed["轴"], "向": warmed["向"], "动": warmed["温"]})
+    keys = ("c", "m", "s", "k", "p")
+    pose = rest
+    rousing = False
+    if warmed["温"] and (t // 61440) % 2 == 0:
+        rousing = True
+        sizes = [NC, NM, NS, NK, NP]
+        axis = _AXIS_NAMES.index(warmed["轴"])
+        coord = [warmed["坐标"][key] for key in keys]
+        nxt = coord[axis] + warmed["向"]
+        if 0 <= nxt < sizes[axis]:
+            coord[axis] = nxt
+            pose = _compact_pose(decode(_id_of(*coord)), {"息": last["息"], "时": last["时"], "分": last["分"], "轴": warmed["轴"], "向": warmed["向"], "动": True})
+    return {
+        "息": warmed["息"],
+        "种": warmed["种"],
+        "步": warmed["步"],
+        "迹": warmed["迹"],
+        "回": warmed["回"],
+        "轴": pose["轴"],
+        "向": pose["向"],
+        "落": warmed["落"],
+        "侧": warmed["侧"],
+        "着": warmed["着"],
+        "起": warmed["起"],
+        "由": warmed["由"],
+        "起处": warmed["起处"],
+        "栖": warmed["栖"],
+        "栖处": warmed["栖处"],
+        "转": warmed["转"],
+        "转处": warmed["转处"],
+        "顾": warmed["顾"],
+        "顾处": warmed["顾处"],
+        "倾": warmed["倾"],
+        "倾处": warmed["倾处"],
+        "贴": warmed["贴"],
+        "贴处": warmed["贴处"],
+        "含": warmed["含"],
+        "含处": warmed["含处"],
+        "温": warmed["温"],
+        "温处": rest,
+        "醒": rousing,
+        "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
+    }
+
 # ══════ 造词族：与 lexicon.js 逐位一致 ══════
 _U32 = 0xFFFFFFFF
 
@@ -1007,8 +1061,9 @@ def main(argv=None):
     ap.add_argument("--nestle",nargs="?",const="",default=None,help="贴息种子（编号或词，缺省为0）")
     ap.add_argument("--hold",nargs="?",const="",default=None,help="含息种子（编号或词，缺省为0）")
     ap.add_argument("--warm",nargs="?",const="",default=None,help="温息种子（编号或词，缺省为0）")
-    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息/含息/温息 Unix 秒（UTC）")
-    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息/含息/温息步数，2至4")
+    ap.add_argument("--rouse",nargs="?",const="",default=None,help="醒息种子（编号或词，缺省为0）")
+    ap.add_argument("--at",type=int,default=-1,help="一息/余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息/含息/温息/醒息 Unix 秒（UTC）")
+    ap.add_argument("--n",type=int,default=3,help="余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息/含息/温息/醒息步数，2至4")
     ap.add_argument("--coin",default=None,help="确定性种子造词（与 JS autoCoin 同种子同词）")
     ap.add_argument("--sample",type=int,default=0)
     ap.add_argument("--dump",default="")
@@ -1043,6 +1098,12 @@ def main(argv=None):
     if a.near:
         try:
             out({"word":a.near,"neighbors":near(a.near)})
+        except (ValueError, TypeError) as ex:
+            print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
+        return
+    if a.rouse is not None and a.at >= 0:
+        try:
+            out(rouse(a.rouse, a.at, a.n))
         except (ValueError, TypeError) as ex:
             print(json.dumps({"error":str(ex)},ensure_ascii=False)); sys.exit(2)
         return
