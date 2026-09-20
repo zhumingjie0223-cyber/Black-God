@@ -76,6 +76,8 @@ test('邻近、时间与一息编译为有界工具，规划标题用时区',()=
   assert.equal(lean.actions[0].arguments.operation,'倾息');
   const nestle=compileTask('行：贴息("1700000000")');
   assert.equal(nestle.actions[0].arguments.operation,'贴息');
+  const hold=compileTask('行：含息("1700000000")');
+  assert.equal(hold.actions[0].arguments.operation,'含息');
   assert.deepEqual(describePlan(program).map(x=>x.title),['奥形凝起','Asia/Shanghai','1700000000','1700000000','1700000000','1700000000','1700000000','1700000000']);
 });
 test('规划描述 JS 与 Python 一致',()=>{

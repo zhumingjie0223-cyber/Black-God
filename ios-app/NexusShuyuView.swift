@@ -37,6 +37,7 @@ struct NexusShuyuView: View {
                         Button("看「奥形凝起」顾息再望") { gaze() }.accessibilityIdentifier("shuyu.gaze")
                         Button("看「奥形凝起」倾息再近") { incline() }.accessibilityIdentifier("shuyu.incline")
                         Button("看「奥形凝起」贴息再贴") { nestle() }.accessibilityIdentifier("shuyu.nestle")
+                        Button("看「奥形凝起」含息再含") { hold() }.accessibilityIdentifier("shuyu.hold")
                     }.textSelection(.enabled)
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
@@ -237,6 +238,21 @@ struct NexusShuyuView: View {
             let nestled = (object["贴"] as? NSNumber)?.boolValue ?? (object["贴"] as? Bool ?? false)
             let lean = (object["倾处"] as? [String: Any])?["汉"] as? String ?? han
             word = ["id": id.stringValue, "汉": han, "词": form, "义": "贴息 \(count.intValue) 格\(nestled ? "贴住" : "未贴")：\(names) ⊏ \(lean)"]
+            verified = count.intValue == steps.count
+            error = nil
+        } catch { word = [:]; verified = false; self.error = error.localizedDescription }
+    }
+    private func hold() {
+        do {
+            let at = String(Int(Date().timeIntervalSince1970))
+            let value = try NexusShuyuEngine.shared.invoke("含息", input: #"["奥形凝起","\#(at)",3]"#)
+            guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+                  let id = object["id"] as? NSNumber, let han = object["汉"] as? String, let form = object["词"] as? String,
+                  let steps = object["迹"] as? [Any], let count = object["步"] as? NSNumber else { throw NexusError.invalidResponse }
+            let names = steps.compactMap { ($0 as? [String: Any])?["汉"] as? String }.joined(separator: " → ")
+            let held = (object["含"] as? NSNumber)?.boolValue ?? (object["含"] as? Bool ?? false)
+            let close = (object["贴处"] as? [String: Any])?["汉"] as? String ?? han
+            word = ["id": id.stringValue, "汉": han, "词": form, "义": "含息 \(count.intValue) 格\(held ? "含住" : "未含")：\(names) ⊂ \(close)"]
             verified = count.intValue == steps.count
             error = nil
         } catch { word = [:]; verified = false; self.error = error.localizedDescription }

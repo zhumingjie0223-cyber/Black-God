@@ -274,6 +274,16 @@ test('GET /nestle 贴息与参数校验', async () => {
   assert.equal((await call(env, '/nestle?word=绝不存在&at=0')).status, 400);
 });
 
+test('GET /hold 含息与参数校验', async () => {
+  const env = mockEnv();
+  const r = await (await call(env, '/hold?word=0&at=60&n=3')).json();
+  assert.equal(r.贴, true);
+  assert.equal(r.种.id, 0);
+  assert.equal((await call(env, '/hold')).status, 400);
+  assert.equal((await call(env, '/hold?word=0&at=1700000000&n=1')).status, 400);
+  assert.equal((await call(env, '/hold?word=绝不存在&at=0')).status, 400);
+});
+
 test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   const root = await (await call(mockEnv(), '/')).json();
   assert.deepEqual(root.axes, { 核: 1040, 映: 180, 态: 80, 标: 64, 相: 8 });
@@ -292,6 +302,7 @@ test('GET / 与 /status 带轴尺寸与新路由清单', async () => {
   assert.ok(root.endpoints.some(e => e.startsWith('/gaze')));
   assert.ok(root.endpoints.some(e => e.startsWith('/incline')));
   assert.ok(root.endpoints.some(e => e.startsWith('/nestle')));
+  assert.ok(root.endpoints.some(e => e.startsWith('/hold')));
   const st = await (await call(mockEnv(), '/status')).json();
   assert.deepEqual(st.axes, root.axes);
 });
