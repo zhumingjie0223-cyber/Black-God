@@ -13,10 +13,11 @@ App Store 构建包含下列组件；各组件保留各自许可。
 - Alpine minirootfs 3.22.5 aarch64, with signature-verified OpenSSL 3.5.8 updates. Exact CDN URLs, SHA256 hashes and the image identity are pinned in tools/runtime/image-lock.json. tools/runtime/prepare_image.py imports the clean base and uses Alpine apk to verify and install the pinned updates offline. No preconfigured Minis image or user data is copied. Installed package licenses and upstream texts are bundled in ios-app/AppStore/OPEN_SOURCE_LICENSES.md.
 
 
-Original Black God source retains its existing MIT notices. A linked runtime build includes GPL components and must not be described or distributed as an MIT-only binary. App Store Connect reports version 1.2.1 as ready for distribution. The corresponding source for version 1.3.0 (12), including modifications, build scripts and bundled Alpine package sources, is provided at https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.3.0-build12. Source publication and App Store review or availability are separate statuses. The repository root LICENSE does not replace any third-party license.
+Original Black God source retains its existing MIT notices. A linked runtime build includes GPL components and must not be described or distributed as an MIT-only binary. App Store Connect reports version 1.2.1 as ready for distribution. The corresponding source for version 1.3.0 (13), including modifications, build scripts and bundled Alpine package sources, is provided at https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.3.0-build13. Source publication and App Store review or availability are separate statuses. The repository root LICENSE does not replace any third-party license.
 
 
-Black God local changes to the pinned kernel snapshot (2026-09-09):
+Black God local changes to the pinned kernel snapshot (2026-09-09, updated 2026-09-24):
+- kernel/uname.c: bounds guest hostname copies and supplies a safe fallback if the host uname query fails; long device or build-runner names cannot overwrite the guest uname structure.
 - fs/path.c: per-task filesystem root for absolute/relative paths and symlink expansion, length guards, sandbox cache bypass, and parent mutation permission checks.
 - fs/generic.c: defer truncation until guest access checks succeed; creation permission checks for missing targets.
 - kernel/fs.c: require all requested permission bits; restrict sandbox chroot, mknod, ownership/mode changes, and truncation to authorized writable files.

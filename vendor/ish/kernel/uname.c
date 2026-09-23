@@ -15,15 +15,19 @@ const char *uname_version = "SUPER AWESOME";
 const char *uname_hostname_override = NULL;
 
 void do_uname(struct uname *uts) {
-    struct utsname real_uname;
-    uname(&real_uname);
-    const char *hostname = real_uname.nodename;
+    struct utsname real_uname = {0};
+    const char *hostname = "localhost";
+    if (uname(&real_uname) == 0)
+        hostname = real_uname.nodename;
     if (uname_hostname_override)
         hostname = uname_hostname_override;
 
     memset(uts, 0, sizeof(struct uname));
     strcpy(uts->system, "Linux");
-    strcpy(uts->hostname, hostname);
+    // Darwin and overrides can exceed the Linux guest's 64-byte hostname.
+    size_t hostname_len = strnlen(hostname, sizeof(uts->hostname) - 1);
+    memcpy(uts->hostname, hostname, hostname_len);
+    uts->hostname[hostname_len] = '\0';
     strcpy(uts->release, "4.20.69-ish");
     snprintf(uts->version, sizeof(uts->version), "%s %s %s", uname_version, __DATE__, __TIME__);
 #if defined(GUEST_ARM64)

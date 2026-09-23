@@ -3,3 +3,4 @@
 • Added a compact live window for Shell commands, with real output, stop controls and expandable details.
 • Added native iPad layouts with a sidebar and portrait and landscape support.
 • Improved conversation clearing, interrupted-task recovery and command cancellation.
+Fixed a crash in the embedded command environment when the device name is unusually long.

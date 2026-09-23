@@ -44,6 +44,9 @@ jobs:
     - name: Generate Xcode Project and runtime
       run: make generate
 
+    - name: Verify guest uname memory boundaries
+      run: python3 tools/runtime/test_uname.py
+
     - name: Verify bundled engine and both implementations
       run: make test-shuyu
 
