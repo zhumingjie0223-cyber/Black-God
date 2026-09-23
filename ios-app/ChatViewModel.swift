@@ -265,22 +265,8 @@ final class ChatViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(NexusPresence.settleHold))
             guard !Task.isCancelled, let self else { return }
             self.presenceTick = Date()
-            try? await Task.sleep(for: .seconds(NexusPresence.waitHold))
-            guard !Task.isCancelled else { return }
-            self.presenceTick = Date()
-            try? await Task.sleep(for: .seconds(NexusPresence.spaceHold))
-            guard !Task.isCancelled else { return }
-            self.presenceTick = Date()
-            try? await Task.sleep(for: .seconds(NexusPresence.keepHold))
-            guard !Task.isCancelled else { return }
-            self.presenceTick = Date()
-            try? await Task.sleep(for: .seconds(NexusPresence.companyHold))
-            guard !Task.isCancelled else { return }
-            self.presenceTick = Date()
-            try? await Task.sleep(for: .seconds(NexusPresence.tendHold))
-            guard !Task.isCancelled else { return }
-            self.presenceTick = Date()
-            try? await Task.sleep(for: .seconds(NexusPresence.wakeHold))
+            let remain = max(0, NexusPresence.afterglow - NexusPresence.settleHold)
+            try? await Task.sleep(for: .seconds(remain))
             guard !Task.isCancelled else { return }
             self.presenceTick = Date()
         }
