@@ -45,6 +45,8 @@ struct NexusStreamContent {
     private(set) var completed = false
     private(set) var output = ""
     private var sawFinish = false
+    private var sawToolFinish = false
+    private var tools = NexusToolCallAssembler()
     init(providerType: NexusProviderType) { self.providerType = providerType }
 
     mutating func receive(_ payload: String) throws -> String? {
@@ -68,22 +70,33 @@ struct NexusStreamContent {
                 text = delta["text"] as? String
             }
             if type == "content_block_start", let block = object["content_block"] as? [String: Any], block["type"] as? String == "tool_use" {
-                throw NexusError.apiError("服务商返回了未声明的原生工具调用，请检查接口兼容性。")
+                let index = object["index"] as? Int ?? 0
+                tools.append(index: index, name: block["name"] as? String, arguments: nil)
+            }
+            if type == "content_block_delta", let delta = object["delta"] as? [String: Any], delta["type"] as? String == "input_json_delta" {
+                let index = object["index"] as? Int ?? 0
+                tools.append(index: index, name: nil, arguments: delta["partial_json"] as? String)
             }
             if type == "message_delta", let delta = object["delta"] as? [String: Any], let reason = delta["stop_reason"] as? String {
-                try validateFinish(reason)
-                sawFinish = true
+                if reason == "tool_use" { sawToolFinish = true; sawFinish = true }
+                else { try validateFinish(reason); sawFinish = true }
             }
             if type == "message_stop" { completed = true }
         case .openAICompatible:
             if let choices = object["choices"] as? [[String: Any]], let choice = choices.first {
                 if let delta = choice["delta"] as? [String: Any] {
-                    if let calls = delta["tool_calls"] as? [Any], !calls.isEmpty { throw NexusError.apiError("服务商返回了未声明的原生工具调用，请检查接口兼容性。") }
+                    if let calls = delta["tool_calls"] as? [[String: Any]] {
+                        for call in calls {
+                            let index = (call["index"] as? NSNumber)?.intValue ?? 0
+                            let function = call["function"] as? [String: Any]
+                            tools.append(index: index, name: function?["name"] as? String, arguments: function?["arguments"] as? String)
+                        }
+                    }
                     text = delta["content"] as? String ?? delta["refusal"] as? String
                 }
                 if let reason = choice["finish_reason"] as? String {
-                    try validateFinish(reason)
-                    sawFinish = true
+                    if reason == "tool_calls" { sawToolFinish = true; sawFinish = true }
+                    else { try validateFinish(reason); sawFinish = true }
                 }
             }
         }
@@ -100,15 +113,36 @@ struct NexusStreamContent {
         case .gemini, .responses: throw NexusError.invalidResponse
         case .openAICompatible:
             guard let choice = (object["choices"] as? [[String: Any]])?.first,
-                  let message = choice["message"] as? [String: Any],
-                  let reason = choice["finish_reason"] as? String,
-                  (message["tool_calls"] as? [Any])?.isEmpty != false else { throw NexusError.invalidResponse }
-            try validateFinish(reason)
-            output = message["content"] as? String ?? message["refusal"] as? String ?? ""
+                  let message = choice["message"] as? [String: Any] else { throw NexusError.invalidResponse }
+            let reason = choice["finish_reason"] as? String
+            if reason == "length" || reason == "content_filter" { try validateFinish(reason ?? "") }
+            var calls: [[String: Any]] = []
+            if let rawCalls = message["tool_calls"] as? [[String: Any]] {
+                for item in rawCalls {
+                    guard let function = item["function"] as? [String: Any],
+                          let name = function["name"] as? String, !name.isEmpty,
+                          let arguments = NexusToolArguments.parse(function["arguments"]) else {
+                        throw NexusError.apiError("工具参数不完整，尚未执行。")
+                    }
+                    calls.append(["name": name, "arguments": arguments])
+                }
+            }
+            if reason == "tool_calls", calls.isEmpty { throw NexusError.apiError("模型声称要调用工具，但没有给出完整调用，尚未执行。") }
+            output = NexusToolCallText.appending(calls, to: message["content"] as? String ?? message["refusal"] as? String ?? "")
         case .anthropic:
             guard let blocks = object["content"] as? [[String: Any]], let reason = object["stop_reason"] as? String else { throw NexusError.invalidResponse }
-            try validateFinish(reason)
-            output = blocks.filter { $0["type"] as? String == "text" }.compactMap { $0["text"] as? String }.joined()
+            if reason == "max_tokens" { try validateFinish(reason) }
+            var calls: [[String: Any]] = []
+            for block in blocks where block["type"] as? String == "tool_use" {
+                guard let name = block["name"] as? String, !name.isEmpty,
+                      let arguments = NexusToolArguments.parse(block["input"]) else {
+                    throw NexusError.apiError("工具参数不完整，尚未执行。")
+                }
+                calls.append(["name": name, "arguments": arguments])
+            }
+            if reason == "tool_use", calls.isEmpty { throw NexusError.apiError("模型声称要调用工具，但没有给出完整调用，尚未执行。") }
+            if calls.isEmpty { try validateFinish(reason) }
+            output = NexusToolCallText.appending(calls, to: blocks.filter { $0["type"] as? String == "text" }.compactMap { $0["text"] as? String }.joined())
         }
         completed = true
         try validateEnd()
@@ -123,8 +157,17 @@ struct NexusStreamContent {
         default: throw NexusError.apiError("服务商未正常完成回答（\(reason)）。")
         }
     }
-    func validateEnd() throws {
+    mutating func validateEnd() throws {
         guard completed || sawFinish else { throw NexusError.apiError("连接在回答完成前中断，请重试。") }
+        switch tools.completed() {
+        case nil:
+            throw NexusError.apiError("工具参数不完整，尚未执行。")
+        case let calls?:
+            if sawToolFinish, calls.isEmpty {
+                throw NexusError.apiError("模型声称要调用工具，但没有给出完整调用，尚未执行。")
+            }
+            output = NexusToolCallText.appending(calls, to: output)
+        }
         guard !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NexusError.invalidResponse }
     }
 }

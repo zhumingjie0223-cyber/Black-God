@@ -429,7 +429,7 @@ final class NexusExecutor {
         for round in 0..<maxToolRounds {
             do {
                 try Task.checkCancellation()
-                let reply = try await turn(messages, tools.nativeDefinitions)
+                let reply = try await turn(messages, tools.nativeDefinitions).promotingTextCalls()
                 try Task.checkCancellation()
                 if reply.calls.isEmpty { return reply.text }
                 guard round < maxToolRounds - 1 else { throw NexusReasoningError.execution("已达到工具轮次上限，任务尚未完成。") }

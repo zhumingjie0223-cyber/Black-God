@@ -72,9 +72,9 @@ enum NexusAdditionalProtocols {
             let identifier = provided ?? (optionalID ? UUID().uuidString : "")
             guard !identifier.isEmpty, identifier.utf8.count <= 512, ids.insert(identifier).inserted,
                   let name = name as? String, !name.isEmpty,
-                  let args = args as? [String: String], calls.count < 8 else { throw NexusError.invalidResponse }
+                  let arguments = NexusToolArguments.parse(args), calls.count < 8 else { throw NexusError.invalidResponse }
             calls.append(NexusNativeCall(providerID: identifier,
-                call: NexusToolCall(id: UUID(), name: name, arguments: args), hasProviderID: provided != nil))
+                call: NexusToolCall(id: UUID(), name: name, arguments: arguments), hasProviderID: provided != nil))
         }
         if type == .gemini {
             guard let candidates = object["candidates"] as? [[String: Any]], candidates.count == 1,
@@ -85,7 +85,7 @@ enum NexusAdditionalProtocols {
             }
             for part in parts {
                 if let function = part["functionCall"] as? [String: Any] {
-                    try add(id: function["id"], name: function["name"], args: function["args"] ?? [:], optionalID: true)
+                    try add(id: function["id"], name: function["name"], args: function["args"], optionalID: true)
                 }
                 if part["thought"] as? Bool != true, let value = part["text"] as? String { text += value }
             }
@@ -100,8 +100,8 @@ enum NexusAdditionalProtocols {
             for item in output {
                 switch item["type"] as? String {
                 case "function_call":
-                    guard let raw = item["arguments"] as? String else { throw NexusError.invalidResponse }
-                    try add(id: item["call_id"], name: item["name"], args: JSONSerialization.jsonObject(with: Data(raw.utf8)))
+                    guard let raw = item["arguments"] else { throw NexusError.invalidResponse }
+                    try add(id: item["call_id"], name: item["name"], args: raw)
                 case "message":
                     guard let content = item["content"] as? [[String: Any]] else { throw NexusError.invalidResponse }
                     for part in content {

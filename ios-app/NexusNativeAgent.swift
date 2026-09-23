@@ -72,7 +72,7 @@ enum NexusNativeCodec {
         func add(_ id: Any?, _ name: Any?, _ input: Any?) throws {
             guard let id = id as? String, !id.isEmpty, id.utf8.count <= 512,
                   ids.insert(id).inserted, let name = name as? String, !name.isEmpty,
-                  let arguments = input as? [String: String], calls.count < 8 else {
+                  let arguments = NexusToolArguments.parse(input), calls.count < 8 else {
                 throw NexusError.apiError("模型返回了无效、重复或过多的工具调用，尚未执行。")
             }
             calls.append(NexusNativeCall(providerID: id, call: NexusToolCall(id: UUID(), name: name, arguments: arguments)))
@@ -92,28 +92,67 @@ enum NexusNativeCodec {
             assistant = ["role": "assistant", "content": blocks]
         } else {
             guard let choices = object["choices"] as? [[String: Any]], choices.count == 1,
-                  let message = choices[0]["message"] as? [String: Any],
-                  let stop = choices[0]["finish_reason"] as? String, ["stop", "tool_calls"].contains(stop) else {
+                  let message = choices[0]["message"] as? [String: Any] else {
                 throw NexusError.apiError("模型工具响应未正常完成，尚未执行。")
             }
+            let reasonValue = choices[0]["finish_reason"]
+            let stop: String?
+            if reasonValue == nil || reasonValue is NSNull { stop = nil }
+            else if let text = reasonValue as? String { stop = text }
+            else { throw NexusError.apiError("模型工具响应未正常完成，尚未执行。") }
+            switch stop {
+            case "length", "content_filter":
+                throw NexusError.apiError("模型工具响应未完整结束，尚未执行。")
+            case "stop", "tool_calls", nil: break
+            default:
+                throw NexusError.apiError("模型工具响应未正常完成，尚未执行。")
+            }
+            var suppliedIDs: [Int: String] = [:]
             if let rawCalls = message["tool_calls"], !(rawCalls is NSNull) {
                 guard let list = rawCalls as? [[String: Any]] else { throw NexusError.invalidResponse }
-                for item in list {
-                    guard item["type"] as? String == "function", let function = item["function"] as? [String: Any],
-                          let raw = function["arguments"] as? String else { throw NexusError.invalidResponse }
-                    try add(item["id"], function["name"], JSONSerialization.jsonObject(with: Data(raw.utf8)))
+                for (index, item) in list.enumerated() {
+                    if let type = item["type"] as? String, type != "function" { throw NexusError.invalidResponse }
+                    guard let function = item["function"] as? [String: Any] else { throw NexusError.invalidResponse }
+                    let rawID = item["id"] as? String
+                    let id = (rawID?.isEmpty == false) ? rawID! : "call_local_\(index)"
+                    if rawID?.isEmpty != false { suppliedIDs[index] = id }
+                    try add(id, function["name"], function["arguments"])
                 }
             }
-            guard (stop == "tool_calls") == !calls.isEmpty else { throw NexusError.invalidResponse }
+            if stop == "tool_calls", calls.isEmpty {
+                throw NexusError.apiError("模型声称要调用工具，但没有给出完整调用，尚未执行。")
+            }
             text = message["content"] as? String ?? message["refusal"] as? String ?? ""
             var replay = message
             replay["role"] = "assistant"
+            if !suppliedIDs.isEmpty, var list = replay["tool_calls"] as? [[String: Any]] {
+                for (index, id) in suppliedIDs where list.indices.contains(index) { list[index]["id"] = id }
+                replay["tool_calls"] = list
+            }
             assistant = replay
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !calls.isEmpty else {
             throw NexusError.apiError("模型未返回回答或工具调用。")
         }
         return NexusNativeReply(text: text, calls: calls, assistant: assistant)
+    }
+}
+
+extension NexusNativeReply {
+    /// 本地模型常把工具调用写在正文里，而不是 tool_calls 字段。正文能完整解析时才执行。
+    func promotingTextCalls() -> NexusNativeReply {
+        guard calls.isEmpty else { return self }
+        let extracted = NexusToolCallParser.extract(from: text)
+        guard !extracted.isEmpty else { return self }
+        let natives: [NexusNativeCall] = extracted.enumerated().map { index, call in
+            NexusNativeCall(providerID: "call_text_\(index)", call: call)
+        }
+        let toolCalls: [[String: Any]] = natives.map { native in
+            let data = (try? JSONSerialization.data(withJSONObject: native.call.arguments)) ?? Data("{}".utf8)
+            let arguments = String(data: data, encoding: .utf8) ?? "{}"
+            return ["id": native.providerID, "type": "function", "function": ["name": native.call.name, "arguments": arguments]]
+        }
+        return NexusNativeReply(text: "", calls: natives, assistant: ["role": "assistant", "content": "", "tool_calls": toolCalls])
     }
 }
 

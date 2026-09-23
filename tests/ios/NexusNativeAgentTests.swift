@@ -59,15 +59,62 @@ final class NexusNativeAgentTests: XCTestCase {
         XCTAssertNotNil((body["tools"] as? [[String: Any]])?.first?["input_schema"])
     }
     func testMalformedArgumentsDuplicateIDsAndExcessiveCallsFailBeforeExecution() throws {
-        for calls in [[call(arguments: "{")], [call(arguments: "{\"expression\":12}")], [call(), call()], (0..<9).map { call("call_\($0)") }] {
+        for calls in [[call(arguments: "{")], [call(), call()], (0..<9).map { call("call_\($0)") }] {
             XCTAssertThrowsError(try reply(calls))
         }
     }
+    func testLocalToolPayloadsWithStopObjectAndNumericArgumentsExecute() throws {
+        let numeric = try reply([call(arguments: "{\"expression\":12}")])
+        XCTAssertEqual(numeric.calls.first?.call.arguments["expression"], "12")
+        let object: [String: Any] = ["id": "call_obj", "function": ["name": "calc", "arguments": ["expression": "3+4", "flag": true]]]
+        let stopped = try NexusNativeCodec.decode(JSONSerialization.data(withJSONObject: ["choices": [["message": ["tool_calls": [object]], "finish_reason": "stop"]]]), type: .openAICompatible)
+        XCTAssertEqual(stopped.calls.first?.providerID, "call_obj")
+        XCTAssertEqual(stopped.calls.first?.call.arguments["expression"], "3+4")
+        XCTAssertEqual(stopped.calls.first?.call.arguments["flag"], "true")
+        let missingReason = try NexusNativeCodec.decode(JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": NSNull(), "tool_calls": [call("call_plain")]]]]]), type: .openAICompatible)
+        XCTAssertEqual(missingReason.calls.first?.providerID, "call_plain")
+        let embedded = NexusNativeReply(text: "{\"name\":\"calc\",\"arguments\":{\"expression\":\"12*3\"}}", calls: [], assistant: ["role": "assistant", "content": ""]).promotingTextCalls()
+        XCTAssertEqual(embedded.calls.first?.call.name, "calc")
+        XCTAssertEqual(embedded.calls.first?.providerID, "call_text_0")
+        let envelope = #"{"tool_calls":[{"function":{"name":"calc","arguments":{"expression":"1+1"}}}]}"#
+        XCTAssertEqual(NexusToolCallParser.extract(from: envelope).first?.arguments["expression"], "1+1")
+    }
     func testTruncationAndMismatchedCompletionCannotExecute() throws {
-        for reason in ["length", "content_filter", "stop"] {
+        for reason in ["length", "content_filter"] {
             let data = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["tool_calls": [call()]], "finish_reason": reason]]])
             XCTAssertThrowsError(try NexusNativeCodec.decode(data, type: .openAICompatible))
         }
+        let claimed = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": "部分结果"], "finish_reason": "tool_calls"]]])
+        XCTAssertThrowsError(try NexusNativeCodec.decode(claimed, type: .openAICompatible))
+    }
+    func testStreamedLocalToolCallBecomesExecutableText() throws {
+        var content = NexusStreamContent(providerType: .openAICompatible)
+        let events = [
+            #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"calc","arguments":""}}]},"finish_reason":null}]}"#,
+            #"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"expression\":\"3+4\"}"}}]},"finish_reason":"tool_calls"}]}"#
+        ]
+        for event in events { _ = try content.receive(event) }
+        _ = try content.receive("[DONE]")
+        try content.validateEnd()
+        let calls = NexusToolCallParser.extract(from: content.output)
+        XCTAssertEqual(calls.first?.name, "calc")
+        XCTAssertEqual(calls.first?.arguments["expression"], "3+4")
+    }
+    func testTextToolCallInNativeStepActuallyRuns() async throws {
+        var rounds = 0
+        let executor = NexusExecutor(planner: NativeSingleStepPlanner(), verifier: NexusContentVerifier(), tools: registry(), nativeTurn: { messages, _ in
+            rounds += 1
+            if rounds == 1 {
+                return NexusNativeReply(text: #"{"name":"calc","arguments":{"expression":"12*3"}}"#, calls: [], assistant: ["role": "assistant", "content": ""])
+            }
+            guard case .results(let results) = messages.last else { throw NexusError.invalidResponse }
+            XCTAssertEqual(results.first?.1.output, "36")
+            return try self.reply(text: "总价36元")
+        })
+        let answer = await executor.run(goal: "计算12*3")
+        XCTAssertEqual(answer, "总价36元")
+        XCTAssertEqual(executor.toolTraces.count, 1)
+        XCTAssertNil(executor.lastError)
     }
     func testOnlyImplementedToolsAreAdvertisedAndArgumentsValidated() {
         let tools = registry()
