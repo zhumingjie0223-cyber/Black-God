@@ -17,7 +17,7 @@ struct RootView: View {
                 case .tools: ToolsView(chat: chatModel)
                 case .media: MediaView()
                 case .monitor: MonitorView()
-                case .me: MeView(cognitive: chatModel.cognitive, memory: chatModel.memory, skills: chatModel.skills, practice: chatModel.practice)
+                case .me: MeView(cognitive: chatModel.cognitive, memory: chatModel.memory, skills: chatModel.skills, practice: chatModel.practice, learning: chatModel.learning)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

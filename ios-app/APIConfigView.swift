@@ -188,7 +188,7 @@ struct APIConfigView: View {
                 }
                 Section("向模型发送内容") {
                     Text("接收方：" + baseURL).font(.footnote).textSelection(.enabled)
-                    Text("请求会发送当前对话、选用的长期记忆、技能指令及工具结果；它们可能包含个人信息或文件内容。认证凭据发送至配置的服务商；其保留和使用规则由服务商决定。关闭许可会阻止后续模型请求，不会撤回已发送内容。")
+                    Text("请求会发送当前对话、选用的长期记忆、技能指令、每天学习记下的更新预备及工具结果；它们可能包含个人信息或文件内容。认证凭据发送至配置的服务商；其保留和使用规则由服务商决定。关闭许可会阻止后续模型请求，不会撤回已发送内容。")
                         .font(.footnote).foregroundStyle(.secondary)
                     Toggle("允许向此连接发送上述内容", isOn: Binding(get: { sharingAllowed }, set: {
                         sharingAllowed = $0; NexusDataConsent.shared.set($0, for: connection)

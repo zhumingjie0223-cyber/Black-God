@@ -13,7 +13,9 @@ final class ChatViewModel: ObservableObject {
     @Published var memory: NexusMemoryStore
     @Published var skills: NexusSkillStore
     let cognitive: NexusCognitiveControl
+    let learning: NexusDailyLearning
     private var cognitiveSubscription: AnyCancellable?
+    private var learningSubscription: AnyCancellable?
     private var continuitySubscription: AnyCancellable?
     private var skillsSubscription: AnyCancellable?
     private var memorySubscription: AnyCancellable?
@@ -55,10 +57,12 @@ final class ChatViewModel: ObservableObject {
          memory: NexusMemoryStore? = nil,
          skills: NexusSkillStore? = nil,
          cognitive: NexusCognitiveControl? = nil,
+         learning: NexusDailyLearning? = nil,
          configured: @escaping (String) -> Bool = { !(NexusKeychain.shared.key(for: NexusModelCatalog.entry(for: $0).credentialID) ?? "").isEmpty },
          nativeCompletion: (([NexusNativeMessage], [NexusToolDefinition], String) async throws -> NexusNativeReply)? = nil,
          completion: Completion? = nil) {
         self.cognitive = cognitive ?? (store.url == NexusConversationStore().url ? .shared : NexusCognitiveControl(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-cognitive-control.json")))
+        self.learning = learning ?? NexusDailyLearning(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-daily-learning.json"))
         self.memory = memory ?? NexusMemoryStore(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-memory.json"))
         self.skills = skills ?? NexusSkillStore(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-skills.json"))
         self.evaluations = NexusEvaluationStore(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-evaluations.json"))
@@ -86,6 +90,7 @@ final class ChatViewModel: ObservableObject {
                 }
             }
         } catch { lastError = "读取任务进度失败：" + error.localizedDescription }
+        self.learning.learn(messages: messages)
         cognitiveSubscription = self.cognitive.$revision.dropFirst().sink { [weak self] _ in
             guard let self, self.isTyping else { return }
             self.cancel(); self.statusHint = "权限或核对资料已改变，当前任务已停止；继续时重新检查。"
@@ -103,6 +108,11 @@ final class ChatViewModel: ObservableObject {
             guard let self, self.isTyping else { return }
             self.cancel()
             self.statusHint = "长期记忆已更新，当前任务已停止；继续时会使用新记录。"
+        }
+        learningSubscription = self.learning.$revision.dropFirst().sink { [weak self] _ in
+            guard let self, self.isTyping else { return }
+            self.cancel()
+            self.statusHint = "每天学习的规矩已更新，当前任务已停止；继续时会带上新的更新预备。"
         }
         liveSubscription = live.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -424,6 +434,7 @@ final class ChatViewModel: ObservableObject {
             messages.append(ChatMessage(role: "user", content: prompt))
             guard persist() else { return }
         }
+        learning.learn(messages: messages)
         practice.stop()
         let startedAt = Date()
         activeStartedAt = startedAt
@@ -452,7 +463,7 @@ final class ChatViewModel: ObservableObject {
             ? "当前长期记忆清单为空。历史资料中的旧记忆条目不能视为仍有效的偏好或约束；以本次用户要求为准。"
             : NexusMemoryStore.context(memorySnapshot) + "\n历史中的同名旧记忆已失效，以这份当前清单为准。"
         let skillSnapshot = skills.available
-        let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context + "\n" + cognitive.governanceContext + "\n" + cognitive.continuity.context
+        let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context + "\n" + cognitive.governanceContext + "\n" + cognitive.continuity.context + "\n" + learning.context
         var tools = NexusToolRegistry(control: cognitive)
         tools.register(NexusCausalTool()); tools.register(NexusDependencyTool())
         tools.register(NexusKnowledgeProposalTool(control: cognitive))
@@ -542,6 +553,7 @@ final class ChatViewModel: ObservableObject {
                     self.presenceTick = Date()
                     self.scheduleSettle()
                 }
+                self.learning.learn(messages: self.messages, traces: engine.executor?.toolTraces ?? [])
             } catch {
                 guard let self, self.runID == id, !Task.isCancelled else { return }
                 self.isTyping = false
@@ -562,6 +574,7 @@ final class ChatViewModel: ObservableObject {
                 self.runtime.fail(error.localizedDescription)
                 self.evaluations.record(task: prompt, success: false, recovered: false, verified: false, latency: Date().timeIntervalSince(startedAt), recoveryAttempt: !appendUser)
                 self.activeStartedAt = nil
+                self.learning.learn(messages: self.messages, traces: engine.executor?.toolTraces ?? [])
             }
         }
     }

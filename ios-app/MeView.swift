@@ -11,7 +11,9 @@ struct MeView: View {
     @ObservedObject var memory: NexusMemoryStore
     @ObservedObject var skills: NexusSkillStore
     @ObservedObject var practice: NexusSkillPractice
+    @ObservedObject var learning: NexusDailyLearning
     @State private var showSkills = false
+    @State private var showLearning = false
     @State private var showPrivacy = false
     @State private var showLicenses = false
     private var version: String {
@@ -51,6 +53,10 @@ struct MeView: View {
                         SettingRow(icon: "brain.head.profile", title: "长期记忆", value: "\(memory.curated.count)条", color: .bgGold)
                     }.accessibilityIdentifier("memory.open")
                     Divider().background(Color.bgCardLight)
+                    Button { showLearning = true } label: {
+                        SettingRow(icon: "book.closed", title: "每天学习", value: learning.error == nil ? "\(learning.kept.count)条预备" : "读取失败", color: .bgGold)
+                    }.accessibilityIdentifier("daily.learning.open")
+                    Divider().background(Color.bgCardLight)
                     Button { showSkills = true } label: {
                         SettingRow(icon: "list.bullet.rectangle", title: "任务技能", value: "\(skills.items.count)个", color: .bgGold)
                     }.accessibilityIdentifier("skills.open")
@@ -76,6 +82,7 @@ struct MeView: View {
         .sheet(isPresented: $showLicenses) { NexusPrivacyView(resource: "OPEN_SOURCE_LICENSES", title: "开源许可") }
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
+        .sheet(isPresented: $showLearning) { NexusDailyLearningView(learning: learning) }
         .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }
