@@ -6,6 +6,7 @@ struct NexusLinuxTool: NexusTool {
     let workspace: UUID
     var onStart: ((String) -> Void)? = nil
     var onOutput: ((String, Bool) -> Void)? = nil
+    var onStatus: ((String) -> Void)? = nil
     var isEnabled: () -> Bool = { NexusLinuxTool.enabled }
     static var enabled: Bool { enabled(in: .standard) }
     static func enabled(in defaults: UserDefaults) -> Bool {
@@ -22,7 +23,7 @@ struct NexusLinuxTool: NexusTool {
         }
         do {
             onStart?(command)
-            let result = try await NexusLinuxRuntime.shared.execute(command: command, timeout: timeout, workspace: workspace, onOutput: onOutput)
+            let result = try await NexusLinuxRuntime.shared.execute(command: command, timeout: timeout, workspace: workspace, onStatus: onStatus, onOutput: onOutput)
             let text = "exit_code=\(result.exitCode)\nstdout:\n\(result.output)\nstderr:\n\(result.errorOutput)"
                 + (result.failure.map { "\nerror: " + $0 } ?? "")
             return NexusToolResult(callID: call.id, output: text, succeeded: result.succeeded)

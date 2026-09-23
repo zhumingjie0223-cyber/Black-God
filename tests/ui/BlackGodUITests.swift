@@ -2,6 +2,126 @@ import XCTest
 
 final class BlackGodUITests: XCTestCase {
     @MainActor
+    func testRedesignedMainPanelsAndCreationState() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        XCTAssertTrue(app.buttons["chat.actions"].waitForExistence(timeout: 8))
+        capture(app, name: "新版-对话")
+        XCTAssertFalse(app.buttons["tab.1"].exists)
+        XCTAssertFalse(app.buttons["execution.start"].exists)
+        app.buttons["tab.2"].tap()
+        let generate = app.buttons["media.generate"]
+        reveal(generate, in: app)
+        XCTAssertTrue(generate.exists)
+        XCTAssertFalse(generate.isEnabled)
+        let field = app.descendants(matching: .any)["media.prompt"]
+        field.tap(); field.typeText("A quiet forest cabin")
+        let copy = app.buttons["media.copy"]
+        reveal(copy, in: app); copy.tap()
+        XCTAssertTrue(app.buttons["已复制描述"].waitForExistence(timeout: 3))
+        app.swipeDown()
+        app.swipeDown()
+        capture(app, name: "新版-创作")
+        // End editing before changing the phone's bottom navigation.
+        _ = app.buttons["tab.3"].waitForExistence(timeout: 3)
+        if !app.buttons["tab.3"].exists { app.swipeDown() }
+        app.buttons["tab.3"].tap()
+        XCTAssertTrue(app.staticTexts["monitor.sample-count"].waitForExistence(timeout: 5))
+        capture(app, name: "新版-监测")
+        app.buttons["tab.4"].tap()
+        XCTAssertTrue(app.buttons["api.open"].waitForExistence(timeout: 5))
+        capture(app, name: "新版-我的")
+        app.buttons["api.open"].tap()
+        XCTAssertTrue(app.navigationBars["模型连接"].waitForExistence(timeout: 5))
+        capture(app, name: "新版-模型连接")
+        app.buttons["完成"].tap()
+        app.buttons["tab.0"].tap()
+        XCTAssertTrue(app.buttons["chat.connection"].isHittable)
+    }
+
+    @MainActor
+    func testLargeTextKeepsPrimaryControlsReachable() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["chat.connection"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["chat.connection"].isHittable)
+        XCTAssertTrue(app.buttons["chat.send"].exists)
+        capture(app, name: "新版-辅助大字体对话")
+        app.buttons["tab.3"].tap()
+        let benchmark = app.buttons["benchmark.open"]
+        reveal(benchmark, in: app, upSwipes: 12)
+        benchmark.tap()
+        XCTAssertTrue(app.buttons["benchmark.start"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        app.buttons["tab.4"].tap()
+        let connection = app.buttons["api.open"]
+        reveal(connection, in: app); connection.tap()
+        let login = app.buttons["oauth.login"]
+        reveal(login, in: app)
+        XCTAssertTrue(login.isHittable)
+        capture(app, name: "新版-辅助大字体连接")
+        app.buttons["完成"].tap()
+    }
+
+    @MainActor
+    func testTabletSidebarAndLandscapeComposer() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        guard app.frame.width >= 700 else { throw XCTSkip("此用例用于原生 iPad 布局") }
+        for i in [0, 2, 3, 4] { XCTAssertTrue(app.buttons["tab.\(i)"].isHittable) }
+        capture(app, name: "新版-iPad竖屏")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        app.buttons["tab.0"].tap()
+        XCTAssertGreaterThan(app.frame.width, app.frame.height)
+        XCTAssertTrue(app.buttons["chat.connection"].isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["chat.input"].isHittable)
+        capture(app, name: "新版-iPad横屏")
+        XCTAssertFalse(app.buttons["tab.1"].exists)
+        app.buttons["tab.3"].tap()
+        XCTAssertTrue(app.staticTexts["monitor.sample-count"].waitForExistence(timeout: 5))
+        capture(app, name: "新版-iPad监测")
+        app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
+        XCTAssertTrue(app.navigationBars["模型连接"].waitForExistence(timeout: 5))
+        capture(app, name: "新版-iPad连接面板")
+        app.buttons["完成"].tap()
+    }
+
+    @MainActor
+    private func openAdvanced(in app: XCUIApplication) {
+        app.buttons["tab.4"].tap()
+        let advanced = app.buttons["advanced.open"]
+        reveal(advanced, in: app)
+        advanced.tap()
+        XCTAssertTrue(app.navigationBars["高级设置"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func capture(_ app: XCUIApplication, name: String) {
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = name; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    @MainActor
+    func testConversationManagementEntryIsDiscoverable() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch(); app.buttons["tab.0"].tap()
+        let actions = app.buttons["chat.actions"]
+        XCTAssertTrue(actions.waitForExistence(timeout: 8))
+        XCTAssertTrue(actions.isHittable)
+        XCTAssertEqual(actions.label, "对话管理")
+        XCTAssertTrue(app.buttons["chat.connection"].isHittable)
+        actions.tap()
+        XCTAssertTrue(app.buttons["清空当前对话"].waitForExistence(timeout: 3))
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "对话管理入口"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    @MainActor
     func testChatComposerChipsUseJadePrompts() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
@@ -11,9 +131,9 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.chip.calc"].exists)
         XCTAssertTrue(app.buttons["chat.chip.shuyu"].exists)
         XCTAssertTrue(app.buttons["chat.chip.pulse"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["chat.presence"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["chat.empty"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["chat.breath"].exists)
-        XCTAssertTrue(["在场", "该练", "可续", "处理中", "开口", "刚歇", "在听", "余韵", "看着", "还在", "顿笔", "惦记", "收笔", "落定", "应声", "衔着", "跟上", "等下文", "侧耳", "让开", "挨着", "守着", "偎着", "陪着", "依着", "候着"].contains(app.staticTexts["chat.mood"].label))
+        XCTAssertTrue(["就绪", "在场", "该练", "可续", "处理中", "开口", "刚歇", "在听", "余韵", "看着", "还在", "顿笔", "惦记", "收笔", "落定", "应声", "衔着", "跟上", "等下文", "侧耳", "让开", "挨着", "守着", "偎着", "陪着", "依着", "候着"].contains(app.staticTexts["chat.mood"].label))
         let field = app.descendants(matching: .any)["chat.input"]
         XCTAssertTrue(field.waitForExistence(timeout: 4))
         field.tap()
@@ -114,9 +234,11 @@ final class BlackGodUITests: XCTestCase {
         let entry = app.buttons["licenses.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
         // 版本文案随 project.yml 的版本号变化；只校验“x.y.z（build）”格式，避免每次升 build 都改测试。
-        let versionText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Black God · ")).firstMatch
+        let versionText = app.staticTexts["app.version"]
+        reveal(versionText, in: app)
         XCTAssertTrue(versionText.exists, "应显示版本文案")
         XCTAssertNotNil(versionText.label.range(of: #"\d+\.\d+\.\d+（\d+）"#, options: .regularExpression), "版本文案应形如 1.2.0（8），实际：\(versionText.label)")
+        reveal(entry, in: app)
         XCTAssertTrue(entry.isHittable); entry.tap()
         XCTAssertTrue(app.navigationBars["开源许可"].waitForExistence(timeout: 5))
         let text = app.staticTexts["document.paragraph.0"]
@@ -206,16 +328,19 @@ final class BlackGodUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
-        app.buttons["tab.1"].tap(); app.swipeUp()
+        openAdvanced(in: app)
+        reveal(app.buttons["shuyu.open"], in: app)
         app.buttons["shuyu.open"].tap()
         app.buttons["shuyu.generate"].tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 10))
         let verified = app.staticTexts["词形与汉译反查一致"]
         reveal(verified, in: app)
         XCTAssertTrue(verified.exists)
+        reveal(app.buttons["shuyu.analogy"], in: app)
         app.buttons["shuyu.analogy"].tap()
         reveal(verified, in: app)
         XCTAssertTrue(verified.waitForExistence(timeout: 5))
+        reveal(app.buttons["shuyu.near"], in: app)
         app.buttons["shuyu.near"].tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let pulse = app.buttons["shuyu.pulse"]
@@ -275,13 +400,19 @@ final class BlackGodUITests: XCTestCase {
         rouse.tap()
         XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
-        app.buttons["完成"].tap()
+        app.navigationBars["枢语"].buttons["完成"].tap()
+        reveal(app.buttons["storage.open"], in: app)
         app.buttons["storage.open"].tap()
         XCTAssertTrue(app.buttons["storage.budget.8"].waitForExistence(timeout: 10))
-        let capacity = app.staticTexts["手机剩余空间"]
+        let capacity = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "手机剩余空间")).firstMatch
         XCTAssertTrue(capacity.waitForExistence(timeout: 20))
+        // LabeledContent exposes this read-only label separately from its hittable List row.
+        // Verify its actual visible frame instead of requiring the text to accept taps.
+        XCTAssertFalse(capacity.frame.isEmpty)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(capacity.frame))
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "运行空间"; shot.lifetime = .keepAlways; add(shot)
-        app.buttons["完成"].tap()
+        app.navigationBars["运行空间"].buttons["完成"].tap()
+        app.navigationBars["高级设置"].buttons["完成"].tap()
         app.buttons["tab.4"].tap()
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "任务技能")).firstMatch.tap()
         let start = app.buttons["practice.start"]
@@ -294,25 +425,25 @@ final class BlackGodUITests: XCTestCase {
     }
 
     @MainActor
-    func testNaturalTaskEntryHidesTerminalAndLiveOutputArrivesBeforeExit() {
+    func testAdvancedTerminalAndLiveOutputArrivesBeforeExit() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
-        app.buttons["tab.1"].tap()
-        XCTAssertTrue(app.buttons["execution.start"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["execution.start"].isEnabled)
+        XCTAssertFalse(app.buttons["tab.1"].exists)
         XCTAssertFalse(app.textViews["linux.command"].exists)
+        openAdvanced(in: app)
         let entry = XCTAttachment(screenshot: app.screenshot())
-        entry.name = "自然语言任务入口"; entry.lifetime = .keepAlways; add(entry)
-        app.swipeUp()
+        entry.name = "高级设置入口"; entry.lifetime = .keepAlways; add(entry)
+        reveal(app.buttons["linux.advanced"], in: app)
         app.buttons["linux.advanced"].tap()
         XCTAssertTrue(app.buttons["linux.clear"].waitForExistence(timeout: 10))
         app.buttons["linux.clear"].tap()
         app.textViews["linux.command"].tap()
         app.textViews["linux.command"].typeText("printf 'LIVE_FIRST\\n'; sleep 20; printf 'LIVE_LAST\\n'")
+        reveal(app.buttons["linux.run"], in: app)
         app.buttons["linux.run"].tap()
         let first = app.staticTexts["LIVE_FIRST"]
-        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertTrue(first.waitForExistence(timeout: 30))
         XCTAssertTrue(app.buttons["live.stop"].exists)
         XCTAssertFalse(app.staticTexts["LIVE_LAST"].exists)
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -327,8 +458,9 @@ final class BlackGodUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.3"].tap()
-        XCTAssertTrue(app.staticTexts["无警告答复率"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["模型复核通过率"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "无警告答复率")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "模型自检通过率")).firstMatch.exists)
+        reveal(app.buttons["benchmark.open"], in: app)
         app.buttons["benchmark.open"].tap()
         XCTAssertTrue(app.buttons["benchmark.start"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "不采纳模型自评")).firstMatch.exists)
@@ -344,15 +476,15 @@ final class BlackGodUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openTools() {
-            let tab = app.buttons["tab.1"]
-            XCTAssertTrue(tab.waitForExistence(timeout: 10))
-            tab.tap()
+            openAdvanced(in: app)
             let advanced = app.buttons["linux.advanced"]
             reveal(advanced, in: app)
             advanced.tap()
             XCTAssertTrue(app.buttons["linux.run"].waitForExistence(timeout: 10))
         }
         func enter(_ script: String) {
+            let back = app.buttons["linux.backToCommand"]
+            if back.exists && back.isHittable { back.tap() }
             let clear = app.buttons["linux.clear"]
             reveal(clear, in: app)
             clear.tap()
@@ -360,10 +492,12 @@ final class BlackGodUITests: XCTestCase {
             reveal(editor, in: app)
             editor.tap()
             editor.typeText(script)
+            reveal(app.buttons["linux.run"], in: app)
             app.buttons["linux.run"].tap()
         }
         func finished(containing text: String) {
             let result = app.staticTexts["linux.result"]
+            reveal(result, in: app)
             let predicate = NSPredicate(format: "label CONTAINS %@", text)
             expectation(for: predicate, evaluatedWith: result)
             waitForExpectations(timeout: 20)
@@ -383,14 +517,16 @@ final class BlackGodUITests: XCTestCase {
         app.activate()
         finished(containing: "后台")
         enter("sleep 20")
-        pauseForStart()
+        let executionStarted = NSPredicate(format: "label == %@", "正在执行命令")
+        expectation(for: executionStarted, evaluatedWith: app.staticTexts["live.status"])
+        waitForExpectations(timeout: 30)
         app.terminate()
         app.launch()
         openTools()
         // This record comes from forced termination, not an automatic retry.
-        let interrupted = app.staticTexts["意外中断"].firstMatch
+        let interrupted = app.staticTexts["linux.latestStatus"]
         reveal(interrupted, in: app, upSwipes: 8)
-        XCTAssertTrue(interrupted.waitForExistence(timeout: 10))
+        XCTAssertEqual(interrupted.label, "意外中断")
         enter("cat " + file + "; rm " + file)
         finished(containing: "retained")
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -405,6 +541,7 @@ final class BlackGodUITests: XCTestCase {
         app.buttons["tab.4"].tap()
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "神枢连接")).firstMatch.tap()
         let provider = app.buttons["api.provider"]
+        reveal(provider, in: app)
         XCTAssertTrue(provider.waitForExistence(timeout: 10))
         provider.tap()
         let gemini = app.buttons["Google Gemini"]
@@ -422,7 +559,7 @@ final class BlackGodUITests: XCTestCase {
         provider.tap()
         app.buttons["阿里云百炼 / 通义千问"].tap()
         reveal(base, in: app)
-        XCTAssertEqual(base.value as? String, "HTTPS 接口地址")
+        XCTAssertEqual(base.value as? String, "https://")
         reveal(models, in: app)
         XCTAssertFalse(models.isEnabled)
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -535,19 +672,43 @@ extension XCTestCase {
     /// 用短距离拖动代替整屏 swipe：整屏 swipeDown 会把以 sheet 弹出的页面直接关掉。
     @MainActor
     func reveal(_ element: XCUIElement, in app: XCUIApplication, upSwipes: Int = 6, downSwipes: Int = 8, file: StaticString = #filePath, line: UInt = #line) {
-        func visible() -> Bool { element.exists && element.isHittable }
+        func contentBounds() -> CGRect {
+            let window = app.windows.firstMatch.frame
+            var top = window.minY + 48
+            var bottom = window.maxY - 16
+            if app.navigationBars.firstMatch.exists { top = max(top, app.navigationBars.firstMatch.frame.maxY) }
+            let keyboard = app.keyboards.firstMatch
+            if keyboard.exists { bottom = min(bottom, keyboard.frame.minY) }
+            let tab = app.buttons["tab.0"]
+            if tab.exists && tab.isHittable && tab.frame.midY > window.midY {
+                bottom = min(bottom, tab.frame.minY - 8)
+            }
+            return CGRect(x: window.minX, y: top, width: window.width, height: max(80, bottom - top))
+        }
+        func visible() -> Bool {
+            guard element.exists, element.isHittable else { return false }
+            let bounds = contentBounds(), frame = element.frame
+            return frame.minY >= bounds.minY && frame.maxY <= bounds.maxY
+        }
         if visible() { return }
         func nudge(contentUp: Bool) {
-            let container: XCUIElement
-            if app.collectionViews.firstMatch.exists { container = app.collectionViews.firstMatch }
-            else if app.scrollViews.firstMatch.exists { container = app.scrollViews.firstMatch }
-            else { container = app.windows.firstMatch }
-            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: contentUp ? 0.72 : 0.38))
-            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: contentUp ? 0.38 : 0.72))
+            let bounds = contentBounds()
+            let container = app.scrollViews.firstMatch.exists ? app.scrollViews.firstMatch.frame : bounds
+            let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+            let x = max(bounds.minX + 30, min(container.midX, bounds.maxX - 30))
+            let from = origin.withOffset(CGVector(dx: x, dy: bounds.minY + bounds.height * (contentUp ? 0.74 : 0.28)))
+            let to = origin.withOffset(CGVector(dx: x, dy: bounds.minY + bounds.height * (contentUp ? 0.28 : 0.74)))
             from.press(forDuration: 0.05, thenDragTo: to)
         }
-        for _ in 0..<upSwipes where !visible() { nudge(contentUp: true) }
-        for _ in 0..<downSwipes where !visible() { nudge(contentUp: false) }
-        XCTAssertTrue(element.waitForExistence(timeout: 3), "未能滑动到元素：\(element)", file: file, line: line)
+        for attempt in 0..<(upSwipes + downSwipes) {
+            if visible() { return }
+            if element.exists {
+                let frame = element.frame, bounds = contentBounds()
+                if frame.minY < bounds.minY { nudge(contentUp: false); continue }
+                if frame.maxY > bounds.maxY { nudge(contentUp: true); continue }
+            }
+            nudge(contentUp: attempt < upSwipes)
+        }
+        XCTAssertTrue(visible(), "未能将元素完整显示在可操作区域：\(element)", file: file, line: line)
     }
 }

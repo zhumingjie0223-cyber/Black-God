@@ -1,4 +1,7 @@
-Black God combines AI conversations, task skills, curated memory and local tools on iPhone.
+Black God combines AI conversations, task skills, curated memory and local tools on iPhone and iPad.
+
+A CLEANER BLACK-AND-GREEN INTERFACE
+Navigate through Chat, Create, Monitor and Me. Use a floating composer, animated lighting and task details that expand when needed. Native iPad layouts include a sidebar and portrait and landscape support.
 
 CONNECT YOUR MODELS
 Configure Claude, OpenAI, Gemini and OpenAI-compatible providers. Discover available models where supported, or enter a model ID supplied by your provider. Save separate connections for different accounts.
@@ -7,6 +10,11 @@ OpenRouter account authorization is available. Kimi, Grok and MiniMax compatibil
 
 CHAT AND WORK
 Use streaming conversations and native tool calls with supported models. Run local calculations, inspect task plans and execution output, manage memories and skills, and run built-in practice examples. An embedded Linux environment provides a local workspace and advanced command controls.
+
+When a Shell tool runs in Chat, a compact live window displays its command and real output. Stop execution or expand the details. Execution permission, storage controls and the manual terminal are under Me → Advanced Settings.
+
+CREATIVE DRAFTS
+Edit and copy image and video descriptions or speech scripts. Generation services are not connected; the app currently does not generate images, video or speech.
 
 CONTROL DATA SHARING
 Credentials are stored in Keychain. Conversations, memories, skills and workspace files are stored locally. Before model content is sent, the connection screen explains its destination and data scope and asks for explicit permission. Requests may include conversation content, selected memories and tool results. Providers handle transmitted data under their own policies.

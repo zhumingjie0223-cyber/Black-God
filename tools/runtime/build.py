@@ -48,5 +48,8 @@ for platform in ['iphoneos', 'iphonesimulator']:
 b = configure('host')
 run('ninja', '-C', b, 'tools/fakefsify')
 run(MESON, 'configure', b, '-Dlog_handler=dprintf')
+# main.c includes this generated header without a Meson source dependency.
+# Generate it first so a clean parallel host build cannot race the compiler.
+run('ninja', '-C', b, 'cpu-offsets.h')
 run('ninja', '-C', b, 'ish')
 run(sys.executable, ROOT/'tools/runtime/prepare_image.py')

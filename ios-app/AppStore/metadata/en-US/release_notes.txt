@@ -1,0 +1,5 @@
+• Refreshed the black-and-green interface with a cleaner chat layout, floating composer and animated lighting.
+• Simplified navigation into Chat, Create, Monitor and Me. Advanced tools now live in Me → Advanced Settings.
+• Added a compact live window for Shell commands, with real output, stop controls and expandable details.
+• Added native iPad layouts with a sidebar and portrait and landscape support.
+• Improved conversation clearing, interrupted-task recovery and command cancellation.

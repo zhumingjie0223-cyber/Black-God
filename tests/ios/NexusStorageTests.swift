@@ -49,4 +49,48 @@ final class NexusStorageTests: XCTestCase {
         XCTAssertEqual(snapshot.files, 1)
     }
 
+    func testDirectorySymlinksDoNotEscapeRuntimeOrCountTargetFiles() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let root = folder.appendingPathComponent("runtime")
+        let outside = folder.appendingPathComponent("outside")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 31).write(to: root.appendingPathComponent("kept"))
+        try Data(repeating: 2, count: 4096).write(to: outside.appendingPathComponent("hidden"))
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("directory-link"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("broken-link"), withDestinationURL: folder.appendingPathComponent("missing"))
+        let snapshot = try NexusStorage.measure(root: root)
+        XCTAssertEqual(snapshot.used, 31)
+        XCTAssertEqual(snapshot.files, 1)
+    }
+
+    @MainActor
+    func testCancelledBackgroundMeasurementDoesNotPopulateCache() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 10).write(to: root.appendingPathComponent("first"))
+        let task = Task { try await NexusStorage.measureInBackground(root: root, useCache: true) }
+        task.cancel()
+        do { _ = try await task.value; XCTFail("已取消的测量不能交付或缓存结果") }
+        catch is CancellationError {} catch { XCTFail(error.localizedDescription) }
+        try Data(repeating: 2, count: 20).write(to: root.appendingPathComponent("second"))
+        let complete = try NexusStorage.measureCached(root: root, budget: NexusStorage.gib)
+        XCTAssertEqual(complete.used, 30)
+        XCTAssertEqual(complete.files, 2)
+    }
+
+    @MainActor
+    func testCancelledRequestCannotReturnAnExistingCachedMeasurement() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        _ = try NexusStorage.measureCached(root: root, budget: NexusStorage.gib)
+        let task = Task { try await NexusStorage.measureInBackground(root: root, useCache: true) }
+        task.cancel()
+        do { _ = try await task.value; XCTFail("命中缓存也必须遵守取消") }
+        catch is CancellationError {} catch { XCTFail(error.localizedDescription) }
+    }
+
 }

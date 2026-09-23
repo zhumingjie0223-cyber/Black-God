@@ -13,7 +13,7 @@ App Store 构建包含下列组件；各组件保留各自许可。
 - Alpine minirootfs 3.22.5 aarch64, with signature-verified OpenSSL 3.5.8 updates. Exact CDN URLs, SHA256 hashes and the image identity are pinned in tools/runtime/image-lock.json. tools/runtime/prepare_image.py imports the clean base and uses Alpine apk to verify and install the pinned updates offline. No preconfigured Minis image or user data is copied. Installed package licenses and upstream texts are bundled in ios-app/AppStore/OPEN_SOURCE_LICENSES.md.
 
 
-Original Black God source retains its existing MIT notices. A linked runtime build includes GPL components and must not be described or distributed as an MIT-only binary. The 1.2.0 (3) binary has been privately uploaded to App Store Connect for processing; no public App Store release has been verified. Before distribution, include applicable notices and complete corresponding source (including modifications/build scripts and sources required for bundled Alpine packages) and validate the distribution process. The repository root LICENSE does not replace any third-party license.
+Original Black God source retains its existing MIT notices. A linked runtime build includes GPL components and must not be described or distributed as an MIT-only binary. App Store Connect reports version 1.2.1 as ready for distribution. The corresponding source for version 1.3.0 (12), including modifications, build scripts and bundled Alpine package sources, is provided at https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.3.0-build12. Source publication and App Store review or availability are separate statuses. The repository root LICENSE does not replace any third-party license.
 
 
 Black God local changes to the pinned kernel snapshot (2026-09-09):

@@ -29,6 +29,8 @@ struct NexusAgentCheckpoint: Codable {
     var evidence: [NexusSavedEvidence] = []
     var pendingTool: String?
     var finalMessage: ChatMessage?
+    // A regenerated reply replaces this message only after the new reply has been saved.
+    var replacingMessageID: UUID?
     var warning: String?
     // Preserve the earlier recovery summary if the app exits during replanning.
     var inheritedContext: String?

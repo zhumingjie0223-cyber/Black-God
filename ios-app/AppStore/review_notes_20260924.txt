@@ -1,0 +1,16 @@
+This update redesigns the existing client interface, adds native iPad layouts, and makes local Shell execution visible in a compact live window.
+
+Navigation now contains Chat, Create, Monitor and Me. Advanced controls are under Me → 高级设置 (Advanced Settings). The interface remains primarily Simplified Chinese.
+
+The embedded Alpine Linux environment executes commands within the app’s own workspace. It does not control iOS or other apps. Commands can access network destinations and package repositories when requested. Execution can be stopped, and entering the background stops the current command. The live window displays actual command output; it is not a screen recording or remote-device control feature.
+
+To inspect local execution without model credentials:
+1. Open Me → 高级设置 → 手动终端 (Manual Terminal).
+2. Replace the editor contents with: printf 'LIVE_START\n'; sleep 3; printf 'LIVE_END\n'
+3. Tap 运行命令 (Run Command). The first line appears while the command is still running. The stop control can interrupt execution.
+
+The compact window inside Chat appears when a supported, configured model invokes a Shell tool. Online conversations and model-driven tool use require valid third-party provider credentials, network access and available quota. The connection screen identifies the destination and requests permission before sending conversation content, selected memories or tool results. The developer operates no chat relay.
+
+The Create page currently supports editing and copying creative drafts. Image, video and speech generation services are not connected, and the generation button is visibly disabled.
+
+Chat → 对话管理 → 清空当前对话 clears local chat messages and the current task recovery record. It does not delete separately managed memories, skills or workspace files. Corrupted chat or task files are preserved in local recovery copies before clearing.

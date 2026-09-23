@@ -167,14 +167,16 @@ final class NexusAgentCheckpointTests: XCTestCase {
     }
 
     func testCannotStartIfCheckpointPathIsUnwritable() throws {
-        try FileManager.default.createDirectory(at: store.url, withIntermediateDirectories: true)
         var requests = 0
         let vm = ChatViewModel(store: conversation, configured: { _ in true }, completion: { _, _ in requests += 1; return "未执行" })
+        // Inject a write failure after a successful initial read, rather than exercising corrupt-file recovery.
+        try FileManager.default.createDirectory(at: store.url, withIntermediateDirectories: true)
         vm.send("新任务")
         XCTAssertFalse(vm.isTyping)
         XCTAssertEqual(requests, 0)
         XCTAssertTrue(vm.messages.isEmpty)
         XCTAssertTrue(vm.lastError?.contains("任务尚未开始") == true)
+        XCTAssertTrue(try store.url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true)
     }
 
 

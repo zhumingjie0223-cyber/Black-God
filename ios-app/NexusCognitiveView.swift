@@ -109,8 +109,10 @@ struct NexusCognitiveView: View {
                 Section("现实世界接入状态") {
                     Text("已接入：文本、本机图片文字识别和本地工具输出。\n待接入：通用图像理解、语音转写、机器人和真实实验设备。来源字段可记录实验出处，但不代表验证过实验。")
                 }
-                Section("审计 \(control.state.audit.count)/2000") {
-                    Text("仅记录事件、工具名、调用编号和参数摘要哈希，不保存原始参数。最多2000条，满额停止受管操作，不自动覆盖。")
+                Section("审计 \(control.state.audit.count)/\(NexusCognitiveControl.auditLimit)") {
+                    Text("仅记录事件、工具名、调用编号和参数摘要哈希，不保存原始参数。保留最近2000条，超出后移除最早记录，继续记录新事件；这不是完整历史档案。未完成工具的调用编号独立保留，用于重启后识别中断。")
+                    Text("累计已移出历史窗口：\(control.state.auditRetiredCount)条。移出的事件详情无法在应用内恢复。")
+                        .font(.caption).foregroundStyle(.secondary)
                     ForEach(control.state.audit.suffix(30).reversed()) { event in
                         VStack(alignment: .leading) { Text(event.event); Text(event.subject).font(.caption); Text(event.date.formatted()).font(.caption2) }
                     }

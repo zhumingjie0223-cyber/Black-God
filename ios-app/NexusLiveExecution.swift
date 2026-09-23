@@ -14,6 +14,7 @@ final class NexusLiveExecution: ObservableObject {
     }
     @Published private(set) var state: State = .idle
     @Published private(set) var entries: [Entry] = []
+    @Published private(set) var latestCommand: Entry?
     @Published private(set) var status = ""
     @Published private(set) var goal = ""
     @Published private(set) var omitted = false
@@ -21,10 +22,15 @@ final class NexusLiveExecution: ObservableObject {
     private var seen = Set<UUID>()
     var visible: Bool { state != .idle }
 
+    func reset() {
+        state = .idle; entries = []; latestCommand = nil; status = ""; goal = ""; omitted = false
+        key = nil; seen = []
+    }
+
     func begin(goal: String, redacting key: String? = nil) {
         self.key = key
         self.goal = clean(goal, limit: 200)
-        entries = []; seen = []; omitted = false
+        entries = []; latestCommand = nil; seen = []; omitted = false
         state = .running; status = "正在理解任务"
     }
     func phase(_ text: String) {
@@ -34,7 +40,9 @@ final class NexusLiveExecution: ObservableObject {
     }
     func append(_ kind: Kind, _ text: String) {
         guard state == .running else { return }
-        entries.append(Entry(kind: kind, text: clean(text, limit: 1200)))
+        let entry = Entry(kind: kind, text: clean(text, limit: 1200))
+        if kind == .command { latestCommand = entry }
+        entries.append(entry)
         while entries.count > 60 || entries.reduce(0, { $0 + $1.text.count }) > 16000 {
             entries.removeFirst(); omitted = true
         }

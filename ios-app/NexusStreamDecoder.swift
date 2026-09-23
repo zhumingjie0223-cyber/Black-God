@@ -71,11 +71,11 @@ struct NexusStreamContent {
             }
             if type == "content_block_start", let block = object["content_block"] as? [String: Any], block["type"] as? String == "tool_use" {
                 let index = object["index"] as? Int ?? 0
-                tools.append(index: index, name: block["name"] as? String, arguments: nil)
+                try tools.append(index: index, name: block["name"] as? String, arguments: nil)
             }
             if type == "content_block_delta", let delta = object["delta"] as? [String: Any], delta["type"] as? String == "input_json_delta" {
                 let index = object["index"] as? Int ?? 0
-                tools.append(index: index, name: nil, arguments: delta["partial_json"] as? String)
+                try tools.append(index: index, name: nil, arguments: delta["partial_json"] as? String)
             }
             if type == "message_delta", let delta = object["delta"] as? [String: Any], let reason = delta["stop_reason"] as? String {
                 if reason == "tool_use" { sawToolFinish = true; sawFinish = true }
@@ -89,7 +89,7 @@ struct NexusStreamContent {
                         for call in calls {
                             let index = (call["index"] as? NSNumber)?.intValue ?? 0
                             let function = call["function"] as? [String: Any]
-                            tools.append(index: index, name: function?["name"] as? String, arguments: function?["arguments"] as? String)
+                            try tools.append(index: index, name: function?["name"] as? String, arguments: function?["arguments"] as? String)
                         }
                     }
                     text = delta["content"] as? String ?? delta["refusal"] as? String
@@ -100,8 +100,10 @@ struct NexusStreamContent {
                 }
             }
         }
+        guard output.utf8.count + (text?.utf8.count ?? 0) + tools.byteCount <= NexusToolCallLimits.payloadBytes else {
+            throw NexusError.apiError("回答超过本机接收上限。")
+        }
         if let text {
-            guard output.utf8.count + text.utf8.count <= 2_000_000 else { throw NexusError.apiError("回答超过本机接收上限。") }
             output += text
         }
         return text

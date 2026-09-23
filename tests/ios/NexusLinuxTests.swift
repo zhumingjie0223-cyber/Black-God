@@ -3,6 +3,95 @@ import XCTest
 
 @MainActor
 final class NexusLinuxTests: XCTestCase {
+    func testBackgroundCancellationDuringPreparationNeverStartsLateCommandAndNextRunWorks() async throws {
+        var attempts = 0
+        var resumeScan: CheckedContinuation<NexusStorageSnapshot, Never>?
+        var scanWasCancelled = false
+        let snapshot = NexusStorageSnapshot(used: 0, free: 10 * NexusStorage.gib, budget: NexusStorage.budget(), files: 0)
+        let runtime = NexusLinuxRuntime(measureStorage: { _, _ in
+            attempts += 1
+            if attempts == 1 {
+                let result = await withCheckedContinuation { resumeScan = $0 }
+                scanWasCancelled = Task.isCancelled
+                return result
+            }
+            return snapshot
+        })
+        let priorRecords = try runtime.recentExecutions().map(\.id)
+        let task = Task { try await runtime.execute(command: "printf MUST_NOT_RUN") }
+        for _ in 0..<100 where resumeScan == nil { try await Task.sleep(for: .milliseconds(10)) }
+        let finishScan = try XCTUnwrap(resumeScan)
+        runtime.cancelActive(reason: "应用进入后台，命令已停止")
+        // Even a measurement implementation that returns after cancellation must not start a command.
+        finishScan.resume(returning: snapshot)
+        do { _ = try await task.value; XCTFail("准备阶段取消后不能执行命令") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("后台"), error.localizedDescription) }
+        XCTAssertTrue(scanWasCancelled)
+        XCTAssertFalse(runtime.isExecuting)
+        XCTAssertEqual(try runtime.recentExecutions().map(\.id), priorRecords)
+        let next = try await runtime.execute(command: "printf recovered", workspace: NexusWorkspaceIdentity.id(for: "preflight-tests"))
+        XCTAssertEqual(next.output, "recovered")
+        XCTAssertNil(next.failure)
+        XCTAssertEqual(attempts, 2)
+    }
+
+    func testTaskCancellationPropagatesToPreparationWithoutStartingCommand() async throws {
+        var scanning = false
+        var scanWasCancelled = false
+        let runtime = NexusLinuxRuntime(measureStorage: { _, _ in
+            scanning = true
+            do { try await Task.sleep(for: .seconds(60)) }
+            catch { scanWasCancelled = Task.isCancelled; throw error }
+            return NexusStorageSnapshot(used: 0, free: 10 * NexusStorage.gib, budget: NexusStorage.budget(), files: 0)
+        })
+        let priorRecords = try runtime.recentExecutions().map(\.id)
+        let task = Task { try await runtime.execute(command: "printf MUST_NOT_RUN") }
+        for _ in 0..<100 where !scanning { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(scanning)
+        task.cancel()
+        do { _ = try await task.value; XCTFail("任务必须取消") }
+        catch is CancellationError {} catch { XCTFail(error.localizedDescription) }
+        XCTAssertTrue(scanWasCancelled)
+        XCTAssertFalse(runtime.isExecuting)
+        XCTAssertEqual(try runtime.recentExecutions().map(\.id), priorRecords)
+    }
+
+    func testCancelledStorageWatcherCannotStopNextCommandWithLateError() async throws {
+        var measurements = 0
+        var resumeWatcher: CheckedContinuation<NexusStorageSnapshot, Error>?
+        let snapshot = NexusStorageSnapshot(used: 0, free: 10 * NexusStorage.gib, budget: NexusStorage.budget(), files: 0)
+        let runtime = NexusLinuxRuntime(measureStorage: { _, _ in
+            measurements += 1
+            if measurements == 2 { return try await withCheckedThrowingContinuation { resumeWatcher = $0 } }
+            return snapshot
+        })
+        let workspace = NexusWorkspaceIdentity.id(for: "preflight-tests")
+        let first = Task { try await runtime.execute(command: "sleep 60", workspace: workspace) }
+        defer {
+            first.cancel()
+            resumeWatcher?.resume(throwing: CancellationError())
+        }
+        for _ in 0..<1000 where resumeWatcher == nil { try await Task.sleep(for: .milliseconds(10)) }
+        _ = try XCTUnwrap(resumeWatcher)
+        first.cancel()
+        do { _ = try await first.value; XCTFail("第一条命令应取消") }
+        catch is CancellationError {} catch { XCTFail(error.localizedDescription) }
+        var secondStarted = false
+        let second = Task {
+            try await runtime.execute(command: "sleep 0.3; printf second", workspace: workspace,
+                onStatus: { if $0 == "正在执行命令" { secondStarted = true } })
+        }
+        defer { second.cancel() }
+        for _ in 0..<100 where !secondStarted { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(secondStarted)
+        let oldWatcher = try XCTUnwrap(resumeWatcher)
+        resumeWatcher = nil
+        oldWatcher.resume(throwing: URLError(.cannotOpenFile))
+        let result = try await second.value
+        XCTAssertEqual(result.output, "second")
+        XCTAssertTrue(result.succeeded, result.failure ?? result.errorOutput)
+    }
+
     func testGuestDiskCapacityReportsOnlyAppBudget() async throws {
         let result = try await NexusLinuxRuntime.shared.execute(command: "stat -f -c '%S %b' .")
         XCTAssertTrue(result.succeeded, result.output)

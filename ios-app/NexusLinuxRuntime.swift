@@ -14,18 +14,24 @@ struct NexusLinuxResult {
 final class NexusLinuxRuntime {
     static let shared = NexusLinuxRuntime()
     private var busy = false
+    private var executionToken: UUID?
     var isExecuting: Bool { busy }
     private var preparedWorkspaces = Set<UUID>()
     private(set) var ready = false
     private var activePID: Int32?
     private var activeID: UUID?
     private var cancellationReason: String?
+    private var preparationTask: Task<NexusStorageSnapshot, Error>?
+    private let measureStorage: (URL, Int64) async throws -> NexusStorageSnapshot
     private let rootParent: URL
     private lazy var journal = NexusExecutionJournal(url: rootParent.appendingPathComponent("execution-journal.json"))
     private(set) var interruptedCount = 0
-    init(rootParent: URL? = nil) {
+    init(rootParent: URL? = nil, measureStorage: @escaping (URL, Int64) async throws -> NexusStorageSnapshot = { root, budget in
+        try await NexusStorage.measureInBackground(root: root, budget: budget, useCache: true)
+    }) {
         self.rootParent = rootParent ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("BlackGodLinux", isDirectory: true)
+        self.measureStorage = measureStorage
     }
     func prepare() throws {
         if ready { return }
@@ -43,7 +49,7 @@ final class NexusLinuxRuntime {
         guard code == 0 else { throw NexusReasoningError.execution("Linux 启动失败（\(code)），请重启应用后再试。") }
         ready = true
     }
-    func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
+    func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), onStatus: ((String) -> Void)? = nil, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
         try Task.checkCancellation()
         guard !busy else { throw NexusReasoningError.execution("Linux 正在执行另一项任务，请稍后重试。") }
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -51,15 +57,38 @@ final class NexusLinuxRuntime {
               timeout.isFinite, timeout > 0, timeout <= 120 else {
             throw NexusReasoningError.execution("命令为空、过长或超时范围无效（1—120秒）。")
         }
+        onStatus?("正在准备运行环境…")
         try prepare()
         guard ISHKernel.shared.reapAndCountGuestProcesses() == 0 else {
             throw NexusReasoningError.execution("上一次 Linux 进程尚未退出，请稍后重试或重启应用。")
         }
         busy = true
-        defer { busy = false; ISHKernel.shared.nextRoot = nil }
+        let token = UUID()
+        executionToken = token
+        cancellationReason = nil
+        defer {
+            preparationTask?.cancel(); preparationTask = nil
+            busy = false; executionToken = nil; cancellationReason = nil; ISHKernel.shared.nextRoot = nil
+        }
         let storageRoot = rootParent
         let initialBudget = NexusStorage.budget()
-        let measured = try await Task.detached(priority: .utility) { try NexusStorage.measureCached(root: storageRoot, budget: initialBudget) }.value
+        onStatus?("正在检查工作区与可用空间…")
+        let scan = Task { try await measureStorage(storageRoot, initialBudget) }
+        preparationTask = scan
+        let measured: NexusStorageSnapshot
+        do {
+            measured = try await withTaskCancellationHandler {
+                let snapshot = try await scan.value
+                try Task.checkCancellation()
+                return snapshot
+            } onCancel: { scan.cancel() }
+        } catch {
+            try Task.checkCancellation()
+            if let cancellationReason { throw NexusReasoningError.execution(cancellationReason) }
+            throw error
+        }
+        preparationTask = nil
+        try checkPreparationCancellation()
         let spaceBudget = NexusStorage.adoptExistingUsage(measured)
         let space = NexusStorageSnapshot(used: measured.used, free: measured.free, budget: spaceBudget, files: measured.files)
         blackgod_set_guest_storage(UInt64(space.budget), UInt64(max(0, space.used)))
@@ -68,12 +97,16 @@ final class NexusLinuxRuntime {
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(for: .seconds(5))
-                    let usage = try await Task.detached(priority: .utility) { try NexusStorage.measureCached(root: storageRoot, budget: spaceBudget) }.value
+                    let usage = try await self.measureStorage(storageRoot, spaceBudget)
                     try Task.checkCancellation()
+                    guard self.executionToken == token else { return }
                     blackgod_set_guest_storage(UInt64(spaceBudget), UInt64(max(0, usage.used)))
                     if let reason = usage.stopReason { self.cancelActive(reason: reason); return }
                 } catch is CancellationError { return }
-                catch { self.cancelActive(reason: "空间检查失败，命令已停止"); return }
+                catch {
+                    guard !Task.isCancelled, self.executionToken == token else { return }
+                    self.cancelActive(reason: "空间检查失败，命令已停止"); return
+                }
             }
         }
         defer { watcher.cancel() }
@@ -81,6 +114,7 @@ final class NexusLinuxRuntime {
         do {
         let root = "/sessions/" + workspace.uuidString
         if !preparedWorkspaces.contains(workspace) {
+            onStatus?("正在准备独立工作区…")
             let setup = """
             set -e
             if [ ! -d '\(root)' ] && [ -d '\(root).previous' ]; then mv '\(root).previous' '\(root)'; fi
@@ -107,7 +141,9 @@ final class NexusLinuxRuntime {
             guard result.succeeded else { throw NexusReasoningError.execution("无法创建独立工作区：" + (result.failure ?? result.errorOutput)) }
             preparedWorkspaces.insert(workspace)
         }
+        try checkPreparationCancellation()
         ISHKernel.shared.nextRoot = root
+        onStatus?("正在执行命令")
         let result = try await runCommand(command: "umask 077\ncd /workspace || exit 125\n" + command, timeout: timeout, onOutput: onOutput)
         // 被系统（进入后台、空间不足）强制停止的命令记为“意外中断”，用户主动停止记为“已取消”；只有命令自身出错才记“失败”。
         let status: String
@@ -122,6 +158,11 @@ final class NexusLinuxRuntime {
         }
     }
     func recentExecutions() throws -> [NexusExecutionRecord] { try journal.records() }
+
+    private func checkPreparationCancellation() throws {
+        try Task.checkCancellation()
+        if let cancellationReason { throw NexusReasoningError.execution(cancellationReason) }
+    }
 
     private func runCommand(command: String, timeout: TimeInterval, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
         try Task.checkCancellation()
@@ -196,8 +237,10 @@ final class NexusLinuxRuntime {
         }.value
     }
     func cancelActive(reason: String = "用户停止") {
-        guard let pid = activePID else { return }
+        guard busy else { return }
         cancellationReason = reason
+        preparationTask?.cancel()
+        guard let pid = activePID else { return }
         print("LINUX_CANCEL reason=\(reason) pid=\(pid)")
         ISHShellExecutor.killProcessGroup(pid)
         ISHShellExecutor.finalizeTimedOutPid(pid)

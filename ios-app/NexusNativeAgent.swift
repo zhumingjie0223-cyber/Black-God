@@ -12,6 +12,30 @@ struct NexusNativeReply {
     let calls: [NexusNativeCall]
     // 原样保留服务商要求回传的推理签名等字段；不展示或持久化。
     let assistant: [String: Any]
+    var providerType: NexusProviderType = .openAICompatible
+}
+
+enum NexusToolCallLimits {
+    static let count = 8
+    static let payloadBytes = 2_000_000
+
+    static func validate(_ calls: [NexusNativeCall]) throws {
+        try validate(calls.map(\.call))
+    }
+
+    static func validate(_ calls: [NexusToolCall]) throws {
+        guard calls.count <= count else {
+            throw NexusError.apiError("模型返回的工具调用超过单轮上限，尚未执行。")
+        }
+        var bytes = 0
+        for call in calls {
+            bytes += call.name.utf8.count
+            bytes += call.arguments.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count }
+            guard bytes <= payloadBytes else {
+                throw NexusError.apiError("模型工具参数超过接收上限，尚未执行。")
+            }
+        }
+    }
 }
 
 enum NexusNativeMessage {
@@ -134,25 +158,29 @@ enum NexusNativeCodec {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !calls.isEmpty else {
             throw NexusError.apiError("模型未返回回答或工具调用。")
         }
-        return NexusNativeReply(text: text, calls: calls, assistant: assistant)
+        return NexusNativeReply(text: text, calls: calls, assistant: assistant, providerType: type)
     }
 }
 
 extension NexusNativeReply {
-    /// 本地模型常把工具调用写在正文里，而不是 tool_calls 字段。正文能完整解析时才执行。
-    func promotingTextCalls() -> NexusNativeReply {
+    /// 兼容本地模型的纯工具 JSON；带说明文字的示例仍是回答，不执行。
+    func promotingTextCalls() throws -> NexusNativeReply {
         guard calls.isEmpty else { return self }
-        let extracted = NexusToolCallParser.extract(from: text)
-        guard !extracted.isEmpty else { return self }
-        let natives: [NexusNativeCall] = extracted.enumerated().map { index, call in
+        let parsed = NexusToolCallParser.response(from: text)
+        guard !parsed.calls.isEmpty, parsed.text.isEmpty else { return self }
+        guard providerType == .openAICompatible else {
+            throw NexusError.apiError("当前协议需要原生工具调用，模型只返回了正文 JSON，尚未执行工具。")
+        }
+        let natives: [NexusNativeCall] = parsed.calls.enumerated().map { index, call in
             NexusNativeCall(providerID: "call_text_\(index)", call: call)
         }
+        try NexusToolCallLimits.validate(natives)
         let toolCalls: [[String: Any]] = natives.map { native in
             let data = (try? JSONSerialization.data(withJSONObject: native.call.arguments)) ?? Data("{}".utf8)
             let arguments = String(data: data, encoding: .utf8) ?? "{}"
             return ["id": native.providerID, "type": "function", "function": ["name": native.call.name, "arguments": arguments]]
         }
-        return NexusNativeReply(text: "", calls: natives, assistant: ["role": "assistant", "content": "", "tool_calls": toolCalls])
+        return NexusNativeReply(text: "", calls: natives, assistant: ["role": "assistant", "content": "", "tool_calls": toolCalls], providerType: providerType)
     }
 }
 

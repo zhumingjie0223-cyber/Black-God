@@ -124,6 +124,7 @@ actor NexusClient {
         let request = try NexusProviderRequestBuilder.request(model: entry, messages: messages, apiKey: key)
         do {
             try Task.checkCancellation()
+            try consentValidator(entry)
             let (bytes, response) = try await session.bytes(for: request, delegate: NexusRedirectGuard())
             guard let http = response as? HTTPURLResponse else { throw NexusError.invalidResponse }
             guard http.statusCode == 200 else {
@@ -190,6 +191,7 @@ actor NexusClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         do {
             try Task.checkCancellation()
+            try consentValidator(entry)
             let (bytes, response) = try await session.bytes(for: request, delegate: NexusRedirectGuard())
             guard let http = response as? HTTPURLResponse else { throw NexusError.invalidResponse }
             var data = Data()

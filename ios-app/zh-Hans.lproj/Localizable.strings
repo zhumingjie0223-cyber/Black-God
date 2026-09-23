@@ -10,7 +10,7 @@
 */
 
 /* ===== 底部 Tab ===== */
-"tab.chat" = "Black God AI";
+"tab.chat" = "对话";
 "tab.tools" = "工具";
 "tab.media" = "创作";
 "tab.monitor" = "监测";

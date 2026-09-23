@@ -33,6 +33,9 @@ final class ChatViewModel: ObservableObject {
     private var liveSubscription: AnyCancellable?
     private let checkpointStore: NexusAgentCheckpointStore
     private let store: NexusConversationStore
+    private var unreadableStoreURLs = Set<URL>()
+    private var pendingClearFailure = false
+    private var storageReady: Bool { unreadableStoreURLs.isEmpty && !pendingClearFailure }
     private let completion: Completion?
     private let nativeCompletion: (([NexusNativeMessage], [NexusToolDefinition], String) async throws -> NexusNativeReply)?
     private let configured: (String) -> Bool
@@ -68,24 +71,24 @@ final class ChatViewModel: ObservableObject {
         self.configured = configured
         self.completion = completion
         self.nativeCompletion = nativeCompletion
-        do { messages = try store.load() }
-        catch { lastError = "读取历史记录失败：\(error.localizedDescription)" }
-        do {
-            if var saved = try checkpointStore.load() {
-                if saved.state == .running {
-                    saved.state = .interrupted
-                    saved = try checkpointStore.save(saved)
-                }
-                taskCheckpoint = saved
-                if saved.canResume { lastPrompt = saved.goal }
-                if let reply = saved.finalMessage,
-                   !messages.contains(where: { $0.id == reply.id }) {
-                    messages.append(reply)
-                    try store.save(messages)
-                    statusHint = saved.warning
-                }
+        do { try store.finishPendingClear(checkpointURL: checkpointStore.url) }
+        catch {
+            pendingClearFailure = true
+            lastError = "上次清空尚未完成，请重试清空：" + error.localizedDescription
+        }
+        if !pendingClearFailure {
+            do { messages = try store.load() }
+            catch {
+                unreadableStoreURLs.insert(store.url)
+                lastError = "读取历史记录失败，原文件已保留：\(error.localizedDescription)"
             }
-        } catch { lastError = "读取任务进度失败：" + error.localizedDescription }
+            do { taskCheckpoint = try checkpointStore.load() }
+            catch {
+                unreadableStoreURLs.insert(checkpointStore.url)
+                lastError = "读取任务进度失败，原文件已保留：" + error.localizedDescription
+            }
+            if storageReady { restoreSavedCheckpoint() }
+        }
         cognitiveSubscription = self.cognitive.$revision.dropFirst().sink { [weak self] _ in
             guard let self, self.isTyping else { return }
             self.cancel(); self.statusHint = "权限或核对资料已改变，当前任务已停止；继续时重新检查。"
@@ -137,9 +140,53 @@ final class ChatViewModel: ObservableObject {
     }
     var currentMood: String { presence.mood }
     var currentPlan: NexusTaskPlan? { activeEngine?.plan ?? runtime.currentPlan }
-    var canResume: Bool { !isTyping && taskCheckpoint?.canResume == true }
+    var canResume: Bool { storageReady && !isTyping && taskCheckpoint?.canResume == true }
     var canRetry: Bool { canResume && lastPrompt != nil && lastError != nil }
-    var canRegenerate: Bool { !isTyping && lastPrompt != nil && messages.last?.role == "assistant" && taskCheckpoint?.canResume != true }
+    var canRegenerate: Bool { storageReady && !isTyping && lastPrompt != nil && messages.last?.role == "assistant" && taskCheckpoint?.canResume != true }
+    var canClearConversation: Bool { !messages.isEmpty || taskCheckpoint != nil || !storageReady }
+
+    private func restoreSavedCheckpoint() {
+        guard var saved = taskCheckpoint else { return }
+        do {
+            if saved.state == .running {
+                saved.state = .interrupted
+                saved = try checkpointStore.save(saved)
+                taskCheckpoint = saved
+            }
+            if let reply = saved.finalMessage {
+                var restored = messages.filter { $0.id != saved.replacingMessageID }
+                if !restored.contains(where: { $0.id == reply.id }) { restored.append(reply) }
+                if restored.map(\.id) != messages.map(\.id) {
+                    try store.save(restored)
+                    messages = restored
+                }
+                statusHint = saved.warning
+            }
+            if saved.canResume || (saved.finalMessage != nil && saved.finalMessage?.id == messages.last?.id) { lastPrompt = saved.goal }
+        } catch { lastError = "恢复任务进度失败：" + error.localizedDescription }
+    }
+
+    /// Explicitly requested by the user; a durable intent makes interrupted clearing restart-safe.
+    @discardableResult
+    func clearConversation() -> Bool {
+        if isTyping { cancel() }
+        do {
+            try store.clear(checkpointURL: checkpointStore.url, preserving: Array(unreadableStoreURLs))
+        } catch {
+            pendingClearFailure = FileManager.default.fileExists(atPath: store.clearIntentURL.path)
+            lastError = "清空对话未完成，记录尚未全部删除，请重试：" + error.localizedDescription
+            return false
+        }
+        unreadableStoreURLs = []; pendingClearFailure = false
+        messages = []; taskCheckpoint = nil; lastPrompt = nil
+        lastError = nil; statusHint = "对话和任务恢复记录已清空"
+        runtime.reset(); live.reset()
+        pulseNote = nil; pulseWord = nil; keptDraft = ""; retractedDraft = ""
+        retractedAt = nil; heardAt = nil; noticedAt = nil; composerDraft = ""; composerPrefill = nil
+        hitchTask?.cancel(); retractTask?.cancel(); settleTask?.cancel(); hearTask?.cancel()
+        presenceTick = Date()
+        return true
+    }
 
     func send(_ text: String) {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -153,12 +200,8 @@ final class ChatViewModel: ObservableObject {
     }
 
     func regenerate() {
-        guard canRegenerate, let prompt = lastPrompt else { return }
-        if messages.last?.role == "assistant" {
-            messages.removeLast()
-            guard persist() else { return }
-        }
-        start(prompt, appendUser: false)
+        guard canRegenerate, let prompt = lastPrompt, let reply = messages.last else { return }
+        start(prompt, appendUser: false, replacingMessageID: reply.id)
     }
 
     func resume() {
@@ -399,7 +442,13 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    private func start(_ prompt: String, appendUser: Bool, recovering: NexusAgentCheckpoint? = nil) {
+    private func start(_ prompt: String, appendUser: Bool, recovering: NexusAgentCheckpoint? = nil, replacingMessageID: UUID? = nil) {
+        guard storageReady else {
+            lastError = pendingClearFailure
+                ? "上次清空尚未完成，请先重试清空对话。"
+                : "历史记录未能读取，已保留原文件。请先清空对话恢复使用；清空前会保留损坏记录的备份。"
+            return
+        }
         let selectedModel = NexusKeychain.shared.selectedModel
         guard configured(selectedModel) else {
             lastError = "请先在连接设置中保存当前模型服务商的密钥。"
@@ -409,6 +458,7 @@ final class ChatViewModel: ObservableObject {
         let key = NexusKeychain.shared.key(for: connection.credentialID)
         let recoveryContext = recovering.map { NexusEvidence.preview($0.recoveryContext, limit: 16000) } ?? ""
         var saved = NexusAgentCheckpoint(id: UUID(), goal: prompt, connection: connection)
+        saved.replacingMessageID = replacingMessageID ?? recovering?.replacingMessageID
         saved.inheritedContext = recoveryContext.isEmpty ? nil : recoveryContext
         do { taskCheckpoint = try checkpointStore.save(saved, redacting: key) }
         catch { lastError = "无法保存任务进度，任务尚未开始：" + error.localizedDescription; return }
@@ -417,7 +467,7 @@ final class ChatViewModel: ObservableObject {
         runID = id
         lastPrompt = prompt
         // 只回传最近对话，内部记忆与状态提示不作为用户消息展示。
-        var history = NexusContextBudget.history(messages)
+        var history = NexusContextBudget.history(messages.filter { $0.id != saved.replacingMessageID })
         if !appendUser, history.last?.role == "user" { history.removeLast() }
         if history.first?.role == "assistant" { history.removeFirst() }
         if appendUser {
@@ -476,6 +526,9 @@ final class ChatViewModel: ObservableObject {
             }, onOutput: { [weak self] text, error in
                 guard let self, self.runID == id else { return }
                 self.live.append(error ? .error : .output, text)
+            }, onStatus: { [weak self] status in
+                guard let self, self.runID == id else { return }
+                self.live.phase(status)
             }))
         }
         tools.register(NexusMemorySearchTool(items: memorySnapshot))
@@ -529,8 +582,11 @@ final class ChatViewModel: ObservableObject {
                     self.taskCheckpoint = try self.checkpointStore.save(saved, redacting: key)
                 }
                 if let traces = engine.executor?.toolTraces { self.emitAutoSelfDecisions(traces: traces, run: id) }
-                self.messages.append(message)
-                self.persist()
+                var updated = self.messages.filter { $0.id != self.taskCheckpoint?.replacingMessageID }
+                updated.append(message)
+                do { try self.store.save(updated) }
+                catch { throw NexusReasoningError.execution("保存历史记录失败，答复已保留在任务进度中：" + error.localizedDescription) }
+                self.messages = updated
                 self.runtime.append(.text(reply))
                 self.runtime.append(.completed)
                 self.cognitive.continuity.finish(run: id, kind: outcome.warning == nil ? .answered : .warning, summary: outcome.warning ?? "答复已生成；请依据实际证据判断结果。")

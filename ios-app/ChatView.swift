@@ -12,6 +12,9 @@ struct ChatView: View {
     @State private var skillDraft: NexusSkillDraft?
     @State private var memoryMessage: ChatMessage?
     @State private var showConnection = false
+    @State private var showClearConversation = false
+    @State private var showTaskDetails = false
+    @State private var showPracticeDetails = false
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -19,15 +22,15 @@ struct ChatView: View {
             chatHeader
             PresenceStrip(snapshot: vm.presence) { vm.actOnPresence() }
                 .padding(.horizontal, 16).padding(.bottom, 8)
-            NexusActivityPanel(chat: vm, practice: vm.practice).padding(.horizontal, 16).padding(.bottom, 8)
-            if let plan = vm.currentPlan, !plan.steps.isEmpty, vm.isTyping || vm.canResume {
-                NexusPlanStrip(plan: plan).padding(.horizontal, 16).padding(.bottom, 8)
-            }
+            NexusActivitySummary(chat: vm, practice: vm.practice) { openTaskDetails(practice: vm.practice.isRunning) }
+                .padding(.horizontal, 16).padding(.bottom, 8)
+            GeometryReader { viewport in
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 14) {
-                        if vm.messages.isEmpty {
-                            ChatEmptyState(pulseNote: vm.pulseNote) { input = $0; inputFocused = true }
+                        if vm.messages.isEmpty && vm.lastError == nil && !vm.canResume {
+                            ChatEmptyState()
+                                .frame(minHeight: max(260, viewport.size.height - 36))
                         }
                         ForEach(vm.messages) { msg in
                             MessageBubble(message: msg).id(msg.id).contextMenu {
@@ -41,52 +44,29 @@ struct ChatView: View {
                             }
                         }
                         if vm.isTyping { TypingIndicator().id("typing") }
+                        VStack(alignment: .leading, spacing: 12) { conversationStatus }
+                            .frame(maxWidth: .infinity).id("chat.status")
                     }
                     .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 16)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .onChange(of: vm.messages.count) { _, _ in
-                    withAnimation { proxy.scrollTo(vm.messages.last?.id, anchor: .bottom) }
+                    withAnimation { proxy.scrollTo("chat.status", anchor: .bottom) }
+                }
+                .onChange(of: vm.lastError) { _, error in
+                    if error != nil { withAnimation { proxy.scrollTo("chat.status", anchor: .bottom) } }
+                }
+                .onChange(of: vm.canResume) { _, resumable in
+                    if resumable { withAnimation { proxy.scrollTo("chat.status", anchor: .bottom) } }
+                }
+                .onChange(of: vm.statusHint) { _, status in
+                    if !vm.isTyping, status != nil { withAnimation { proxy.scrollTo("chat.status", anchor: .bottom) } }
                 }
             }
-            if !vm.isTyping, let task = vm.taskCheckpoint, NexusSkillContent.candidate(from: task) != nil {
-                Button("把本次流程整理为技能") { skillDraft = NexusSkillDraft(source: task) }
-                    .font(.caption).padding(8).accessibilityIdentifier("skills.fromTask")
-            }
-            if vm.canResume, let task = vm.taskCheckpoint {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("有未完成任务").font(.caption.bold())
-                    Text(task.goal).font(.caption).lineLimit(2)
-                    Text("继续时会先检查已有进度；发送新问题会替换这份恢复记录。")
-                        .font(.caption2).foregroundStyle(Color.bgTextSecondary)
-                    HStack {
-                        Button("继续任务") { vm.resume() }.accessibilityIdentifier("chat.resume")
-                        Spacer()
-                        Button("结束此任务") { vm.discardRecovery() }.accessibilityIdentifier("chat.discard")
-                    }
-                }.padding(12).background(Color.bgCard).padding(.horizontal, 16)
-            }
-            if let status = vm.statusHint {
-                Text(status).font(.caption).foregroundStyle(Color.bgTextSecondary).padding(8)
-            }
-            if let error = vm.lastError {
-                HStack {
-                    Text(error).font(.caption).foregroundStyle(Color.bgTextSecondary)
-                    Spacer()
-                    if vm.canRetry { Button("重试") { vm.retry() } }
-                    if !vm.apiKeyConfigured { Button("配置连接") { showConnection = true }.accessibilityIdentifier("api.open") }
-                }.padding(.horizontal, 16).padding(.vertical, 8)
-            }
-            if vm.canRegenerate {
-                HStack {
-                    Spacer()
-                    Button("重新生成上一则") { vm.regenerate() }
-                        .font(.caption.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
-                        .accessibilityIdentifier("chat.regenerate")
-                }.padding(.horizontal, 16).padding(.bottom, 4)
             }
             inputBar
         }
-        .padding(.top, 50)
+        .padding(.top, 12)
         .onAppear {
             NexusShuyuEngine.shared.prepare()
             vm.awaken()
@@ -104,67 +84,176 @@ struct ChatView: View {
         .sheet(item: $skillDraft) { draft in NexusSkillEditor(store: vm.skills, draft: draft) }
         .sheet(item: $memoryMessage) { msg in NexusMemoryEditor(memory: vm.memory, initialText: msg.content) }
         .sheet(isPresented: $showConnection) { APIConfigView() }
+        .sheet(isPresented: $showTaskDetails) {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        if showPracticeDetails {
+                            NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
+                        } else {
+                            if let plan = vm.currentPlan, !plan.steps.isEmpty { NexusPlanStrip(plan: plan) }
+                            NexusLiveExecutionView(live: vm.live, stop: vm.cancel)
+                        }
+                    }.padding(20)
+                }
+                .background(Color.bgDark).navigationTitle(showPracticeDetails ? "演练记录" : "任务详情").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTaskDetails = false } } }
+            }
+            .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+        }
+        .confirmationDialog("清空当前对话？", isPresented: $showClearConversation, titleVisibility: .visible) {
+            Button("清空对话与任务记录", role: .destructive) {
+                if vm.clearConversation() { input = ""; inputFocused = false }
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("将停止当前回答，删除本机聊天消息和任务恢复记录，无法撤销。已保存的长期记忆、技能与自我状态记录需在各自页面管理。损坏文件会保留本地恢复副本。")
+        }
+    }
+
+    @ViewBuilder
+    private var conversationStatus: some View {
+        if vm.canResume, let task = vm.taskCheckpoint {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("任务已暂停", systemImage: "pause.circle")
+                    .font(.subheadline.weight(.medium)).foregroundStyle(Color.bgJadeHi)
+                Text(task.goal).font(.subheadline).lineLimit(2)
+                ViewThatFits(in: .horizontal) {
+                    HStack { recoveryActions }
+                    VStack(alignment: .leading) { recoveryActions }
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(14).bgFloating(cornerRadius: 18)
+        }
+        if !vm.isTyping, let status = vm.statusHint {
+            Label(status, systemImage: "info.circle")
+                .font(.caption).foregroundStyle(vm.live.state == .warning ? Color.orange : Color.bgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        if let error = vm.lastError {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .font(.subheadline).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    if vm.canRetry { Button("重试") { vm.retry() }.buttonStyle(BGSecondaryButtonStyle()) }
+                    if !vm.apiKeyConfigured {
+                        Button("配置连接") { showConnection = true }
+                            .buttonStyle(BGSecondaryButtonStyle()).accessibilityIdentifier("api.open")
+                    }
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(14).bgFloating(cornerRadius: 18)
+        }
+    }
+
+    @ViewBuilder
+    private var recoveryActions: some View {
+        Button("继续任务") { vm.resume() }.buttonStyle(BGSecondaryButtonStyle()).accessibilityIdentifier("chat.resume")
+        Button("结束此任务", role: .destructive) { vm.discardRecovery() }
+            .font(.subheadline).frame(minHeight: 44).accessibilityIdentifier("chat.discard")
     }
 
     var chatHeader: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "sparkles").font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Color.bgGoldLight)
-                .frame(width: 44, height: 44).background(Color.bgCard).clipShape(Circle())
-                .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 2))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Black God AI").font(.bgHeadline()).foregroundStyle(Color.bgTextPrimary)
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles").font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(Color.bgJadeHi)
+                .frame(width: 42, height: 42)
+                .background(Color.bgJade.opacity(0.13), in: RoundedRectangle(cornerRadius: 14))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Black God").font(.title3.weight(.semibold)).foregroundStyle(Color.bgTextPrimary)
                     .accessibilityIdentifier("chat.title")
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     PresenceDot(duration: vm.presence.breath)
-                    Text(vm.currentMood).font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
+                    Text(vm.presence.action == .practice || vm.presence.action == .pulse ? "就绪" : vm.currentMood).font(.caption).foregroundStyle(Color.bgTextSecondary)
                         .accessibilityIdentifier("chat.mood")
                 }
             }
-            Spacer()
-            Button { showConnection = true } label: {
-                Image(systemName: "slider.horizontal.3").font(.system(size: 18)).foregroundStyle(Color.bgGold)
+            Spacer(minLength: 4)
+            Menu {
+                if vm.live.visible || vm.currentPlan != nil {
+                    Button("任务详情", systemImage: "list.bullet.rectangle") { openTaskDetails(practice: false) }
+                        .accessibilityIdentifier("chat.taskDetailsMenu")
+                }
+                if vm.practice.live.visible {
+                    Button("演练记录", systemImage: "checklist") { openTaskDetails(practice: true) }
+                }
+                if !vm.isTyping, let task = vm.taskCheckpoint, NexusSkillContent.candidate(from: task) != nil {
+                    Button("保存本次流程", systemImage: "square.stack.3d.up") { skillDraft = NexusSkillDraft(source: task) }
+                        .accessibilityIdentifier("skills.fromTask")
+                }
+                if vm.canRegenerate {
+                    Button("重新生成上一则", systemImage: "arrow.clockwise") { vm.regenerate() }
+                        .accessibilityIdentifier("chat.regenerate")
+                }
+                Button("清空当前对话", role: .destructive) { showClearConversation = true }
+                    .disabled(!vm.canClearConversation)
+                    .accessibilityIdentifier("chat.clear")
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(Color.bgTextSecondary).frame(width: 44, height: 44)
+                    .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
             }
+            .accessibilityLabel("对话管理").accessibilityIdentifier("chat.actions")
+            Button { showConnection = true } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 19))
+                    .foregroundStyle(Color.bgJadeHi).frame(width: 44, height: 44)
+                    .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .accessibilityLabel("模型连接设置").accessibilityIdentifier("chat.connection")
         }
-        .padding(.horizontal, 16).padding(.bottom, 12).background(Color.bgDark.opacity(0.95))
+        .padding(.horizontal, 20).padding(.bottom, 14)
         .contentShape(Rectangle())
         .onTapGesture { inputFocused = false }
     }
 
     var inputBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(ChatComposerChip.all, id: \.title) { chip in
-                        Button(chip.title) { input = chip.prompt; inputFocused = true }
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.bgJadeHi)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Capsule().fill(Color.bgCardLight))
-                            .overlay(Capsule().stroke(Color.bgJade.opacity(0.35), lineWidth: 0.5))
-                            .accessibilityIdentifier(chip.accessibilityID)
+                        Button { input = chip.prompt; inputFocused = true } label: {
+                            Label(chip.title, systemImage: chip.icon)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.bgTextSecondary)
+                                .padding(.horizontal, 13).frame(minHeight: 44)
+                                .background(Color.bgCard.opacity(0.75), in: Capsule())
+                        }
+                        .buttonStyle(.plain).accessibilityIdentifier(chip.accessibilityID)
                     }
                 }
             }
-            HStack(spacing: 10) {
-                TextField("跟Black God AI说点什么…", text: $input, axis: .vertical)
-                    .focused($inputFocused).font(.bgBody()).foregroundStyle(Color.bgTextPrimary).lineLimit(1...4)
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 22).fill(Color.bgCardLight))
+            HStack(alignment: .bottom, spacing: 10) {
+                TextField("说出你的想法…", text: $input, axis: .vertical)
+                    .focused($inputFocused).font(.body).foregroundStyle(Color.bgTextPrimary).lineLimit(1...5)
+                    .padding(.leading, 16).padding(.vertical, 15)
                     .submitLabel(.send)
                     .accessibilityIdentifier("chat.input")
                     .onSubmit { sendCurrent() }
-                Button {
-                    sendCurrent()
-                } label: {
-                    Image(systemName: vm.isTyping ? "stop.circle.fill" : "arrow.up.circle.fill").font(.system(size: 34))
-                        .foregroundStyle(input.isEmpty ? AnyShapeStyle(Color.bgTextSecondary) : AnyShapeStyle(LinearGradient.goldGradient))
-                }.disabled(!vm.isTyping && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button { sendCurrent() } label: {
+                    Image(systemName: vm.isTyping ? "stop.fill" : "arrow.up")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(vm.isTyping || !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.bgDark : Color.bgTextSecondary)
+                        .frame(width: 44, height: 44)
+                        .background(vm.isTyping || !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.bgJadeHi : Color.bgCardLight, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain).padding(6)
+                .disabled(!vm.isTyping && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
                 .accessibilityLabel(vm.isTyping ? "停止回答" : "发送消息")
+                .accessibilityIdentifier("chat.send")
             }
+            .bgFloating(cornerRadius: 26)
+            .overlay(RoundedRectangle(cornerRadius: 26).stroke(inputFocused ? Color.bgJadeHi.opacity(0.65) : .clear, lineWidth: 1))
+            .shadow(color: Color.bgJadeHi.opacity(inputFocused ? 0.16 : 0.04), radius: inputFocused ? 18 : 8)
         }
-        .padding(.horizontal, 16).padding(.vertical, 12).background(Color.bgDark.opacity(0.98))
+        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 8)
+        .background(Color.bgDark.opacity(0.98))
+    }
+
+    private func openTaskDetails(practice: Bool) {
+        showPracticeDetails = practice
+        showTaskDetails = true
     }
 
     private func sendCurrent() {
@@ -178,33 +267,34 @@ struct ChatView: View {
 
 struct MessageBubble: View {
     let message: ChatMessage
+    @State private var showEvidence = false
     var isUser: Bool { message.role == "user" }
     var body: some View {
-        HStack {
-            if isUser { Spacer(minLength: 50) }
-            VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
-                Text(message.content).font(.bgBody()).textSelection(.enabled)
+        HStack(alignment: .top, spacing: 0) {
+            if isUser { Spacer(minLength: 44) }
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 8) {
+                Text(message.content).font(.body).lineSpacing(5).textSelection(.enabled)
                     .foregroundStyle(isUser ? Color.bgDark : Color.bgTextPrimary)
-                    .padding(.horizontal, 16).padding(.vertical, 11)
-                    .background(isUser ? AnyShapeStyle(LinearGradient.goldGradient) : AnyShapeStyle(Color.bgCard))
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .padding(.horizontal, isUser ? 16 : 4).padding(.vertical, isUser ? 11 : 6)
+                    .background(isUser ? AnyShapeStyle(LinearGradient.goldGradient) : AnyShapeStyle(Color.clear))
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 if !isUser, let evidence = message.evidence, !evidence.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(Array(evidence.enumerated()), id: \.offset) { _, chip in
-                                Text(chip)
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(Color.bgJadeHi)
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(Capsule().fill(Color.bgCardLight))
-                                    .overlay(Capsule().stroke(Color.bgJade.opacity(0.35), lineWidth: 0.5))
+                    DisclosureGroup(isExpanded: $showEvidence) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(evidence.enumerated()), id: \.offset) { _, item in
+                                Text(item).font(.caption).foregroundStyle(Color.bgTextSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                        }
+                        }.padding(.top, 6)
+                    } label: {
+                        Label("查看依据", systemImage: "checkmark.shield")
+                            .font(.caption).foregroundStyle(Color.bgTextSecondary)
                     }
+                    .tint(Color.bgTextSecondary)
                     .accessibilityIdentifier("chat.evidence")
                 }
             }
-            if !isUser { Spacer(minLength: 50) }
+            if !isUser { Spacer(minLength: 20) }
         }
     }
 }
@@ -233,6 +323,14 @@ struct ChatComposerChip {
     let title: String
     let prompt: String
     let accessibilityID: String
+    var icon: String {
+        switch title {
+        case "计算": return "number"
+        case "规划": return "list.bullet"
+        case "枢语": return "character.book.closed"
+        default: return "leaf"
+        }
+    }
     static let all = [
         ChatComposerChip(title: "计算", prompt: "帮我计算并核对结果：", accessibilityID: "chat.chip.calc"),
         ChatComposerChip(title: "规划", prompt: "把这件事拆成可检查的步骤：", accessibilityID: "chat.chip.plan"),
@@ -242,6 +340,7 @@ struct ChatComposerChip {
 }
 
 struct PresenceDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let duration: Double
     @State private var on = false
     var body: some View {
@@ -253,6 +352,7 @@ struct PresenceDot: View {
             .onChange(of: duration) { _, value in breathe(value) }
     }
     private func breathe(_ value: Double) {
+        guard !reduceMotion else { on = true; return }
         on = false
         withAnimation(.easeInOut(duration: max(0.6, value)).repeatForever(autoreverses: true)) { on = true }
     }
@@ -261,86 +361,37 @@ struct PresenceDot: View {
 struct PresenceStrip: View {
     let snapshot: NexusPresenceSnapshot
     let act: () -> Void
-    @State private var on = false
+    private var hasPendingAction: Bool { snapshot.action != .pulse && snapshot.action != .practice && snapshot.action != .none }
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(snapshot.nextWork).font(.caption.bold()).foregroundStyle(Color.bgJadeHi)
-            if !snapshot.thread.isEmpty {
-                Text(snapshot.thread).font(.caption).foregroundStyle(Color.bgTextPrimary).lineLimit(2)
-            }
-            if snapshot.action != .none {
+        HStack(spacing: 8) {
+            if hasPendingAction {
+                Text(snapshot.nextWork).font(.caption).foregroundStyle(Color.bgTextSecondary).lineLimit(1)
+                Spacer(minLength: 8)
                 Button(snapshot.actionTitle, action: act)
                     .font(.caption.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
+                    .frame(minWidth: 44, minHeight: 44)
                     .accessibilityIdentifier("chat.act")
             }
         }
-        .padding(12).background(Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
-        .scaleEffect(leaning(snapshot.stance) ? (on ? 1.0 : 0.98) : 1)
-        .opacity(breathing(snapshot.stance) ? (on ? 1 : 0.72) : 1)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("chat.presence")
-        .onAppear { breathe(snapshot.stance) }
-        .onChange(of: snapshot.stance) { _, value in breathe(value) }
-    }
-    private func breathing(_ stance: String) -> Bool {
-        ["working", "speaking", "answering", "following", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "resting", "yielding", "keeping", "companying", "tending", "waking"].contains(stance)
-    }
-    private func leaning(_ stance: String) -> Bool {
-        ["speaking", "answering", "following", "hitching", "retracting", "watching", "noticing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "resting", "yielding", "keeping", "companying", "tending", "waking"].contains(stance)
-    }
-    private func breathe(_ stance: String) {
-        guard breathing(stance) else { on = false; return }
-        on = false
-        let duration: Double
-        switch stance {
-        case "answering": duration = 0.6
-        case "speaking": duration = 0.7
-        case "working": duration = 0.9
-        case "exhaling": duration = 1.0
-        case "following": duration = 1.05
-        case "listening": duration = 1.1
-        case "carrying": duration = 1.2
-        case "heeding": duration = 1.25
-        case "nestling": duration = 1.35
-        case "nuzzling": duration = 1.45
-        case "clinging": duration = 1.55
-        case "resting": duration = 1.65
-        case "retracting": duration = 1.3
-        case "hitching": duration = 1.5
-        case "watching": duration = 1.4
-        case "awaiting": duration = 1.6
-        case "yielding": duration = 1.7
-        case "keeping": duration = 1.85
-        case "companying": duration = 1.95
-        case "tending": duration = 2.05
-        case "waking": duration = 2.15
-        case "noticing": duration = 1.8
-        case "holding": duration = 2.0
-        case "echoing": duration = 2.2
-        default: duration = 3.2
-        }
-        withAnimation(.easeInOut(duration: duration).repeatForever(autoreverses: true)) { on = true }
+        .padding(.horizontal, hasPendingAction ? 12 : 0)
+        .frame(maxWidth: .infinity, minHeight: hasPendingAction ? 44 : 0)
+        .background(hasPendingAction ? Color.bgCard.opacity(0.5) : .clear, in: Capsule())
+        .accessibilityElement(children: .contain).accessibilityIdentifier("chat.presence")
     }
 }
 
 struct ChatEmptyState: View {
-    var pulseNote: String? = nil
-    let use: (String) -> Void
+    @Environment(\.horizontalSizeClass) private var sizeClass
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(pulseNote.map { "Black God AI 在场 · \($0)" } ?? "Black God AI 在场。直接说出你要完成的事，它会按需使用内置工具执行并核对结果。")
+        VStack(spacing: 24) {
+            BGAuraOrb(diameter: sizeClass == .regular ? 320 : 250)
+            Text("说出你的想法")
+                .font(.title3.weight(.medium)).tracking(2)
                 .foregroundStyle(Color.bgTextSecondary)
-            ForEach(["计算 12 个月每月存 500 元的累计金额，并核对结果。", "用枢语造一个关于「锚点」的词，并核对编号。", "把整理账单拆成可检查的三步计划。"], id: \.self) { sample in
-                Button(sample) { use(sample) }
-                    .font(.subheadline).foregroundStyle(Color.bgTextPrimary).multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12).background(Color.bgCard)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.bgJade.opacity(0.2), lineWidth: 0.5))
-            }
-        }.padding(.vertical, 12).accessibilityIdentifier("chat.empty")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .accessibilityIdentifier("chat.empty")
     }
 }
 

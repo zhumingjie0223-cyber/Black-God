@@ -1,6 +1,6 @@
 # Black God 隐私与数据使用 / Privacy and data use
 
-更新日期 / Updated: 2026-09-09
+更新日期 / Updated: 2026-09-24
 
 ## 中文
 
@@ -30,6 +30,12 @@ API 密钥、OAuth 访问令牌和刷新令牌存放在本机 Keychain，设置�
 
 可以在对话、记忆和技能页面删除对应记录，在运行环境页面清理工作空间。OAuth 连接可通过“断开此连接”清除本机授权凭据；服务商侧的撤销与数据删除需在其账号页面办理。手填密钥可在连接设置中清空后保存。应用没有 Black God 自有账号，也不提供一个会同时清除所有数据的一键按钮。
 
+### 对话清除与审计保留
+
+聊天顶部的“对话管理 → 清空当前对话”会停止当前回答并删除本机聊天消息及当前任务恢复记录。长期记忆、技能、自我状态、评估记录及运行空间文件独立管理，不属于该操作范围。若聊天或任务文件损坏，清空前会保留本地恢复副本（ConversationRecovery），不会上传；这些副本不会因清空当前对话一并删除。
+
+权限与工具审计保留最近2000条事件和累计移出数量，超出后移除最早事件，无法恢复已移出的事件详情。未结束工具的调用编号独立保留，用于下次启动标记中断；该记录不是完整历史审计归档。
+
 ### 联系与政策变化
 
 支持与隐私请求：https://github.com/zhumingjie0223-cyber/Black-God/issues 。请勿在公开问题中粘贴密钥、密码或私人对话。政策更新会修改本文日期。应用不面向儿童设计；商店年龄分级以实际内容问卷和审核结果为准。
@@ -46,7 +52,7 @@ The connection screen displays the destination, explains the data and provides a
 
 Network-enabled tools, scripts and package commands may contact their specified websites or repositories. Tool output may enter later model requests. Review task plans and avoid unnecessary sensitive data. Actual device free space is used locally for display and write protection.
 
-Delete individual chats, memories and skills in their respective screens and clear workspace files in the runtime screen. Disconnect an OAuth connection to remove its local credential; provider-side revocation and deletion are managed with that provider. Clear and save a manually entered key to remove it. There is no Black God account and no single button that deletes every data category.
+Clear the current conversation using Conversation Management at the top of the chat screen; memories and skills are managed separately in their respective screens, and workspace files in the runtime screen. Disconnect an OAuth connection to remove its local credential; provider-side revocation and deletion are managed with that provider. Clear and save a manually entered key to remove it. There is no Black God account and no single button that deletes every data category.
 
 Support and privacy requests: https://github.com/zhumingjie0223-cyber/Black-God/issues . Do not post credentials or private conversations publicly. Policy changes update this date. The app is not designed for children; its store rating depends on the actual questionnaire and review.
 
@@ -56,3 +62,9 @@ Images selected by the user are processed locally with Apple Vision OCR; the cur
 自我状态流在本机保存最近120条目标摘要、执行阶段、工具返回状态和模型公开自评；这不是内部思维链。较早记录滚动移除并显示计数，当前连接凭据按精确匹配隐藏，但不保证识别其他秘密。最近6条摘要可能随后续获准的模型请求发送。用户可在“神枢成长 → 自我状态流”暂停或清空；这不会删除聊天、知识、任务检查点、系统备份或服务商已有的数据。状态流按任务事件更新，不额外调用模型，应用休眠时不持续运行。
 
 The self-state stream stores the latest 120 goal summaries, task phases, tool return statuses and public model assessments locally, not private chain-of-thought. Older entries roll off with an omission count. The current connection credential is redacted by exact match, which does not identify every possible secret. The latest six summaries may enter subsequent permitted model requests. Users can pause or clear the stream under Cognitive Growth → Self-State Stream; this does not delete chats, knowledge, task checkpoints, system backups or provider-held data. Updates follow task events without extra model requests or continuous execution while the app is suspended.
+
+### Conversation clearing and audit retention
+
+Clearing the current conversation stops the active reply and deletes local chat messages and the current task recovery record. It does not delete separately managed memories, skills, self-state records, evaluation records or workspace files. If a chat or task file cannot be read, a local recovery copy is preserved in ConversationRecovery before clearing; these copies are not uploaded or deleted by the conversation-clear action.
+
+Permission and tool audits retain the latest 2,000 events and a cumulative count of removed events. The oldest events are removed as new ones arrive, and their details cannot be recovered in the app. Pending tool call identifiers are stored separately so an interrupted call can be identified at the next launch. This is not a complete historical audit archive.

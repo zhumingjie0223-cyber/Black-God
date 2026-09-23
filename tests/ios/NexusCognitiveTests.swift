@@ -43,6 +43,89 @@ final class NexusCognitiveControlTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
         return NexusCognitiveControl(url: dir.appendingPathComponent("control.json"))
     }
+    private func fullAuditURL(pendingCall: String? = nil) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("control.json")
+        var state = NexusCognitiveControl.State()
+        state.audit = (0..<NexusCognitiveControl.auditLimit).map {
+            .init(id: UUID(), date: Date(timeIntervalSince1970: Double($0)), event: "tool.denied", subject: "fixture:\($0)")
+        }
+        if let pendingCall {
+            state.auditRetiredCount = 8000
+            state.pendingToolCalls = [pendingCall]
+        }
+        try JSONEncoder().encode(state).write(to: url, options: .atomic)
+        return url
+    }
+    func testFullAuditRotatesAndStillAllowsExecutionAndDurableRevocation() throws {
+        let url = try fullAuditURL()
+        let control = NexusCognitiveControl(url: url)
+        let originalFirst = try XCTUnwrap(control.state.audit.first?.id)
+        let call = NexusToolCall(id: UUID(), name: "calc", arguments: ["expression": "private-input"])
+        let revision = try control.begin(call)
+        XCTAssertEqual(control.state.pendingToolCalls, ["calc:" + call.id.uuidString])
+        try control.finish(call, succeeded: true, startedRevision: revision)
+        try control.revokeAll()
+        XCTAssertEqual(control.state.audit.count, NexusCognitiveControl.auditLimit)
+        XCTAssertEqual(control.state.auditRetiredCount, 3)
+        XCTAssertFalse(control.state.audit.contains { $0.id == originalFirst })
+        XCTAssertEqual(control.state.audit.last?.event, "permission.revoked")
+        XCTAssertTrue(control.state.pendingToolCalls.isEmpty)
+        let reopened = NexusCognitiveControl(url: url)
+        XCTAssertNil(reopened.error)
+        XCTAssertTrue(reopened.state.stopped)
+        XCTAssertEqual(reopened.state.auditRetiredCount, 3)
+        XCTAssertThrowsError(try reopened.begin(call))
+        XCTAssertFalse(String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("private-input"))
+    }
+    func testRestartRecoversPendingCallAfterItsStartedEventLeavesAuditWindow() throws {
+        let call = "shell_execute:" + UUID().uuidString
+        let url = try fullAuditURL(pendingCall: call)
+        let recovered = NexusCognitiveControl(url: url)
+        XCTAssertNil(recovered.error)
+        XCTAssertEqual(recovered.state.audit.count, NexusCognitiveControl.auditLimit)
+        XCTAssertEqual(recovered.state.auditRetiredCount, 8001)
+        XCTAssertTrue(recovered.state.pendingToolCalls.isEmpty)
+        XCTAssertEqual(recovered.state.audit.last?.event, "tool.interrupted")
+        XCTAssertEqual(recovered.state.audit.last?.subject, call)
+        let reopened = NexusCognitiveControl(url: url)
+        XCTAssertEqual(reopened.state.auditRetiredCount, 8001)
+        XCTAssertEqual(reopened.state.audit.filter { $0.event == "tool.interrupted" }.count, 1)
+    }
+    func testLegacyFullAuditDerivesPendingCallsAndRecoversWithoutLockout() throws {
+        let url = try fullAuditURL()
+        var state = try JSONDecoder().decode(NexusCognitiveControl.State.self, from: Data(contentsOf: url))
+        let call = "calc:" + UUID().uuidString
+        state.audit[0] = .init(id: UUID(), date: Date(), event: "tool.started", subject: call + ":argument-hash")
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as? [String: Any])
+        legacy.removeValue(forKey: "pendingToolCalls")
+        legacy.removeValue(forKey: "auditRetiredCount")
+        try JSONSerialization.data(withJSONObject: legacy).write(to: url, options: .atomic)
+        let recovered = NexusCognitiveControl(url: url)
+        XCTAssertNil(recovered.error)
+        XCTAssertEqual(recovered.state.auditRetiredCount, 1)
+        XCTAssertTrue(recovered.state.pendingToolCalls.isEmpty)
+        XCTAssertEqual(recovered.state.audit.last?.subject, call)
+        XCTAssertEqual(recovered.state.audit.last?.event, "tool.interrupted")
+        XCTAssertNoThrow(try recovered.revokeAll())
+    }
+    func testFailedAuditRotationDoesNotPermitToolOrRetireMemoryAndRevocationStillStops() throws {
+        let url = try fullAuditURL()
+        let control = NexusCognitiveControl(url: url)
+        let originalIDs = control.state.audit.map(\.id)
+        try FileManager.default.removeItem(at: url)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+        XCTAssertThrowsError(try control.begin(.init(id: UUID(), name: "calc", arguments: [:])))
+        XCTAssertEqual(control.state.audit.map(\.id), originalIDs)
+        XCTAssertEqual(control.state.auditRetiredCount, 0)
+        XCTAssertTrue(control.state.pendingToolCalls.isEmpty)
+        XCTAssertThrowsError(try control.revokeAll())
+        XCTAssertTrue(control.state.stopped)
+        XCTAssertNotNil(control.error)
+        XCTAssertThrowsError(try control.begin(.init(id: UUID(), name: "calc", arguments: [:])))
+    }
     func testProposalCannotPromoteItselfAndConflictNeedsExplicitReplacement() throws {
         let store = store()
         try store.propose(topic: "test", statement: "old", source: "original")

@@ -19,67 +19,91 @@ struct MeView: View {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
         return "\(name)（\(build)）"
     }
+    @State private var showAdvanced = false
     @State private var showMemory = false
     @State private var showNexusConnection = false
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                VStack(spacing: 14) {
-                    Image(systemName: "sparkles").font(.system(size: 44, weight: .semibold))
-                        .foregroundStyle(Color.bgGold)
-                        .frame(width: 100, height: 100).clipShape(Circle())
-                        .overlay(Circle().stroke(LinearGradient.goldGradient, lineWidth: 3))
-                    Text("Black God AI").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
-                    Text("Black God AI 助手 · 为你工作")
-                        .font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
-                    HStack(spacing: 8) {
-                        Label("神枢", systemImage: "infinity")
-                        Label("智能助手", systemImage: "crown.fill")
-                    }
-                    .font(.system(size: 12)).foregroundStyle(Color.bgGold)
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 24).bgCard()
-                .padding(.horizontal, 16).padding(.top, 8)
-                VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("我的").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.vertical, 4)
+
+                settingsGroup("连接") {
                     Button { appState.haptic(); showNexusConnection = true } label: {
-                        SettingRow(icon: "shield.lefthalf.filled", title: "神枢连接", value: "OAuth 登录 · 模型直连", color: .bgGold)
+                        SettingRow(icon: "network", title: "神枢连接", value: "", color: .bgJadeHi, compact: true)
                     }
                     .accessibilityIdentifier("api.open")
-                    Divider().background(Color.bgCardLight)
-                    Button { showMemory = true } label: {
-                        SettingRow(icon: "brain.head.profile", title: "长期记忆", value: "\(memory.curated.count)条", color: .bgGold)
-                    }.accessibilityIdentifier("memory.open")
-                    Divider().background(Color.bgCardLight)
-                    Button { showSkills = true } label: {
-                        SettingRow(icon: "list.bullet.rectangle", title: "任务技能", value: "\(skills.items.count)个", color: .bgGold)
-                    }.accessibilityIdentifier("skills.open")
-                    Divider().background(Color.bgCardLight)
-                    Button { showCognitive = true } label: { SettingRow(icon: "checkmark.shield", title: "神枢成长", value: "核对 · 权限 · 审计", color: .bgGold) }.accessibilityIdentifier("cognitive.open")
-                    Divider().background(Color.bgCardLight)
-                    SettingRow(icon: "heart.fill", title: "助手模式", value: "神枢", color: .pink)
-                    Divider().background(Color.bgCardLight)
-                    Button { showPrivacy = true } label: { SettingRow(icon: "lock.shield.fill", title: "隐私保护", value: "数据使用说明", color: .green) }.accessibilityIdentifier("privacy.open")
-                    Divider().background(Color.bgCardLight)
-                    Button { showLicenses = true } label: { SettingRow(icon: "doc.text", title: "开源许可", value: "源码与许可文本", color: .bgGold) }.accessibilityIdentifier("licenses.open")
                 }
-                .bgCard().padding(.horizontal, 16)
-                Text("Black God · \(version)\nBlack God AI私人专属版 · 神枢")
-                    .font(.system(size: 11)).foregroundStyle(Color.bgTextSecondary)
-                    .multilineTextAlignment(.center).padding(.top, 8)
+
+                settingsGroup("能力") {
+                    Button { showMemory = true } label: {
+                        SettingRow(icon: "brain.head.profile", title: "长期记忆", value: "\(memory.curated.count) 条", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("memory.open")
+                    Divider().overlay(Color.bgCardLight)
+                    Button { showSkills = true } label: {
+                        SettingRow(icon: "list.bullet.rectangle", title: "任务技能", value: "\(skills.items.count) 个", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("skills.open")
+                    Divider().overlay(Color.bgCardLight)
+                    Button { showCognitive = true } label: {
+                        SettingRow(icon: "checkmark.shield", title: "神枢成长", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("cognitive.open")
+                }
+
+                settingsGroup("设置") {
+                    Button { showAdvanced = true } label: {
+                        SettingRow(icon: "slider.horizontal.3", title: "高级设置", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("advanced.open")
+                    Divider().overlay(Color.bgCardLight)
+                    Button { showPrivacy = true } label: {
+                        SettingRow(icon: "lock.shield", title: "隐私保护", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("privacy.open")
+                    Divider().overlay(Color.bgCardLight)
+                    Button { showLicenses = true } label: {
+                        SettingRow(icon: "doc.text", title: "开源许可", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("licenses.open")
+                }
+
+                HStack {
+                    Text("Black God")
+                    Spacer()
+                    Text(version).accessibilityIdentifier("app.version")
+                }
+                .font(.caption)
+                .foregroundStyle(Color.bgTextSecondary)
+                .padding(.horizontal, 4)
             }
-            .padding(.bottom, 100)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
-        .padding(.top, 50)
+        .background(Color.bgDark)
         .sheet(isPresented: $showCognitive) { NexusCognitiveView(control: cognitive) }
         .sheet(isPresented: $showPrivacy) { NexusPrivacyView() }
         .sheet(isPresented: $showLicenses) { NexusPrivacyView(resource: "OPEN_SOURCE_LICENSES", title: "开源许可") }
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
+        .sheet(isPresented: $showAdvanced) { NexusAdvancedSettingsView() }
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
         .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }
     }
+
+    private func settingsGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.bgTextSecondary)
+                .padding(.leading, 4)
+            VStack(spacing: 0, content: content)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+                .bgFloating()
+        }
+    }
+
 }
 
 struct SettingRow: View {
@@ -87,14 +111,35 @@ struct SettingRow: View {
     let title: String
     let value: String
     let color: Color
+    var compact = false
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: icon).font(.system(size: 18)).foregroundStyle(color).frame(width: 28)
-            Text(title).font(.bgBody()).foregroundStyle(Color.bgTextPrimary)
-            Spacer()
-            Text(value).font(.bgCaption()).foregroundStyle(Color.bgTextSecondary)
-            Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(Color.bgTextSecondary)
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(color)
+                .frame(width: compact ? 36 : 42, height: compact ? 36 : 42)
+                .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Color.bgTextPrimary)
+                if !compact, !value.isEmpty {
+                    Text(value)
+                        .font(.caption)
+                        .foregroundStyle(Color.bgTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            if compact, !value.isEmpty {
+                Text(value).font(.caption.monospacedDigit()).foregroundStyle(Color.bgTextSecondary)
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.bgTextSecondary)
         }
-        .padding(.vertical, 14).padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 }

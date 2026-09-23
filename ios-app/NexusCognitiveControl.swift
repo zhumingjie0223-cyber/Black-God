@@ -5,6 +5,7 @@ import CryptoKit
 @MainActor
 final class NexusCognitiveControl: ObservableObject {
     static let shared = NexusCognitiveControl(url: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("nexus-cognitive-control.json"))
+    static let auditLimit = 2000
     struct Audit: Codable, Identifiable {
         let id: UUID; let date: Date; let event: String; let subject: String
     }
@@ -35,6 +36,10 @@ final class NexusCognitiveControl: ObservableObject {
         var governanceEnabled = true
         var records: [Knowledge] = []
         var audit: [Audit] = []
+        var auditRetiredCount = 0
+        // Track unfinished calls independently of the rolling display history.
+        // Otherwise rotating away tool.started would lose crash recovery evidence.
+        var pendingToolCalls: [String] = []
         var selfDecisions: [SelfDecision] = []
 
         init() {}
@@ -48,7 +53,21 @@ final class NexusCognitiveControl: ObservableObject {
             governanceEnabled = try c.decodeIfPresent(Bool.self, forKey: .governanceEnabled) ?? true
             records = try c.decodeIfPresent([Knowledge].self, forKey: .records) ?? []
             audit = try c.decodeIfPresent([Audit].self, forKey: .audit) ?? []
+            auditRetiredCount = try c.decodeIfPresent(Int.self, forKey: .auditRetiredCount) ?? 0
+            if let pending = try c.decodeIfPresent([String].self, forKey: .pendingToolCalls) {
+                pendingToolCalls = pending
+            } else {
+                // Older files have only the audit trail, without a pending-call index.
+                for item in audit { trackTool(event: item.event, subject: item.subject) }
+            }
             selfDecisions = try c.decodeIfPresent([SelfDecision].self, forKey: .selfDecisions) ?? []
+        }
+        mutating func trackTool(event: String, subject: String) {
+            let call = subject.split(separator: ":").prefix(2).joined(separator: ":")
+            if event == "tool.started", !pendingToolCalls.contains(call) { pendingToolCalls.append(call) }
+            if ["tool.completed", "tool.failed", "tool.interrupted"].contains(event) {
+                pendingToolCalls.removeAll { $0 == call }
+            }
         }
     }
     @Published private(set) var state = State()
@@ -65,14 +84,15 @@ final class NexusCognitiveControl: ObservableObject {
             if FileManager.default.fileExists(atPath: url.path) {
                 guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) <= 4_000_000 else { throw NexusError.invalidResponse }
                 let loaded = try JSONDecoder().decode(State.self, from: Data(contentsOf: url))
-                guard loaded.version == 1, loaded.records.count <= 200, loaded.audit.count <= 2000,
+                guard loaded.version == 1, loaded.records.count <= 200, loaded.audit.count <= Self.auditLimit,
+                      loaded.auditRetiredCount >= 0, loaded.pendingToolCalls.count <= Self.auditLimit,
+                      Set(loaded.pendingToolCalls).count == loaded.pendingToolCalls.count,
                       Set(loaded.records.map(\.id)).count == loaded.records.count,
                       loaded.records.allSatisfy({ !$0.topic.isEmpty && $0.topic.count <= 80 && !$0.statement.isEmpty && $0.statement.count <= 1200 && !$0.source.isEmpty && $0.source.count <= 500 }) else { throw NexusError.invalidResponse }
                 state = loaded
                 // Permission leases never survive a process restart.
                 state.workspaceUntil = nil
-                let finished = Set(state.audit.filter { ["tool.completed", "tool.failed", "tool.interrupted"].contains($0.event) }.map(\.subject))
-                let pending = state.audit.filter { $0.event == "tool.started" }.map { $0.subject.split(separator: ":").prefix(2).joined(separator: ":") }.filter { !finished.contains($0) }
+                let pending = state.pendingToolCalls
                 for item in pending { try commit(state, event: "tool.interrupted", subject: item) }
             }
         } catch { writable = false; self.error = "治理记录读取失败，已停止受管工具，保留原文件。" }
@@ -298,8 +318,16 @@ final class NexusCognitiveControl: ObservableObject {
     private func commit(_ input: State, event: String, subject: String) throws {
         guard writable else { throw failure("治理存储不可写，受管操作已停止") }
         var next = input
-        guard next.audit.count < 2000 else { throw failure("审计记录已满，受管操作停止；不会自动覆盖记录") }
         next.audit.append(Audit(id: UUID(), date: Date(), event: event, subject: subject))
+        next.trackTool(event: event, subject: subject)
+        guard next.pendingToolCalls.count <= Self.auditLimit else { throw failure("未完成工具记录已达上限，请重启应用恢复中断记录。") }
+        let retired = max(0, next.audit.count - Self.auditLimit)
+        if retired > 0 {
+            let (total, overflow) = next.auditRetiredCount.addingReportingOverflow(retired)
+            guard !overflow else { throw failure("审计计数无效，受管操作已停止") }
+            next.auditRetiredCount = total
+            next.audit.removeFirst(retired)
+        }
         let data = try JSONEncoder().encode(next)
         guard data.count <= 4_000_000 else { throw failure("治理记录已满") }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

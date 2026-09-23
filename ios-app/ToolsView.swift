@@ -1,71 +1,65 @@
 import SwiftUI
 
-/// Users describe the result; the agent generates commands inside the embedded runtime.
-struct ToolsView: View {
-    @EnvironmentObject var appState: AppState
-    @ObservedObject var chat: ChatViewModel
+/// Secondary controls live under My settings; everyday work starts in chat.
+struct NexusAdvancedSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("blackgod.linux.modelTools") private var allowExecution = true
-    @State private var request = ""
     @State private var showTerminal = false
     @State private var showStorage = false
     @State private var showShuyu = false
-    @State private var showConnection = false
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("内置执行").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
-                Text("说出目标，Black God 帮你执行")
-                    .font(.headline).foregroundStyle(Color.bgTextPrimary)
-                Text("无需安装其他应用，也不用输入代码。你提出需求，AI 会按需使用内置工具计算、处理文字和生成工作区文件，并根据实际执行结果回答。")
-                    .font(.subheadline).foregroundStyle(Color.bgTextSecondary)
-                Toggle("允许 Black God 执行任务", isOn: $allowExecution)
-                    .accessibilityIdentifier("execution.enabled")
-                Text("执行范围是应用内的独立工作区，可以修改其中的文件和访问网络，不能直接读取手机其他应用。进入后台会停止当前命令。")
-                    .font(.caption).foregroundStyle(Color.bgTextSecondary)
-                TextField("例如：统计这段文字的字数并找出重复词……", text: $request, axis: .vertical)
-                    .lineLimit(3...6).padding(12).bgCard()
-                    .accessibilityIdentifier("execution.request")
-                Button(chat.isTyping ? "查看正在进行的任务" : "交给 Black God") {
-                    if chat.isTyping { appState.currentTab = .chat; return }
-                    guard chat.apiKeyConfigured else { showConnection = true; return }
-                    chat.send(request)
-                    if chat.isTyping { appState.currentTab = .chat }
-                }
-                .buttonStyle(.borderedProminent).accessibilityIdentifier("execution.start")
-                .disabled(!chat.isTyping && request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if !allowExecution {
-                    Text("内置执行已关闭；仍可对话和计算，需要操作文件的任务会受限。")
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("允许助手执行任务", isOn: $allowExecution)
+                            .font(.headline).tint(Color.bgJadeHi)
+                            .accessibilityIdentifier("execution.enabled")
+                        Text("允许 Black God 在应用内的独立工作区操作文件和访问网络。日常任务可直接在对话中提出。")
+                            .font(.footnote).foregroundStyle(Color.bgTextSecondary)
+                    }.bgCard()
+                    VStack(spacing: 0) {
+                        Button { showStorage = true } label: {
+                            SettingRow(icon: "internaldrive", title: "容量与空间", value: "查看用量，调整工作区预算", color: .bgJadeHi)
+                        }.accessibilityIdentifier("storage.open")
+                        Divider().overlay(Color.bgBorder)
+                        Button { showShuyu = true } label: {
+                            SettingRow(icon: "character.book.closed", title: "枢语", value: "语言检索与组合", color: .bgJadeHi)
+                        }.accessibilityIdentifier("shuyu.open")
+                        Divider().overlay(Color.bgBorder)
+                        Button { showTerminal = true } label: {
+                            SettingRow(icon: "terminal", title: "手动终端", value: "高级调试 · 内置 Linux 环境", color: .bgJadeHi)
+                        }.accessibilityIdentifier("linux.advanced")
+                    }.buttonStyle(.plain).bgCard()
+                    Text("进入后台会停止当前命令。手动终端用于高级调试。")
                         .font(.caption).foregroundStyle(Color.bgTextSecondary)
+                }.padding(20)
+            }
+            .background(Color.bgDark)
+            .navigationTitle("高级设置")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+            .sheet(isPresented: $showStorage) { NexusStorageView() }
+            .sheet(isPresented: $showShuyu) { NexusShuyuView() }
+            .sheet(isPresented: $showTerminal) {
+                NavigationStack {
+                    NexusTerminalView().navigationTitle("手动终端")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
                 }
-                Text("可以这样说").font(.headline)
-                ForEach(["计算12个月每月存500元的累计金额，并核对结果。", "把苹果12元、牛奶18元、面包9元整理成CSV文件保存在工作区，并核对总价。", "统计这段文字里每个词出现的次数：apple banana apple orange banana apple"], id: \.self) { example in
-                    Button(example) { request = example }
-                        .font(.subheadline).foregroundStyle(Color.bgTextPrimary).multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(12).bgCard()
-                }
-                Button("枢语：自己的语言") { showShuyu = true }.accessibilityIdentifier("shuyu.open")
-                Button("查看容量与扩展空间") { showStorage = true }.accessibilityIdentifier("storage.open")
-                Divider()
-                Button("高级工具：手动终端") { showTerminal = true }
-                    .font(.caption).accessibilityIdentifier("linux.advanced")
-                Text("内置运行能力仍在验收中。手动终端仅供调试，日常使用直接对话即可。")
-                    .font(.caption).foregroundStyle(Color.bgTextSecondary)
-            }.padding(16).padding(.bottom, 40)
-        }.padding(.top, 50)
-        .sheet(isPresented: $showTerminal) {
-            NavigationStack {
-                NexusTerminalView().navigationTitle("手动终端")
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
             }
         }
-        .sheet(isPresented: $showShuyu) { NexusShuyuView() }
-        .sheet(isPresented: $showStorage) { NexusStorageView() }
-        .sheet(isPresented: $showConnection) { APIConfigView() }
-        .onChange(of: allowExecution) { _, enabled in
-            if !enabled {
-                NexusLinuxRuntime.shared.cancelActive(reason: "内置执行已关闭")
-                if chat.isTyping { chat.cancel() }
-            }
+    }
+}
+
+private struct NexusToolsSectionLabel: View {
+    let title: String
+    let detail: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.headline).foregroundStyle(Color.bgTextPrimary)
+            if let detail { Text(detail).font(.caption).foregroundStyle(Color.bgTextSecondary) }
         }
     }
 }
@@ -82,71 +76,113 @@ struct NexusTerminalView: View {
     @State private var journalError: String?
     private var workspace: UUID { NexusWorkspaceIdentity.id(for: "tools") }
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Linux 工作区").font(.bgTitle()).foregroundStyle(Color.bgTextPrimary)
-                Text("本机 Alpine Linux · ARM64 · 实验功能")
-                    .font(.subheadline).foregroundStyle(Color.bgTextSecondary)
-                NexusLiveExecutionView(live: live) { task?.cancel() }
-                TextEditor(text: $command)
-                    .focused($editingCommand)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minHeight: 135).scrollContentBackground(.hidden).bgCard()
-                    .autocorrectionDisabled().textInputAutocapitalization(.never)
-                    .accessibilityLabel("Linux 命令").accessibilityIdentifier("linux.command")
-                    .disabled(running)
-                HStack {
-                    Button(running ? "停止命令" : "运行命令") {
-                        if running { task?.cancel(); return }
-                        editingCommand = false
-                        running = true
-                        result = "正在执行…"
-                        let script = command
-                        live.begin(goal: "手动终端")
-                        live.phase("正在执行命令")
-                        live.append(.command, script)
-                        task = Task {
-                            defer { running = false; task = nil; refreshJournal() }
-                            do {
-                                let output = try await NexusLinuxRuntime.shared.execute(command: script, workspace: workspace, onOutput: { line, error in live.append(error ? .error : .output, line) })
-                                result = "退出码：\(output.exitCode) · \(String(format: "%.2f", output.duration)) 秒\n"
-                                    + output.output + (output.errorOutput.isEmpty ? "" : "\n错误输出：\n" + output.errorOutput)
-                                    + (output.failure.map { "\n" + $0 } ?? "")
-                                live.append(output.succeeded ? .result : .error, result)
-                                live.finish(output.succeeded ? .answered : .failed, message: output.succeeded ? "命令执行结束" : "命令未成功完成")
-                            } catch is CancellationError { result = "命令已取消，子进程已终止。"; live.finish(.cancelled, message: result) }
-                            catch { result = error.localizedDescription; live.finish(.failed, message: result) }
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    BGPageHeader(title: "命令工作区", subtitle: "本机 Alpine Linux · ARM64", eyebrow: "高级工具 · 实验功能")
+                    VStack(alignment: .leading, spacing: 14) {
+                        Label("编写命令", systemImage: "terminal").font(.headline).foregroundStyle(Color.bgTextPrimary)
+                        TextEditor(text: $command)
+                            .focused($editingCommand)
+                            .font(.system(.body, design: .monospaced)).foregroundStyle(Color.bgTextPrimary)
+                            .frame(minHeight: 170).scrollContentBackground(.hidden).padding(12)
+                            .background(Color.bgDark, in: RoundedRectangle(cornerRadius: 14))
+                            .autocorrectionDisabled().textInputAutocapitalization(.never)
+                            .accessibilityLabel("Linux 命令").accessibilityIdentifier("linux.command")
+                            .disabled(running)
+                        Button(action: runCommand) {
+                            Label(running ? "停止命令" : "运行命令", systemImage: running ? "stop.fill" : "play.fill")
+                                .frame(maxWidth: .infinity)
+                        }.buttonStyle(BGPrimaryButtonStyle()).accessibilityIdentifier("linux.run")
+                        HStack(spacing: 10) {
+                            Button { command = "" } label: {
+                                Label("清空命令", systemImage: "delete.left").frame(maxWidth: .infinity)
+                            }.buttonStyle(BGSecondaryButtonStyle()).disabled(running).accessibilityIdentifier("linux.clear")
+                            if !result.isEmpty && !running {
+                                ShareLink(item: result) {
+                                    Label("分享输出", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+                                }.buttonStyle(BGSecondaryButtonStyle())
+                            }
                         }
-                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("linux.run")
-                    Button("清空命令") { command = "" }.disabled(running).accessibilityIdentifier("linux.clear")
-                    if !result.isEmpty && !running { ShareLink("分享输出", item: result) }
-                }
-                Text("内置 BusyBox 工具，可运行 sh、awk 等脚本。命令默认最多30秒，单路输出上限256 KiB。离开应用进入后台会停止当前命令；暂不支持持续后台任务。")
-                    .font(.footnote).foregroundStyle(Color.bgTextSecondary)
-                if !result.isEmpty {
-                    Text(result).accessibilityIdentifier("linux.result").font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding().bgCard()
-                }
-                if let journalError { Text(journalError).font(.footnote).foregroundStyle(.red) }
-                if !records.isEmpty {
-                    Text("最近执行").font(.headline)
-                    Text("仅保留时间和结果状态，不保存命令正文。中断的命令不会自动重跑。")
-                        .font(.footnote).foregroundStyle(Color.bgTextSecondary)
-                    ForEach(records.prefix(5)) { record in
-                        HStack {
-                            Text(record.startedAt, style: .time)
-                            Spacer()
-                            Text(statusName(record.status))
-                            if let code = record.exitCode { Text("退出码 \(code)") }
-                        }.font(.caption)
+                    }.bgCard().id("terminal.editor")
+                    if !result.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("运行输出", systemImage: "text.alignleft").font(.headline).foregroundStyle(Color.bgTextPrimary)
+                            if !running {
+                                Button {
+                                    withAnimation { proxy.scrollTo("terminal.editor", anchor: .top) }
+                                } label: {
+                                    Label("回到命令", systemImage: "arrow.up").frame(maxWidth: .infinity)
+                                }.buttonStyle(BGSecondaryButtonStyle()).accessibilityIdentifier("linux.backToCommand")
+                            }
+                            Text(result).accessibilityIdentifier("linux.result")
+                                .font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
+                                .foregroundStyle(Color.bgTextPrimary).frame(maxWidth: .infinity, alignment: .leading)
+                        }.bgCard().id("terminal.output")
                     }
+                    NexusLiveExecutionView(live: live) { task?.cancel() }.id("terminal.live")
+                    if let journalError {
+                        Label(journalError, systemImage: "exclamationmark.circle")
+                            .font(.footnote).foregroundStyle(Color.red).frame(maxWidth: .infinity, alignment: .leading).bgCard()
+                    }
+                    if !records.isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            NexusToolsSectionLabel(title: "最近执行", detail: "仅保存时间和结果状态，不保存命令正文。")
+                            ForEach(records.prefix(5)) { record in
+                                HStack(spacing: 10) {
+                                    Image(systemName: record.status == "completed" ? "checkmark.circle" : record.status == "failed" ? "exclamationmark.circle" : "clock")
+                                        .foregroundStyle(record.status == "completed" ? Color.bgJadeHi : Color.bgTextSecondary)
+                                    Text(record.startedAt, style: .time).foregroundStyle(Color.bgTextSecondary)
+                                    Spacer(minLength: 4)
+                                    Text(statusName(record.status)).foregroundStyle(Color.bgTextPrimary)
+                                        .accessibilityIdentifier(record.id == records.first?.id ? "linux.latestStatus" : "linux.status.\(record.id)")
+                                    if let code = record.exitCode { Text("退出码 \(code)").foregroundStyle(Color.bgTextSecondary) }
+                                }.font(.caption).padding(.vertical, 5)
+                            }
+                            Text("中断的命令不会自动重跑。")
+                                .font(.caption).foregroundStyle(Color.bgTextSecondary)
+                        }.bgCard()
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("运行范围", systemImage: "info.circle").font(.subheadline.weight(.semibold))
+                        Text("内置 BusyBox，可运行 sh、awk 等脚本。命令默认最多 30 秒，单路输出上限 256 KiB。")
+                        Text("进入后台会停止当前命令，暂不支持持续后台任务。")
+                    }.font(.caption).foregroundStyle(Color.bgTextSecondary).bgCard()
+                    Text("运行环境由 Black God 内置提供。所含开源组件、源码与许可证见「开源许可」页。")
+                        .font(.caption).foregroundStyle(Color.bgTextSecondary)
+                }.padding(20)
+            }
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: running) { _, isRunning in
+                    guard isRunning || !result.isEmpty else { return }
+                    withAnimation { proxy.scrollTo(isRunning ? "terminal.live" : "terminal.output", anchor: .top) }
                 }
-                Text("运行环境由 Black God 内置提供。所含开源组件、源码与许可证见「开源许可」页。")
-                    .font(.caption).foregroundStyle(Color.bgTextSecondary)
-            }.padding(16).padding(.bottom, 100)
+                .onAppear { refreshJournal() }
+                .onDisappear { task?.cancel() }
         }
-            .onAppear { refreshJournal() }
-            .onDisappear { task?.cancel() }
+    }
+    private func runCommand() {
+        if running { task?.cancel(); return }
+        editingCommand = false
+        running = true
+        result = "正在执行…"
+        let script = command
+        live.begin(goal: "手动终端")
+        live.phase("正在准备运行环境…")
+        live.append(.command, script)
+        task = Task {
+            defer { running = false; task = nil; refreshJournal() }
+            do {
+                let output = try await NexusLinuxRuntime.shared.execute(command: script, workspace: workspace,
+                    onStatus: { live.phase($0) }, onOutput: { line, error in live.append(error ? .error : .output, line) })
+                result = "退出码：\(output.exitCode) · \(String(format: "%.2f", output.duration)) 秒\n"
+                    + output.output + (output.errorOutput.isEmpty ? "" : "\n错误输出：\n" + output.errorOutput)
+                    + (output.failure.map { "\n" + $0 } ?? "")
+                live.append(output.succeeded ? .result : .error, result)
+                live.finish(output.succeeded ? .answered : .failed, message: output.succeeded ? "命令执行结束" : "命令未成功完成")
+            } catch is CancellationError { result = "命令已取消，子进程已终止。"; live.finish(.cancelled, message: result) }
+            catch { result = error.localizedDescription; live.finish(.failed, message: result) }
+        }
     }
     private func refreshJournal() {
         do {

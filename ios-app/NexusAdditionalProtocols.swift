@@ -115,6 +115,6 @@ enum NexusAdditionalProtocols {
             assistant = ["output": output]
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !calls.isEmpty else { throw NexusError.invalidResponse }
-        return NexusNativeReply(text: text, calls: calls, assistant: assistant)
+        return NexusNativeReply(text: text, calls: calls, assistant: assistant, providerType: type)
     }
 }

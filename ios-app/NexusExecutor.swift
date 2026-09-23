@@ -370,8 +370,15 @@ final class NexusExecutor {
             }
 
             let response = NexusToolCallParser.response(from: output)
-            let calls = tools.isEmpty ? [] : response.calls
-            if calls.isEmpty { lastOutput = response.text; break }
+            let calls = tools.isEmpty || !response.text.isEmpty ? [] : response.calls
+            if calls.isEmpty { lastOutput = output; break }
+            do {
+                try NexusToolCallLimits.validate(calls)
+            } catch {
+                lastError = error.localizedDescription
+                onEvent?(lastError!)
+                return ""
+            }
             if round == maxToolRounds - 1 {
                 lastError = "已达到工具轮次上限，任务尚未完成。"
                 onEvent?(lastError!)
@@ -382,7 +389,7 @@ final class NexusExecutor {
             transcript.append("模型：\n\(output)")
 
             var resultBlocks: [String] = []
-            for call in calls.prefix(8) {
+            for call in calls {
                 let fingerprint = call.name + "|" + String(data: (try? JSONEncoder().encode(call.arguments.sorted { $0.key < $1.key }.map { [$0.key, $0.value] })) ?? Data(), encoding: .utf8)!
                 guard !tools.canReuseResult(call.name) || attempted.insert(fingerprint).inserted else {
                     resultBlocks.append("[\(call.name)] 相同参数已尝试过，请使用已有结果；失败时修改参数或说明限制。")
@@ -431,6 +438,7 @@ final class NexusExecutor {
                 try Task.checkCancellation()
                 let reply = try await turn(messages, tools.nativeDefinitions).promotingTextCalls()
                 try Task.checkCancellation()
+                try NexusToolCallLimits.validate(reply.calls)
                 if reply.calls.isEmpty { return reply.text }
                 guard round < maxToolRounds - 1 else { throw NexusReasoningError.execution("已达到工具轮次上限，任务尚未完成。") }
                 messages.append(.assistant(reply))

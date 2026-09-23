@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct NexusStorageSnapshot: Sendable {
     let used: Int64
@@ -35,43 +36,80 @@ struct NexusStorage {
     }
     private static let cacheLock = NSLock()
     private static var cached: [String: (Date, NexusStorageSnapshot)] = [:]
+    private struct FileIdentity: Hashable {
+        let device: dev_t
+        let inode: ino_t
+    }
     static func measureCached(root: URL, budget: Int64) throws -> NexusStorageSnapshot {
+        try Task.checkCancellation()
         cacheLock.lock(); let prior = cached[root.path]; cacheLock.unlock()
         if let prior, Date().timeIntervalSince(prior.0) < 5 {
             return NexusStorageSnapshot(used: prior.1.used, free: prior.1.free, budget: budget, files: prior.1.files)
         }
         let snapshot = try measure(root: root, budget: budget)
+        try Task.checkCancellation()
         cacheLock.lock()
         if cached.count > 16 { cached.removeAll() }
         cached[root.path] = (Date(), snapshot)
         cacheLock.unlock()
         return snapshot
     }
-    private static func disappeared(_ error: Error) -> Bool {
-        let error = error as NSError
-        return (error.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError, NSFileReadNoSuchFileError].contains(error.code)) || (error.domain == NSPOSIXErrorDomain && error.code == 2)
+    static func measureInBackground(root: URL = root, budget: Int64 = budget(), useCache: Bool = false) async throws -> NexusStorageSnapshot {
+        try Task.checkCancellation()
+        let worker = Task.detached(priority: .utility) {
+            try useCache ? measureCached(root: root, budget: budget) : measure(root: root, budget: budget)
+        }
+        return try await withTaskCancellationHandler {
+            do {
+                let snapshot = try await worker.value
+                try Task.checkCancellation()
+                return snapshot
+            } catch {
+                try Task.checkCancellation()
+                throw error
+            }
+        } onCancel: { worker.cancel() }
     }
     static func measure(root: URL = root, budget: Int64 = budget()) throws -> NexusStorageSnapshot {
+        try Task.checkCancellation()
         let fm = FileManager.default
         let volume = fm.fileExists(atPath: root.path) ? root : root.deletingLastPathComponent()
         let values = try fm.attributesOfFileSystem(forPath: volume.path)
         guard let free = (values[.systemFreeSize] as? NSNumber)?.int64Value else { throw NexusReasoningError.execution("无法读取手机剩余空间") }
         var used: Int64 = 0; var files = 0
-        var seen = Set<AnyHashable>()
-        var traversalError: Error?
+        var seen = Set<FileIdentity>()
         if fm.fileExists(atPath: root.path) {
-            guard let iterator = fm.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .fileResourceIdentifierKey], errorHandler: { _, error in if disappeared(error) { return true }; traversalError = error; return false }) else { throw NexusReasoningError.execution("无法读取运行环境空间") }
-            for case let path as URL in iterator {
-                let info: URLResourceValues
-                do { info = try path.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .fileResourceIdentifierKey]) }
-                catch { if disappeared(error) { continue }; throw error }
-                if info.isSymbolicLink == true { iterator.skipDescendants(); continue }
-                guard info.isRegularFile == true else { continue }
-                if let id = info.fileResourceIdentifier as? AnyHashable, !seen.insert(id).inserted { continue }
-                used += Int64(info.fileSize ?? 0); files += 1
+            // fts supplies lstat metadata in one traversal. Avoid NSURL resource-property
+            // resolution for every hard-linked runtime file, without following symlinks.
+            try root.withUnsafeFileSystemRepresentation { representation in
+                guard let representation, let path = strdup(representation) else {
+                    throw NexusReasoningError.execution("无法读取运行环境空间")
+                }
+                defer { Darwin.free(path) }
+                var paths: [UnsafeMutablePointer<CChar>?] = [path, nil]
+                guard let tree = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR, nil) else {
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+                }
+                defer { fts_close(tree) }
+                while true {
+                    try Task.checkCancellation()
+                    errno = 0
+                    guard let entry = fts_read(tree) else {
+                        if errno != 0 { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+                        break
+                    }
+                    let info = Int32(entry.pointee.fts_info)
+                    if [FTS_ERR, FTS_DNR, FTS_NS].contains(info) {
+                        if entry.pointee.fts_errno == ENOENT { continue }
+                        throw NSError(domain: NSPOSIXErrorDomain, code: Int(entry.pointee.fts_errno))
+                    }
+                    guard info == FTS_F, let metadata = entry.pointee.fts_statp else { continue }
+                    let id = FileIdentity(device: metadata.pointee.st_dev, inode: metadata.pointee.st_ino)
+                    guard seen.insert(id).inserted else { continue }
+                    used += Int64(metadata.pointee.st_size); files += 1
+                }
             }
         }
-        if let traversalError { throw traversalError }
         return NexusStorageSnapshot(used: used, free: free, budget: budget, files: files)
     }
     static func setBudget(_ gibibytes: Int64, snapshot: NexusStorageSnapshot, defaults: UserDefaults = .standard) throws {

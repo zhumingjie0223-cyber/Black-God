@@ -1,54 +1,101 @@
 name: Build Black God iOS
 
-# 手动运行原生 iOS 回归与无签名发布构建；正式分发另需开发者签名。
+# 自动验证原生改动；此流程只产生测试证据和无签名构建，不上传 App Store。
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'ios-app/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'vendor/**'
+      - 'shuyu/**'
+      - 'Makefile'
+      - '.github/workflows/build.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios-app/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'vendor/**'
+      - 'shuyu/**'
+      - 'Makefile'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 60
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install XcodeGen
-      run: brew install xcodegen ninja llvm libarchive pkg-config
+    - name: Install build tools
+      run: brew install xcodegen ninja llvm lld libarchive pkg-config
 
-    - name: Generate Xcode Project
-      run: |
-        make generate
+    - name: Generate Xcode Project and runtime
+      run: make generate
+
+    - name: Verify bundled engine and both implementations
+      run: make test-shuyu
 
     - name: Run iOS regression tests
+      working-directory: ios-app
       run: |
+        set -euo pipefail
         DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(d["udid"] for group in data["devices"].values() for d in group if d.get("isAvailable") and "iPhone" in d["name"]))')
-        make test-ios IOS_DESTINATION="platform=iOS Simulator,id=$DEVICE_ID"
+        xcodebuild test \
+          -project BlackGod.xcodeproj \
+          -scheme BlackGod \
+          -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+          -parallel-testing-enabled NO \
+          -resultBundlePath TestResults.xcresult \
+          CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: BlackGod-test-results
+        path: ios-app/TestResults.xcresult
+        if-no-files-found: warn
+        retention-days: 14
 
     - name: Build App (unsigned)
+      working-directory: ios-app
       run: |
-        cd ios-app
-        set -o pipefail
+        set -euo pipefail
         xcodebuild build \
           -project BlackGod.xcodeproj \
           -scheme BlackGod \
           -configuration Release \
-          -sdk iphoneos \
+          -destination 'generic/platform=iOS' \
           -derivedDataPath build \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGN_IDENTITY=""
+          CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
 
     - name: Package unsigned IPA
+      working-directory: ios-app
       run: |
-        cd ios-app
-        APP_PATH=$(find build -name "*.app" -type d | head -1)
-        echo "App路径: $APP_PATH"
+        set -euo pipefail
+        APP_PATH=build/Build/Products/Release-iphoneos/BlackGod.app
+        test -d "$APP_PATH"
+        test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")" = 'com.blackgod.nexus'
         mkdir -p Payload
-        cp -r "$APP_PATH" Payload/
-        zip -r BlackGod-unsigned.ipa Payload
-        echo "✅ IPA: $(ls -lh BlackGod-unsigned.ipa)"
+        ditto "$APP_PATH" Payload/BlackGod.app
+        ditto -c -k --keepParent Payload BlackGod-unsigned.ipa
 
-    - name: Upload IPA
+    - name: Upload unsigned build
       uses: actions/upload-artifact@v4
       with:
         name: BlackGod-unsigned-IPA
         path: ios-app/BlackGod-unsigned.ipa
         if-no-files-found: error
+        retention-days: 14

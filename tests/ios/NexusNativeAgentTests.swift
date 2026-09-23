@@ -73,7 +73,7 @@ final class NexusNativeAgentTests: XCTestCase {
         XCTAssertEqual(stopped.calls.first?.call.arguments["flag"], "true")
         let missingReason = try NexusNativeCodec.decode(JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": NSNull(), "tool_calls": [call("call_plain")]]]]]), type: .openAICompatible)
         XCTAssertEqual(missingReason.calls.first?.providerID, "call_plain")
-        let embedded = NexusNativeReply(text: "{\"name\":\"calc\",\"arguments\":{\"expression\":\"12*3\"}}", calls: [], assistant: ["role": "assistant", "content": ""]).promotingTextCalls()
+        let embedded = try NexusNativeReply(text: "{\"name\":\"calc\",\"arguments\":{\"expression\":\"12*3\"}}", calls: [], assistant: ["role": "assistant", "content": ""]).promotingTextCalls()
         XCTAssertEqual(embedded.calls.first?.call.name, "calc")
         XCTAssertEqual(embedded.calls.first?.providerID, "call_text_0")
         let envelope = #"{"tool_calls":[{"function":{"name":"calc","arguments":{"expression":"1+1"}}}]}"#
