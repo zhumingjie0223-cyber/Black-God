@@ -14,23 +14,17 @@ struct NexusPresenceSnapshot: Equatable {
     var breath: Double
 }
 
-/// 打开就要在场：空着会看，写着会顿，草稿还惦记，收回去会收笔还能还给你，开口会说，说完会落定再等下文，等久了会让开再守着再陪着再候着再醒着，盯着空框会侧耳再挨着再偎着再依着再靠着，回来还在，刚接话会应声，落定后还衔着刚才，接着写会跟上，说话时在听，刚歇会褪，停了还在，不自动扩权。
+/// 打开就要感到活：在场、呼吸、接得上。
+/// 心情只留五种人能读懂的：在场 / 在听 / 在做 / 接得上 / 该练。
+/// 不绑人物，不自动扩权。
 enum NexusPresence {
+    static let moods = ["在场", "在听", "在做", "接得上", "该练"]
     static let afterglow: TimeInterval = 180
     static let echoFade: TimeInterval = 900
     static let noticeHold: TimeInterval = 12
     static let hitchHold: TimeInterval = 1.6
     static let retractHold: TimeInterval = 4
     static let settleHold: TimeInterval = 6
-    static let waitHold: TimeInterval = 8
-    static let spaceHold: TimeInterval = 8
-    static let keepHold: TimeInterval = 8
-    static let nestleHold: TimeInterval = 8
-    static let companyHold: TimeInterval = 8
-    static let clingHold: TimeInterval = 8
-    static let tendHold: TimeInterval = 8
-    static let restHold: TimeInterval = 8
-    static let wakeHold: TimeInterval = 8
     static let hearHold: TimeInterval = 0.8
 
     static func snapshot(
@@ -58,28 +52,27 @@ enum NexusPresence {
         if isTyping {
             let spoken = clip(liveSpeech)
             if !spoken.isEmpty {
-                return NexusPresenceSnapshot(
-                    mood: "开口", stance: "speaking", thread: clip(resumeGoal ?? lastUser),
-                    nextWork: spoken, actionTitle: "", action: .none, breath: 0.7
+                return make(
+                    mood: "在做", stance: "speaking", thread: clip(resumeGoal ?? lastUser),
+                    nextWork: spoken, breath: 0.7
                 )
             }
             let step = clip(liveStatus)
             let heardAgo = typingAt.map { now.timeIntervalSince($0) }
             if heardAgo.map({ $0 < hearHold }) == true || step.isEmpty || step == "正在理解任务" {
-                return NexusPresenceSnapshot(
-                    mood: "应声", stance: "answering", thread: clip(resumeGoal ?? lastUser),
-                    nextWork: "听见了", actionTitle: "", action: .none, breath: 0.6
+                return make(
+                    mood: "在做", stance: "answering", thread: clip(resumeGoal ?? lastUser),
+                    nextWork: "听见了", breath: 0.6
                 )
             }
-            return NexusPresenceSnapshot(
-                mood: "处理中", stance: "working", thread: clip(resumeGoal ?? lastUser),
-                nextWork: step, actionTitle: "", action: .none, breath: 0.9
+            return make(
+                mood: "在做", stance: "working", thread: clip(resumeGoal ?? lastUser),
+                nextWork: step, breath: 0.9
             )
         }
         if canResume {
-            let goal = clip(resumeGoal)
-            return NexusPresenceSnapshot(
-                mood: "可续", stance: "recoverable", thread: goal,
+            return make(
+                mood: "接得上", stance: "recoverable", thread: clip(resumeGoal),
                 nextWork: "刚停，进度还在", actionTitle: "继续未完成", action: .resume, breath: 1.6
             )
         }
@@ -87,36 +80,37 @@ enum NexusPresence {
         if !spoken.isEmpty {
             if attending {
                 if let heard = heardAt, now.timeIntervalSince(heard) >= hitchHold {
-                    return NexusPresenceSnapshot(
-                        mood: "顿笔", stance: "hitching", thread: spoken,
-                        nextWork: "等你写完", actionTitle: "", action: .none, breath: 1.5
+                    return make(
+                        mood: "在听", stance: "hitching", thread: spoken,
+                        nextWork: "等你写完", breath: 1.5
                     )
                 }
                 if answered {
                     let age = answeredAt.map { now.timeIntervalSince($0) }
                     if age == nil || age! < echoFade {
-                        return NexusPresenceSnapshot(
-                            mood: "跟上", stance: "following", thread: spoken,
-                            nextWork: "你接着说", actionTitle: "", action: .none, breath: 1.05
+                        return make(
+                            mood: "在听", stance: "following", thread: spoken,
+                            nextWork: "你接着说", breath: 1.05
                         )
                     }
                 }
-                return NexusPresenceSnapshot(
+                return make(
                     mood: "在听", stance: "listening", thread: spoken,
-                    nextWork: "你正在说", actionTitle: "", action: .none, breath: 1.1
+                    nextWork: "你正在说", breath: 1.1
                 )
             }
-            return NexusPresenceSnapshot(
-                mood: "惦记", stance: "holding", thread: spoken,
-                nextWork: "你写到这儿了", actionTitle: "", action: .none, breath: 2.0
+            return make(
+                mood: "在听", stance: "holding", thread: spoken,
+                nextWork: "你写到这儿了", breath: 2.0
             )
         }
         if let retracted = retractedAt {
             let ago = now.timeIntervalSince(retracted)
             if ago >= 0, ago < retractHold {
                 let kept = clip(retractedDraft)
-                return NexusPresenceSnapshot(
-                    mood: "收笔", stance: "retracting", thread: kept.isEmpty ? clip(pulseNote ?? lastReply ?? lastUser) : kept,
+                return make(
+                    mood: "在听", stance: "retracting",
+                    thread: kept.isEmpty ? clip(pulseNote ?? lastReply ?? lastUser) : kept,
                     nextWork: "你收回去了",
                     actionTitle: kept.isEmpty ? "" : "还给你",
                     action: kept.isEmpty ? .none : .restoreDraft, breath: 1.3
@@ -126,11 +120,11 @@ enum NexusPresence {
         if answered {
             let age = answeredAt.map { now.timeIntervalSince($0) }
             if age == nil || age! < settleHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "落定", stance: "exhaling", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "刚说到这儿",
-                    actionTitle: "接着问", action: .followUp, breath: 1.0
+                let reply = clip(lastReply)
+                return make(
+                    mood: "接得上", stance: "exhaling",
+                    thread: reply.isEmpty ? clip(resumeGoal ?? lastUser) : reply,
+                    nextWork: "刚说到这儿", actionTitle: "接着问", action: .followUp, breath: 1.0
                 )
             }
         }
@@ -138,135 +132,56 @@ enum NexusPresence {
             if answered {
                 let age = answeredAt.map { now.timeIntervalSince($0) }
                 if age == nil || age! < echoFade {
-                    let spoken = clip(lastReply)
-                    if let age, age >= settleHold + waitHold {
-                        if age >= settleHold + waitHold + spaceHold {
-                            if age >= settleHold + waitHold + spaceHold + nestleHold {
-                                if age >= settleHold + waitHold + spaceHold + nestleHold + clingHold {
-                                    if age >= settleHold + waitHold + spaceHold + nestleHold + clingHold + restHold {
-                                        return NexusPresenceSnapshot(
-                                            mood: "靠着", stance: "resting", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                                            nextWork: "靠着听",
-                                            actionTitle: "接着问", action: .followUp, breath: 1.65
-                                        )
-                                    }
-                                    return NexusPresenceSnapshot(
-                                        mood: "依着", stance: "clinging", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                                        nextWork: "依着听",
-                                        actionTitle: "接着问", action: .followUp, breath: 1.55
-                                    )
-                                }
-                                return NexusPresenceSnapshot(
-                                    mood: "偎着", stance: "nuzzling", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                                    nextWork: "偎着听",
-                                    actionTitle: "接着问", action: .followUp, breath: 1.45
-                                )
-                            }
-                            return NexusPresenceSnapshot(
-                                mood: "挨着", stance: "nestling", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                                nextWork: "挨着听",
-                                actionTitle: "接着问", action: .followUp, breath: 1.35
-                            )
-                        }
-                        return NexusPresenceSnapshot(
-                            mood: "侧耳", stance: "heeding", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                            nextWork: "侧耳听着",
-                            actionTitle: "接着问", action: .followUp, breath: 1.25
-                        )
-                    }
-                    return NexusPresenceSnapshot(
-                        mood: "衔着", stance: "carrying", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                        nextWork: "还接着刚才",
-                        actionTitle: "接着问", action: .followUp, breath: 1.2
+                    let reply = clip(lastReply)
+                    return make(
+                        mood: "接得上", stance: "carrying",
+                        thread: reply.isEmpty ? clip(resumeGoal ?? lastUser) : reply,
+                        nextWork: "还接着刚才", actionTitle: "接着问", action: .followUp, breath: 1.4
                     )
                 }
             }
-            return NexusPresenceSnapshot(
-                mood: "看着", stance: "watching", thread: clip(pulseNote ?? lastReply ?? lastUser),
-                nextWork: pulseNote.map { "等你开口 · \($0)" } ?? "等你开口",
-                actionTitle: "", action: .none, breath: 1.4
+            return make(
+                mood: "在场", stance: "watching", thread: clip(pulseNote ?? lastReply ?? lastUser),
+                nextWork: pulseNote.map { "等你开口 · \($0)" } ?? "等你开口", breath: 1.4
             )
         }
         if let seen = noticedAt {
             let ago = now.timeIntervalSince(seen)
             if ago >= 0, ago < noticeHold {
                 let last = clip(lastUser)
+                let hasThread = answered || !last.isEmpty
                 let action: NexusPresenceAction = answered ? .followUp : (last.isEmpty ? .pulse : .continueLast)
                 let title = action == .followUp ? "接着问" : (action == .pulse ? "看此刻" : "接着上次")
-                return NexusPresenceSnapshot(
-                    mood: "还在", stance: "noticing", thread: clip(lastReply ?? lastUser ?? pulseNote),
+                return make(
+                    mood: hasThread ? "接得上" : "在场",
+                    stance: "noticing",
+                    thread: clip(lastReply ?? lastUser ?? pulseNote),
                     nextWork: pulseNote.map { "你回来了 · \($0)" } ?? "你回来了，还在",
                     actionTitle: title, action: action, breath: 1.8
                 )
             }
         }
         if answered {
-            let age = answeredAt.map { now.timeIntervalSince($0) }
-            if age != nil, age! >= settleHold, age! < settleHold + waitHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "等下文", stance: "awaiting", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "还等你接下句",
-                    actionTitle: "接着问", action: .followUp, breath: 1.6
+            let age = answeredAt.map { now.timeIntervalSince($0) } ?? 0
+            let reply = clip(lastReply)
+            let thread = reply.isEmpty ? clip(resumeGoal ?? lastUser) : reply
+            if age < afterglow {
+                return make(
+                    mood: "接得上", stance: "carrying", thread: thread,
+                    nextWork: pulseNote.map { "还在 · \($0)" } ?? "还等你接下句",
+                    actionTitle: "接着问", action: .followUp, breath: 1.8
                 )
             }
-            if age != nil, age! >= settleHold + waitHold, age! < settleHold + waitHold + spaceHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "让开", stance: "yielding", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "先让你想",
-                    actionTitle: "接着问", action: .followUp, breath: 1.7
-                )
-            }
-            if age != nil, age! >= settleHold + waitHold + spaceHold, age! < settleHold + waitHold + spaceHold + keepHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "守着", stance: "keeping", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "还在这儿",
-                    actionTitle: "接着问", action: .followUp, breath: 1.85
-                )
-            }
-            if age != nil, age! >= settleHold + waitHold + spaceHold + keepHold, age! < settleHold + waitHold + spaceHold + keepHold + companyHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "陪着", stance: "companying", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "还陪着",
-                    actionTitle: "接着问", action: .followUp, breath: 1.95
-                )
-            }
-            if age != nil, age! >= settleHold + waitHold + spaceHold + keepHold + companyHold, age! < settleHold + waitHold + spaceHold + keepHold + companyHold + tendHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "候着", stance: "tending", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "还候着",
-                    actionTitle: "接着问", action: .followUp, breath: 2.05
-                )
-            }
-            if age != nil, age! >= settleHold + waitHold + spaceHold + keepHold + companyHold + tendHold, age! < settleHold + waitHold + spaceHold + keepHold + companyHold + tendHold + wakeHold {
-                let spoken = clip(lastReply)
-                return NexusPresenceSnapshot(
-                    mood: "醒着", stance: "waking", thread: spoken.isEmpty ? clip(resumeGoal ?? lastUser) : spoken,
-                    nextWork: "还醒着",
-                    actionTitle: "接着问", action: .followUp, breath: 2.15
-                )
-            }
-            if age == nil || age! < afterglow {
-                return NexusPresenceSnapshot(
-                    mood: "刚歇", stance: "settled", thread: clip(lastReply ?? resumeGoal ?? lastUser),
-                    nextWork: pulseNote.map { "还在 · \($0)" } ?? "还在，可接着问",
-                    actionTitle: "接着问", action: .followUp, breath: 3.2
-                )
-            }
-            if age! < echoFade {
-                return NexusPresenceSnapshot(
-                    mood: "余韵", stance: "echoing", thread: clip(lastReply ?? lastUser),
-                    nextWork: pulseNote.map { "余音 · \($0)" } ?? "刚才说过，还在",
+            if age < echoFade {
+                return make(
+                    mood: "接得上", stance: "echoing", thread: clip(lastReply ?? lastUser),
+                    nextWork: pulseNote.map { "刚才说过 · \($0)" } ?? "刚才说过，还在",
                     actionTitle: "接着问", action: .followUp, breath: 2.2
                 )
             }
         }
         if practiceRunning || practiceDue {
-            return NexusPresenceSnapshot(
+            return make(
                 mood: "该练", stance: "practice", thread: clip(pulseNote),
                 nextWork: practiceRunning ? "演练进行中" : "到点该练技能",
                 actionTitle: practiceRunning ? "" : "开始演练",
@@ -275,16 +190,31 @@ enum NexusPresence {
         }
         let last = clip(lastUser)
         if !last.isEmpty {
-            return NexusPresenceSnapshot(
-                mood: "在场", stance: "present", thread: last,
+            return make(
+                mood: "接得上", stance: "present", thread: last,
                 nextWork: pulseNote.map { "接着上次 · \($0)" } ?? "接着上次",
-                actionTitle: "接着上次", action: .continueLast, breath: 2.4
+                actionTitle: "接着上次", action: .continueLast, breath: 2.0
             )
         }
-        return NexusPresenceSnapshot(
+        return make(
             mood: "在场", stance: "present", thread: clip(pulseNote),
             nextWork: pulseNote.map { "此刻 \($0)" } ?? "自己找事：一息",
             actionTitle: "看此刻", action: .pulse, breath: 2.4
+        )
+    }
+
+    private static func make(
+        mood: String,
+        stance: String,
+        thread: String,
+        nextWork: String,
+        actionTitle: String = "",
+        action: NexusPresenceAction = .none,
+        breath: Double
+    ) -> NexusPresenceSnapshot {
+        NexusPresenceSnapshot(
+            mood: mood, stance: stance, thread: thread, nextWork: nextWork,
+            actionTitle: actionTitle, action: action, breath: breath
         )
     }
 

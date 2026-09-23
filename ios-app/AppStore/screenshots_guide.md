@@ -7,11 +7,11 @@
 
 | 序号 | 主题 | 顶部标语（中） | 顶部标语（英） |
 |---|---|---|---|
-| ① | 主对话界面 | 直连 Claude，逐字实时回复 | Straight to Claude. Streamed word by word. |
-| ② | API Key 配置 | 自带 API Key，零后端 · 零中转 | Bring your own key. No servers of ours. |
-| ③ | 多模型选择 | 多模型自由切换，费用自己掌控 | Switch between Claude models in one tap. |
-| ④ | 神枢状态 | 对话记录只留在你的 iPhone | Your history lives only on your device. |
-| ⑤ | 本地优先设置 | Keychain 加密，无账号 · 无埋点 | Encrypted by iOS Keychain. No tracking. |
+| ① | 主对话 · 在场 | 打开第一屏就在场 | Present, breathing, connectable. |
+| ② | 对话 · 接得上 | 上次说过就接得上 | Last talk stays in the thread. |
+| ③ | 神枢连接 | 神枢连接 · 模型直连 | OAuth or your own key. |
+| ④ | 内置执行 | 本机执行看得见 | Built-in tools run locally. |
+| ⑤ | 我的 | Black God AI 助手身份 | One assistant identity. |
 
 设计规格：
 - 画布 393×852 CSS 像素 = iPhone 6.7″ 逻辑尺寸；与 App Store 6.7″ 规格 1290×2796 **同比例**，放大 3.28 倍即精确对齐。

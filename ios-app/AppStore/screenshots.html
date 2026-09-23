@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>神枢 Black God · App Store 截图（iPhone 6.7″ · 5 张）</title>
+<title>Black God · App Store 截图（iPhone 6.7″ · 5 张）</title>
 <!--
   神枢 Black God · App Store 截图源文件
   ─────────────────────────────────────────────
@@ -337,6 +337,54 @@ h2 em{
   box-shadow:0 6px 16px -6px var(--jade-glow);
 }
 
+.brand img{
+  width:18px;height:18px;border-radius:5px;display:block;object-fit:cover;
+  box-shadow:0 0 14px -4px var(--jade-glow);
+}
+@keyframes breath{
+  from{transform:scale(.92);opacity:.42}
+  to{transform:scale(1.28);opacity:1}
+}
+@keyframes stripBreath{
+  from{transform:scale(.985);opacity:.78}
+  to{transform:scale(1);opacity:1}
+}
+.breath{
+  width:7px;height:7px;border-radius:50%;background:var(--jade-hi);
+  animation:breath 2.4s ease-in-out infinite alternate;
+}
+.strip{
+  margin:0 16px 8px;padding:12px;border-radius:12px;
+  background:var(--surface-2);border:1px solid rgba(63,165,122,.28);
+  animation:stripBreath 2.4s ease-in-out infinite alternate;
+}
+.strip .w{font:600 12px/1.3 var(--font-sans);color:var(--jade-hi)}
+.strip .t{margin-top:4px;font:400 12px/1.35 var(--font-sans);color:var(--text)}
+.strip .act{margin-top:6px;font:600 12px/1 var(--font-sans);color:var(--jade-hi)}
+.chips{display:flex;gap:8px;padding:0 14px 8px}
+.chip{
+  padding:6px 10px;border-radius:999px;
+  font:600 11px/1 var(--font-sans);color:var(--jade-hi);
+  background:var(--surface-3);border:1px solid rgba(63,165,122,.35);
+}
+.tabbar{
+  position:absolute;left:0;right:0;bottom:0;z-index:7;
+  height:84px;padding:12px 8px 28px;display:flex;
+  background:var(--surface);border-top:1px solid rgba(63,165,122,.1);
+}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font:500 10px/1 var(--font-sans);color:var(--text-3)}
+.tab.on{color:var(--jade-hi)}
+.spark-av{
+  width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--surface-2);
+  box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--jade);
+  color:var(--jade-hi);font-size:20px;
+}
+.me-hero{padding:80px 16px 8px;text-align:center}
+.me-hero .spark-av{width:100px;height:100px;margin:0 auto 14px;font-size:44px;border-width:3px}
+.me-hero .n{font:700 28px/1.2 var(--font-sans)}
+.me-hero .d{margin-top:6px;font:500 13px/1.4 var(--font-sans);color:var(--text-2)}
+
 /* ═══════════════════════════════════════════════
    5. 截图 ② · API Key 配置
    ═══════════════════════════════════════════════ */
@@ -525,7 +573,7 @@ h2 em{
 <!-- ─────────── 顶部工具条（导出时隐藏） ─────────── -->
 <div class="toolbar">
   <span class="dot"></span>
-  <b>神枢 Black God · App Store 截图</b>
+  <b>Black God · App Store 截图</b>
   <span>iPhone 6.7″ · 5 张 · 每张 393×852（@3x → 1290×2796）</span>
   <span class="sp"></span>
   <span>导出：地址加 <code>?export</code> 隐藏本条 → DevTools 对每个 <code>section.shot</code> 「捕获节点截图」（DPR 设为 3）。详见 <code>screenshots_guide.md</code></span>
@@ -538,10 +586,10 @@ h2 em{
   <div class="glow"></div><div class="glow b"></div>
   <div class="mark">神</div>
   <header class="copy">
-    <div class="brand"><i>神</i>神枢 · Black God</div>
-    <div class="kicker">01 · 对话 Chat</div>
-    <h2>神枢对话<br><em>即时</em>响应</h2>
-    <p class="en">Straight to Claude. Streamed word by word,<br>no relay in between.</p>
+    <div class="brand"><img src="../Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="Black God">Black God</div>
+    <div class="kicker">01 · 对话</div>
+    <h2>打开第一屏<br>就<em>在场</em></h2>
+    <p class="en">Present, breathing, connectable.<br>The first screen already lives.</p>
   </header>
 
   <div class="phone">
@@ -552,28 +600,41 @@ h2 em{
         <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
 
         <div class="chat-head">
-          <div class="avatar">神</div>
+          <div class="spark-av">✦</div>
           <div>
-            <div class="name">神枢 Nexus</div>
-            <div class="state"><i></i>直连 Anthropic · 流式输出</div>
+            <div class="name">Black God AI</div>
+            <div class="state"><span class="breath"></span>在场</div>
           </div>
           <div class="grow"></div>
-          <span class="pill mono">sonnet-4-6</span>
         </div>
 
-        <div class="msgs">
-          <div class="day">今天 09:41</div>
-          <div class="bubble user">帮我把这段周报压缩成三句话。</div>
-          <div class="bubble ai">好的，压缩后如下：<ol><li>本周完成 iOS 端流式对话与 Keychain 密钥存储，核心链路闭环。</li><li>修复 3 个高优先级问题，崩溃率降至 0.1% 以下。</li><li>下周重点：多模型切换与历史导出。</li></ol></div>
-          <div class="meta"><i></i>claude-sonnet-4-6 · 1.2s · 本地保存</div>
-          <div class="bubble user">再来一个英文版，发给海外团队。</div>
-          <div class="bubble ai">Sure — here's the English version:<ol><li>Shipped streaming chat with Keychain-backed key storage on iOS, clos<span class="cursor"></span></li></ol></div>
+        <div class="strip">
+          <div class="w">自己找事：一息</div>
+          <div class="t">夜 · 奥形凝起</div>
+          <div class="act">看此刻</div>
         </div>
 
-        <div class="inputbar">
-          <span class="mic"><svg class="ico"><use href="#i-mic"/></svg></span>
-          <div class="field">跟神枢说点什么…</div>
-          <span class="send"><svg class="ico"><use href="#i-up"/></svg></span>
+        <div class="msgs" style="padding-top:4px">
+          <div style="font:400 15px/1.5 var(--font-sans);color:var(--text-2);padding:4px 0 8px">Black God AI 在场。直接说出你要完成的事，它会按需使用内置工具执行并核对结果。</div>
+          <div class="bubble ai" style="max-width:100%">计算 12 个月每月存 500 元的累计金额，并核对结果。</div>
+          <div class="bubble ai" style="max-width:100%">用枢语造一个关于「锚点」的词，并核对编号。</div>
+        </div>
+
+        <div class="inputbar" style="top:auto;bottom:84px;flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px 12px">
+          <div class="chips" style="padding:0">
+            <span class="chip">计算</span><span class="chip">规划</span><span class="chip">枢语</span><span class="chip">一息</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="field">跟Black God AI说点什么…</div>
+            <span class="send"><svg class="ico"><use href="#i-up"/></svg></span>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on">Black God AI</div>
+          <div class="tab">工具</div>
+          <div class="tab">创作</div>
+          <div class="tab">监测</div>
+          <div class="tab">我的</div>
         </div>
         <div class="home"></div>
       </div>
@@ -582,14 +643,73 @@ h2 em{
 </section>
 
 <!-- ═══════════════════════ ② API Key 配置 ═══════════════════════ -->
-<section class="shot" id="shot-2" data-title="API Key 配置">
+<section class="shot" id="shot-2" data-title="接得上">
   <div class="glow"></div><div class="glow b"></div>
   <div class="mark">枢</div>
   <header class="copy">
-    <div class="brand"><i>神</i>神枢 · Black God</div>
-    <div class="kicker">02 · 密钥 API Key</div>
-    <h2>你的密钥<br><em>本地保存</em></h2>
-    <p class="en">Bring your own key. Requests go from your<br>iPhone straight to Anthropic — no servers of ours.</p>
+    <div class="brand"><img src="../Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="Black God">Black God</div>
+    <div class="kicker">02 · 接得上</div>
+    <h2>上次说过<br>就<em>接得上</em></h2>
+    <p class="en">Last talk stays in the thread.<br>Tap to continue — no restart.</p>
+  </header>
+
+  <div class="phone">
+    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
+    <div class="screen">
+      <div class="app">
+        <div class="island"></div>
+        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
+
+        <div class="chat-head">
+          <div class="spark-av">✦</div>
+          <div>
+            <div class="name">Black God AI</div>
+            <div class="state"><span class="breath"></span>接得上</div>
+          </div>
+        </div>
+
+        <div class="strip">
+          <div class="w">还接着刚才</div>
+          <div class="t">累计 6000 元。12×500=6000，已核对。</div>
+          <div class="act">接着问</div>
+        </div>
+
+        <div class="msgs">
+          <div class="bubble user">计算 12 个月每月存 500 元的累计金额，并核对结果。</div>
+          <div class="bubble ai">累计 6000 元。<br>12 × 500 = 6000，已核对。</div>
+        </div>
+
+        <div class="inputbar" style="top:auto;bottom:84px;flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px 12px">
+          <div class="chips" style="padding:0">
+            <span class="chip">计算</span><span class="chip">规划</span><span class="chip">枢语</span><span class="chip">一息</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="field">跟Black God AI说点什么…</div>
+            <span class="send"><svg class="ico"><use href="#i-up"/></svg></span>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on">Black God AI</div>
+          <div class="tab">工具</div>
+          <div class="tab">创作</div>
+          <div class="tab">监测</div>
+          <div class="tab">我的</div>
+        </div>
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ ③ 多模型选择 ═══════════════════════ -->
+<section class="shot" id="shot-3" data-title="神枢连接">
+  <div class="glow"></div><div class="glow b"></div>
+  <div class="mark">连</div>
+  <header class="copy">
+    <div class="brand"><img src="../Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="Black God">Black God</div>
+    <div class="kicker">03 · 连接</div>
+    <h2>神枢连接<br><em>模型直连</em></h2>
+    <p class="en">OAuth or your own key.<br>Each connection keeps its own permission.</p>
   </header>
 
   <div class="phone">
@@ -600,129 +720,31 @@ h2 em{
         <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
 
         <div class="nav">
-          <div><div class="title">API 配置</div></div>
+          <div><div class="title">神枢连接</div></div>
           <div class="act">完成</div>
         </div>
 
-        <div class="hero-card">
-          <div class="big"><svg class="ico"><use href="#i-lock"/></svg></div>
-          <div class="grow" style="flex:1">
-            <div class="t">Keychain 加密存储</div>
-            <div class="d">仅本机可读 · 不上传任何服务器</div>
-          </div>
-          <span class="pill"><span class="dot"></span>已连接</span>
+        <div class="label">OAuth 账号登录</div>
+        <div class="group">
+          <div class="cell"><div class="grow">使用 OpenRouter 账号登录</div><span class="chev">›</span></div>
+          <div class="cell"><div class="grow">使用 Kimi 账号登录</div><span class="chev">›</span></div>
         </div>
+        <div class="foot">在服务商页面登录后自动保存凭据，无需复制密钥。</div>
 
-        <div class="label">Anthropic API Key</div>
+        <div class="label">已保存连接</div>
         <div class="group">
           <div class="cell">
-            <span class="icobox"><svg class="ico"><use href="#i-key"/></svg></span>
-            <div class="keyfield">sk-ant-api03-<span class="dots">••••••••••</span>7Qx</div>
-            <svg class="ico eye"><use href="#i-eye"/></svg>
-          </div>
-        </div>
-        <div class="foot">Key 仅存储在本机 Keychain，不上传任何服务器。<br>获取 Key：console.anthropic.com</div>
-
-        <div class="label">模型</div>
-        <div class="group">
-          <div class="cell">
-            <span class="icobox grey"><svg class="ico"><use href="#i-spark"/></svg></span>
-            <div class="grow">选择模型</div>
-            <span class="val mono">claude-sonnet-4-6 <svg class="ico chev"><use href="#i-chev-r"/></svg></span>
-          </div>
-        </div>
-
-        <div class="label">连接</div>
-        <div class="group">
-          <div class="cell">
-            <span class="icobox grey"><svg class="ico"><use href="#i-bolt"/></svg></span>
-            <div class="grow">连接测试</div>
-            <span class="val ok"><svg class="ico"><use href="#i-check"/></svg> 通过 · <span class="mono">412 ms</span></span>
+            <span class="icobox"><svg class="ico"><use href="#i-spark"/></svg></span>
+            <div class="grow">Claude</div>
+            <span class="val mono">sonnet-4-6</span>
           </div>
           <div class="cell">
-            <span class="icobox grey"><svg class="ico"><use href="#i-globe"/></svg></span>
-            <div class="grow">请求端点</div>
-            <span class="val mono" style="font-size:13px">api.anthropic.com</span>
+            <span class="icobox grey"><svg class="ico"><use href="#i-key"/></svg></span>
+            <div class="grow">OpenAI 兼容</div>
+            <span class="val">可填写模型 ID</span>
           </div>
         </div>
-
-        <div class="btn-primary" style="margin-top:18px"><svg class="ico"><use href="#i-check"/></svg>已保存</div>
-        <div class="foot" style="text-align:center;margin-top:10px">费用按你自己的 API 账户结算 · App 不收取任何订阅费</div>
-
-        <div class="home"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════ ③ 多模型选择 ═══════════════════════ -->
-<section class="shot" id="shot-3" data-title="多模型选择">
-  <div class="glow"></div><div class="glow b"></div>
-  <div class="mark">模</div>
-  <header class="copy">
-    <div class="brand"><i>神</i>神枢 · Black God</div>
-    <div class="kicker">03 · 模型 Models</div>
-    <h2>选择你的<br><em>模型与能力</em></h2>
-    <p class="en">Choose the model for the moment.<br>You only pay your own API bill.</p>
-  </header>
-
-  <div class="phone">
-    <span class="k l1"></span><span class="k l2"></span><span class="k l3"></span><span class="k r1"></span>
-    <div class="screen">
-      <div class="app">
-        <div class="island"></div>
-        <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
-
-        <div class="nav" style="align-items:flex-start;flex-direction:column;gap:4px">
-          <div class="back"><svg class="ico"><use href="#i-chev-l"/></svg>API 配置</div>
-          <div class="title">选择模型</div>
-          <div class="sub">切换即时生效 · 按你自己的 Anthropic 账户计费</div>
-        </div>
-
-        <div class="models">
-          <div class="model">
-            <div class="mono-ico">O5</div>
-            <div class="grow" style="flex:1;min-width:0">
-              <div class="n">claude-opus-5</div>
-              <div class="d">旗舰 · 最强推理 <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
-            </div>
-            <div class="radio"></div>
-          </div>
-          <div class="model">
-            <div class="mono-ico">F5</div>
-            <div class="grow" style="flex:1;min-width:0">
-              <div class="n">claude-fable-5-1</div>
-              <div class="d">长文创作 · 叙事 <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
-            </div>
-            <div class="radio"></div>
-          </div>
-          <div class="model">
-            <div class="mono-ico">O4</div>
-            <div class="grow" style="flex:1;min-width:0">
-              <div class="n">claude-opus-4-8</div>
-              <div class="d">稳定旗舰 · 复杂任务 <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
-            </div>
-            <div class="radio"></div>
-          </div>
-          <div class="model sel">
-            <div class="mono-ico">S4</div>
-            <div class="grow" style="flex:1;min-width:0">
-              <div class="n">claude-sonnet-4-6</div>
-              <div class="d">均衡 · 日常首选 <span class="pill" style="padding:2px 7px;font-size:10px">推荐</span></div>
-            </div>
-            <div class="radio"><svg class="ico"><use href="#i-check"/></svg></div>
-          </div>
-          <div class="model">
-            <div class="mono-ico">H4</div>
-            <div class="grow" style="flex:1;min-width:0">
-              <div class="n">claude-haiku-4-5</div>
-              <div class="d">极速 · 低成本 <span class="bars"><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
-            </div>
-            <div class="radio"></div>
-          </div>
-        </div>
-
-        <div class="foot" style="margin-top:16px;text-align:center">模型列表随 Anthropic 官方接口更新 · 无需升级 App</div>
+        <div class="foot">每个连接单独控制内容发送许可。凭据存在本机 Keychain。</div>
 
         <div class="home"></div>
       </div>
@@ -731,14 +753,14 @@ h2 em{
 </section>
 
 <!-- ═══════════════════════ ④ 神枢状态 ═══════════════════════ -->
-<section class="shot" id="shot-4" data-title="神枢状态">
+<section class="shot" id="shot-4" data-title="内置执行">
   <div class="glow"></div><div class="glow b"></div>
-  <div class="mark">记</div>
+  <div class="mark">做</div>
   <header class="copy">
-    <div class="brand"><i>神</i>神枢 · Black God</div>
-    <div class="kicker">04 · 历史 History</div>
-    <h2>神枢状态<br><em>始终在线</em></h2>
-    <p class="en">Your history lives only on your device.<br>Never uploaded, never synced, never analyzed.</p>
+    <div class="brand"><img src="../Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="Black God">Black God</div>
+    <div class="kicker">04 · 在做</div>
+    <h2>本机执行<br><em>看得见</em></h2>
+    <p class="en">Describe the result. Built-in tools run locally.<br>Dangerous steps still wait for you.</p>
   </header>
 
   <div class="phone">
@@ -748,65 +770,29 @@ h2 em{
         <div class="island"></div>
         <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
 
-        <div class="nav">
-          <div><div class="title">历史记录</div></div>
-          <div class="act">编辑</div>
-        </div>
-
-        <div class="stats">
-          <div><b>128</b><small>会话</small></div>
-          <div><b>3.2 <span style="font-size:14px;font-weight:600">MB</span></b><small>本机占用</small></div>
-          <div><b class="j">0 <span style="font-size:14px;font-weight:600">B</span></b><small>已上传</small></div>
-        </div>
-
-        <div class="hist">
-          <div class="lbl">今天</div>
-          <div class="grp">
-            <div class="row">
-              <span class="ib"><svg class="ico"><use href="#i-doc"/></svg></span>
-              <div class="grow">
-                <div class="t">周报压缩成三句话 <time>09:41</time></div>
-                <div class="p">好的，压缩后如下：1. 本周完成 iOS 端流式对话与 Keychain…</div>
-                <div class="m"><span class="tag">sonnet-4-6</span><span class="tag">6 条</span></div>
-              </div>
-            </div>
-            <div class="row">
-              <span class="ib"><svg class="ico"><use href="#i-code"/></svg></span>
-              <div class="grow">
-                <div class="t">SwiftUI 列表性能优化 <time>08:12</time></div>
-                <div class="p">LazyVStack 配合 id 稳定与 equatable 视图可以显著减少重绘…</div>
-                <div class="m"><span class="tag">opus-5</span><span class="tag">14 条</span></div>
-              </div>
-            </div>
+        <div class="nav" style="padding-top:66px">
+          <div>
+            <div class="title">内置执行</div>
+            <div class="sub">说出目标，Black God 帮你执行</div>
           </div>
-
-          <div class="lbl">昨天</div>
-          <div class="grp">
-            <div class="row">
-              <span class="ib"><svg class="ico"><use href="#i-heart"/></svg></span>
-              <div class="grow">
-                <div class="t">给妈妈的生日祝福 <time>22:05</time></div>
-                <div class="p">妈，又一年了。谢谢你把最好的时光都给了我们…</div>
-                <div class="m"><span class="tag">fable-5-1</span><span class="tag">3 条</span></div>
-              </div>
-            </div>
-            <div class="swipe-wrap">
-              <div class="del"><svg class="ico"><use href="#i-trash"/></svg>删除</div>
-              <div class="row swiped" style="border-top:1px solid var(--line)">
-                <span class="ib"><svg class="ico"><use href="#i-globe"/></svg></span>
-                <div class="grow">
-                  <div class="t">翻译产品说明书（中→英） <time>15:30</time></div>
-                  <div class="p">Here is the English version of the product manual…</div>
-                  <div class="m"><span class="tag">sonnet-4-6</span><span class="tag">9 条</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
         </div>
-
-        <div class="hist-foot"><svg class="ico" style="color:var(--jade-hi)"><use href="#i-lock"/></svg> 全部对话仅保存在此 iPhone · 不上传 · 不同步</div>
-
+        <div class="foot" style="margin-top:8px">无需安装其他应用。提出需求，按需使用内置工具计算、处理文字和生成工作区文件。</div>
+        <div class="group" style="margin-top:14px">
+          <div class="cell"><div class="grow">允许 Black God 执行任务</div><span class="pill"><span class="dot"></span>开</span></div>
+        </div>
+        <div class="label">可以这样说</div>
+        <div class="group">
+          <div class="cell"><div class="grow" style="font-size:14px">计算12个月每月存500元的累计金额，并核对结果。</div></div>
+          <div class="cell"><div class="grow" style="font-size:14px">把苹果12元、牛奶18元、面包9元整理成CSV。</div></div>
+        </div>
+        <div class="btn-primary" style="margin-top:18px">交给 Black God</div>
+        <div class="tabbar">
+          <div class="tab">Black God AI</div>
+          <div class="tab on">工具</div>
+          <div class="tab">创作</div>
+          <div class="tab">监测</div>
+          <div class="tab">我的</div>
+        </div>
         <div class="home"></div>
       </div>
     </div>
@@ -814,14 +800,14 @@ h2 em{
 </section>
 
 <!-- ═══════════════════════ ⑤ 本地优先设置 ═══════════════════════ -->
-<section class="shot" id="shot-5" data-title="本地优先设置">
+<section class="shot" id="shot-5" data-title="我的">
   <div class="glow"></div><div class="glow b"></div>
-  <div class="mark">私</div>
+  <div class="mark">我</div>
   <header class="copy">
-    <div class="brand"><i>神</i>神枢 · Black God</div>
-    <div class="kicker">05 · 隐私 Privacy</div>
-    <h2><em>神枢设置<br><em>本地优先</em></h2>
-    <p class="en">Encrypted by iOS Keychain. No account,<br>no tracking, no ads — wipe everything in one tap.</p>
+    <div class="brand"><img src="../Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="Black God">Black God</div>
+    <div class="kicker">05 · 我的</div>
+    <h2>Black God AI<br><em>助手身份</em></h2>
+    <p class="en">One assistant identity. Graphite and jade.<br>Your data stays on this iPhone.</p>
   </header>
 
   <div class="phone">
@@ -831,49 +817,25 @@ h2 em{
         <div class="island"></div>
         <div class="statusbar"><span>9:41</span><span class="r"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="28" height="13"><use href="#i-batt"/></svg></span></div>
 
-        <div class="nav" style="align-items:flex-start;flex-direction:column;gap:4px;padding-top:62px">
-          <div class="back"><svg class="ico"><use href="#i-chev-l"/></svg>我的</div>
-          <div class="title">隐私保护</div>
+        <div class="me-hero">
+          <div class="spark-av">✦</div>
+          <div class="n">Black God AI</div>
+          <div class="d">Black God AI 助手 · 为你工作</div>
         </div>
-
-        <div class="shield-hero">
-          <span class="ring c"></span><span class="ring b"></span><span class="ring a"></span>
-          <div class="shield"><svg class="ico"><use href="#i-shield"/></svg></div>
+        <div class="group" style="margin-top:8px">
+          <div class="cell"><span class="icobox"><svg class="ico"><use href="#i-shield"/></svg></span><div class="grow">神枢连接</div><span class="val">OAuth 登录 · 模型直连</span></div>
+          <div class="cell"><span class="icobox grey"><svg class="ico"><use href="#i-heart"/></svg></span><div class="grow">长期记忆</div><span class="val">本机</span></div>
+          <div class="cell"><span class="icobox grey"><svg class="ico"><use href="#i-doc"/></svg></span><div class="grow">任务技能</div><span class="val">本机</span></div>
+          <div class="cell"><span class="icobox grey"><svg class="ico"><use href="#i-lock"/></svg></span><div class="grow">隐私保护</div><span class="val">数据使用说明</span></div>
         </div>
-        <div class="priv-title">
-          <div class="t">零后端 · 本地优先</div>
-          <div class="d">你的对话，只属于你自己</div>
+        <div class="foot" style="text-align:center;margin-top:16px">Black God · 1.3.0（11）<br>Black God AI私人专属版 · 神枢</div>
+        <div class="tabbar">
+          <div class="tab">Black God AI</div>
+          <div class="tab">工具</div>
+          <div class="tab">创作</div>
+          <div class="tab">监测</div>
+          <div class="tab on">我的</div>
         </div>
-
-        <div class="flow">
-          <div class="node">
-            <div class="bx"><svg class="ico"><use href="#i-phone"/></svg></div>
-            <div class="n">你的 iPhone</div>
-            <div class="s">Keychain · 本地</div>
-          </div>
-          <div class="link"><span>直连 HTTPS</span></div>
-          <div class="node">
-            <div class="bx"><svg class="ico"><use href="#i-spark"/></svg></div>
-            <div class="n">Anthropic</div>
-            <div class="s">api.anthropic.com</div>
-          </div>
-          <div class="link off"><span>无</span></div>
-          <div class="node dead">
-            <div class="bx"><svg class="ico"><use href="#i-server"/></svg></div>
-            <div class="n">中转服务器</div>
-            <div class="s">不存在</div>
-          </div>
-        </div>
-
-        <div class="group checks" style="margin-top:12px">
-          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">API Key 存于 iOS Keychain<small>系统级加密，仅本机可读</small></div></div>
-          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">对话历史仅存本机<small>不上传 · 不同步 · 不分析</small></div></div>
-          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">无账号、无注册、无埋点、无广告</div></div>
-          <div class="cell"><span class="chk"><svg class="ico"><use href="#i-check"/></svg></span><div class="grow">开源可审计<small>github.com/zhumingjie0223-cyber/Black-God</small></div></div>
-        </div>
-
-        <div class="btn-ghost"><svg class="ico"><use href="#i-eraser"/></svg>一键清除全部数据</div>
-
         <div class="home"></div>
       </div>
     </div>

@@ -1,0 +1,12 @@
+This is a real major update.
+
+Open the first screen and it is already present: the jade breath still moves. If you talked before, the mood is Connectable — tap to continue without starting over.
+
+Moods are now five readable states:
+• Present
+• Listening
+• Working
+• Connectable
+• Practice due
+
+Stacked micro-mood names are gone. The assistant is not bound to a character. Dangerous actions still need your confirmation.

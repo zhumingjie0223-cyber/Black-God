@@ -265,6 +265,7 @@ struct PresenceStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(snapshot.nextWork).font(.caption.bold()).foregroundStyle(Color.bgJadeHi)
+                .accessibilityIdentifier("chat.nextWork")
             if !snapshot.thread.isEmpty {
                 Text(snapshot.thread).font(.caption).foregroundStyle(Color.bgTextPrimary).lineLimit(2)
             }
@@ -277,51 +278,16 @@ struct PresenceStrip: View {
         .padding(12).background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.bgJade.opacity(0.28), lineWidth: 0.5))
-        .scaleEffect(leaning(snapshot.stance) ? (on ? 1.0 : 0.98) : 1)
-        .opacity(breathing(snapshot.stance) ? (on ? 1 : 0.72) : 1)
+        .scaleEffect(on ? 1.0 : 0.985)
+        .opacity(on ? 1 : 0.78)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.presence")
-        .onAppear { breathe(snapshot.stance) }
-        .onChange(of: snapshot.stance) { _, value in breathe(value) }
+        .onAppear { breathe(snapshot.breath) }
+        .onChange(of: snapshot.breath) { _, value in breathe(value) }
     }
-    private func breathing(_ stance: String) -> Bool {
-        ["working", "speaking", "answering", "following", "listening", "hitching", "holding", "retracting", "watching", "noticing", "settled", "echoing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "resting", "yielding", "keeping", "companying", "tending", "waking"].contains(stance)
-    }
-    private func leaning(_ stance: String) -> Bool {
-        ["speaking", "answering", "following", "hitching", "retracting", "watching", "noticing", "exhaling", "carrying", "awaiting", "heeding", "nestling", "nuzzling", "clinging", "resting", "yielding", "keeping", "companying", "tending", "waking"].contains(stance)
-    }
-    private func breathe(_ stance: String) {
-        guard breathing(stance) else { on = false; return }
+    private func breathe(_ duration: Double) {
         on = false
-        let duration: Double
-        switch stance {
-        case "answering": duration = 0.6
-        case "speaking": duration = 0.7
-        case "working": duration = 0.9
-        case "exhaling": duration = 1.0
-        case "following": duration = 1.05
-        case "listening": duration = 1.1
-        case "carrying": duration = 1.2
-        case "heeding": duration = 1.25
-        case "nestling": duration = 1.35
-        case "nuzzling": duration = 1.45
-        case "clinging": duration = 1.55
-        case "resting": duration = 1.65
-        case "retracting": duration = 1.3
-        case "hitching": duration = 1.5
-        case "watching": duration = 1.4
-        case "awaiting": duration = 1.6
-        case "yielding": duration = 1.7
-        case "keeping": duration = 1.85
-        case "companying": duration = 1.95
-        case "tending": duration = 2.05
-        case "waking": duration = 2.15
-        case "noticing": duration = 1.8
-        case "holding": duration = 2.0
-        case "echoing": duration = 2.2
-        default: duration = 3.2
-        }
-        withAnimation(.easeInOut(duration: duration).repeatForever(autoreverses: true)) { on = true }
+        withAnimation(.easeInOut(duration: max(0.6, duration)).repeatForever(autoreverses: true)) { on = true }
     }
 }
 
@@ -330,6 +296,10 @@ struct ChatEmptyState: View {
     let use: (String) -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                PresenceDot(duration: 2.4)
+                Text("在场").font(.caption.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
+            }
             Text(pulseNote.map { "Black God AI 在场 · \($0)" } ?? "Black God AI 在场。直接说出你要完成的事，它会按需使用内置工具执行并核对结果。")
                 .foregroundStyle(Color.bgTextSecondary)
             ForEach(["计算 12 个月每月存 500 元的累计金额，并核对结果。", "用枢语造一个关于「锚点」的词，并核对编号。", "把整理账单拆成可检查的三步计划。"], id: \.self) { sample in
