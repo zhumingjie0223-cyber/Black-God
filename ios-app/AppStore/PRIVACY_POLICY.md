@@ -1,6 +1,6 @@
 # Black God 隐私与数据使用 / Privacy and data use
 
-更新日期 / Updated: 2026-09-09
+更新日期 / Updated: 2026-09-23
 
 ## 中文
 
@@ -12,7 +12,7 @@ API 密钥、OAuth 访问令牌和刷新令牌存放在本机 Keychain，设置�
 
 ### 数据发送与许可
 
-在你明确允许某个连接发送内容后，模型请求会把当前对话、选用的长期记忆、技能指令和工具结果发送至你配置的服务商。这些内容可能包含个人信息和文件内容。服务商收到认证凭据、请求与网络连接信息，可将使用情况关联至其账号。数据保留与处理由相应服务商及其下游服务政策决定。
+在你明确允许某个连接发送内容后，模型请求会把当前对话、选用的长期记忆、技能指令、每天学习记下的更新预备和工具结果发送至你配置的服务商。这些内容可能包含个人信息和文件内容。服务商收到认证凭据、请求与网络连接信息，可将使用情况关联至其账号。数据保留与处理由相应服务商及其下游服务政策决定。
 
 “我的 → 神枢连接”显示接收地址及发送内容，并提供许可开关。关闭许可阻止后续模型内容请求；已发送的请求或服务商已保留的数据不会因此撤回。获取模型列表会向该服务商发送认证凭据，不会发送对话内容。
 
@@ -40,7 +40,7 @@ Black God is an independent AI client with local tools and an embedded Linux env
 
 API keys and OAuth access/refresh tokens are stored in this-device-only Keychain entries. Connections, chats, memories, skills, task checkpoints and workspace files are stored in the app container. System backups depend on device settings. Keychain entries may survive uninstalling the app.
 
-After you explicitly allow a connection, model requests send the current conversation, selected memories, skill instructions and tool results to its configured provider. These may contain personal information or file content. Authentication and network information can associate requests with your provider account. Provider and downstream policies govern retention and processing. OpenRouter may route requests to downstream model providers.
+After you explicitly allow a connection, model requests send the current conversation, selected memories, skill instructions, daily-learning notes kept for the next update, and tool results to its configured provider. These may contain personal information or file content. Authentication and network information can associate requests with your provider account. Provider and downstream policies govern retention and processing. OpenRouter may route requests to downstream model providers.
 
 The connection screen displays the destination, explains the data and provides a permission switch. Turning permission off prevents subsequent model-content requests; it cannot recall data already sent. Model discovery sends authentication credentials but no conversation. Account login and code/token exchange use provider authorization services; Black God does not ask for provider passwords. Kimi, Grok and MiniMax compatibility sign-in uses public CLI authorization flows.
 
@@ -54,5 +54,9 @@ Images selected by the user are processed locally with Apple Vision OCR; the cur
 
 
 自我状态流在本机保存最近120条目标摘要、执行阶段、工具返回状态和模型公开自评；这不是内部思维链。较早记录滚动移除并显示计数，当前连接凭据按精确匹配隐藏，但不保证识别其他秘密。最近6条摘要可能随后续获准的模型请求发送。用户可在“神枢成长 → 自我状态流”暂停或清空；这不会删除聊天、知识、任务检查点、系统备份或服务商已有的数据。状态流按任务事件更新，不额外调用模型，应用休眠时不持续运行。
+
+每天学习在本机最多保留 30 条规矩，一天最多新记一条，只来自你的纠正或工具失败。最近 8 条仍保留的更新预备可能随后续获准的模型请求发送。可以在“我的 → 每天学习”撤下；撤下后不再注入，当天不会改记另一条。这不启用知识、不改变权限，应用休眠时不学习。
+
+Daily learning stores at most 30 local rules and adds at most one per day, taken only from your corrections or tool failures. Up to eight kept update-preparation notes may enter subsequent permitted model requests. You can dismiss them under Me → Daily Learning; a dismissed day does not record a replacement. This does not activate knowledge or change permissions, and it does not run while the app is suspended.
 
 The self-state stream stores the latest 120 goal summaries, task phases, tool return statuses and public model assessments locally, not private chain-of-thought. Older entries roll off with an omission count. The current connection credential is redacted by exact match, which does not identify every possible secret. The latest six summaries may enter subsequent permitted model requests. Users can pause or clear the stream under Cognitive Growth → Self-State Stream; this does not delete chats, knowledge, task checkpoints, system backups or provider-held data. Updates follow task events without extra model requests or continuous execution while the app is suspended.
