@@ -299,6 +299,18 @@ struct MessageBubble: View {
     }
 }
 
+// 仅自动化测试的调试构建停用装饰性循环动效，避免 XCTest 永远等不到界面空闲。
+// 正式发行包与普通调试启动始终保留原有动效；不影响任何状态计时或任务执行。
+private enum ChatMotion {
+    static var continuousAnimationsEnabled: Bool {
+#if DEBUG
+        return ProcessInfo.processInfo.environment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] != "1"
+#else
+        return true
+#endif
+    }
+}
+
 struct TypingIndicator: View {
     @State private var on = false
     var body: some View {
@@ -308,7 +320,7 @@ struct TypingIndicator: View {
                     Circle().fill(Color.bgJadeHi).frame(width: 7, height: 7)
                         .scaleEffect(on ? 1.18 : 0.86)
                         .opacity(on ? (i == 1 ? 1 : 0.58) : 0.28)
-                        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true).delay(Double(i) * 0.12), value: on)
+                        .animation(ChatMotion.continuousAnimationsEnabled ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true).delay(Double(i) * 0.12) : nil, value: on)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 12).background(Color.bgCard)
@@ -352,7 +364,7 @@ struct PresenceDot: View {
             .onChange(of: duration) { _, value in breathe(value) }
     }
     private func breathe(_ value: Double) {
-        guard !reduceMotion else { on = true; return }
+        guard !reduceMotion, ChatMotion.continuousAnimationsEnabled else { on = true; return }
         on = false
         withAnimation(.easeInOut(duration: max(0.6, value)).repeatForever(autoreverses: true)) { on = true }
     }

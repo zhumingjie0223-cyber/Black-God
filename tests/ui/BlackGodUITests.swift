@@ -2,8 +2,15 @@ import XCTest
 
 final class BlackGodUITests: XCTestCase {
     @MainActor
-    func testRedesignedMainPanelsAndCreationState() {
+    private func makeApplication() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchEnvironment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] = "1"
+        return app
+    }
+
+    @MainActor
+    func testRedesignedMainPanelsAndCreationState() {
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         XCTAssertTrue(app.buttons["chat.actions"].waitForExistence(timeout: 8))
@@ -42,7 +49,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testLargeTextKeepsPrimaryControlsReachable() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
         app.launch()
         XCTAssertTrue(app.buttons["chat.connection"].waitForExistence(timeout: 8))
@@ -67,7 +74,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testTabletSidebarAndLandscapeComposer() throws {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         guard app.frame.width >= 700 else { throw XCTSkip("此用例用于原生 iPad 布局") }
@@ -107,7 +114,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testConversationManagementEntryIsDiscoverable() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.0"].tap()
         let actions = app.buttons["chat.actions"]
@@ -123,7 +130,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testChatComposerChipsUseJadePrompts() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.0"].tap()
@@ -165,7 +172,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testSelfContinuityEntryPauseAndClear() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["cognitive.open"]
@@ -195,7 +202,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testCognitivePermissionsAndObservationEntry() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["cognitive.open"]
@@ -229,7 +236,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testVersionAndBundledLicensePage() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["licenses.open"]
@@ -255,7 +262,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testOAuthLoginEntryAndBrowserCancellation() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.4"].tap()
@@ -282,7 +289,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testDeviceLoginBrowserReturnAndExplicitCancellation() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
         let login = app.buttons["oauth.kimi-oauth"]
@@ -304,7 +311,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testClaudeConfigurationAndExplicitDataPermission() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
         let claude = app.buttons["claude.api"]
@@ -326,7 +333,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testBuiltInPracticeAndStorageControls() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         openAdvanced(in: app)
@@ -427,7 +434,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testAdvancedTerminalAndLiveOutputArrivesBeforeExit() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         XCTAssertFalse(app.buttons["tab.1"].exists)
@@ -455,7 +462,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testMonitorSeparatesTelemetryFromIndependentAcceptance() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.3"].tap()
@@ -473,7 +480,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testBackgroundStopAndRelaunchRecovery() throws {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openTools() {
@@ -536,7 +543,7 @@ final class BlackGodUITests: XCTestCase {
     }
     @MainActor
     func testProviderPresetsAndModelDiscoveryControls() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.4"].tap()
@@ -570,7 +577,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testCuratedMemoryCreateCorrectPersistAndDelete() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openMemory() {
@@ -615,7 +622,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testSkillsCreateEditRestoreAndDelete() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openSkills() {
