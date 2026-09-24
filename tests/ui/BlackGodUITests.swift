@@ -332,7 +332,7 @@ final class BlackGodUITests: XCTestCase {
         reveal(app.buttons["shuyu.open"], in: app)
         app.buttons["shuyu.open"].tap()
         app.buttons["shuyu.generate"].tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 10))
+        assertShuyuResult(in: app)
         let verified = app.staticTexts["词形与汉译反查一致"]
         reveal(verified, in: app)
         XCTAssertTrue(verified.exists)
@@ -342,63 +342,63 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(verified.waitForExistence(timeout: 5))
         reveal(app.buttons["shuyu.near"], in: app)
         app.buttons["shuyu.near"].tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let pulse = app.buttons["shuyu.pulse"]
         reveal(pulse, in: app)
         pulse.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let trail = app.buttons["shuyu.trail"]
         reveal(trail, in: app)
         trail.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let echo = app.buttons["shuyu.echo"]
         reveal(echo, in: app)
         echo.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let sway = app.buttons["shuyu.sway"]
         reveal(sway, in: app)
         sway.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let land = app.buttons["shuyu.land"]
         reveal(land, in: app)
         land.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let stir = app.buttons["shuyu.stir"]
         reveal(stir, in: app)
         stir.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let perch = app.buttons["shuyu.perch"]
         reveal(perch, in: app)
         perch.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let turn = app.buttons["shuyu.turn"]
         reveal(turn, in: app)
         turn.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let gaze = app.buttons["shuyu.gaze"]
         reveal(gaze, in: app)
         gaze.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let incline = app.buttons["shuyu.incline"]
         reveal(incline, in: app)
         incline.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let nestle = app.buttons["shuyu.nestle"]
         reveal(nestle, in: app)
         nestle.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let hold = app.buttons["shuyu.hold"]
         reveal(hold, in: app)
         hold.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let warm = app.buttons["shuyu.warm"]
         reveal(warm, in: app)
         warm.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let rouse = app.buttons["shuyu.rouse"]
         reveal(rouse, in: app)
         rouse.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.navigationBars["枢语"].buttons["完成"].tap()
         reveal(app.buttons["storage.open"], in: app)
@@ -668,6 +668,16 @@ final class BlackGodUITests: XCTestCase {
 }
 
 extension XCTestCase {
+    /// Form 只生成当前可见的行；每次操作后先滚回结果行，再检查真实结果。
+    @MainActor
+    func assertShuyuResult(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let result = app.staticTexts["shuyu.word"]
+        reveal(result, in: app, upSwipes: 12, downSwipes: 16, file: file, line: line)
+        XCTAssertTrue(result.waitForExistence(timeout: 10), "枢语结果行未出现", file: file, line: line)
+        XCTAssertFalse(result.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                       "枢语结果不能为空", file: file, line: line)
+    }
+
     /// 列表/表单页面只渲染可见区域；页面变长后需要先滑到元素处再断言，否则不是功能缺陷而是查找失败。
     /// 用短距离拖动代替整屏 swipe：整屏 swipeDown 会把以 sheet 弹出的页面直接关掉。
     @MainActor
