@@ -1,5 +1,6 @@
 import XCTest
 import Security
+import Combine
 @testable import BlackGod
 
 private final class OAuthFixtureProtocol: URLProtocol {
@@ -29,6 +30,18 @@ final class NexusOAuthTests: XCTestCase {
         defer { SecItemDelete([kSecClass: kSecClassGenericPassword, kSecAttrService: service] as CFDictionary) }
         try body(NexusKeychain(service: service))
     }
+    // 等待真实的浏览器就绪事件，不把冷启动的网络监听器限制在一秒内。
+    @MainActor
+    private func startLogin(_ login: NexusOAuthLogin, entry: NexusModelEntry,
+                            file: StaticString = #filePath, line: UInt = #line) async throws -> NexusOAuthBrowser {
+        let ready = expectation(description: "本地回调监听器就绪并生成授权页面")
+        let observer = login.$browser.compactMap { $0 }.first().sink { _ in ready.fulfill() }
+        defer { observer.cancel() }
+        login.start(entry: entry)
+        await fulfillment(of: [ready], timeout: 10)
+        return try XCTUnwrap(login.browser, "登录初始化未完成：\(login.status)", file: file, line: line)
+    }
+
     func testPKCEAgainstRFC7636VectorAndIndependentRandomSessions() throws {
         XCTAssertEqual(attempt.challenge, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
         let a = try NexusOAuthAttempt(), b = try NexusOAuthAttempt()
@@ -152,13 +165,15 @@ final class NexusOAuthTests: XCTestCase {
         let login = NexusOAuthLogin(keychain: store, exchange: { _, code in
             XCTAssertEqual(code, "fixture-code"); return "fixture-key"
         })
-        login.start(entry: draft)
-        for _ in 0..<100 where login.browser == nil { try await Task.sleep(for: .milliseconds(10)) }
-        let browser = try XCTUnwrap(login.browser)
+        defer { login.cancel() }
+        let browser = try await startLogin(login, entry: draft)
         let parts = URLComponents(url: browser.url, resolvingAgainstBaseURL: false)!
         let callback = try XCTUnwrap(parts.queryItems!.first { $0.name == "callback_url" }?.value)
+        let finished = expectation(description: "授权完成并退出运行状态")
+        let observer = login.$isRunning.filter { !$0 }.first().sink { _ in finished.fulfill() }
+        defer { observer.cancel() }
         _ = try await URLSession.shared.data(from: URL(string: callback + "&code=fixture-code")!)
-        for _ in 0..<100 where login.isRunning { try await Task.sleep(for: .milliseconds(10)) }
+        await fulfillment(of: [finished], timeout: 10)
         XCTAssertFalse(login.isRunning); XCTAssertNil(login.browser); XCTAssertEqual(login.completedEntry, draft)
         XCTAssertEqual(store.key(for: draft.credentialID), "fixture-key"); XCTAssertNil(store.selectedConnection)
     }
@@ -167,21 +182,23 @@ final class NexusOAuthTests: XCTestCase {
         let service = "blackgod.oauth.tests." + UUID().uuidString
         defer { SecItemDelete([kSecClass: kSecClassGenericPassword, kSecAttrService: service] as CFDictionary) }
         let store = NexusKeychain(service: service), draft = entry()
-        var enteredExchange = false
+        let enteredExchange = expectation(description: "授权交换已经开始")
+        let returnedExchange = expectation(description: "取消后的迟到结果已经返回")
         var release: CheckedContinuation<String, Never>?
         let login = NexusOAuthLogin(keychain: store, exchange: { _, _ in
-            enteredExchange = true
-            return await withCheckedContinuation { release = $0 }
+            enteredExchange.fulfill()
+            let key = await withCheckedContinuation { release = $0 }
+            returnedExchange.fulfill()
+            return key
         })
-        login.start(entry: draft)
-        for _ in 0..<100 where login.browser == nil { try await Task.sleep(for: .milliseconds(10)) }
-        let browser = try XCTUnwrap(login.browser)
+        defer { release?.resume(returning: "cleanup"); release = nil }
+        defer { login.cancel() }
+        let browser = try await startLogin(login, entry: draft)
         let callback = URLComponents(url: browser.url, resolvingAgainstBaseURL: false)!.queryItems!.first { $0.name == "callback_url" }!.value!
         _ = try await URLSession.shared.data(from: URL(string: callback + "&code=fixture")!)
-        for _ in 0..<100 where !enteredExchange { try await Task.sleep(for: .milliseconds(10)) }
-        XCTAssertTrue(enteredExchange)
-        login.cancel(); release?.resume(returning: "late-key")
-        try await Task.sleep(for: .milliseconds(50))
+        await fulfillment(of: [enteredExchange], timeout: 10)
+        login.cancel(); release?.resume(returning: "late-key"); release = nil
+        await fulfillment(of: [returnedExchange], timeout: 10)
         XCTAssertNil(store.key(for: draft.credentialID)); XCTAssertNil(login.completedEntry)
         XCTAssertFalse(login.isRunning)
     }

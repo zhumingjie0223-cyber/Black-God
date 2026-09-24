@@ -141,7 +141,8 @@ final class BlackGodUITests: XCTestCase {
         app.buttons["chat.chip.plan"].tap()
         XCTAssertEqual(app.staticTexts["chat.mood"].label, "在听")
         expectation(for: NSPredicate(format: "label == %@", "顿笔"), evaluatedWith: app.staticTexts["chat.mood"])
-        waitForExpectations(timeout: 3)
+        // 保留同一个状态断言；额外时间只用于繁忙运行器的界面快照调度，不改变产品的 1.6 秒停笔时间。
+        waitForExpectations(timeout: 10)
         app.descendants(matching: .any)["chat.title"].tap()
         expectation(for: NSPredicate(format: "label == %@", "惦记"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 3)
