@@ -301,7 +301,7 @@ struct MessageBubble: View {
 
 // 仅自动化测试的调试构建停用装饰性循环动效，避免 XCTest 永远等不到界面空闲。
 // 正式发行包与普通调试启动始终保留原有动效；不影响任何状态计时或任务执行。
-private enum ChatMotion {
+enum ChatMotion {
     static var continuousAnimationsEnabled: Bool {
 #if DEBUG
         return ProcessInfo.processInfo.environment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] != "1"
