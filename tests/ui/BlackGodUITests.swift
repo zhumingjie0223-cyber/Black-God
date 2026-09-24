@@ -261,6 +261,30 @@ final class BlackGodUITests: XCTestCase {
     }
 
     @MainActor
+    func testOAuthLoginButtonPaddingStartsAndCancels() {
+        let app = makeApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        app.buttons["tab.4"].tap()
+        app.buttons["api.open"].tap()
+        let login = app.buttons["oauth.login"]
+        reveal(login, in: app)
+        XCTAssertTrue(login.isEnabled)
+        // 点击文字左侧的按钮留白，验证整个可见按钮均可启动真实授权。
+        login.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+        let close = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "关闭", "Close")).firstMatch
+        guard close.waitForExistence(timeout: 25) else {
+            XCTFail("点击按钮留白后未出现官方授权页面：" + app.debugDescription)
+            return
+        }
+        close.tap()
+        let status = app.staticTexts["oauth.status"]
+        expectation(for: NSPredicate(format: "label == %@", "已取消登录。"), evaluatedWith: status)
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(login.isEnabled)
+    }
+
+    @MainActor
     func testOAuthLoginEntryAndBrowserCancellation() {
         let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
@@ -273,10 +297,15 @@ final class BlackGodUITests: XCTestCase {
             XCTAssertTrue(app.buttons["oauth." + id].exists)
         }
         let entry = XCTAttachment(screenshot: app.screenshot()); entry.name = "OAuth登录入口"; entry.lifetime = .keepAlways; add(entry)
-        login.tap()
-        // Only open the provider's login page and cancel; never submit credentials or consent.
+        reveal(login, in: app)
+        XCTAssertTrue(login.isEnabled)
+        // 等按钮完整可操作后按压，避免繁忙运行器丢失过短的触摸事件；不提交账号或授权。
+        login.press(forDuration: 0.15)
         let done = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "关闭", "Close")).firstMatch
-        XCTAssertTrue(done.waitForExistence(timeout: 15), app.debugDescription)
+        guard done.waitForExistence(timeout: 30) else {
+            XCTFail("登录操作未打开官方页面：" + app.debugDescription)
+            return
+        }
         let browser = XCTAttachment(screenshot: app.screenshot()); browser.name = "OAuth官方授权页面"; browser.lifetime = .keepAlways; add(browser)
         done.tap()
         XCTAssertTrue(login.waitForExistence(timeout: 10))

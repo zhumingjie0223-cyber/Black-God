@@ -108,8 +108,8 @@ struct BGAuraOrb: View {
     var diameter: CGFloat = 240
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || scenePhase != .active)) { timeline in
-            BGAuraFrame(diameter: diameter, time: reduceMotion ? 0 : timeline.date.timeIntervalSince(epoch))
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !ChatMotion.continuousAnimationsEnabled || scenePhase != .active)) { timeline in
+            BGAuraFrame(diameter: diameter, time: reduceMotion || !ChatMotion.continuousAnimationsEnabled ? 0 : timeline.date.timeIntervalSince(epoch))
         }
         .frame(width: diameter, height: diameter)
         .allowsHitTesting(false).accessibilityHidden(true)
