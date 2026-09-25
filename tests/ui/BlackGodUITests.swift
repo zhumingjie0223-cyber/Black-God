@@ -2,8 +2,15 @@ import XCTest
 
 final class BlackGodUITests: XCTestCase {
     @MainActor
-    func testRedesignedMainPanelsAndCreationState() {
+    private func makeApplication() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchEnvironment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] = "1"
+        return app
+    }
+
+    @MainActor
+    func testRedesignedMainPanelsAndCreationState() {
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         XCTAssertTrue(app.buttons["chat.actions"].waitForExistence(timeout: 8))
@@ -42,7 +49,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testLargeTextKeepsPrimaryControlsReachable() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
         app.launch()
         XCTAssertTrue(app.buttons["chat.connection"].waitForExistence(timeout: 8))
@@ -67,7 +74,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testTabletSidebarAndLandscapeComposer() throws {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         guard app.frame.width >= 700 else { throw XCTSkip("此用例用于原生 iPad 布局") }
@@ -107,7 +114,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testConversationManagementEntryIsDiscoverable() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.0"].tap()
         let actions = app.buttons["chat.actions"]
@@ -123,7 +130,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testChatComposerChipsUseJadePrompts() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.0"].tap()
@@ -141,7 +148,8 @@ final class BlackGodUITests: XCTestCase {
         app.buttons["chat.chip.plan"].tap()
         XCTAssertEqual(app.staticTexts["chat.mood"].label, "在听")
         expectation(for: NSPredicate(format: "label == %@", "顿笔"), evaluatedWith: app.staticTexts["chat.mood"])
-        waitForExpectations(timeout: 3)
+        // 保留同一个状态断言；额外时间只用于繁忙运行器的界面快照调度，不改变产品的 1.6 秒停笔时间。
+        waitForExpectations(timeout: 10)
         app.descendants(matching: .any)["chat.title"].tap()
         expectation(for: NSPredicate(format: "label == %@", "惦记"), evaluatedWith: app.staticTexts["chat.mood"])
         waitForExpectations(timeout: 3)
@@ -164,7 +172,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testSelfContinuityEntryPauseAndClear() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["cognitive.open"]
@@ -194,7 +202,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testCognitivePermissionsAndObservationEntry() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["cognitive.open"]
@@ -228,7 +236,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testVersionAndBundledLicensePage() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap()
         let entry = app.buttons["licenses.open"]
@@ -253,8 +261,32 @@ final class BlackGodUITests: XCTestCase {
     }
 
     @MainActor
+    func testOAuthLoginButtonPaddingStartsAndCancels() {
+        let app = makeApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        app.buttons["tab.4"].tap()
+        app.buttons["api.open"].tap()
+        let login = app.buttons["oauth.login"]
+        reveal(login, in: app)
+        XCTAssertTrue(login.isEnabled)
+        // 点击文字左侧的按钮留白，验证整个可见按钮均可启动真实授权。
+        login.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+        let close = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "关闭", "Close")).firstMatch
+        guard close.waitForExistence(timeout: 25) else {
+            XCTFail("点击按钮留白后未出现官方授权页面：" + app.debugDescription)
+            return
+        }
+        close.tap()
+        let status = app.staticTexts["oauth.status"]
+        expectation(for: NSPredicate(format: "label == %@", "已取消登录。"), evaluatedWith: status)
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(login.isEnabled)
+    }
+
+    @MainActor
     func testOAuthLoginEntryAndBrowserCancellation() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.4"].tap()
@@ -265,10 +297,15 @@ final class BlackGodUITests: XCTestCase {
             XCTAssertTrue(app.buttons["oauth." + id].exists)
         }
         let entry = XCTAttachment(screenshot: app.screenshot()); entry.name = "OAuth登录入口"; entry.lifetime = .keepAlways; add(entry)
-        login.tap()
-        // Only open the provider's login page and cancel; never submit credentials or consent.
+        reveal(login, in: app)
+        XCTAssertTrue(login.isEnabled)
+        // 等按钮完整可操作后按压，避免繁忙运行器丢失过短的触摸事件；不提交账号或授权。
+        login.press(forDuration: 0.15)
         let done = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "关闭", "Close")).firstMatch
-        XCTAssertTrue(done.waitForExistence(timeout: 15), app.debugDescription)
+        guard done.waitForExistence(timeout: 30) else {
+            XCTFail("登录操作未打开官方页面：" + app.debugDescription)
+            return
+        }
         let browser = XCTAttachment(screenshot: app.screenshot()); browser.name = "OAuth官方授权页面"; browser.lifetime = .keepAlways; add(browser)
         done.tap()
         XCTAssertTrue(login.waitForExistence(timeout: 10))
@@ -281,7 +318,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testDeviceLoginBrowserReturnAndExplicitCancellation() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
         let login = app.buttons["oauth.kimi-oauth"]
@@ -303,7 +340,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testClaudeConfigurationAndExplicitDataPermission() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch(); app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
         let claude = app.buttons["claude.api"]
@@ -325,14 +362,14 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testBuiltInPracticeAndStorageControls() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         openAdvanced(in: app)
         reveal(app.buttons["shuyu.open"], in: app)
         app.buttons["shuyu.open"].tap()
         app.buttons["shuyu.generate"].tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 10))
+        assertShuyuResult(in: app)
         let verified = app.staticTexts["词形与汉译反查一致"]
         reveal(verified, in: app)
         XCTAssertTrue(verified.exists)
@@ -342,63 +379,63 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(verified.waitForExistence(timeout: 5))
         reveal(app.buttons["shuyu.near"], in: app)
         app.buttons["shuyu.near"].tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let pulse = app.buttons["shuyu.pulse"]
         reveal(pulse, in: app)
         pulse.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let trail = app.buttons["shuyu.trail"]
         reveal(trail, in: app)
         trail.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let echo = app.buttons["shuyu.echo"]
         reveal(echo, in: app)
         echo.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let sway = app.buttons["shuyu.sway"]
         reveal(sway, in: app)
         sway.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let land = app.buttons["shuyu.land"]
         reveal(land, in: app)
         land.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let stir = app.buttons["shuyu.stir"]
         reveal(stir, in: app)
         stir.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let perch = app.buttons["shuyu.perch"]
         reveal(perch, in: app)
         perch.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let turn = app.buttons["shuyu.turn"]
         reveal(turn, in: app)
         turn.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let gaze = app.buttons["shuyu.gaze"]
         reveal(gaze, in: app)
         gaze.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let incline = app.buttons["shuyu.incline"]
         reveal(incline, in: app)
         incline.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let nestle = app.buttons["shuyu.nestle"]
         reveal(nestle, in: app)
         nestle.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let hold = app.buttons["shuyu.hold"]
         reveal(hold, in: app)
         hold.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let warm = app.buttons["shuyu.warm"]
         reveal(warm, in: app)
         warm.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let rouse = app.buttons["shuyu.rouse"]
         reveal(rouse, in: app)
         rouse.tap()
-        XCTAssertTrue(app.staticTexts["shuyu.word"].waitForExistence(timeout: 5))
+        assertShuyuResult(in: app)
         let language = XCTAttachment(screenshot: app.screenshot()); language.name = "枢语语言"; language.lifetime = .keepAlways; add(language)
         app.navigationBars["枢语"].buttons["完成"].tap()
         reveal(app.buttons["storage.open"], in: app)
@@ -426,7 +463,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testAdvancedTerminalAndLiveOutputArrivesBeforeExit() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         XCTAssertFalse(app.buttons["tab.1"].exists)
@@ -454,7 +491,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testMonitorSeparatesTelemetryFromIndependentAcceptance() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.3"].tap()
@@ -472,7 +509,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testBackgroundStopAndRelaunchRecovery() throws {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openTools() {
@@ -535,7 +572,7 @@ final class BlackGodUITests: XCTestCase {
     }
     @MainActor
     func testProviderPresetsAndModelDiscoveryControls() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         app.buttons["tab.4"].tap()
@@ -569,7 +606,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testCuratedMemoryCreateCorrectPersistAndDelete() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openMemory() {
@@ -614,7 +651,7 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     func testSkillsCreateEditRestoreAndDelete() {
-        let app = XCUIApplication()
+        let app = makeApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         func openSkills() {
@@ -668,6 +705,16 @@ final class BlackGodUITests: XCTestCase {
 }
 
 extension XCTestCase {
+    /// Form 只生成当前可见的行；每次操作后先滚回结果行，再检查真实结果。
+    @MainActor
+    func assertShuyuResult(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let result = app.staticTexts["shuyu.word"]
+        reveal(result, in: app, upSwipes: 12, downSwipes: 16, file: file, line: line)
+        XCTAssertTrue(result.waitForExistence(timeout: 10), "枢语结果行未出现", file: file, line: line)
+        XCTAssertFalse(result.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                       "枢语结果不能为空", file: file, line: line)
+    }
+
     /// 列表/表单页面只渲染可见区域；页面变长后需要先滑到元素处再断言，否则不是功能缺陷而是查找失败。
     /// 用短距离拖动代替整屏 swipe：整屏 swipeDown 会把以 sheet 弹出的页面直接关掉。
     @MainActor

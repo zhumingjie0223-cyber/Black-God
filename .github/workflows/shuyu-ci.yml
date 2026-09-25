@@ -1,20 +1,20 @@
 name: 枢语引擎 CI
 
 # 两仓合一后:枢语源头引擎测试在本仓 shuyu/ 目录跑（原 shuyu-lang 仓 ci.yml 迁入并改路径）。
-# 只在 shuyu/ 源头或 web/nexus-do/ 消费副本变动时触发,避免无关改动空跑。
+# 校验当前枢语源头与 iOS 内置运行时，不再依赖已经退役的网页后端。
 on:
   push:
     branches: [main]
     paths:
       - 'shuyu/**'
-      - 'web/nexus-do/lexicon.js'
-      - 'web/nexus-do/lexicon_data.js'
+      - 'ios-app/ShuyuRuntime/**'
+      - 'tools/shuyu/**'
       - '.github/workflows/shuyu-ci.yml'
   pull_request:
     paths:
       - 'shuyu/**'
-      - 'web/nexus-do/lexicon.js'
-      - 'web/nexus-do/lexicon_data.js'
+      - 'ios-app/ShuyuRuntime/**'
+      - 'tools/shuyu/**'
       - '.github/workflows/shuyu-ci.yml'
 
 jobs:
@@ -51,11 +51,14 @@ jobs:
       - run: python -m unittest discover -s tests -v
 
   sync-check:
-    name: 同仓同步校验（shuyu ↔ web/nexus-do 引擎层）
+    name: 内置运行时同步校验（shuyu ↔ iOS）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node tools/check-sync.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 tools/shuyu/bundle.py --check
