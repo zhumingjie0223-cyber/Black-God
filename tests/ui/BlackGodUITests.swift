@@ -8,11 +8,21 @@ final class BlackGodUITests: XCTestCase {
         return app
     }
 
+    /// 模拟器偶发启动超时：先终止残留进程，再等首屏就绪信号。
+    @MainActor
+    private func launchReady(_ app: XCUIApplication, arguments: [String], file: StaticString = #filePath, line: UInt = #line) {
+        app.launchArguments = arguments
+        app.terminate()
+        app.launch()
+        let ready = app.buttons["chat.actions"].waitForExistence(timeout: 30)
+            || app.buttons["tab.0"].waitForExistence(timeout: 5)
+        XCTAssertTrue(ready, "应用首屏未就绪", file: file, line: line)
+    }
+
     @MainActor
     func testRedesignedMainPanelsAndCreationState() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         XCTAssertTrue(app.buttons["chat.actions"].waitForExistence(timeout: 8))
         capture(app, name: "新版-对话")
         XCTAssertFalse(app.buttons["tab.1"].exists)
@@ -473,8 +483,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testAdvancedTerminalAndLiveOutputArrivesBeforeExit() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         XCTAssertFalse(app.buttons["tab.1"].exists)
         XCTAssertFalse(app.textViews["linux.command"].exists)
         openAdvanced(in: app)

@@ -211,7 +211,7 @@ struct NexusSandboxView: View {
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { showControls.toggle() }
                 appState.haptic(.light)
             } label: {
-                Label(showControls ? "收起" : "开关", systemImage: "slider.horizontal.3")
+                Label(showControls ? "收" : "开", systemImage: "slider.horizontal.3")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(BGSecondaryButtonStyle())
@@ -233,7 +233,7 @@ struct NexusSandboxView: View {
             Text(imageQuotaText)
                 .font(.caption.monospacedDigit()).foregroundStyle(Color.bgJadeHi)
                 .accessibilityIdentifier("sandbox.imageQuota")
-            Text("工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))；整镜像硬顶 \(NexusStorage.absoluteCeilingGiB) GiB。下拉把手卷帘展开，上推收起。")
+            Text("上限 \(NexusWorkspaceQuota.maxFiles) 文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes)) · 镜像 \(NexusStorage.absoluteCeilingGiB) GiB")
                 .font(.footnote).foregroundStyle(Color.bgTextSecondary)
         }
     }
