@@ -22,6 +22,7 @@ struct MeView: View {
     @State private var showAdvanced = false
     @State private var showMemory = false
     @State private var showNexusConnection = false
+    @State private var showTerminal = false
 
     var body: some View {
         ScrollView {
@@ -51,11 +52,17 @@ struct MeView: View {
                     }.accessibilityIdentifier("cognitive.open")
                 }
 
-                settingsGroup("设置") {
+                settingsGroup("执行") {
+                    Button { showTerminal = true } label: {
+                        SettingRow(icon: "terminal", title: "手动终端", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("linux.open")
+                    Divider().overlay(Color.bgCardLight)
                     Button { showAdvanced = true } label: {
                         SettingRow(icon: "slider.horizontal.3", title: "高级设置", value: "", color: .bgJadeHi, compact: true)
                     }.accessibilityIdentifier("advanced.open")
-                    Divider().overlay(Color.bgCardLight)
+                }
+
+                settingsGroup("设置") {
                     Button { showPrivacy = true } label: {
                         SettingRow(icon: "lock.shield", title: "隐私保护", value: "", color: .bgJadeHi, compact: true)
                     }.accessibilityIdentifier("privacy.open")
@@ -85,6 +92,13 @@ struct MeView: View {
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
         .sheet(isPresented: $showAdvanced) { NexusAdvancedSettingsView() }
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
+        .sheet(isPresented: $showTerminal) {
+            NavigationStack {
+                NexusTerminalView().navigationTitle("手动终端")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
+            }
+        }
         .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }

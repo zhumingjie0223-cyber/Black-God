@@ -14,6 +14,7 @@ struct ChatView: View {
     @State private var showConnection = false
     @State private var showClearConversation = false
     @State private var showSessions = false
+    @State private var showTerminal = false
     @State private var showTaskDetails = false
     @State private var showPracticeDetails = false
     @FocusState private var inputFocused: Bool
@@ -86,6 +87,13 @@ struct ChatView: View {
         .sheet(item: $memoryMessage) { msg in NexusMemoryEditor(memory: vm.memory, initialText: msg.content) }
         .sheet(isPresented: $showConnection) { APIConfigView() }
         .sheet(isPresented: $showSessions) { NexusSessionListView(vm: vm) }
+        .sheet(isPresented: $showTerminal) {
+            NavigationStack {
+                NexusTerminalView().navigationTitle("手动终端")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
+            }
+        }
         .sheet(isPresented: $showTaskDetails) {
             NavigationStack {
                 ScrollView {
@@ -189,6 +197,8 @@ struct ChatView: View {
                     }
                     .accessibilityIdentifier("chat.newSession")
                 }
+                Button("手动终端", systemImage: "terminal") { showTerminal = true }
+                    .accessibilityIdentifier("chat.terminal")
                 if vm.live.visible || vm.currentPlan != nil {
                     Button("任务详情", systemImage: "list.bullet.rectangle") { openTaskDetails(practice: false) }
                         .accessibilityIdentifier("chat.taskDetailsMenu")
