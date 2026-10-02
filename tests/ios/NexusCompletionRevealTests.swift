@@ -13,7 +13,7 @@ final class NexusCompletionRevealTests: XCTestCase {
     }
 
     func testOutcomeCopyIsChinese() {
-        XCTAssertEqual(NexusCompletionReveal.Outcome.success.title, "任务已落成")
-        XCTAssertEqual(NexusCompletionReveal.Outcome.failure.title, "未能完成")
+        XCTAssertEqual(NexusCompletionReveal.Outcome.success.title, "已完成")
+        XCTAssertEqual(NexusCompletionReveal.Outcome.failure.title, "失败")
     }
 }

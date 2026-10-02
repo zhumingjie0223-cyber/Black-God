@@ -9,9 +9,9 @@ struct NexusCompletionReveal: View {
 
         var title: String {
             switch self {
-            case .success: return "任务已落成"
-            case .warning: return "完成但有告警"
-            case .failure: return "未能完成"
+            case .success: return "已完成"
+            case .warning: return "有告警"
+            case .failure: return "失败"
             }
         }
 
@@ -129,14 +129,15 @@ struct NexusCompletionReveal: View {
                     onOpenTheater()
                     dismiss()
                 }) {
-                    Label("拉开执行剧场", systemImage: "rectangle.bottomhalf.inset.filled")
+                    Label("过程", systemImage: "rectangle.bottomhalf.inset.filled")
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(BGPrimaryButtonStyle())
                 .accessibilityIdentifier("completion.openTheater")
+                .accessibilityLabel("查看过程")
 
                 Button(action: dismiss) {
-                    Text("收下")
+                    Text("好")
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(BGSecondaryButtonStyle())

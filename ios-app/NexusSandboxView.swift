@@ -44,7 +44,7 @@ struct NexusSandboxView: View {
 
                 VStack(alignment: .leading, spacing: 18) {
                     actionRow
-                    BGPullDrawer(isOpen: $showControls, title: "沙箱开关", accessibilityID: "sandbox.drawer") {
+                    BGPullDrawer(isOpen: $showControls, title: "开关", accessibilityID: "sandbox.drawer") {
                         controlsPanelContent
                     }
                     .id("sandbox.drawer.anchor")

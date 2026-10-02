@@ -80,9 +80,6 @@ struct BGPullDrawer<Content: View>: View {
                     .font(.headline)
                     .foregroundStyle(Color.bgTextPrimary)
                 Spacer()
-                Text(isOpen ? "卷上" : "抽开")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.bgJadeHi)
                 Image(systemName: "chevron.compact.down")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.bgJadeHi)
@@ -171,7 +168,7 @@ struct BGBottomDrawer<Content: View>: View {
                         HStack {
                             Text(title).font(.headline).foregroundStyle(Color.bgTextPrimary)
                             Spacer()
-                            Button("完成") { dismiss() }
+                            Button("好") { dismiss() }
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Color.bgJadeHi)
                                 .accessibilityIdentifier("drawer.dismiss")

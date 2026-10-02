@@ -70,21 +70,17 @@ struct MeView: View {
                 }
 
                 settingsGroup("触感") {
-                    Toggle("轻触反馈", isOn: $appState.hapticEnabled)
+                    Toggle("轻触", isOn: $appState.hapticEnabled)
                         .font(.body.weight(.medium))
                         .tint(Color.bgJadeHi)
                         .padding(.vertical, 10)
                         .accessibilityIdentifier("haptic.enabled")
                     Divider().overlay(Color.bgCardLight)
-                    Toggle("任务完成震动", isOn: $appState.taskCompleteHapticEnabled)
+                    Toggle("完成震动", isOn: $appState.taskCompleteHapticEnabled)
                         .font(.body.weight(.medium))
                         .tint(Color.bgJadeHi)
                         .padding(.vertical, 10)
                         .accessibilityIdentifier("haptic.taskComplete")
-                    Text("任务成功或失败时震动提示；可单独关闭，不影响轻触反馈。")
-                        .font(.caption)
-                        .foregroundStyle(Color.bgTextSecondary)
-                        .padding(.bottom, 6)
                 }
 
                 settingsGroup("设置") {

@@ -104,7 +104,7 @@ struct ChatView: View {
             }
         }
         .overlay {
-            BGBottomDrawer(isPresented: $showTaskDetails, title: showPracticeDetails ? "执行剧场" : "执行剧场") {
+            BGBottomDrawer(isPresented: $showTaskDetails, title: "过程") {
                 VStack(spacing: 16) {
                     if showPracticeDetails {
                         NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
