@@ -64,9 +64,14 @@ struct NexusTaskBootstrap {
         tools.register(NexusClockTool())
         tools.register(NexusCalculatorTool())
         if NexusLinuxTool.enabled {
-            let workspace = NexusWorkspaceIdentity.id(for: source)
-            tools.register(NexusLinuxTool(workspace: workspace, onStart: { live?.onStart($0) },
-                onOutput: { live?.onOutput($0, $1) }, onStatus: { live?.onStatus($0) }))
+            let workspace = NexusWorkspaceIdentity.id(for: source == "chat" ? "chat" : source)
+            NexusLinuxRuntime.shared.registerSandboxTools(
+                into: &tools,
+                workspace: workspace,
+                onStart: { live?.onStart($0) },
+                onOutput: { live?.onOutput($0, $1) },
+                onStatus: { live?.onStatus($0) }
+            )
         }
         tools.register(NexusMemorySearchTool(items: memoryItems))
         tools.register(NexusShuyuRunTool(tools: tools, onTrace: { live?.onTrace($0) }))

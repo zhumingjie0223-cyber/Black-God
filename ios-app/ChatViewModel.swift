@@ -723,16 +723,22 @@ final class ChatViewModel: ObservableObject {
         tools.register(NexusClockTool())
         tools.register(NexusCalculatorTool())
         if NexusLinuxTool.enabled {
-            tools.register(NexusLinuxTool(workspace: NexusWorkspaceIdentity.id(for: "chat"), onStart: { [weak self] command in
-                guard let self, self.runID == id else { return }
-                self.live.append(.command, command)
-            }, onOutput: { [weak self] text, error in
-                guard let self, self.runID == id else { return }
-                self.live.append(error ? .error : .output, text)
-            }, onStatus: { [weak self] status in
-                guard let self, self.runID == id else { return }
-                self.live.phase(status)
-            }))
+            NexusLinuxRuntime.shared.registerSandboxTools(
+                into: &tools,
+                workspace: NexusWorkspaceIdentity.id(for: "chat"),
+                onStart: { [weak self] command in
+                    guard let self, self.runID == id else { return }
+                    self.live.append(.command, command)
+                },
+                onOutput: { [weak self] text, error in
+                    guard let self, self.runID == id else { return }
+                    self.live.append(error ? .error : .output, text)
+                },
+                onStatus: { [weak self] status in
+                    guard let self, self.runID == id else { return }
+                    self.live.phase(status)
+                }
+            )
         }
         tools.register(NexusMemorySearchTool(items: memorySnapshot))
         tools.register(NexusShuyuRunTool(tools: tools, onTrace: { [weak self] trace in

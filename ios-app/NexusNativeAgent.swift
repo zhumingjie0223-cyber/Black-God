@@ -189,6 +189,10 @@ extension NexusToolRegistry {
     var nativeDefinitions: [NexusToolDefinition] {
         let definitions: [(String, String, [String: String], [String])] = [
             ("shell_execute", "在独立文件工作区的 Alpine Linux 中执行脚本，返回 stdout、stderr 和退出码；不能访问宿主凭据，不支持持续后台进程", ["command": "shell 脚本", "timeout": "可选秒数字符串，默认30，最多120"], ["command"]),
+            ("workspace_list", "列出沙箱工作区文件与硬配额用量", [String: String](), []),
+            ("workspace_read", "读取沙箱工作区文件", ["path": "相对 /workspace 的路径", "max_chars": "可选，默认12000"], ["path"]),
+            ("workspace_write", "写入沙箱工作区文件；受硬配额约束", ["path": "相对路径", "content": "UTF-8 文本"], ["path", "content"]),
+            ("http_fetch", "仅 HTTPS 抓取并保存到沙箱工作区；不执行页面脚本", ["url": "https 地址", "path": "保存相对路径", "max_bytes": "可选，默认524288"], ["url", "path"]),
             ("shuyu", "查询、编解码、类比、邻近、一息、余息、回息、摇息、落息、起息、栖息、转息、顾息、倾息、贴息、含息、温息、醒息与检验Black God自己的枢语", ["operation": "容量/解码/拉丁编号/汉译编号/检索/造词/组合/类比/邻近/一息/余息/回息/摇息/落息/起息/栖息/转息/顾息/倾息/贴息/含息/温息/醒息/编译/规划/往返/质数", "input": "操作输入字符串；容量可为空；类比为JSON数组；邻近为词或JSON数组；一息为Unix秒或JSON数组[词,秒]；余息、回息、摇息、落息、起息、栖息、转息、顾息、倾息、贴息、含息、温息与醒息为Unix秒或JSON数组[词,秒,步数]"], ["operation"]),
             ("shuyu_execute", "执行枢语方言：最多8行，未知工具预先拒绝，失败停止", ["program": "例如 行：计算(\"12*3\") → \"36\""], ["program"]),
             ("plan", "记录一个可检查的任务步骤标题", ["title": "步骤标题"], ["title"]),

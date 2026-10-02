@@ -195,16 +195,21 @@ final class NexusLinuxRuntime {
     }
 
     func importToWorkspace(data: Data, named name: String, workspace: UUID) async throws {
-        let safe = Self.sanitizeFileName(name)
-        guard !data.isEmpty, data.count <= 2 * 1024 * 1024 else {
-            throw NexusReasoningError.execution("导入文件需在 1 字节到 2 MiB 之间。")
+        let safe = Self.sanitizeFileName(name.contains("/") ? (name as NSString).lastPathComponent : name)
+        let relative = name.contains("/") ? Self.sanitizeRelativePath(name) : safe
+        guard !data.isEmpty, data.count <= NexusWorkspaceQuota.maxSingleWrite else {
+            throw NexusReasoningError.execution("导入文件需在 1 字节到 \(NexusWorkspaceQuota.byteText(Int64(NexusWorkspaceQuota.maxSingleWrite))) 之间。")
         }
         _ = try await execute(command: "true", timeout: 30, workspace: workspace)
         guard let dir = hostWorkspaceURL(for: workspace) else {
             throw NexusReasoningError.execution("工作区尚未就绪，请先打开沙箱或运行一条命令。")
         }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let target = dir.appendingPathComponent(safe)
+        let target = relative.contains("/")
+            ? dir.appendingPathComponent(relative)
+            : dir.appendingPathComponent(safe)
+        let creating = !FileManager.default.fileExists(atPath: target.path)
+        try NexusWorkspaceQuota.enforce(adding: Int64(data.count), creatingFile: creating, at: dir)
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: target, options: .atomic)
     }
 

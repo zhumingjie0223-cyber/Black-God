@@ -5,9 +5,11 @@ import UniformTypeIdentifiers
 struct NexusSandboxView: View {
     @EnvironmentObject var appState: AppState
     @AppStorage("blackgod.linux.modelTools") private var allowExecution = true
+    @AppStorage("blackgod.sandbox.network") private var allowNetwork = true
     @State private var showTerminal = false
     @State private var showStorage = false
     @State private var files: [NexusWorkspaceFile] = []
+    @State private var quotaText = "配额未读取"
     @State private var status = "尚未读取工作区"
     @State private var busy = false
     @State private var errorText: String?
@@ -25,7 +27,7 @@ struct NexusSandboxView: View {
                         Text("沙箱").font(.title2.weight(.semibold)).foregroundStyle(Color.bgTextPrimary)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("sandbox.title")
-                        Text("本机 Alpine Linux · 独立工作区")
+                        Text("本机 Alpine Linux · 硬配额隔离工作区")
                             .font(.caption).foregroundStyle(Color.bgTextSecondary)
                     }
                     Spacer(minLength: 0)
@@ -39,10 +41,15 @@ struct NexusSandboxView: View {
                     Toggle("允许助手使用沙箱执行", isOn: $allowExecution)
                         .font(.headline).tint(Color.bgJadeHi)
                         .accessibilityIdentifier("execution.enabled")
-                    Text("开启后，对话与快捷指令可在隔离工作区运行命令、读写文件。进入后台会停止当前命令。")
+                    Toggle("允许沙箱 HTTPS 抓取", isOn: $allowNetwork)
+                        .font(.headline).tint(Color.bgJadeHi)
+                        .accessibilityIdentifier("sandbox.network")
+                    Text("对话与快捷指令可调用：shell_execute、workspace_list/read/write、http_fetch。单工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 个文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))。进入后台会停止当前命令。")
                         .font(.footnote).foregroundStyle(Color.bgTextSecondary)
                     Text(status).font(.caption).foregroundStyle(Color.bgTextSecondary)
                         .accessibilityIdentifier("sandbox.status")
+                    Text(quotaText).font(.caption.monospacedDigit()).foregroundStyle(Color.bgJadeHi)
+                        .accessibilityIdentifier("sandbox.quota")
                 }
                 .padding(16).bgFloating()
 
@@ -101,7 +108,7 @@ struct NexusSandboxView: View {
                 }
                 .padding(16).bgFloating()
 
-                Text("沙箱与聊天会话隔离：这里的文件属于沙箱工作区；对话任务使用独立聊天工作区。密钥与宿主相册不会挂进沙箱。")
+                Text("沙箱与聊天会话隔离：沙箱页文件属 sandbox 工作区；对话任务使用 chat 工作区。http_fetch 只走 HTTPS，不执行页面脚本。宿主密钥不会挂进沙箱。")
                     .font(.caption).foregroundStyle(Color.bgTextSecondary)
             }
             .padding(20)
@@ -178,11 +185,15 @@ struct NexusSandboxView: View {
             do {
                 let listed = try await NexusLinuxRuntime.shared.listWorkspaceFiles(workspace: workspace)
                 files = listed
+                let host = NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
+                let quota = try NexusWorkspaceQuota.measure(at: host)
+                quotaText = quota.summary
                 status = listed.isEmpty ? "沙箱就绪 · 工作区为空" : "沙箱就绪 · \(listed.count) 个文件"
                 errorText = nil
             } catch {
                 files = []
                 status = "沙箱未就绪"
+                quotaText = "配额未读取"
                 errorText = error.localizedDescription
             }
         }
