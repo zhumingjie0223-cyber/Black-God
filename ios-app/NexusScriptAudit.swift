@@ -1,9 +1,9 @@
 import Foundation
+import CryptoKit
 
-/// 不可信脚本静态审计：在进 Linux 之前拦截高危模式。
-/// 默认拦截；助手可带口令单次放行，用户可在沙箱页打开「允许危险命令」。
+/// 不可信脚本静态审计：归一化后再匹配；拦截可留痕；放行危险命令仍记覆盖。
 enum NexusScriptAudit {
-    enum Level: String, Equatable, Sendable {
+    enum Level: String, Equatable, Sendable, Codable {
         case allow
         case caution
         case block
@@ -12,6 +12,7 @@ enum NexusScriptAudit {
     struct Verdict: Equatable, Sendable {
         let level: Level
         let reasons: [String]
+        let normalized: String
         var summary: String {
             if reasons.isEmpty { return "审计：未发现高危模式" }
             let head = level == .block ? "审计拦截" : (level == .caution ? "审计提醒" : "审计")
@@ -19,19 +20,48 @@ enum NexusScriptAudit {
         }
     }
 
+    struct Event: Codable, Identifiable, Equatable, Sendable {
+        let id: UUID
+        let at: Date
+        let level: Level
+        let reasons: [String]
+        let digest: String
+        let preview: String
+        let overridden: Bool
+    }
+
     static let confirmPhrase = "确认执行危险命令"
+    private static let journalKey = "blackgod.sandbox.auditJournal"
+    private static let journalLimit = 40
 
     static func allowDangerous(in defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: "blackgod.sandbox.allowDangerous")
     }
 
+    /// 折叠空白、去掉行尾反斜杠续行，降低简单混淆绕过。
+    static func normalize(_ command: String) -> String {
+        var text = command.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\\\n", with: " ")
+        text = text.replacingOccurrences(of: "\t", with: " ")
+        while text.contains("  ") { text = text.replacingOccurrences(of: "  ", with: " ") }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static func inspect(_ command: String) -> Verdict {
-        let text = command
+        let text = normalize(command)
         var block: [String] = []
         var caution: [String] = []
 
         func match(_ pattern: String) -> Bool {
             text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+
+        if text.contains("\0") {
+            block.append("含空字节")
+        }
+        if match(#"\$['\"]|\\x[0-9a-f]{2}|\\[0-7]{3}"#) {
+            caution.append("含转义/拼接混淆痕迹")
         }
 
         // 只拦删根/通配根路径，避免误伤沙箱内 `rm -rf /workspace/foo`。
@@ -98,12 +128,12 @@ enum NexusScriptAudit {
         }
 
         if !block.isEmpty {
-            return Verdict(level: .block, reasons: unique(block))
+            return Verdict(level: .block, reasons: unique(block), normalized: text)
         }
         if !caution.isEmpty {
-            return Verdict(level: .caution, reasons: unique(caution))
+            return Verdict(level: .caution, reasons: unique(caution), normalized: text)
         }
-        return Verdict(level: .allow, reasons: [])
+        return Verdict(level: .allow, reasons: [], normalized: text)
     }
 
     private static func unique(_ items: [String]) -> [String] {
@@ -111,15 +141,51 @@ enum NexusScriptAudit {
         return items.filter { seen.insert($0).inserted }
     }
 
-    /// 返回放行后的审计结论；拦截时抛出中文说明。
-    static func authorize(_ command: String, confirm: String? = nil, allowDangerous: Bool = false) throws -> Verdict {
+    /// 返回放行后的审计结论；拦截时抛出中文说明。危险开关放行仍会留痕。
+    @discardableResult
+    static func authorize(
+        _ command: String,
+        confirm: String? = nil,
+        allowDangerous: Bool = false,
+        defaults: UserDefaults = .standard
+    ) throws -> Verdict {
         let verdict = inspect(command)
-        guard verdict.level == .block else { return verdict }
-        if allowDangerous { return verdict }
+        if verdict.level != .block {
+            if verdict.level == .caution {
+                record(verdict, command: command, overridden: false, defaults: defaults)
+            }
+            return verdict
+        }
+        if allowDangerous {
+            record(verdict, command: command, overridden: true, defaults: defaults)
+            return verdict
+        }
         let phrase = (confirm ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if phrase == confirmPhrase { return verdict }
+        if phrase == confirmPhrase {
+            record(verdict, command: command, overridden: true, defaults: defaults)
+            return verdict
+        }
+        record(verdict, command: command, overridden: false, defaults: defaults)
         throw NexusReasoningError.execution(
-            verdict.summary + "。默认拒绝执行。若你确认风险，请在参数 confirm 填「\(confirmPhrase)」，或在沙箱页打开「允许危险命令」。"
+            verdict.summary + "。默认拒绝执行。若你确认风险，请在参数 confirm 填「\(confirmPhrase)」，或在沙箱页打开「允许危险命令」（仍会留痕）。"
         )
+    }
+
+    static func recentEvents(in defaults: UserDefaults = .standard) -> [Event] {
+        guard let data = defaults.data(forKey: journalKey),
+              let list = try? JSONDecoder().decode([Event].self, from: data) else { return [] }
+        return list
+    }
+
+    static func record(_ verdict: Verdict, command: String, overridden: Bool, defaults: UserDefaults = .standard) {
+        let digest = SHA256.hash(data: Data(verdict.normalized.utf8)).map { String(format: "%02x", $0) }.joined()
+        let preview = String(normalize(command).prefix(96))
+        var list = recentEvents(in: defaults)
+        list.insert(Event(id: UUID(), at: Date(), level: verdict.level, reasons: verdict.reasons,
+                          digest: String(digest.prefix(16)), preview: preview, overridden: overridden), at: 0)
+        if list.count > journalLimit { list = Array(list.prefix(journalLimit)) }
+        if let data = try? JSONEncoder().encode(list) {
+            defaults.set(data, forKey: journalKey)
+        }
     }
 }

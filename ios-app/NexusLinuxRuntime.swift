@@ -89,6 +89,47 @@ final class NexusLinuxRuntime {
         if audit.level != .allow {
             onStatus?(audit.summary)
         }
+        return try await withPreparedWorkspace(workspace: workspace, onStatus: onStatus) { token in
+            let recordID = try journal.begin(workspace: workspace, command: command)
+            do {
+                try await ensureSessionRoot(workspace: workspace, onStatus: onStatus)
+                try checkPreparationCancellation()
+                ISHKernel.shared.nextRoot = "/sessions/" + workspace.uuidString
+                onStatus?("正在执行命令")
+                let result = try await runCommand(
+                    command: "umask 077\ncd /workspace || exit 125\n" + command,
+                    timeout: timeout,
+                    onOutput: onOutput
+                )
+                let status: String
+                if result.succeeded { status = "completed" }
+                else if result.exitCode < 0, let reason = cancellationReason {
+                    status = reason == "用户停止" ? "cancelled" : "interrupted"
+                } else { status = "failed" }
+                try journal.finish(recordID, status: status, exitCode: result.exitCode)
+                _ = token
+                return result
+            } catch {
+                try? journal.finish(recordID, status: Task.isCancelled ? "cancelled" : "failed")
+                throw error
+            }
+        }
+    }
+
+    /// 准备内核与会话工作区，不跑用户命令；供导入/配额读取复用，避免假执行 `true`。
+    func ensureWorkspaceReady(workspace: UUID, onStatus: ((String) -> Void)? = nil) async throws {
+        try Task.checkCancellation()
+        guard !busy else { throw NexusReasoningError.execution("Linux 正在执行另一项任务，请稍后重试。") }
+        try await withPreparedWorkspace(workspace: workspace, onStatus: onStatus) { _ in
+            try await ensureSessionRoot(workspace: workspace, onStatus: onStatus)
+        }
+    }
+
+    private func withPreparedWorkspace<T>(
+        workspace: UUID,
+        onStatus: ((String) -> Void)?,
+        body: (UUID) async throws -> T
+    ) async throws -> T {
         onStatus?("正在准备运行环境…")
         try prepare()
         guard ISHKernel.shared.reapAndCountGuestProcesses() == 0 else {
@@ -124,7 +165,7 @@ final class NexusLinuxRuntime {
         let spaceBudget = NexusStorage.hardBudget(adoptExistingUsage: measured)
         let space = NexusStorageSnapshot(used: measured.used, free: measured.free, budget: spaceBudget, files: measured.files)
         blackgod_set_guest_storage(UInt64(space.budget), UInt64(max(0, space.used)))
-        if let reason = space.stopReason { busy = false; throw NexusReasoningError.execution(reason) }
+        if let reason = space.stopReason { throw NexusReasoningError.execution(reason) }
         try NexusStorage.enforceHardCeiling(space)
         let watcher = Task { @MainActor in
             while !Task.isCancelled {
@@ -143,53 +184,42 @@ final class NexusLinuxRuntime {
             }
         }
         defer { watcher.cancel() }
-        let recordID = try journal.begin(workspace: workspace, command: command)
-        do {
-        let root = "/sessions/" + workspace.uuidString
-        if !preparedWorkspaces.contains(workspace) {
-            onStatus?("正在准备独立工作区…")
-            let setup = """
-            set -e
-            if [ ! -d '\(root)' ] && [ -d '\(root).previous' ]; then mv '\(root).previous' '\(root)'; fi
-            if [ ! -f '\(root)/.ready' ]; then
-              mkdir -p /sessions
-              chmod 700 /sessions
-              staging='\(root).install'
-              rm -rf "$staging"
-              mkdir -p "$staging"
-              cp -al /bin /sbin /lib /usr /etc "$staging/"
-              mkdir -p "$staging/dev" "$staging/tmp" "$staging/workspace"
-              cp -a /dev/null /dev/zero /dev/urandom "$staging/dev/"
-              chown 1000:1000 "$staging/workspace" "$staging/tmp"
-              chmod 700 "$staging/workspace" "$staging/tmp"
-              if [ -d '\(root)/workspace' ]; then cp -a '\(root)/workspace/.' "$staging/workspace/"; fi
-              touch "$staging/.ready"
-              if [ -d '\(root)' ]; then rm -rf '\(root).previous'; mv '\(root)' '\(root).previous'; fi
-              mv "$staging" '\(root)'
-              rm -rf '\(root).previous'
-            fi
-            """
-            ISHKernel.shared.nextRoot = nil
-            let result = try await runCommand(command: setup, timeout: 30)
-            guard result.succeeded else { throw NexusReasoningError.execution("无法创建独立工作区：" + (result.failure ?? result.errorOutput)) }
-            preparedWorkspaces.insert(workspace)
-        }
-        try checkPreparationCancellation()
-        ISHKernel.shared.nextRoot = root
-        onStatus?("正在执行命令")
-        let result = try await runCommand(command: "umask 077\ncd /workspace || exit 125\n" + command, timeout: timeout, onOutput: onOutput)
-        // 被系统（进入后台、空间不足）强制停止的命令记为“意外中断”，用户主动停止记为“已取消”；只有命令自身出错才记“失败”。
-        let status: String
-        if result.succeeded { status = "completed" }
-        else if result.exitCode < 0, let reason = cancellationReason { status = reason == "用户停止" ? "cancelled" : "interrupted" }
-        else { status = "failed" }
-        try journal.finish(recordID, status: status, exitCode: result.exitCode)
-        return result
-        } catch {
-            try? journal.finish(recordID, status: Task.isCancelled ? "cancelled" : "failed")
-            throw error
-        }
+        return try await body(token)
     }
+
+    private func ensureSessionRoot(workspace: UUID, onStatus: ((String) -> Void)?) async throws {
+        let root = "/sessions/" + workspace.uuidString
+        guard !preparedWorkspaces.contains(workspace) else { return }
+        onStatus?("正在准备独立工作区…")
+        let setup = """
+        set -e
+        if [ ! -d '\(root)' ] && [ -d '\(root).previous' ]; then mv '\(root).previous' '\(root)'; fi
+        if [ ! -f '\(root)/.ready' ]; then
+          mkdir -p /sessions
+          chmod 700 /sessions
+          staging='\(root).install'
+          rm -rf "$staging"
+          mkdir -p "$staging"
+          cp -al /bin /sbin /lib /usr /etc "$staging/"
+          mkdir -p "$staging/dev" "$staging/tmp" "$staging/workspace"
+          cp -a /dev/null /dev/zero /dev/urandom "$staging/dev/"
+          chown 1000:1000 "$staging/workspace" "$staging/tmp"
+          chmod 700 "$staging/workspace" "$staging/tmp"
+          if [ -d '\(root)/workspace' ]; then cp -a '\(root)/workspace/.' "$staging/workspace/"; fi
+          touch "$staging/.ready"
+          if [ -d '\(root)' ]; then rm -rf '\(root).previous'; mv '\(root)' '\(root).previous'; fi
+          mv "$staging" '\(root)'
+          rm -rf '\(root).previous'
+        fi
+        """
+        ISHKernel.shared.nextRoot = nil
+        let result = try await runCommand(command: setup, timeout: 30)
+        guard result.succeeded else {
+            throw NexusReasoningError.execution("无法创建独立工作区：" + (result.failure ?? result.errorOutput))
+        }
+        preparedWorkspaces.insert(workspace)
+    }
+
     func recentExecutions() throws -> [NexusExecutionRecord] { try journal.records() }
 
     /// 已安装镜像根目录（含 data/sessions）；未安装时为 nil。
@@ -228,7 +258,7 @@ final class NexusLinuxRuntime {
         guard !data.isEmpty, data.count <= Int(NexusWorkspaceQuota.maxSingleWrite) else {
             throw NexusReasoningError.execution("导入文件需在 1 字节到 \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxSingleWrite)) 之间。")
         }
-        _ = try await execute(command: "true", timeout: 30, workspace: workspace)
+        try await ensureWorkspaceReady(workspace: workspace)
         guard let dir = hostWorkspaceURL(for: workspace) else {
             throw NexusReasoningError.execution("工作区尚未就绪，请先打开沙箱或运行一条命令。")
         }

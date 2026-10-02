@@ -20,6 +20,7 @@ struct NexusSandboxView: View {
     @State private var previewItem: PreviewItem?
     @State private var confirmClear = false
     @State private var clearPhrase = ""
+    @State private var auditEvents: [NexusScriptAudit.Event] = []
     private var workspace: UUID { NexusWorkspaceIdentity.id(for: "sandbox") }
 
     private struct PreviewItem: Identifiable {
@@ -53,10 +54,10 @@ struct NexusSandboxView: View {
                     Toggle("允许沙箱 HTTPS 抓取", isOn: $allowNetwork)
                         .font(.headline).tint(Color.bgJadeHi)
                         .accessibilityIdentifier("sandbox.network")
-                    Toggle("允许危险命令（关闭审计拦截）", isOn: $allowDangerous)
+                    Toggle("允许危险命令（仍留审计痕迹）", isOn: $allowDangerous)
                         .font(.headline).tint(Color.bgJadeHi)
                         .accessibilityIdentifier("sandbox.allowDangerous")
-                    Text("对话与快捷指令可调用：shell_execute、workspace_list/read/write/delete、http_fetch。工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 个文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))；整镜像绝对硬顶 \(NexusStorage.absoluteCeilingGiB) GiB。高危脚本默认拦截。进入后台会停止当前命令。")
+                    Text("对话与快捷指令可调用：shell_execute、workspace_list/read/write/delete、http_fetch。工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 个文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))；整镜像绝对硬顶 \(NexusStorage.absoluteCeilingGiB) GiB。高危脚本默认拦截；命令先归一化再审计。进入后台会停止当前命令。")
                         .font(.footnote).foregroundStyle(Color.bgTextSecondary)
                     Text(status).font(.caption).foregroundStyle(Color.bgTextSecondary)
                         .accessibilityIdentifier("sandbox.status")
@@ -66,6 +67,26 @@ struct NexusSandboxView: View {
                         .accessibilityIdentifier("sandbox.imageQuota")
                 }
                 .padding(16).bgFloating()
+
+                if !auditEvents.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("最近审计").font(.headline).foregroundStyle(Color.bgTextPrimary)
+                        ForEach(auditEvents.prefix(5)) { event in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(auditTitle(event))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(event.level == .block && !event.overridden ? Color.red : Color.bgJadeHi)
+                                Text(event.preview)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(Color.bgTextSecondary)
+                                    .lineLimit(2)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    .padding(16).bgFloating()
+                    .accessibilityIdentifier("sandbox.audit")
+                }
 
                 HStack(spacing: 10) {
                     Button { showTerminal = true } label: {
@@ -131,7 +152,7 @@ struct NexusSandboxView: View {
             .padding(20)
         }
         .background(Color.bgDark)
-        .onAppear { refreshFiles() }
+        .onAppear { refreshFiles(); auditEvents = NexusScriptAudit.recentEvents() }
         .onChange(of: allowExecution) { _, enabled in
             if !enabled { NexusLinuxRuntime.shared.cancelActive(reason: "内置执行已关闭") }
         }
@@ -209,6 +230,7 @@ struct NexusSandboxView: View {
                 let quota = try NexusWorkspaceQuota.measure(at: host)
                 quotaText = quota.summary
                 imageQuotaText = await NexusLinuxRuntime.shared.imageQuotaSummary()
+                auditEvents = NexusScriptAudit.recentEvents()
                 status = listed.isEmpty ? "沙箱就绪 · 工作区为空" : "沙箱就绪 · \(listed.count) 个文件"
                 errorText = nil
             } catch {
@@ -216,9 +238,21 @@ struct NexusSandboxView: View {
                 status = "沙箱未就绪"
                 quotaText = "配额未读取"
                 imageQuotaText = "整镜像：未读取"
+                auditEvents = NexusScriptAudit.recentEvents()
                 errorText = error.localizedDescription
             }
         }
+    }
+
+    private func auditTitle(_ event: NexusScriptAudit.Event) -> String {
+        let level: String
+        switch event.level {
+        case .block: level = event.overridden ? "高危已放行" : "已拦截"
+        case .caution: level = "提醒"
+        case .allow: level = "放行"
+        }
+        let reason = event.reasons.first ?? ""
+        return reason.isEmpty ? level : "\(level) · \(reason)"
     }
 
     private func importFile(_ url: URL) {
