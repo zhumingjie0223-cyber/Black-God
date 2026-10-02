@@ -17,7 +17,16 @@ struct ChatView: View {
     @State private var showTerminal = false
     @State private var showTaskDetails = false
     @State private var showPracticeDetails = false
+    @State private var completionReveal: CompletionPayload?
     @FocusState private var inputFocused: Bool
+
+    private struct CompletionPayload: Identifiable, Equatable {
+        let id = UUID()
+        let outcome: NexusCompletionReveal.Outcome
+        let goal: String
+        let detail: String
+        let practice: Bool
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -94,22 +103,47 @@ struct ChatView: View {
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
             }
         }
-        .sheet(isPresented: $showTaskDetails) {
-            NavigationStack {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        if showPracticeDetails {
-                            NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
-                        } else {
-                            if let plan = vm.currentPlan, !plan.steps.isEmpty { NexusPlanStrip(plan: plan) }
-                            NexusLiveExecutionView(live: vm.live, stop: vm.cancel)
-                        }
-                    }.padding(20)
+        .overlay {
+            BGBottomDrawer(isPresented: $showTaskDetails, title: "过程") {
+                VStack(spacing: 16) {
+                    if showPracticeDetails {
+                        NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
+                    } else {
+                        if let plan = vm.currentPlan, !plan.steps.isEmpty { NexusPlanStrip(plan: plan) }
+                        NexusLiveExecutionView(live: vm.live, stop: vm.cancel)
+                    }
                 }
-                .background(Color.bgDark).navigationTitle(showPracticeDetails ? "演练记录" : "任务详情").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTaskDetails = false } } }
+                .padding(.top, 4)
             }
-            .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+        }
+        .overlay {
+            if let payload = completionReveal {
+                NexusCompletionReveal(
+                    outcome: payload.outcome,
+                    goal: payload.goal,
+                    detail: payload.detail,
+                    onOpenTheater: {
+                        // 先清揭晓再开剧场，避免双遮罩抢焦点
+                        completionReveal = nil
+                        inputFocused = false
+                        openTaskDetails(practice: payload.practice)
+                    },
+                    onDismiss: {
+                        // 只清自己这一次，防止动画延迟误杀后来的揭晓
+                        if completionReveal?.id == payload.id {
+                            completionReveal = nil
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(20)
+            }
+        }
+        .onChange(of: vm.live.state) { previous, next in
+            presentCompletion(from: previous, to: next, practice: false)
+        }
+        .onChange(of: vm.practice.live.state) { previous, next in
+            presentCompletion(from: previous, to: next, practice: true)
         }
         .confirmationDialog("清空当前对话？", isPresented: $showClearConversation, titleVisibility: .visible) {
             Button("清空对话与任务记录", role: .destructive) {
@@ -290,7 +324,35 @@ struct ChatView: View {
 
     private func openTaskDetails(practice: Bool) {
         showPracticeDetails = practice
-        showTaskDetails = true
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
+            showTaskDetails = true
+        }
+        appState.haptic(.light)
+    }
+
+    private func presentCompletion(from previous: NexusLiveExecution.State, to next: NexusLiveExecution.State, practice: Bool) {
+        guard ChatMotion.completionRevealEnabled else {
+            // 测试宿主：只保留完成震动契约，不盖界面
+            if previous == .running {
+                switch next {
+                case .answered: appState.taskCompleteHaptic(success: true)
+                case .warning, .failed: appState.taskCompleteHaptic(success: false)
+                default: break
+                }
+            }
+            return
+        }
+        guard previous == .running, let outcome = NexusCompletionReveal.Outcome.from(next) else { return }
+        let live = practice ? vm.practice.live : vm.live
+        inputFocused = false
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+            completionReveal = CompletionPayload(
+                outcome: outcome,
+                goal: live.goal,
+                detail: live.status.isEmpty ? outcome.title : live.status,
+                practice: practice
+            )
+        }
     }
 
     private func sendCurrent() {
@@ -342,6 +404,17 @@ enum ChatMotion {
     static var continuousAnimationsEnabled: Bool {
 #if DEBUG
         return ProcessInfo.processInfo.environment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] != "1"
+#else
+        return true
+#endif
+    }
+
+    /// 自动化宿主里不弹完成揭晓，避免盖住截图/挡点击；正式包始终开启。
+    static var completionRevealEnabled: Bool {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return false }
+        if ProcessInfo.processInfo.environment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] == "1" { return false }
+        return true
 #else
         return true
 #endif

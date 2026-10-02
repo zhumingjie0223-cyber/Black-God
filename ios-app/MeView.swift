@@ -69,6 +69,20 @@ struct MeView: View {
                     }.accessibilityIdentifier("advanced.open")
                 }
 
+                settingsGroup("触感") {
+                    Toggle("轻触", isOn: $appState.hapticEnabled)
+                        .font(.body.weight(.medium))
+                        .tint(Color.bgJadeHi)
+                        .padding(.vertical, 10)
+                        .accessibilityIdentifier("haptic.enabled")
+                    Divider().overlay(Color.bgCardLight)
+                    Toggle("完成震动", isOn: $appState.taskCompleteHapticEnabled)
+                        .font(.body.weight(.medium))
+                        .tint(Color.bgJadeHi)
+                        .padding(.vertical, 10)
+                        .accessibilityIdentifier("haptic.taskComplete")
+                }
+
                 settingsGroup("设置") {
                     Button { showVault = true } label: {
                         SettingRow(icon: "externaldrive.badge.timemachine", title: "数据与备份", value: "", color: .bgJadeHi, compact: true)

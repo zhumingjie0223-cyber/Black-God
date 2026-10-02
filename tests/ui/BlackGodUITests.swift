@@ -8,11 +8,21 @@ final class BlackGodUITests: XCTestCase {
         return app
     }
 
+    /// 模拟器偶发启动超时：先终止残留进程，再等首屏就绪信号。
+    @MainActor
+    private func launchReady(_ app: XCUIApplication, arguments: [String], file: StaticString = #filePath, line: UInt = #line) {
+        app.launchArguments = arguments
+        app.terminate()
+        app.launch()
+        let ready = app.buttons["chat.actions"].waitForExistence(timeout: 30)
+            || app.buttons["tab.0"].waitForExistence(timeout: 5)
+        XCTAssertTrue(ready, "应用首屏未就绪", file: file, line: line)
+    }
+
     @MainActor
     func testRedesignedMainPanelsAndCreationState() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         XCTAssertTrue(app.buttons["chat.actions"].waitForExistence(timeout: 8))
         capture(app, name: "新版-对话")
         XCTAssertFalse(app.buttons["tab.1"].exists)
@@ -22,7 +32,19 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["sandbox.demo"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["sandbox.terminal"].exists)
         app.buttons["sandbox.controls"].tap()
-        XCTAssertTrue(app.switches["execution.enabled"].waitForExistence(timeout: 5))
+        // 首屏英雄区较高，卷帘在下方；ScrollView 常把屏外节点藏掉，先滑出再断言
+        let execution = app.switches["execution.enabled"]
+        reveal(execution, in: app, upSwipes: 8)
+        if !execution.waitForExistence(timeout: 2) {
+            let drawerToggle = app.buttons["sandbox.drawer.toggle"]
+            reveal(drawerToggle, in: app, upSwipes: 4)
+            if drawerToggle.waitForExistence(timeout: 2) { drawerToggle.tap() }
+            reveal(execution, in: app, upSwipes: 4)
+        }
+        XCTAssertTrue(execution.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["sandbox.drawer"].waitForExistence(timeout: 3)
+        )
         capture(app, name: "新版-沙箱")
         // End editing before changing the phone's bottom navigation.
         _ = app.buttons["tab.3"].waitForExistence(timeout: 3)
@@ -32,6 +54,8 @@ final class BlackGodUITests: XCTestCase {
         capture(app, name: "新版-监测")
         app.buttons["tab.4"].tap()
         XCTAssertTrue(app.buttons["api.open"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["haptic.enabled"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["haptic.taskComplete"].exists)
         capture(app, name: "新版-我的")
         app.buttons["api.open"].tap()
         XCTAssertTrue(app.navigationBars["模型连接"].waitForExistence(timeout: 5))
@@ -459,8 +483,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testAdvancedTerminalAndLiveOutputArrivesBeforeExit() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         XCTAssertFalse(app.buttons["tab.1"].exists)
         XCTAssertFalse(app.textViews["linux.command"].exists)
         openAdvanced(in: app)

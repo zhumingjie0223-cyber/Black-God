@@ -50,11 +50,35 @@ enum L10n {
 class AppState: ObservableObject {
     @Published var isUnlocked = false
     @Published var currentTab: AppTab = .chat
-    @Published var hapticEnabled = true
+    /// 轻触反馈（切页、发送等）
+    @Published var hapticEnabled: Bool {
+        didSet { UserDefaults.standard.set(hapticEnabled, forKey: Self.hapticKey) }
+    }
+    /// 任务完成震动（成功/失败提示），可单独关闭
+    @Published var taskCompleteHapticEnabled: Bool {
+        didSet { UserDefaults.standard.set(taskCompleteHapticEnabled, forKey: Self.taskHapticKey) }
+    }
+
+    private static let hapticKey = "blackgod.haptic.enabled"
+    private static let taskHapticKey = "blackgod.haptic.taskComplete"
+
+    init() {
+        let defaults = UserDefaults.standard
+        hapticEnabled = (defaults.object(forKey: Self.hapticKey) as? Bool) ?? true
+        taskCompleteHapticEnabled = (defaults.object(forKey: Self.taskHapticKey) as? Bool) ?? true
+    }
 
     func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
         guard hapticEnabled else { return }
         UIImpactFeedbackGenerator(style: style).impactOccurred()
+    }
+
+    /// 任务跑完时的通知级震动；受「任务完成震动」开关控制。
+    func taskCompleteHaptic(success: Bool) {
+        guard taskCompleteHapticEnabled else { return }
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(success ? .success : .error)
     }
 }
 
