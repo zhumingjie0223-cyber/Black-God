@@ -126,8 +126,8 @@ struct NexusCompletionReveal: View {
             HStack(spacing: 10) {
                 Button(action: {
                     appState.haptic(.light)
+                    // 由宿主立刻清揭晓并开剧场，不做延迟 dismiss，避免双层遮罩
                     onOpenTheater()
-                    dismiss()
                 }) {
                     Label("过程", systemImage: "rectangle.bottomhalf.inset.filled")
                         .frame(maxWidth: .infinity, minHeight: 48)

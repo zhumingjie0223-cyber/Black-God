@@ -122,8 +122,18 @@ struct ChatView: View {
                     outcome: payload.outcome,
                     goal: payload.goal,
                     detail: payload.detail,
-                    onOpenTheater: { openTaskDetails(practice: payload.practice) },
-                    onDismiss: { completionReveal = nil }
+                    onOpenTheater: {
+                        // 先清揭晓再开剧场，避免双遮罩抢焦点
+                        completionReveal = nil
+                        inputFocused = false
+                        openTaskDetails(practice: payload.practice)
+                    },
+                    onDismiss: {
+                        // 只清自己这一次，防止动画延迟误杀后来的揭晓
+                        if completionReveal?.id == payload.id {
+                            completionReveal = nil
+                        }
+                    }
                 )
                 .transition(.opacity)
                 .zIndex(20)
@@ -321,8 +331,20 @@ struct ChatView: View {
     }
 
     private func presentCompletion(from previous: NexusLiveExecution.State, to next: NexusLiveExecution.State, practice: Bool) {
+        guard ChatMotion.completionRevealEnabled else {
+            // 测试宿主：只保留完成震动契约，不盖界面
+            if previous == .running {
+                switch next {
+                case .answered: appState.taskCompleteHaptic(success: true)
+                case .warning, .failed: appState.taskCompleteHaptic(success: false)
+                default: break
+                }
+            }
+            return
+        }
         guard previous == .running, let outcome = NexusCompletionReveal.Outcome.from(next) else { return }
         let live = practice ? vm.practice.live : vm.live
+        inputFocused = false
         withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
             completionReveal = CompletionPayload(
                 outcome: outcome,
@@ -382,6 +404,17 @@ enum ChatMotion {
     static var continuousAnimationsEnabled: Bool {
 #if DEBUG
         return ProcessInfo.processInfo.environment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] != "1"
+#else
+        return true
+#endif
+    }
+
+    /// 自动化宿主里不弹完成揭晓，避免盖住截图/挡点击；正式包始终开启。
+    static var completionRevealEnabled: Bool {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return false }
+        if ProcessInfo.processInfo.environment["BLACKGOD_UI_TEST_NO_CONTINUOUS_ANIMATIONS"] == "1" { return false }
+        return true
 #else
         return true
 #endif

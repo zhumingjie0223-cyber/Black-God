@@ -16,4 +16,9 @@ final class NexusCompletionRevealTests: XCTestCase {
         XCTAssertEqual(NexusCompletionReveal.Outcome.success.title, "已完成")
         XCTAssertEqual(NexusCompletionReveal.Outcome.failure.title, "失败")
     }
+
+    func testAutomationHostDisablesCompletionReveal() {
+        // 单元测试进程带 XCTestConfigurationFilePath，正式包不会
+        XCTAssertFalse(ChatMotion.completionRevealEnabled)
+    }
 }
