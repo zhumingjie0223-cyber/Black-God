@@ -181,10 +181,11 @@ struct ChatView: View {
                             .foregroundStyle(Color.bgTextSecondary)
                             .lineLimit(1)
                             .accessibilityIdentifier("chat.sessionTitle")
-                    } else {
-                        Text(vm.presence.action == .practice || vm.presence.action == .pulse ? "就绪" : vm.currentMood).font(.caption).foregroundStyle(Color.bgTextSecondary)
-                            .accessibilityIdentifier("chat.mood")
                     }
+                    Text(vm.presence.action == .practice || vm.presence.action == .pulse ? "就绪" : vm.currentMood)
+                        .font(.caption)
+                        .foregroundStyle(Color.bgTextSecondary)
+                        .accessibilityIdentifier("chat.mood")
                 }
             }
             Spacer(minLength: 4)

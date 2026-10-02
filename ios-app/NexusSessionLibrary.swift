@@ -258,9 +258,11 @@ struct NexusSessionLibrary {
         var hits: [SearchHit] = []
         for session in index.sessions.sorted(by: { $0.updatedAt > $1.updatedAt }) {
             let messages = (try? conversationStore(for: session.id).load()) ?? []
-            for message in messages.reversed() {
+            // 每个会话只取一条最佳命中，避免同会话多条刷屏。
+            if let message = messages.reversed().first(where: { message in
                 let hay = message.content.lowercased()
-                guard terms.allSatisfy({ hay.contains($0) }) else { continue }
+                return terms.allSatisfy { hay.contains($0) }
+            }) {
                 hits.append(SearchHit(
                     sessionID: session.id,
                     sessionTitle: session.title,

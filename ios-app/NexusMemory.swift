@@ -195,9 +195,14 @@ enum NexusContextBudget {
     /// 保留最近对话；若超预算，从更早轮次提取约束与首问，写成可追溯压缩摘要。
     static func compact(_ messages: [ChatMessage], maxCharacters: Int = 16000, keepRecent: Int = 20) -> Pack {
         let window = Array(messages.suffix(keepRecent))
+        let earlier = Array(messages.dropLast(window.count))
         let fitted = fit(window, maxCharacters: maxCharacters)
-        let fittedIDs = Set(fitted.map(\.id))
-        let dropped = messages.filter { !fittedIDs.contains($0.id) }
+        // 窗口内被截断的原文也算“挤出”，否则超长旧消息只裁切却不生成摘要。
+        let truncated = window.filter { original in
+            guard let kept = fitted.first(where: { $0.id == original.id }) else { return true }
+            return kept.content.count < original.content.count
+        }
+        let dropped = earlier + truncated
         guard !dropped.isEmpty else {
             return Pack(messages: fitted, summary: nil, droppedCount: 0)
         }
