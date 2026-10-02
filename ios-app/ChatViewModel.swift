@@ -24,6 +24,8 @@ final class ChatViewModel: ObservableObject {
     private var activeRecoveryAttempt = false
     @Published var modelRegistry = NexusModelRegistry()
     @Published private(set) var taskCheckpoint: NexusAgentCheckpoint?
+    @Published private(set) var sessions: [NexusSessionRecord] = []
+    @Published private(set) var activeSessionID: UUID?
     @Published private(set) var pulseNote: String?
     @Published private(set) var pulseWord: String?
     @Published private(set) var presenceTick = Date()
@@ -31,8 +33,9 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var attending = false
     @Published var composerPrefill: String?
     private var liveSubscription: AnyCancellable?
-    private let checkpointStore: NexusAgentCheckpointStore
-    private let store: NexusConversationStore
+    private var checkpointStore: NexusAgentCheckpointStore
+    private var store: NexusConversationStore
+    private let sessionLibrary: NexusSessionLibrary?
     private var unreadableStoreURLs = Set<URL>()
     private var pendingClearFailure = false
     private var storageReady: Bool { unreadableStoreURLs.isEmpty && !pendingClearFailure }
@@ -54,37 +57,71 @@ final class ChatViewModel: ObservableObject {
     private var settleTask: Task<Void, Never>?
     private var hearTask: Task<Void, Never>?
 
+    var supportsSessions: Bool { sessionLibrary != nil }
+    var activeSessionTitle: String {
+        sessions.first(where: { $0.id == activeSessionID })?.title ?? "对话"
+    }
+
     init(store: NexusConversationStore = NexusConversationStore(),
+         sessions library: NexusSessionLibrary? = nil,
          memory: NexusMemoryStore? = nil,
          skills: NexusSkillStore? = nil,
          cognitive: NexusCognitiveControl? = nil,
          configured: @escaping (String) -> Bool = { !(NexusKeychain.shared.key(for: NexusModelCatalog.entry(for: $0).credentialID) ?? "").isEmpty },
          nativeCompletion: (([NexusNativeMessage], [NexusToolDefinition], String) async throws -> NexusNativeReply)? = nil,
          completion: Completion? = nil) {
-        self.cognitive = cognitive ?? (store.url == NexusConversationStore().url ? .shared : NexusCognitiveControl(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-cognitive-control.json")))
-        self.memory = memory ?? NexusMemoryStore(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-memory.json"))
-        self.skills = skills ?? NexusSkillStore(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-skills.json"))
-        self.evaluations = NexusEvaluationStore(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-evaluations.json"))
-        self.practice = NexusSkillPractice(url: store.url.deletingLastPathComponent().appendingPathComponent("nexus-skill-practice.json"))
-        self.store = store
-        self.checkpointStore = NexusAgentCheckpointStore(url: store.url.deletingPathExtension().appendingPathExtension("agent.json"))
+        let defaultStoreURL = NexusConversationStore().url
+        let usingDefaultStore = store.url.path == defaultStoreURL.path
+        let candidateLibrary = library ?? (usingDefaultStore ? NexusSessionLibrary(root: defaultStoreURL.deletingLastPathComponent()) : nil)
+        var resolvedLibrary: NexusSessionLibrary?
+        var resolvedStore = store
+        var resolvedCheckpoint = NexusAgentCheckpointStore(url: store.url.deletingPathExtension().appendingPathExtension("agent.json"))
+        var bootstrappedSessions: [NexusSessionRecord] = []
+        var bootstrappedActive: UUID?
+        var sessionBootstrapError: String?
+        if let candidateLibrary {
+            do {
+                let index = try candidateLibrary.bootstrap()
+                bootstrappedSessions = index.sessions.sorted { $0.updatedAt > $1.updatedAt }
+                bootstrappedActive = index.activeID
+                resolvedStore = candidateLibrary.conversationStore(for: index.activeID)
+                resolvedCheckpoint = candidateLibrary.checkpointStore(for: index.activeID)
+                resolvedLibrary = candidateLibrary
+            } catch {
+                // 会话索引失败时退回传入的单文件存储，避免整页无法打开。
+                sessionBootstrapError = "会话目录未能打开，已改用单文件对话：" + error.localizedDescription
+            }
+        }
+        // 多会话：共享数据放 Application Support 根；单测自定义路径仍与对话文件同目录。
+        let root = resolvedLibrary?.root ?? store.url.deletingLastPathComponent()
+        self.cognitive = cognitive ?? (usingDefaultStore ? .shared : NexusCognitiveControl(url: root.appendingPathComponent("nexus-cognitive-control.json")))
+        self.memory = memory ?? NexusMemoryStore(url: root.appendingPathComponent("nexus-memory.json"))
+        self.skills = skills ?? NexusSkillStore(url: root.appendingPathComponent("nexus-skills.json"))
+        self.evaluations = NexusEvaluationStore(url: root.appendingPathComponent("nexus-evaluations.json"))
+        self.practice = NexusSkillPractice(url: root.appendingPathComponent("nexus-skill-practice.json"))
+        self.sessionLibrary = resolvedLibrary
+        self.store = resolvedStore
+        self.checkpointStore = resolvedCheckpoint
+        self.sessions = bootstrappedSessions
+        self.activeSessionID = bootstrappedActive
         self.configured = configured
         self.completion = completion
         self.nativeCompletion = nativeCompletion
-        do { try store.finishPendingClear(checkpointURL: checkpointStore.url) }
+        if let sessionBootstrapError { lastError = sessionBootstrapError }
+        do { try resolvedStore.finishPendingClear(checkpointURL: resolvedCheckpoint.url) }
         catch {
             pendingClearFailure = true
             lastError = "上次清空尚未完成，请重试清空：" + error.localizedDescription
         }
         if !pendingClearFailure {
-            do { messages = try store.load() }
+            do { messages = try resolvedStore.load() }
             catch {
-                unreadableStoreURLs.insert(store.url)
+                unreadableStoreURLs.insert(resolvedStore.url)
                 lastError = "读取历史记录失败，原文件已保留：\(error.localizedDescription)"
             }
-            do { taskCheckpoint = try checkpointStore.load() }
+            do { taskCheckpoint = try resolvedCheckpoint.load() }
             catch {
-                unreadableStoreURLs.insert(checkpointStore.url)
+                unreadableStoreURLs.insert(resolvedCheckpoint.url)
                 lastError = "读取任务进度失败，原文件已保留：" + error.localizedDescription
             }
             if storageReady { restoreSavedCheckpoint() }
@@ -159,6 +196,7 @@ final class ChatViewModel: ObservableObject {
                 if restored.map(\.id) != messages.map(\.id) {
                     try store.save(restored)
                     messages = restored
+                    noteSession()
                 }
                 statusHint = saved.warning
             }
@@ -185,7 +223,140 @@ final class ChatViewModel: ObservableObject {
         retractedAt = nil; heardAt = nil; noticedAt = nil; composerDraft = ""; composerPrefill = nil
         hitchTask?.cancel(); retractTask?.cancel(); settleTask?.cancel(); hearTask?.cancel()
         presenceTick = Date()
+        if let library = sessionLibrary, let id = activeSessionID {
+            if let updated = try? library.touch(id, messages: [], forceTitle: true) {
+                refreshSessionList(preferring: updated)
+            }
+        }
         return true
+    }
+
+    @discardableResult
+    func createSession() -> Bool {
+        guard let library = sessionLibrary else { return false }
+        if isTyping { cancel() }
+        do {
+            let session = try library.create()
+            return loadSession(session.id, hint: "已新建对话")
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func switchSession(_ id: UUID) -> Bool {
+        guard let library = sessionLibrary, id != activeSessionID else { return id == activeSessionID }
+        if isTyping { cancel() }
+        do {
+            _ = try library.select(id)
+            return loadSession(id, hint: nil)
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func renameSession(_ id: UUID, title: String) -> Bool {
+        guard let library = sessionLibrary else { return false }
+        do {
+            let updated = try library.rename(id, title: title)
+            refreshSessionList(preferring: updated)
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func deleteSession(_ id: UUID) -> Bool {
+        guard let library = sessionLibrary else { return false }
+        if isTyping { cancel() }
+        do {
+            let index = try library.delete(id)
+            sessions = index.sessions.sorted { $0.updatedAt > $1.updatedAt }
+            return loadSession(index.activeID, hint: "会话已删除")
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    func exportActiveSessionJSON() throws -> Data {
+        guard let library = sessionLibrary, let id = activeSessionID else {
+            throw NexusSessionError.missing
+        }
+        return try library.export(id)
+    }
+
+    func exportActiveSessionText() throws -> String {
+        guard let library = sessionLibrary, let id = activeSessionID else {
+            throw NexusSessionError.missing
+        }
+        return try library.exportPlainText(id)
+    }
+
+    func exportSessionJSON(_ id: UUID) throws -> Data {
+        guard let library = sessionLibrary else { throw NexusSessionError.missing }
+        return try library.export(id)
+    }
+
+    func exportSessionText(_ id: UUID) throws -> String {
+        guard let library = sessionLibrary else { throw NexusSessionError.missing }
+        return try library.exportPlainText(id)
+    }
+
+    private func loadSession(_ id: UUID, hint: String?) -> Bool {
+        guard let library = sessionLibrary else { return false }
+        store = library.conversationStore(for: id)
+        checkpointStore = library.checkpointStore(for: id)
+        activeSessionID = id
+        unreadableStoreURLs = []
+        pendingClearFailure = false
+        messages = []
+        taskCheckpoint = nil
+        lastPrompt = nil
+        lastError = nil
+        statusHint = hint
+        runtime.reset(); live.reset()
+        pulseNote = nil; pulseWord = nil; keptDraft = ""; retractedDraft = ""
+        retractedAt = nil; heardAt = nil; noticedAt = nil; composerDraft = ""; composerPrefill = nil
+        hitchTask?.cancel(); retractTask?.cancel(); settleTask?.cancel(); hearTask?.cancel()
+        presenceTick = Date()
+        do { try store.finishPendingClear(checkpointURL: checkpointStore.url) }
+        catch {
+            pendingClearFailure = true
+            lastError = "上次清空尚未完成，请重试清空：" + error.localizedDescription
+            refreshSessionList()
+            return false
+        }
+        do { messages = try store.load() }
+        catch {
+            unreadableStoreURLs.insert(store.url)
+            lastError = "读取历史记录失败，原文件已保留：\(error.localizedDescription)"
+        }
+        do { taskCheckpoint = try checkpointStore.load() }
+        catch {
+            unreadableStoreURLs.insert(checkpointStore.url)
+            lastError = "读取任务进度失败，原文件已保留：" + error.localizedDescription
+        }
+        if storageReady { restoreSavedCheckpoint() }
+        refreshSessionList()
+        return true
+    }
+
+    private func refreshSessionList(preferring updated: NexusSessionRecord? = nil) {
+        guard let library = sessionLibrary else { return }
+        if let list = try? library.list() {
+            sessions = list
+        } else if let updated {
+            if let offset = sessions.firstIndex(where: { $0.id == updated.id }) {
+                sessions[offset] = updated
+            }
+            sessions.sort { $0.updatedAt > $1.updatedAt }
+        }
     }
 
     func send(_ text: String) {
@@ -587,6 +758,7 @@ final class ChatViewModel: ObservableObject {
                 do { try self.store.save(updated) }
                 catch { throw NexusReasoningError.execution("保存历史记录失败，答复已保留在任务进度中：" + error.localizedDescription) }
                 self.messages = updated
+                self.noteSession()
                 self.runtime.append(.text(reply))
                 self.runtime.append(.completed)
                 self.cognitive.continuity.finish(run: id, kind: outcome.warning == nil ? .answered : .warning, summary: outcome.warning ?? "答复已生成；请依据实际证据判断结果。")
@@ -624,8 +796,18 @@ final class ChatViewModel: ObservableObject {
 
     @discardableResult
     private func persist() -> Bool {
-        do { try store.save(messages); return true }
+        do {
+            try store.save(messages)
+            noteSession()
+            return true
+        }
         catch { lastError = "保存历史记录失败：\(error.localizedDescription)"; return false }
+    }
+
+    private func noteSession() {
+        guard let library = sessionLibrary, let id = activeSessionID,
+              let updated = try? library.touch(id, messages: messages) else { return }
+        refreshSessionList(preferring: updated)
     }
 
     private func emitAutoSelfDecisions(traces: [NexusToolTrace], run: UUID) {
