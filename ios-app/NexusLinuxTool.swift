@@ -2,7 +2,7 @@ import Foundation
 
 struct NexusLinuxTool: NexusTool {
     let name = "shell_execute"
-    let usage = "在应用内 Alpine Linux 执行 shell 脚本。每个工作区有独立文件根目录，以非 root 用户执行；不能访问宿主应用凭据。参数 command；timeout 为可选秒数字符串，最多120。"
+    let usage = "在应用内 Alpine Linux 执行 shell 脚本。每个工作区有独立文件根目录，以非 root 用户执行；不能访问宿主应用凭据。高危命令默认拦截，需 confirm=确认执行危险命令 或沙箱页打开允许危险命令。参数 command；timeout 可选；confirm 可选。"
     let workspace: UUID
     var onStart: ((String) -> Void)? = nil
     var onOutput: ((String, Bool) -> Void)? = nil
@@ -22,10 +22,24 @@ struct NexusLinuxTool: NexusTool {
             return NexusToolResult(callID: call.id, output: "缺少命令或超时参数无效。", succeeded: false)
         }
         do {
+            let audit = try NexusScriptAudit.authorize(
+                command,
+                confirm: call.arguments["confirm"],
+                allowDangerous: NexusScriptAudit.allowDangerous()
+            )
             onStart?(command)
-            let result = try await NexusLinuxRuntime.shared.execute(command: command, timeout: timeout, workspace: workspace, onStatus: onStatus, onOutput: onOutput)
+            if audit.level != .allow { onStatus?(audit.summary) }
+            let result = try await NexusLinuxRuntime.shared.execute(
+                command: command,
+                timeout: timeout,
+                workspace: workspace,
+                confirm: call.arguments["confirm"],
+                onStatus: onStatus,
+                onOutput: onOutput
+            )
             let text = "exit_code=\(result.exitCode)\nstdout:\n\(result.output)\nstderr:\n\(result.errorOutput)"
                 + (result.failure.map { "\nerror: " + $0 } ?? "")
+                + (audit.level == .allow ? "" : "\n" + audit.summary)
             return NexusToolResult(callID: call.id, output: text, succeeded: result.succeeded)
         } catch {
             return NexusToolResult(callID: call.id, output: error.localizedDescription, succeeded: false)

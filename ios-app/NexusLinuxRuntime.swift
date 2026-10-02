@@ -14,6 +14,25 @@ struct NexusWorkspaceFile: Identifiable, Equatable, Sendable {
     let path: String
 }
 
+enum NexusWorkspacePath {
+    static func sanitizeFileName(_ name: String) -> String {
+        let base = (name as NSString).lastPathComponent
+        let cleaned = base.replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\0", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = cleaned.isEmpty ? "import.bin" : cleaned
+        return String(value.prefix(120))
+    }
+
+    static func sanitizeRelativePath(_ path: String) -> String {
+        var value = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.hasPrefix("./") { value = String(value.dropFirst(2)) }
+        value = value.replacingOccurrences(of: "\0", with: "")
+        let parts = value.split(separator: "/").map(String.init).filter { $0 != ".." && $0 != "." && !$0.isEmpty }
+        return parts.joined(separator: "/")
+    }
+}
+
 /// A single kernel per app. Commands are serialized; host app data is never mounted.
 @MainActor
 final class NexusLinuxRuntime {
@@ -54,13 +73,21 @@ final class NexusLinuxRuntime {
         guard code == 0 else { throw NexusReasoningError.execution("Linux 启动失败（\(code)），请重启应用后再试。") }
         ready = true
     }
-    func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), onStatus: ((String) -> Void)? = nil, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
+    func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), confirm: String? = nil, onStatus: ((String) -> Void)? = nil, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
         try Task.checkCancellation()
         guard !busy else { throw NexusReasoningError.execution("Linux 正在执行另一项任务，请稍后重试。") }
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !command.utf8.contains(0), command.utf8.count <= 32768,
               timeout.isFinite, timeout > 0, timeout <= 120 else {
             throw NexusReasoningError.execution("命令为空、过长或超时范围无效（1—120秒）。")
+        }
+        let audit = try NexusScriptAudit.authorize(
+            command,
+            confirm: confirm,
+            allowDangerous: NexusScriptAudit.allowDangerous()
+        )
+        if audit.level != .allow {
+            onStatus?(audit.summary)
         }
         onStatus?("正在准备运行环境…")
         try prepare()
@@ -76,7 +103,7 @@ final class NexusLinuxRuntime {
             busy = false; executionToken = nil; cancellationReason = nil; ISHKernel.shared.nextRoot = nil
         }
         let storageRoot = rootParent
-        let initialBudget = NexusStorage.budget()
+        let initialBudget = NexusStorage.hardBudget()
         onStatus?("正在检查工作区与可用空间…")
         let scan = Task { try await measureStorage(storageRoot, initialBudget) }
         preparationTask = scan
@@ -94,10 +121,11 @@ final class NexusLinuxRuntime {
         }
         preparationTask = nil
         try checkPreparationCancellation()
-        let spaceBudget = NexusStorage.adoptExistingUsage(measured)
+        let spaceBudget = NexusStorage.hardBudget(adoptExistingUsage: measured)
         let space = NexusStorageSnapshot(used: measured.used, free: measured.free, budget: spaceBudget, files: measured.files)
         blackgod_set_guest_storage(UInt64(space.budget), UInt64(max(0, space.used)))
         if let reason = space.stopReason { busy = false; throw NexusReasoningError.execution(reason) }
+        try NexusStorage.enforceHardCeiling(space)
         let watcher = Task { @MainActor in
             while !Task.isCancelled {
                 do {
@@ -195,8 +223,8 @@ final class NexusLinuxRuntime {
     }
 
     func importToWorkspace(data: Data, named name: String, workspace: UUID) async throws {
-        let safe = Self.sanitizeFileName(name.contains("/") ? (name as NSString).lastPathComponent : name)
-        let relative = name.contains("/") ? Self.sanitizeRelativePath(name) : safe
+        let safe = NexusWorkspacePath.sanitizeFileName(name.contains("/") ? (name as NSString).lastPathComponent : name)
+        let relative = name.contains("/") ? NexusWorkspacePath.sanitizeRelativePath(name) : safe
         guard !data.isEmpty, data.count <= NexusWorkspaceQuota.maxSingleWrite else {
             throw NexusReasoningError.execution("导入文件需在 1 字节到 \(NexusWorkspaceQuota.byteText(Int64(NexusWorkspaceQuota.maxSingleWrite))) 之间。")
         }
@@ -209,12 +237,45 @@ final class NexusLinuxRuntime {
             : dir.appendingPathComponent(safe)
         let creating = !FileManager.default.fileExists(atPath: target.path)
         try NexusWorkspaceQuota.enforce(adding: Int64(data.count), creatingFile: creating, at: dir)
+        if let root = installedImageRoot() {
+            let image = try await NexusStorage.measureInBackground(root: root, budget: NexusStorage.hardBudget())
+            try NexusStorage.enforceHardCeiling(image, adding: Int64(data.count))
+        }
         try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: target, options: .atomic)
     }
 
+    func deleteWorkspaceFile(_ path: String, workspace: UUID, confirm: String) async throws {
+        guard confirm.trimmingCharacters(in: .whitespacesAndNewlines) == "确认删除" else {
+            throw NexusReasoningError.execution("确认口令不正确。请输入「确认删除」。")
+        }
+        let safe = NexusWorkspacePath.sanitizeRelativePath(path)
+        guard !safe.isEmpty else { throw NexusReasoningError.execution("缺少有效 path。") }
+        let encoded = safe.replacingOccurrences(of: "'", with: "'\\''")
+        let result = try await execute(
+            command: "test -e '\(encoded)' && rm -rf -- '\(encoded)' && printf deleted",
+            timeout: 30,
+            workspace: workspace,
+            confirm: NexusScriptAudit.confirmPhrase
+        )
+        guard result.succeeded else {
+            throw NexusReasoningError.execution(result.failure ?? "删除失败")
+        }
+    }
+
+    func imageQuotaSummary() async -> String {
+        guard let root = installedImageRoot() else { return "整镜像：尚未安装运行环境" }
+        do {
+            let budget = NexusStorage.hardBudget()
+            let snap = try await NexusStorage.measureInBackground(root: root, budget: budget)
+            return "整镜像硬顶 \(NexusWorkspaceQuota.byteText(snap.used))/\(NexusWorkspaceQuota.byteText(budget))（绝对上限 \(NexusStorage.absoluteCeilingGiB) GiB）"
+        } catch {
+            return "整镜像：用量读取失败"
+        }
+    }
+
     func exportWorkspaceFile(_ path: String, workspace: UUID) async throws -> Data {
-        let safe = Self.sanitizeRelativePath(path)
+        let safe = NexusWorkspacePath.sanitizeRelativePath(path)
         let encoded = safe.replacingOccurrences(of: "'", with: "'\\''")
         let result = try await execute(
             command: "test -f '\(encoded)' && wc -c < '\(encoded)' && base64 '\(encoded)'",
@@ -241,23 +302,6 @@ final class NexusLinuxRuntime {
         }
         let result = try await execute(command: "find . -mindepth 1 -maxdepth 3 -exec rm -rf {} + 2>/dev/null; printf cleared", timeout: 60, workspace: workspace)
         guard result.succeeded else { throw NexusReasoningError.execution(result.failure ?? "清空失败") }
-    }
-
-    static func sanitizeFileName(_ name: String) -> String {
-        let base = (name as NSString).lastPathComponent
-        let cleaned = base.replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "\0", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = cleaned.isEmpty ? "import.bin" : cleaned
-        return String(value.prefix(120))
-    }
-
-    static func sanitizeRelativePath(_ path: String) -> String {
-        var value = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        while value.hasPrefix("./") { value = String(value.dropFirst(2)) }
-        value = value.replacingOccurrences(of: "\0", with: "")
-        let parts = value.split(separator: "/").map(String.init).filter { $0 != ".." && $0 != "." && !$0.isEmpty }
-        return parts.joined(separator: "/")
     }
 
     private func checkPreparationCancellation() throws {

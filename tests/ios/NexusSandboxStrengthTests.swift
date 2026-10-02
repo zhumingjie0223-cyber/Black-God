@@ -50,12 +50,33 @@ final class NexusSandboxStrengthTests: XCTestCase {
         registry.register(NexusWorkspaceListTool(workspace: UUID()))
         registry.register(NexusWorkspaceReadTool(workspace: UUID()))
         registry.register(NexusWorkspaceWriteTool(workspace: UUID()))
+        registry.register(NexusWorkspaceDeleteTool(workspace: UUID()))
         registry.register(NexusHTTPFetchTool(workspace: UUID()))
         let names = Set(registry.nativeDefinitions.map(\.name))
         XCTAssertTrue(names.contains("workspace_list"))
         XCTAssertTrue(names.contains("workspace_read"))
         XCTAssertTrue(names.contains("workspace_write"))
+        XCTAssertTrue(names.contains("workspace_delete"))
         XCTAssertTrue(names.contains("http_fetch"))
         XCTAssertTrue(names.contains("shell_execute"))
+    }
+
+    func testWorkspaceDeleteRequiresConfirmPhrase() async {
+        let tool = NexusWorkspaceDeleteTool(workspace: UUID(), isEnabled: { true })
+        let result = await tool.execute(NexusToolCall(id: UUID(), name: "workspace_delete", arguments: [
+            "path": "a.txt", "confirm": "错"
+        ]))
+        XCTAssertFalse(result.succeeded)
+        XCTAssertTrue(result.output.contains("确认删除"))
+    }
+
+    func testHardBudgetNeverExceedsAbsoluteCeiling() {
+        let name = UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(8, forKey: "blackgod.linux.storageGiB")
+        XCTAssertEqual(NexusStorage.hardBudget(in: defaults), NexusStorage.absoluteCeilingGiB * NexusStorage.gib)
+        let over = NexusStorageSnapshot(used: NexusStorage.gib, free: 20 * NexusStorage.gib, budget: NexusStorage.gib, files: 1)
+        XCTAssertThrowsError(try NexusStorage.enforceHardCeiling(over, adding: 1))
     }
 }

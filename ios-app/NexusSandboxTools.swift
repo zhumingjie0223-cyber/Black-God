@@ -65,7 +65,7 @@ struct NexusWorkspaceListTool: NexusTool {
         guard isEnabled() else { return fail(call, "沙箱执行已关闭。") }
         do {
             let files = try await NexusLinuxRuntime.shared.listWorkspaceFiles(workspace: workspace)
-            let host = NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
+            let host = await NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
             let quota = try NexusWorkspaceQuota.measure(at: host)
             if files.isEmpty {
                 return NexusToolResult(callID: call.id, output: "工作区为空。\n" + quota.summary, succeeded: true)
@@ -89,7 +89,7 @@ struct NexusWorkspaceReadTool: NexusTool {
     var isEnabled: () -> Bool = { NexusLinuxTool.enabled }
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         guard isEnabled() else { return fail(call, "沙箱执行已关闭。") }
-        let path = NexusLinuxRuntime.sanitizeRelativePath(call.arguments["path"] ?? "")
+        let path = NexusWorkspacePath.sanitizeRelativePath(call.arguments["path"] ?? "")
         guard !path.isEmpty else { return fail(call, "缺少 path。") }
         let maxChars = min(max(Int(call.arguments["max_chars"] ?? "12000") ?? 12000, 1), 50_000)
         do {
@@ -122,7 +122,7 @@ struct NexusWorkspaceWriteTool: NexusTool {
         guard isEnabled() else {
             return NexusToolResult(callID: call.id, output: "沙箱执行已关闭。", succeeded: false)
         }
-        let path = NexusLinuxRuntime.sanitizeRelativePath(call.arguments["path"] ?? "")
+        let path = NexusWorkspacePath.sanitizeRelativePath(call.arguments["path"] ?? "")
         guard !path.isEmpty, let content = call.arguments["content"] else {
             return NexusToolResult(callID: call.id, output: "缺少 path 或 content。", succeeded: false)
         }
@@ -131,8 +131,34 @@ struct NexusWorkspaceWriteTool: NexusTool {
         }
         do {
             try await NexusLinuxRuntime.shared.importToWorkspace(data: data, named: path, workspace: workspace)
-            let quota = try NexusWorkspaceQuota.measure(at: NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace))
+            let host = await NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
+            let quota = try NexusWorkspaceQuota.measure(at: host)
             return NexusToolResult(callID: call.id, output: "已写入 \(path)\n" + quota.summary, succeeded: true)
+        } catch {
+            return NexusToolResult(callID: call.id, output: error.localizedDescription, succeeded: false)
+        }
+    }
+}
+
+struct NexusWorkspaceDeleteTool: NexusTool {
+    let name = "workspace_delete"
+    let usage = "删除沙箱工作区文件或目录。参数 path；confirm 必须为「确认删除」。受路径消毒约束，不能跨出 /workspace。"
+    let workspace: UUID
+    var isEnabled: () -> Bool = { NexusLinuxTool.enabled }
+    func execute(_ call: NexusToolCall) async -> NexusToolResult {
+        guard isEnabled() else {
+            return NexusToolResult(callID: call.id, output: "沙箱执行已关闭。", succeeded: false)
+        }
+        let path = NexusWorkspacePath.sanitizeRelativePath(call.arguments["path"] ?? "")
+        let confirm = call.arguments["confirm"] ?? ""
+        guard !path.isEmpty else {
+            return NexusToolResult(callID: call.id, output: "缺少 path。", succeeded: false)
+        }
+        do {
+            try await NexusLinuxRuntime.shared.deleteWorkspaceFile(path, workspace: workspace, confirm: confirm)
+            let host = await NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
+            let quota = try NexusWorkspaceQuota.measure(at: host)
+            return NexusToolResult(callID: call.id, output: "已删除 \(path)\n" + quota.summary, succeeded: true)
         } catch {
             return NexusToolResult(callID: call.id, output: error.localizedDescription, succeeded: false)
         }
@@ -161,7 +187,7 @@ struct NexusHTTPFetchTool: NexusTool {
               let url = URL(string: raw), url.scheme?.lowercased() == "https", url.host != nil else {
             return NexusToolResult(callID: call.id, output: "url 必须是 https:// 完整地址。", succeeded: false)
         }
-        let path = NexusLinuxRuntime.sanitizeRelativePath(call.arguments["path"] ?? url.lastPathComponent)
+        let path = NexusWorkspacePath.sanitizeRelativePath(call.arguments["path"] ?? url.lastPathComponent)
         guard !path.isEmpty else {
             return NexusToolResult(callID: call.id, output: "缺少有效 path。", succeeded: false)
         }
@@ -170,7 +196,8 @@ struct NexusHTTPFetchTool: NexusTool {
             let data = try await Self.download(url, maxBytes: maxBytes)
             try await NexusLinuxRuntime.shared.importToWorkspace(data: data, named: path, workspace: workspace)
             let preview = String(decoding: data.prefix(400), as: UTF8.self)
-            let quota = try NexusWorkspaceQuota.measure(at: NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace))
+            let host = await NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
+            let quota = try NexusWorkspaceQuota.measure(at: host)
             return NexusToolResult(
                 callID: call.id,
                 output: "已保存 \(path)（\(data.count) 字节）\n\(quota.summary)\n预览：\n\(preview)",
@@ -192,7 +219,8 @@ struct NexusHTTPFetchTool: NexusTool {
         guard (200...299).contains(http.statusCode) else {
             throw NexusReasoningError.execution("HTTP \(http.statusCode)")
         }
-        if let length = http.expectedContentLength, length > maxBytes {
+        let length = http.expectedContentLength
+        if length >= 0, length > Int64(maxBytes) {
             throw NexusReasoningError.execution("远端声明大小 \(length) 超过上限 \(maxBytes) 字节。")
         }
         var data = Data()
@@ -217,6 +245,7 @@ extension NexusLinuxRuntime {
         registry.register(NexusWorkspaceListTool(workspace: workspace))
         registry.register(NexusWorkspaceReadTool(workspace: workspace))
         registry.register(NexusWorkspaceWriteTool(workspace: workspace))
+        registry.register(NexusWorkspaceDeleteTool(workspace: workspace))
         registry.register(NexusHTTPFetchTool(workspace: workspace))
     }
 }

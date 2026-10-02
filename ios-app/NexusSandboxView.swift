@@ -1,23 +1,32 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 沙箱主页：内置 Alpine Linux 工作区、终端、文件与空间，不再藏进高级设置。
+/// 沙箱主页：内置 Alpine Linux 工作区、终端、文件、审计闸与可视预览。
 struct NexusSandboxView: View {
     @EnvironmentObject var appState: AppState
     @AppStorage("blackgod.linux.modelTools") private var allowExecution = true
     @AppStorage("blackgod.sandbox.network") private var allowNetwork = true
+    @AppStorage("blackgod.sandbox.allowDangerous") private var allowDangerous = false
     @State private var showTerminal = false
     @State private var showStorage = false
     @State private var files: [NexusWorkspaceFile] = []
     @State private var quotaText = "配额未读取"
+    @State private var imageQuotaText = "整镜像：未读取"
     @State private var status = "尚未读取工作区"
     @State private var busy = false
     @State private var errorText: String?
     @State private var importPicker = false
     @State private var exportURL: URL?
+    @State private var previewItem: PreviewItem?
     @State private var confirmClear = false
     @State private var clearPhrase = ""
     private var workspace: UUID { NexusWorkspaceIdentity.id(for: "sandbox") }
+
+    private struct PreviewItem: Identifiable {
+        let id = UUID()
+        let path: String
+        let data: Data
+    }
 
     var body: some View {
         ScrollView {
@@ -27,7 +36,7 @@ struct NexusSandboxView: View {
                         Text("沙箱").font(.title2.weight(.semibold)).foregroundStyle(Color.bgTextPrimary)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("sandbox.title")
-                        Text("本机 Alpine Linux · 硬配额隔离工作区")
+                        Text("本机 Alpine Linux · 硬配额 · 脚本审计")
                             .font(.caption).foregroundStyle(Color.bgTextSecondary)
                     }
                     Spacer(minLength: 0)
@@ -44,12 +53,17 @@ struct NexusSandboxView: View {
                     Toggle("允许沙箱 HTTPS 抓取", isOn: $allowNetwork)
                         .font(.headline).tint(Color.bgJadeHi)
                         .accessibilityIdentifier("sandbox.network")
-                    Text("对话与快捷指令可调用：shell_execute、workspace_list/read/write、http_fetch。单工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 个文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))。进入后台会停止当前命令。")
+                    Toggle("允许危险命令（关闭审计拦截）", isOn: $allowDangerous)
+                        .font(.headline).tint(Color.bgJadeHi)
+                        .accessibilityIdentifier("sandbox.allowDangerous")
+                    Text("对话与快捷指令可调用：shell_execute、workspace_list/read/write/delete、http_fetch。工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 个文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))；整镜像绝对硬顶 \(NexusStorage.absoluteCeilingGiB) GiB。高危脚本默认拦截。进入后台会停止当前命令。")
                         .font(.footnote).foregroundStyle(Color.bgTextSecondary)
                     Text(status).font(.caption).foregroundStyle(Color.bgTextSecondary)
                         .accessibilityIdentifier("sandbox.status")
                     Text(quotaText).font(.caption.monospacedDigit()).foregroundStyle(Color.bgJadeHi)
                         .accessibilityIdentifier("sandbox.quota")
+                    Text(imageQuotaText).font(.caption.monospacedDigit()).foregroundStyle(Color.bgJadeHi)
+                        .accessibilityIdentifier("sandbox.imageQuota")
                 }
                 .padding(16).bgFloating()
 
@@ -84,6 +98,9 @@ struct NexusSandboxView: View {
                                 Text(file.path).font(.system(.footnote, design: .monospaced))
                                     .foregroundStyle(Color.bgTextPrimary).lineLimit(2)
                                 Spacer()
+                                Button("预览") { previewFile(file.path) }
+                                    .disabled(busy)
+                                    .accessibilityIdentifier("sandbox.preview.\(file.path)")
                                 Button("导出") { exportFile(file.path) }
                                     .disabled(busy)
                                     .accessibilityIdentifier("sandbox.export.\(file.path)")
@@ -108,7 +125,7 @@ struct NexusSandboxView: View {
                 }
                 .padding(16).bgFloating()
 
-                Text("沙箱与聊天会话隔离：沙箱页文件属 sandbox 工作区；对话任务使用 chat 工作区。http_fetch 只走 HTTPS，不执行页面脚本。宿主密钥不会挂进沙箱。")
+                Text("沙箱与聊天会话隔离：沙箱页文件属 sandbox 工作区；对话任务使用 chat 工作区。http_fetch 只走 HTTPS，不执行页面脚本。预览为工作区本机渲染，不是远程浏览器点击自动化。宿主密钥不会挂进沙箱。")
                     .font(.caption).foregroundStyle(Color.bgTextSecondary)
             }
             .padding(20)
@@ -126,6 +143,9 @@ struct NexusSandboxView: View {
             }
         }
         .sheet(isPresented: $showStorage) { NexusStorageView() }
+        .sheet(item: $previewItem) { item in
+            NexusWorkspacePreview(path: item.path, data: item.data)
+        }
         .fileImporter(isPresented: $importPicker, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls):
@@ -185,15 +205,17 @@ struct NexusSandboxView: View {
             do {
                 let listed = try await NexusLinuxRuntime.shared.listWorkspaceFiles(workspace: workspace)
                 files = listed
-                let host = NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace)
+                let host = await MainActor.run { NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace) }
                 let quota = try NexusWorkspaceQuota.measure(at: host)
                 quotaText = quota.summary
+                imageQuotaText = await NexusLinuxRuntime.shared.imageQuotaSummary()
                 status = listed.isEmpty ? "沙箱就绪 · 工作区为空" : "沙箱就绪 · \(listed.count) 个文件"
                 errorText = nil
             } catch {
                 files = []
                 status = "沙箱未就绪"
                 quotaText = "配额未读取"
+                imageQuotaText = "整镜像：未读取"
                 errorText = error.localizedDescription
             }
         }
@@ -221,10 +243,23 @@ struct NexusSandboxView: View {
             defer { busy = false }
             do {
                 let data = try await NexusLinuxRuntime.shared.exportWorkspaceFile(path, workspace: workspace)
-                let name = NexusLinuxRuntime.sanitizeFileName(path)
+                let name = NexusWorkspacePath.sanitizeFileName(path)
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
                 try data.write(to: url, options: .atomic)
                 exportURL = url
+            } catch {
+                errorText = error.localizedDescription
+            }
+        }
+    }
+
+    private func previewFile(_ path: String) {
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                let data = try await NexusLinuxRuntime.shared.exportWorkspaceFile(path, workspace: workspace)
+                previewItem = PreviewItem(path: path, data: data)
             } catch {
                 errorText = error.localizedDescription
             }
