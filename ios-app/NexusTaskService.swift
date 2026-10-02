@@ -75,7 +75,7 @@ struct NexusTaskBootstrap {
             )
         }
         tools.register(NexusMemorySearchTool(items: memoryItems))
-        tools.register(NexusShuyuRunTool(tools: tools, onTrace: { live?.onTrace($0) }))
+        tools.register(NexusShuyuRunTool(tools: tools, onTrace: { live?.onTrace([$0]) }))
         return NexusTaskBootstrap(connection: connection, key: key, remembered: remembered, skillIndex: skillIndex,
             memoryItems: memoryItems, skillItems: skillItems, tools: tools)
     }
