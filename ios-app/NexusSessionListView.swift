@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 会话列表：新建、切换、重命名、删除、导出。长期记忆与技能不在此管理。
+/// 会话列表：新建、切换、重命名、删除、导出、跨会话检索。长期记忆与技能不在此管理。
 struct NexusSessionListView: View {
     @ObservedObject var vm: ChatViewModel
     @Environment(\.dismiss) private var dismiss
@@ -9,6 +9,8 @@ struct NexusSessionListView: View {
     @State private var deleteTarget: NexusSessionRecord?
     @State private var exportURL: URL?
     @State private var exportError: String?
+    @State private var query = ""
+    @State private var hits: [NexusSessionLibrary.SearchHit] = []
 
     var body: some View {
         NavigationStack {
@@ -20,6 +22,26 @@ struct NexusSessionListView: View {
                         Label("新建对话", systemImage: "plus.message")
                     }
                     .accessibilityIdentifier("sessions.create")
+                }
+                if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Section("检索结果") {
+                        if hits.isEmpty {
+                            Text("没有匹配的消息。").foregroundStyle(Color.bgTextSecondary)
+                        } else {
+                            ForEach(hits) { hit in
+                                Button {
+                                    if vm.switchSession(hit.sessionID) { dismiss() }
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(hit.sessionTitle).font(.subheadline.weight(.semibold)).foregroundStyle(Color.bgTextPrimary)
+                                        Text((hit.role == "user" ? "你：" : "Black God：") + hit.snippet)
+                                            .font(.caption).foregroundStyle(Color.bgTextSecondary).lineLimit(3)
+                                    }
+                                }
+                                .accessibilityIdentifier("sessions.hit.\(hit.messageID.uuidString)")
+                            }
+                        }
+                    }
                 }
                 Section {
                     ForEach(vm.sessions) { session in
@@ -68,8 +90,12 @@ struct NexusSessionListView: View {
                         }
                     }
                 } footer: {
-                    Text("每个会话的聊天与任务恢复互相隔离。长期记忆、技能与自我状态仍跨会话共享。最多 \(NexusSessionLibrary.maxSessions) 个会话。")
+                    Text("每个会话的聊天与任务恢复互相隔离。长期记忆、技能与自我状态仍跨会话共享。最多 \(NexusSessionLibrary.maxSessions) 个会话。可在上方搜索跨会话内容。")
                 }
+            }
+            .searchable(text: $query, prompt: "搜索全部会话")
+            .onChange(of: query) { _, value in
+                hits = (try? vm.searchSessions(value)) ?? []
             }
             .scrollContentBackground(.hidden)
             .background(Color.bgDark)

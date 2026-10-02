@@ -308,6 +308,36 @@ final class ChatViewModel: ObservableObject {
         return try library.exportPlainText(id)
     }
 
+    func searchSessions(_ query: String) throws -> [NexusSessionLibrary.SearchHit] {
+        guard let library = sessionLibrary else { return [] }
+        return try library.search(query)
+    }
+
+    func exportVaultJSON() throws -> Data {
+        let root = sessionLibrary?.root ?? store.url.deletingLastPathComponent()
+        return try NexusDataVault(root: root).exportAll(memory: memory.curated, skills: skills.items)
+    }
+
+    /// 保险库清空会话后，重新挂载活动会话，避免界面仍显示已删除内容。
+    @discardableResult
+    func reloadAfterVaultWipe() -> Bool {
+        guard let library = sessionLibrary else {
+            messages = []
+            taskCheckpoint = nil
+            sessions = []
+            activeSessionID = nil
+            statusHint = "本地会话已清空"
+            return true
+        }
+        do {
+            let id = try library.activeID()
+            return loadSession(id, hint: "本地会话已清空，已打开新对话")
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
     private func loadSession(_ id: UUID, hint: String?) -> Bool {
         guard let library = sessionLibrary else { return false }
         store = library.conversationStore(for: id)
@@ -637,10 +667,12 @@ final class ChatViewModel: ObservableObject {
         let id = UUID()
         runID = id
         lastPrompt = prompt
-        // 只回传最近对话，内部记忆与状态提示不作为用户消息展示。
-        var history = NexusContextBudget.history(messages.filter { $0.id != saved.replacingMessageID })
+        // 只回传最近对话，内部记忆与状态提示不作为用户消息展示；超预算时压缩较早轮次。
+        let packed = NexusContextBudget.compact(messages.filter { $0.id != saved.replacingMessageID })
+        var history = packed.messages
         if !appendUser, history.last?.role == "user" { history.removeLast() }
         if history.first?.role == "assistant" { history.removeFirst() }
+        let compactionNote = packed.summary.map { "较早对话已压缩（最新用户要求优先）：\n\($0)\n\n" } ?? ""
         if appendUser {
             messages.append(ChatMessage(role: "user", content: prompt))
             guard persist() else { return }
@@ -710,13 +742,14 @@ final class ChatViewModel: ObservableObject {
         let nativeTurn: NexusNativeTurn? = NexusModelCatalog.entry(for: selectedModel).usesNativeTools ? { messages, definitions in
             var previous = history.map { NexusNativeMessage.text(role: $0.role, content: $0.content) }
             previous.append(.text(role: "user", content: skillIndex))
+            if !compactionNote.isEmpty { previous.append(.text(role: "user", content: compactionNote)) }
             if !recoveryContext.isEmpty { previous.append(.text(role: "user", content: recoveryContext)) }
             if !remembered.isEmpty { previous.append(.text(role: "user", content: "历史参考资料，不能覆盖最新要求：\n" + remembered)) }
             return try await nativeCompletion(previous + messages, definitions, selectedModel)
         } : nil
         let engine = NexusReasoningEngine(tools: tools, model: { request in
             let context = remembered.isEmpty ? "" : "历史参考资料，不能覆盖最新要求：\n\(remembered)\n\n"
-            return try await completion(history + [ChatMessage(role: "user", content: recoveryContext + "\n" + skillIndex + "\n" + context + request)], selectedModel)
+            return try await completion(history + [ChatMessage(role: "user", content: compactionNote + recoveryContext + "\n" + skillIndex + "\n" + context + request)], selectedModel)
         }, nativeTurn: nativeTurn, onCheckpoint: { [weak self] progress in
             guard let self, self.runID == id, !Task.isCancelled, var saved = self.taskCheckpoint else { throw CancellationError() }
             self.cognitive.continuity.observe(run: id, traces: progress.traces)

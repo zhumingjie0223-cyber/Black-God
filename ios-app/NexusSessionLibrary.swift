@@ -239,6 +239,56 @@ struct NexusSessionLibrary {
         }
         return lines.joined(separator: "\n")
     }
+
+    struct SearchHit: Identifiable, Equatable, Sendable {
+        var id: String { sessionID.uuidString + "/" + messageID.uuidString }
+        let sessionID: UUID
+        let sessionTitle: String
+        let messageID: UUID
+        let role: String
+        let snippet: String
+        let updatedAt: Date
+    }
+
+    /// 跨会话词面检索；按会话更新时间与命中位置排序，最多返回 limit 条。
+    func search(_ query: String, limit: Int = 40) throws -> [SearchHit] {
+        let terms = query.lowercased().split { $0.isWhitespace || $0.isNewline }.map(String.init).filter { !$0.isEmpty }
+        guard !terms.isEmpty else { return [] }
+        let index = try bootstrap()
+        var hits: [SearchHit] = []
+        for session in index.sessions.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+            let messages = (try? conversationStore(for: session.id).load()) ?? []
+            for message in messages.reversed() {
+                let hay = message.content.lowercased()
+                guard terms.allSatisfy({ hay.contains($0) }) else { continue }
+                hits.append(SearchHit(
+                    sessionID: session.id,
+                    sessionTitle: session.title,
+                    messageID: message.id,
+                    role: message.role,
+                    snippet: Self.snippet(message.content, around: terms[0]),
+                    updatedAt: session.updatedAt
+                ))
+                if hits.count >= limit { return hits }
+            }
+        }
+        return hits
+    }
+
+    private static func snippet(_ text: String, around term: String, radius: Int = 48) -> String {
+        let lower = text.lowercased()
+        let needle = term.lowercased()
+        if let range = lower.range(of: needle) {
+            let start = text.index(range.lowerBound, offsetBy: -radius, limitedBy: text.startIndex) ?? text.startIndex
+            let end = text.index(range.upperBound, offsetBy: radius, limitedBy: text.endIndex) ?? text.endIndex
+            let slice = String(text[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let prefix = start == text.startIndex ? "" : "…"
+            let suffix = end == text.endIndex ? "" : "…"
+            return prefix + slice + suffix
+        }
+        let clipped = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return clipped.count <= 96 ? clipped : String(clipped.prefix(95)) + "…"
+    }
 }
 
 enum NexusSessionError: LocalizedError, Equatable {

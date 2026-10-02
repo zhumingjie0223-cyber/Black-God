@@ -11,6 +11,7 @@ struct MeView: View {
     @ObservedObject var memory: NexusMemoryStore
     @ObservedObject var skills: NexusSkillStore
     @ObservedObject var practice: NexusSkillPractice
+    var onVaultWiped: () -> Void = {}
     @State private var showSkills = false
     @State private var showPrivacy = false
     @State private var showLicenses = false
@@ -23,6 +24,7 @@ struct MeView: View {
     @State private var showMemory = false
     @State private var showNexusConnection = false
     @State private var showTerminal = false
+    @State private var showVault = false
 
     var body: some View {
         ScrollView {
@@ -63,6 +65,10 @@ struct MeView: View {
                 }
 
                 settingsGroup("设置") {
+                    Button { showVault = true } label: {
+                        SettingRow(icon: "externaldrive.badge.timemachine", title: "数据与备份", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("vault.open")
+                    Divider().overlay(Color.bgCardLight)
                     Button { showPrivacy = true } label: {
                         SettingRow(icon: "lock.shield", title: "隐私保护", value: "", color: .bgJadeHi, compact: true)
                     }.accessibilityIdentifier("privacy.open")
@@ -92,6 +98,9 @@ struct MeView: View {
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
         .sheet(isPresented: $showAdvanced) { NexusAdvancedSettingsView() }
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
+        .sheet(isPresented: $showVault) {
+            NexusDataVaultView(memory: memory, skills: skills, onWiped: onVaultWiped)
+        }
         .sheet(isPresented: $showTerminal) {
             NavigationStack {
                 NexusTerminalView().navigationTitle("手动终端")
