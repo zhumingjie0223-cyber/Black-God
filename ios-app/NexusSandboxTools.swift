@@ -191,7 +191,7 @@ struct NexusHTTPFetchTool: NexusTool {
         guard !path.isEmpty else {
             return NexusToolResult(callID: call.id, output: "缺少有效 path。", succeeded: false)
         }
-        let maxBytes = min(max(Int(call.arguments["max_bytes"] ?? "524288") ?? 524288, 1), NexusWorkspaceQuota.maxSingleWrite)
+        let maxBytes = min(max(Int(call.arguments["max_bytes"] ?? "524288") ?? 524288, 1), Int(NexusWorkspaceQuota.maxSingleWrite))
         do {
             let data = try await Self.download(url, maxBytes: maxBytes)
             try await NexusLinuxRuntime.shared.importToWorkspace(data: data, named: path, workspace: workspace)
