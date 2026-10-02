@@ -94,22 +94,24 @@ struct ChatView: View {
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
             }
         }
-        .sheet(isPresented: $showTaskDetails) {
-            NavigationStack {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        if showPracticeDetails {
-                            NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
-                        } else {
-                            if let plan = vm.currentPlan, !plan.steps.isEmpty { NexusPlanStrip(plan: plan) }
-                            NexusLiveExecutionView(live: vm.live, stop: vm.cancel)
-                        }
-                    }.padding(20)
+        .overlay {
+            BGBottomDrawer(isPresented: $showTaskDetails, title: showPracticeDetails ? "演练记录" : "任务详情") {
+                VStack(spacing: 16) {
+                    if showPracticeDetails {
+                        NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
+                    } else {
+                        if let plan = vm.currentPlan, !plan.steps.isEmpty { NexusPlanStrip(plan: plan) }
+                        NexusLiveExecutionView(live: vm.live, stop: vm.cancel)
+                    }
                 }
-                .background(Color.bgDark).navigationTitle(showPracticeDetails ? "演练记录" : "任务详情").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTaskDetails = false } } }
+                .padding(.top, 4)
             }
-            .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+        }
+        .onChange(of: vm.live.state) { previous, next in
+            notifyTaskHaptic(from: previous, to: next)
+        }
+        .onChange(of: vm.practice.live.state) { previous, next in
+            notifyTaskHaptic(from: previous, to: next)
         }
         .confirmationDialog("清空当前对话？", isPresented: $showClearConversation, titleVisibility: .visible) {
             Button("清空对话与任务记录", role: .destructive) {
@@ -290,7 +292,22 @@ struct ChatView: View {
 
     private func openTaskDetails(practice: Bool) {
         showPracticeDetails = practice
-        showTaskDetails = true
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
+            showTaskDetails = true
+        }
+        appState.haptic(.light)
+    }
+
+    private func notifyTaskHaptic(from previous: NexusLiveExecution.State, to next: NexusLiveExecution.State) {
+        guard previous == .running else { return }
+        switch next {
+        case .answered:
+            appState.taskCompleteHaptic(success: true)
+        case .warning, .failed:
+            appState.taskCompleteHaptic(success: false)
+        default:
+            break
+        }
     }
 
     private func sendCurrent() {

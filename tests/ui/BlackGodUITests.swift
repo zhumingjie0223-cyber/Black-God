@@ -32,6 +32,8 @@ final class BlackGodUITests: XCTestCase {
         capture(app, name: "新版-监测")
         app.buttons["tab.4"].tap()
         XCTAssertTrue(app.buttons["api.open"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["haptic.enabled"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["haptic.taskComplete"].exists)
         capture(app, name: "新版-我的")
         app.buttons["api.open"].tap()
         XCTAssertTrue(app.navigationBars["模型连接"].waitForExistence(timeout: 5))
