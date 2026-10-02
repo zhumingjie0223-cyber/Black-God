@@ -225,8 +225,8 @@ final class NexusLinuxRuntime {
     func importToWorkspace(data: Data, named name: String, workspace: UUID) async throws {
         let safe = NexusWorkspacePath.sanitizeFileName(name.contains("/") ? (name as NSString).lastPathComponent : name)
         let relative = name.contains("/") ? NexusWorkspacePath.sanitizeRelativePath(name) : safe
-        guard !data.isEmpty, data.count <= NexusWorkspaceQuota.maxSingleWrite else {
-            throw NexusReasoningError.execution("导入文件需在 1 字节到 \(NexusWorkspaceQuota.byteText(Int64(NexusWorkspaceQuota.maxSingleWrite))) 之间。")
+        guard !data.isEmpty, data.count <= Int(NexusWorkspaceQuota.maxSingleWrite) else {
+            throw NexusReasoningError.execution("导入文件需在 1 字节到 \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxSingleWrite)) 之间。")
         }
         _ = try await execute(command: "true", timeout: 30, workspace: workspace)
         guard let dir = hostWorkspaceURL(for: workspace) else {

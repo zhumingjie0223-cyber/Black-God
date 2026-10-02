@@ -4,7 +4,7 @@ import Foundation
 enum NexusWorkspaceQuota {
     static let maxFiles = 200
     static let maxBytes: Int64 = 32 * 1024 * 1024
-    static let maxSingleWrite = 2 * 1024 * 1024
+    static let maxSingleWrite: Int64 = 2 * 1024 * 1024
 
     struct Snapshot: Equatable, Sendable {
         let files: Int
@@ -39,7 +39,7 @@ enum NexusWorkspaceQuota {
 
     static func enforce(adding bytes: Int64, creatingFile: Bool, at directory: URL?) throws {
         guard bytes >= 0, bytes <= maxSingleWrite else {
-            throw NexusReasoningError.execution("单次写入不得超过 \(byteText(Int64(maxSingleWrite)))。")
+            throw NexusReasoningError.execution("单次写入不得超过 \(byteText(maxSingleWrite))。")
         }
         let snap = try measure(at: directory)
         if creatingFile, snap.files >= maxFiles {
