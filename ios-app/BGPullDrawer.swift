@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 抽拉式卷帘面板：把手下拉展开 / 上推收起，高度像卷帘卷开。
+/// 抽拉式卷帘面板：把手下拉展开 / 上推收起；内容整块弹簧卷开，不裁掉可点控件。
 struct BGPullDrawer<Content: View>: View {
     @Binding var isOpen: Bool
     var title: String
@@ -9,8 +9,6 @@ struct BGPullDrawer<Content: View>: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragOffset: CGFloat = 0
-    @State private var reveal: CGFloat = 0
-    @State private var contentHeight: CGFloat = 1
 
     private let spring = Animation.spring(response: 0.48, dampingFraction: 0.84)
 
@@ -18,18 +16,28 @@ struct BGPullDrawer<Content: View>: View {
         VStack(spacing: 0) {
             handle
             header
-            shutter
+            if isOpen {
+                VStack(alignment: .leading, spacing: 10) {
+                    shutterSlats
+                    content()
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(
+                    reduceMotion
+                    ? .opacity
+                    : .asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    )
+                )
+            }
         }
         .bgFloating(cornerRadius: 22)
         .offset(y: reduceMotion ? 0 : dragOffset)
         .gesture(drag)
-        .onAppear { reveal = isOpen ? 1 : 0 }
-        .onChange(of: isOpen) { _, open in
-            withAnimation(reduceMotion ? .easeInOut(duration: 0.16) : spring) {
-                reveal = open ? 1 : 0
-                dragOffset = 0
-            }
-        }
+        .animation(reduceMotion ? .easeInOut(duration: 0.16) : spring, value: isOpen)
         .accessibilityIdentifier(accessibilityID)
     }
 
@@ -54,7 +62,7 @@ struct BGPullDrawer<Content: View>: View {
             Image(systemName: "chevron.compact.down")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.bgJadeHi)
-                .rotationEffect(.degrees(reveal * 180))
+                .rotationEffect(.degrees(isOpen ? 180 : 0))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -65,50 +73,15 @@ struct BGPullDrawer<Content: View>: View {
         .accessibilityLabel(isOpen ? "收起\(title)" : "展开\(title)")
     }
 
-    private var shutter: some View {
-        content()
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: max(0, contentHeight * reveal), alignment: .top)
-            .clipped()
-            .mask(shutterMask)
-            .opacity(0.4 + 0.6 * Double(reveal))
-            .allowsHitTesting(isOpen)
-            .accessibilityHidden(!isOpen)
-            .background(alignment: .top) {
-                // 不受卷帘高度约束，单独量真实内容高度
-                content()
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .hidden()
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: DrawerHeightKey.self, value: geo.size.height)
-                        }
-                    )
-            }
-            .onPreferenceChange(DrawerHeightKey.self) { contentHeight = max(1, $0) }
-    }
-
-    private var shutterMask: some View {
-        VStack(spacing: 1) {
-            ForEach(0..<10, id: \.self) { index in
-                Rectangle()
-                    .fill(Color.white.opacity(slatOpacity(index)))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: max(8, contentHeight / 10))
+    private var shutterSlats: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<12, id: \.self) { i in
+                Capsule()
+                    .fill(Color.bgJadeHi.opacity(0.16 + Double(i % 3) * 0.07))
+                    .frame(height: 3)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private func slatOpacity(_ index: Int) -> Double {
-        guard reveal > 0 else { return 0 }
-        let threshold = Double(index) / 10.0
-        return min(1, max(0, (Double(reveal) - threshold) / 0.16))
+        .accessibilityHidden(true)
     }
 
     private var drag: some Gesture {
@@ -124,29 +97,26 @@ struct BGPullDrawer<Content: View>: View {
             .onEnded { value in
                 let dy = value.translation.height
                 let predicted = value.predictedEndTranslation.height
-                if isOpen, dy < -28 || predicted < -80 {
-                    isOpen = false
-                } else if !isOpen, dy > 28 || predicted > 80 {
-                    isOpen = true
-                } else {
-                    withAnimation(spring) { dragOffset = 0 }
+                withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : spring) {
+                    if isOpen, dy < -28 || predicted < -80 {
+                        isOpen = false
+                    } else if !isOpen, dy > 28 || predicted > 80 {
+                        isOpen = true
+                    }
+                    dragOffset = 0
                 }
             }
     }
 
     private func toggle() {
-        isOpen.toggle()
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : spring) {
+            isOpen.toggle()
+            dragOffset = 0
+        }
     }
 }
 
-private struct DrawerHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 1
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-/// 从底部抽拉的覆盖层，用于任务详情一类面板（卷帘上推感）。
+/// 从底部抽拉的覆盖层，用于任务详情一类面板。
 struct BGBottomDrawer<Content: View>: View {
     @Binding var isPresented: Bool
     var title: String
@@ -154,7 +124,6 @@ struct BGBottomDrawer<Content: View>: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragOffset: CGFloat = 0
-    @State private var lift: CGFloat = 0
 
     private let spring = Animation.spring(response: 0.48, dampingFraction: 0.86)
 
@@ -193,6 +162,7 @@ struct BGBottomDrawer<Content: View>: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 10)
+                        .accessibilityHidden(true)
 
                         ScrollView {
                             content()
@@ -213,8 +183,7 @@ struct BGBottomDrawer<Content: View>: View {
                             .stroke(Color.bgJadeHi.opacity(0.28), lineWidth: 1)
                     )
                     .shadow(color: Color.bgJadeHi.opacity(0.14), radius: 28, y: -6)
-                    .offset(y: dragOffset + (1 - lift) * 48)
-                    .opacity(0.55 + 0.45 * Double(lift))
+                    .offset(y: dragOffset)
                     .gesture(
                         DragGesture()
                             .onChanged { value in
@@ -235,9 +204,6 @@ struct BGBottomDrawer<Content: View>: View {
                         : .move(edge: .bottom).combined(with: .opacity)
                     )
                     .accessibilityIdentifier("bottom.drawer")
-                    .onAppear {
-                        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : spring) { lift = 1 }
-                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -245,13 +211,12 @@ struct BGBottomDrawer<Content: View>: View {
         .allowsHitTesting(isPresented)
         .animation(reduceMotion ? .easeInOut(duration: 0.18) : spring, value: isPresented)
         .onChange(of: isPresented) { _, presented in
-            if !presented { lift = 0; dragOffset = 0 }
+            if !presented { dragOffset = 0 }
         }
     }
 
     private func dismiss() {
         withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : spring) {
-            lift = 0
             isPresented = false
             dragOffset = 0
         }

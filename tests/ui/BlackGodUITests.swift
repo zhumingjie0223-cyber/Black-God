@@ -22,7 +22,13 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.buttons["sandbox.demo"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["sandbox.terminal"].exists)
         app.buttons["sandbox.controls"].tap()
+        // 卷帘展开后开关才进树；若按钮只切换了标题，再点抽屉标题兜底
+        if !app.switches["execution.enabled"].waitForExistence(timeout: 3) {
+            let drawerToggle = app.buttons["sandbox.drawer.toggle"]
+            if drawerToggle.waitForExistence(timeout: 2) { drawerToggle.tap() }
+        }
         XCTAssertTrue(app.switches["execution.enabled"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["sandbox.drawer"].exists)
         capture(app, name: "新版-沙箱")
         // End editing before changing the phone's bottom navigation.
         _ = app.buttons["tab.3"].waitForExistence(timeout: 3)
