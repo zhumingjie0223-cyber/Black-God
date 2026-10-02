@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 
 /// 工作区文件本机可视预览：HTML 用内嵌页渲染，文本直接显示。不是远程浏览器自动化。

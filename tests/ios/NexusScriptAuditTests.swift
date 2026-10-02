@@ -21,5 +21,7 @@ final class NexusScriptAuditTests: XCTestCase {
         let verdict = NexusScriptAudit.inspect("rm -rf ./build")
         XCTAssertEqual(verdict.level, .caution)
         XCTAssertNoThrow(try NexusScriptAudit.authorize("rm -rf ./build"))
+        // 沙箱内绝对路径删除只提醒，不按“删根”拦截。
+        XCTAssertEqual(NexusScriptAudit.inspect("rm -rf /workspace/tmp").level, .caution)
     }
 }

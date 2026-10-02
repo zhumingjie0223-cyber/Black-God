@@ -300,7 +300,12 @@ final class NexusLinuxRuntime {
         guard confirm.trimmingCharacters(in: .whitespacesAndNewlines) == "确认清空工作区" else {
             throw NexusReasoningError.execution("确认口令不正确。请输入「确认清空工作区」。")
         }
-        let result = try await execute(command: "find . -mindepth 1 -maxdepth 3 -exec rm -rf {} + 2>/dev/null; printf cleared", timeout: 60, workspace: workspace)
+        let result = try await execute(
+            command: "find . -mindepth 1 -maxdepth 3 -exec rm -rf {} + 2>/dev/null; printf cleared",
+            timeout: 60,
+            workspace: workspace,
+            confirm: NexusScriptAudit.confirmPhrase
+        )
         guard result.succeeded else { throw NexusReasoningError.execution(result.failure ?? "清空失败") }
     }
 

@@ -34,8 +34,9 @@ enum NexusScriptAudit {
             text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
         }
 
-        if match(#"rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)?(/|/\*|/\.\.)"#)
-            || match(#"rm\s+-[a-zA-Z]*r[a-zA-Z]*\s+/($|\s)"#) {
+        // 只拦删根/通配根路径，避免误伤沙箱内 `rm -rf /workspace/foo`。
+        if match(#"rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)?(/|/\*|/\.\.)(\s|$)"#)
+            || match(#"rm\s+-[a-zA-Z]*r[a-zA-Z]*\s+/(\s|$)"#) {
             block.append("疑似删除根目录或系统路径")
         }
         if match(#":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"#) || match(#"fork\s*bomb"#) {

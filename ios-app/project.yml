@@ -64,7 +64,7 @@ targets:
         HEADER_SEARCH_PATHS: ["$(SRCROOT)/../vendor", "$(SRCROOT)/../vendor/ish", "$(SRCROOT)/Runtime"]
         GCC_PREPROCESSOR_DEFINITIONS: ["$(inherited)", "GUEST_ARM64=1", "ENGINE_ASBESTOS=1"]
         LIBRARY_SEARCH_PATHS: ["$(SRCROOT)/Runtime/Libs/$(PLATFORM_NAME)"]
-        OTHER_LDFLAGS: ["$(inherited)", "-lish", "-lish_emu", "-lfakefs", "-lsqlite3"]
+        OTHER_LDFLAGS: ["$(inherited)", "-lish", "-lish_emu", "-lfakefs", "-lsqlite3", "-framework", "WebKit"]
         # 桌面显示名由 InfoPlist.strings 按语言覆盖（中文「神枢」/ 英文「Nexus」）
         INFOPLIST_KEY_CFBundleDisplayName: "Black God"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
