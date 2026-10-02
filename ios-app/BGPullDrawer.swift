@@ -36,8 +36,9 @@ struct BGPullDrawer<Content: View>: View {
         }
         .bgFloating(cornerRadius: 22)
         .offset(y: reduceMotion ? 0 : dragOffset)
-        .gesture(drag)
+        .simultaneousGesture(drag)
         .animation(reduceMotion ? .easeInOut(duration: 0.16) : spring, value: isOpen)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityID)
     }
 
@@ -54,21 +55,22 @@ struct BGPullDrawer<Content: View>: View {
     }
 
     private var header: some View {
-        HStack {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(Color.bgTextPrimary)
-            Spacer()
-            Image(systemName: "chevron.compact.down")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.bgJadeHi)
-                .rotationEffect(.degrees(isOpen ? 180 : 0))
+        Button(action: toggle) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(Color.bgTextPrimary)
+                Spacer()
+                Image(systemName: "chevron.compact.down")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.bgJadeHi)
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-        .onTapGesture { toggle() }
-        .accessibilityAddTraits(.isButton)
+        .buttonStyle(.plain)
         .accessibilityIdentifier("\(accessibilityID).toggle")
         .accessibilityLabel(isOpen ? "收起\(title)" : "展开\(title)")
     }

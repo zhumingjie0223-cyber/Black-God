@@ -6,7 +6,7 @@
 - [x] 2. 选型落地：`BGPullDrawer` 卷帘抽拉 + `BGBottomDrawer` 底部抽屉。
 - [x] 3. `taskCompleteHaptic` + 我的页双开关持久化；对话/演练/点亮挂钩。
 - [x] 4. 单测/UI；构建 22；新 PR #138；等 CI。
-- [ ] 5. CI 失败：卷帘高度裁掉 `execution.enabled`，改可靠展开后重推。
+- [x] 5. CI：卷帘裁切已修；屏外无障碍再修（真 Button + 展开滚入 + UI 测 reveal）。
 
 ## 总结
 

@@ -34,6 +34,7 @@ struct NexusSandboxView: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 hero
@@ -46,6 +47,7 @@ struct NexusSandboxView: View {
                     BGPullDrawer(isOpen: $showControls, title: "沙箱开关", accessibilityID: "sandbox.drawer") {
                         controlsPanelContent
                     }
+                    .id("sandbox.drawer.anchor")
                     filesPanel
                     if !auditEvents.isEmpty { auditPanel }
                     Text("沙箱页属 sandbox 工作区；对话属 chat 工作区。http_fetch 仅 HTTPS；预览禁脚本；宿主密钥不进沙箱。")
@@ -53,6 +55,13 @@ struct NexusSandboxView: View {
                 }
                 .padding(20)
             }
+        }
+        .onChange(of: showControls) { _, open in
+            guard open else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.9)) {
+                proxy.scrollTo("sandbox.drawer.anchor", anchor: .top)
+            }
+        }
         }
         .background {
             ZStack {
