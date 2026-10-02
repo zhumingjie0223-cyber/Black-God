@@ -1,14 +1,16 @@
 import SwiftUI
 
-/// 抽拉式卷帘面板：把手下拉展开 / 上推收起；内容整块弹簧卷开，不裁掉可点控件。
+/// 抽拉式卷帘面板：弹簧展开、卡点触感、玉绿扫光——不是普通折叠。
 struct BGPullDrawer<Content: View>: View {
     @Binding var isOpen: Bool
     var title: String
     var accessibilityID: String = "drawer"
     @ViewBuilder var content: () -> Content
 
+    @EnvironmentObject private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragOffset: CGFloat = 0
+    @State private var sweep: CGFloat = 0
 
     private let spring = Animation.spring(response: 0.48, dampingFraction: 0.84)
 
@@ -35,11 +37,28 @@ struct BGPullDrawer<Content: View>: View {
             }
         }
         .bgFloating(cornerRadius: 22)
+        .overlay {
+            if isOpen && !reduceMotion {
+                LinearGradient(
+                    colors: [.clear, Color.bgJadeHi.opacity(0.18), .clear],
+                    startPoint: UnitPoint(x: sweep - 0.2, y: 0),
+                    endPoint: UnitPoint(x: sweep + 0.2, y: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .allowsHitTesting(false)
+            }
+        }
         .offset(y: reduceMotion ? 0 : dragOffset)
         .simultaneousGesture(drag)
         .animation(reduceMotion ? .easeInOut(duration: 0.16) : spring, value: isOpen)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityID)
+        .onChange(of: isOpen) { _, open in
+            appState.haptic(open ? .medium : .soft)
+            guard open, !reduceMotion else { return }
+            sweep = 0
+            withAnimation(.easeInOut(duration: 0.7)) { sweep = 1 }
+        }
     }
 
     private var handle: some View {
@@ -61,6 +80,9 @@ struct BGPullDrawer<Content: View>: View {
                     .font(.headline)
                     .foregroundStyle(Color.bgTextPrimary)
                 Spacer()
+                Text(isOpen ? "卷上" : "抽开")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.bgJadeHi)
                 Image(systemName: "chevron.compact.down")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.bgJadeHi)
@@ -118,21 +140,23 @@ struct BGPullDrawer<Content: View>: View {
     }
 }
 
-/// 从底部抽拉的覆盖层，用于任务详情一类面板。
+/// 从底部抽拉的执行剧场覆盖层。
 struct BGBottomDrawer<Content: View>: View {
     @Binding var isPresented: Bool
     var title: String
     @ViewBuilder var content: () -> Content
 
+    @EnvironmentObject private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragOffset: CGFloat = 0
+    @State private var sweep: CGFloat = 0
 
     private let spring = Animation.spring(response: 0.48, dampingFraction: 0.86)
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                Color.black.opacity(isPresented ? 0.48 : 0)
+                Color.black.opacity(isPresented ? 0.52 : 0)
                     .ignoresSafeArea()
                     .onTapGesture { dismiss() }
                     .accessibilityHidden(!isPresented)
@@ -184,7 +208,18 @@ struct BGBottomDrawer<Content: View>: View {
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .stroke(Color.bgJadeHi.opacity(0.28), lineWidth: 1)
                     )
-                    .shadow(color: Color.bgJadeHi.opacity(0.14), radius: 28, y: -6)
+                    .overlay {
+                        if !reduceMotion {
+                            LinearGradient(
+                                colors: [.clear, Color.bgJadeHi.opacity(0.14), .clear],
+                                startPoint: UnitPoint(x: sweep - 0.15, y: 0),
+                                endPoint: UnitPoint(x: sweep + 0.15, y: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                            .allowsHitTesting(false)
+                        }
+                    }
+                    .shadow(color: Color.bgJadeHi.opacity(0.16), radius: 28, y: -6)
                     .offset(y: dragOffset)
                     .gesture(
                         DragGesture()
@@ -197,6 +232,7 @@ struct BGBottomDrawer<Content: View>: View {
                                     dismiss()
                                 } else {
                                     withAnimation(spring) { dragOffset = 0 }
+                                    appState.haptic(.soft)
                                 }
                             }
                     )
@@ -206,6 +242,12 @@ struct BGBottomDrawer<Content: View>: View {
                         : .move(edge: .bottom).combined(with: .opacity)
                     )
                     .accessibilityIdentifier("bottom.drawer")
+                    .onAppear {
+                        appState.haptic(.medium)
+                        guard !reduceMotion else { return }
+                        sweep = 0
+                        withAnimation(.easeInOut(duration: 0.75)) { sweep = 1 }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -218,6 +260,7 @@ struct BGBottomDrawer<Content: View>: View {
     }
 
     private func dismiss() {
+        appState.haptic(.soft)
         withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : spring) {
             isPresented = false
             dragOffset = 0

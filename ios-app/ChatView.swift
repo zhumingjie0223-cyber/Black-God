@@ -17,7 +17,16 @@ struct ChatView: View {
     @State private var showTerminal = false
     @State private var showTaskDetails = false
     @State private var showPracticeDetails = false
+    @State private var completionReveal: CompletionPayload?
     @FocusState private var inputFocused: Bool
+
+    private struct CompletionPayload: Identifiable, Equatable {
+        let id = UUID()
+        let outcome: NexusCompletionReveal.Outcome
+        let goal: String
+        let detail: String
+        let practice: Bool
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -95,7 +104,7 @@ struct ChatView: View {
             }
         }
         .overlay {
-            BGBottomDrawer(isPresented: $showTaskDetails, title: showPracticeDetails ? "演练记录" : "任务详情") {
+            BGBottomDrawer(isPresented: $showTaskDetails, title: showPracticeDetails ? "执行剧场" : "执行剧场") {
                 VStack(spacing: 16) {
                     if showPracticeDetails {
                         NexusLiveExecutionView(live: vm.practice.live, stop: vm.practice.stop)
@@ -107,11 +116,24 @@ struct ChatView: View {
                 .padding(.top, 4)
             }
         }
+        .overlay {
+            if let payload = completionReveal {
+                NexusCompletionReveal(
+                    outcome: payload.outcome,
+                    goal: payload.goal,
+                    detail: payload.detail,
+                    onOpenTheater: { openTaskDetails(practice: payload.practice) },
+                    onDismiss: { completionReveal = nil }
+                )
+                .transition(.opacity)
+                .zIndex(20)
+            }
+        }
         .onChange(of: vm.live.state) { previous, next in
-            notifyTaskHaptic(from: previous, to: next)
+            presentCompletion(from: previous, to: next, practice: false)
         }
         .onChange(of: vm.practice.live.state) { previous, next in
-            notifyTaskHaptic(from: previous, to: next)
+            presentCompletion(from: previous, to: next, practice: true)
         }
         .confirmationDialog("清空当前对话？", isPresented: $showClearConversation, titleVisibility: .visible) {
             Button("清空对话与任务记录", role: .destructive) {
@@ -298,15 +320,16 @@ struct ChatView: View {
         appState.haptic(.light)
     }
 
-    private func notifyTaskHaptic(from previous: NexusLiveExecution.State, to next: NexusLiveExecution.State) {
-        guard previous == .running else { return }
-        switch next {
-        case .answered:
-            appState.taskCompleteHaptic(success: true)
-        case .warning, .failed:
-            appState.taskCompleteHaptic(success: false)
-        default:
-            break
+    private func presentCompletion(from previous: NexusLiveExecution.State, to next: NexusLiveExecution.State, practice: Bool) {
+        guard previous == .running, let outcome = NexusCompletionReveal.Outcome.from(next) else { return }
+        let live = practice ? vm.practice.live : vm.live
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+            completionReveal = CompletionPayload(
+                outcome: outcome,
+                goal: live.goal,
+                detail: live.status.isEmpty ? outcome.title : live.status,
+                practice: practice
+            )
         }
     }
 
