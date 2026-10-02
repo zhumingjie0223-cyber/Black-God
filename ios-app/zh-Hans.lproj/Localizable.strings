@@ -12,7 +12,7 @@
 /* ===== 底部 Tab ===== */
 "tab.chat" = "对话";
 "tab.tools" = "工具";
-"tab.media" = "创作";
+"tab.media" = "沙箱";
 "tab.monitor" = "监测";
 "tab.me" = "我的";
 

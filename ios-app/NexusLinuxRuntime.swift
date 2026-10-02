@@ -9,6 +9,11 @@ struct NexusLinuxResult {
     var succeeded: Bool { failure == nil && exitCode == 0 }
 }
 
+struct NexusWorkspaceFile: Identifiable, Equatable, Sendable {
+    var id: String { path }
+    let path: String
+}
+
 /// A single kernel per app. Commands are serialized; host app data is never mounted.
 @MainActor
 final class NexusLinuxRuntime {
@@ -158,6 +163,97 @@ final class NexusLinuxRuntime {
         }
     }
     func recentExecutions() throws -> [NexusExecutionRecord] { try journal.records() }
+
+    /// 已安装镜像根目录（含 data/sessions）；未安装时为 nil。
+    func installedImageRoot() -> URL? {
+        let fm = FileManager.default
+        guard let children = try? fm.contentsOfDirectory(at: rootParent, includingPropertiesForKeys: nil) else { return nil }
+        return children.first { fm.fileExists(atPath: $0.appendingPathComponent("meta.db").path) }
+    }
+
+    func hostWorkspaceURL(for workspace: UUID) -> URL? {
+        installedImageRoot()?.appendingPathComponent("data/sessions/\(workspace.uuidString)/workspace", isDirectory: true)
+    }
+
+    /// 列出沙箱工作区文件（相对 /workspace）。必要时先准备环境。
+    func listWorkspaceFiles(workspace: UUID, limit: Int = 80) async throws -> [NexusWorkspaceFile] {
+        let result = try await execute(
+            command: "find . -maxdepth 3 \\( -type f -o -type l \\) ! -path './.*' 2>/dev/null | sed 's|^\\./||' | head -n \(max(1, limit))",
+            timeout: 30,
+            workspace: workspace
+        )
+        guard result.succeeded || !result.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            let detail = result.failure ?? (result.errorOutput.isEmpty ? "无法列出工作区文件" : result.errorOutput)
+            throw NexusReasoningError.execution(detail)
+        }
+        return result.output
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.contains("\0") && !$0.hasPrefix("../") }
+            .prefix(limit)
+            .map { NexusWorkspaceFile(path: $0) }
+    }
+
+    func importToWorkspace(data: Data, named name: String, workspace: UUID) async throws {
+        let safe = Self.sanitizeFileName(name)
+        guard !data.isEmpty, data.count <= 2 * 1024 * 1024 else {
+            throw NexusReasoningError.execution("导入文件需在 1 字节到 2 MiB 之间。")
+        }
+        _ = try await execute(command: "true", timeout: 30, workspace: workspace)
+        guard let dir = hostWorkspaceURL(for: workspace) else {
+            throw NexusReasoningError.execution("工作区尚未就绪，请先打开沙箱或运行一条命令。")
+        }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let target = dir.appendingPathComponent(safe)
+        try data.write(to: target, options: .atomic)
+    }
+
+    func exportWorkspaceFile(_ path: String, workspace: UUID) async throws -> Data {
+        let safe = Self.sanitizeRelativePath(path)
+        let encoded = safe.replacingOccurrences(of: "'", with: "'\\''")
+        let result = try await execute(
+            command: "test -f '\(encoded)' && wc -c < '\(encoded)' && base64 '\(encoded)'",
+            timeout: 60,
+            workspace: workspace
+        )
+        guard result.succeeded else {
+            throw NexusReasoningError.execution(result.failure ?? "无法导出该文件")
+        }
+        let lines = result.output.split(whereSeparator: \.isNewline).map(String.init)
+        guard let sizeLine = lines.first, let size = Int(sizeLine.trimmingCharacters(in: .whitespaces)), size <= 2 * 1024 * 1024 else {
+            throw NexusReasoningError.execution("文件过大或不存在（导出上限 2 MiB）。")
+        }
+        let b64 = lines.dropFirst().joined()
+        guard let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else {
+            throw NexusReasoningError.execution("导出解码失败。")
+        }
+        return data
+    }
+
+    func clearWorkspaceFiles(workspace: UUID, confirm: String) async throws {
+        guard confirm.trimmingCharacters(in: .whitespacesAndNewlines) == "确认清空工作区" else {
+            throw NexusReasoningError.execution("确认口令不正确。请输入「确认清空工作区」。")
+        }
+        let result = try await execute(command: "find . -mindepth 1 -maxdepth 3 -exec rm -rf {} + 2>/dev/null; printf cleared", timeout: 60, workspace: workspace)
+        guard result.succeeded else { throw NexusReasoningError.execution(result.failure ?? "清空失败") }
+    }
+
+    static func sanitizeFileName(_ name: String) -> String {
+        let base = (name as NSString).lastPathComponent
+        let cleaned = base.replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\0", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = cleaned.isEmpty ? "import.bin" : cleaned
+        return String(value.prefix(120))
+    }
+
+    static func sanitizeRelativePath(_ path: String) -> String {
+        var value = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.hasPrefix("./") { value = String(value.dropFirst(2)) }
+        value = value.replacingOccurrences(of: "\0", with: "")
+        let parts = value.split(separator: "/").map(String.init).filter { $0 != ".." && $0 != "." && !$0.isEmpty }
+        return parts.joined(separator: "/")
+    }
 
     private func checkPreparationCancellation() throws {
         try Task.checkCancellation()

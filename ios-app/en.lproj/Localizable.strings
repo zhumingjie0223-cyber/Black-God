@@ -9,7 +9,7 @@
 /* ===== Bottom tabs ===== */
 "tab.chat" = "Chat";
 "tab.tools" = "Tools";
-"tab.media" = "Create";
+"tab.media" = "Sandbox";
 "tab.monitor" = "Monitor";
 "tab.me" = "Me";
 

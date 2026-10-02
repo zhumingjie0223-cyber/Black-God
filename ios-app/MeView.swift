@@ -25,6 +25,7 @@ struct MeView: View {
     @State private var showNexusConnection = false
     @State private var showTerminal = false
     @State private var showVault = false
+    @State private var showMediaDraft = false
 
     var body: some View {
         ScrollView {
@@ -52,6 +53,10 @@ struct MeView: View {
                     Button { showCognitive = true } label: {
                         SettingRow(icon: "checkmark.shield", title: "神枢成长", value: "", color: .bgJadeHi, compact: true)
                     }.accessibilityIdentifier("cognitive.open")
+                    Divider().overlay(Color.bgCardLight)
+                    Button { showMediaDraft = true } label: {
+                        SettingRow(icon: "wand.and.stars", title: "灵感草稿", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("media.open")
                 }
 
                 settingsGroup("执行") {
@@ -100,6 +105,12 @@ struct MeView: View {
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
         .sheet(isPresented: $showVault) {
             NexusDataVaultView(memory: memory, skills: skills, onWiped: onVaultWiped)
+        }
+        .sheet(isPresented: $showMediaDraft) {
+            NavigationStack {
+                MediaView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showMediaDraft = false } } }
+            }
         }
         .sheet(isPresented: $showTerminal) {
             NavigationStack {

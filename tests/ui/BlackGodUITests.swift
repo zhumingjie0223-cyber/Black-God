@@ -18,18 +18,10 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertFalse(app.buttons["tab.1"].exists)
         XCTAssertFalse(app.buttons["execution.start"].exists)
         app.buttons["tab.2"].tap()
-        let generate = app.buttons["media.generate"]
-        reveal(generate, in: app)
-        XCTAssertTrue(generate.exists)
-        XCTAssertFalse(generate.isEnabled)
-        let field = app.descendants(matching: .any)["media.prompt"]
-        field.tap(); field.typeText("A quiet forest cabin")
-        let copy = app.buttons["media.copy"]
-        reveal(copy, in: app); copy.tap()
-        XCTAssertTrue(app.buttons["已复制描述"].waitForExistence(timeout: 3))
-        app.swipeDown()
-        app.swipeDown()
-        capture(app, name: "新版-创作")
+        XCTAssertTrue(app.staticTexts["sandbox.title"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["sandbox.terminal"].exists)
+        XCTAssertTrue(app.switches["execution.enabled"].exists)
+        capture(app, name: "新版-沙箱")
         // End editing before changing the phone's bottom navigation.
         _ = app.buttons["tab.3"].waitForExistence(timeout: 3)
         if !app.buttons["tab.3"].exists { app.swipeDown() }

@@ -66,6 +66,7 @@ private struct NexusToolsSectionLabel: View {
 
 /// Advanced diagnostic terminal; ordinary tasks enter through the shared chat engine.
 struct NexusTerminalView: View {
+    var workspaceName: String = "tools"
     @StateObject private var live = NexusLiveExecution()
     @FocusState private var editingCommand: Bool
     @State private var command = "uname -a\nprintf 'Hello from Black God\\n'"
@@ -74,12 +75,12 @@ struct NexusTerminalView: View {
     @State private var task: Task<Void, Never>?
     @State private var records: [NexusExecutionRecord] = []
     @State private var journalError: String?
-    private var workspace: UUID { NexusWorkspaceIdentity.id(for: "tools") }
+    private var workspace: UUID { NexusWorkspaceIdentity.id(for: workspaceName) }
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    BGPageHeader(title: "命令工作区", subtitle: "本机 Alpine Linux · ARM64", eyebrow: "高级工具 · 实验功能")
+                    BGPageHeader(title: "沙箱终端", subtitle: "本机 Alpine Linux · ARM64", eyebrow: "隔离工作区")
                     VStack(alignment: .leading, spacing: 14) {
                         Label("编写命令", systemImage: "terminal").font(.headline).foregroundStyle(Color.bgTextPrimary)
                         TextEditor(text: $command)
