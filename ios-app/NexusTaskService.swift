@@ -32,8 +32,9 @@ struct NexusTaskBootstrap {
         }
         let connection = NexusModelCatalog.entry(for: selected)
         let key = NexusKeychain.shared.key(for: connection.credentialID)
-        let memoryStore = memory ?? NexusMemoryStore()
-        let skillStore = skills ?? NexusSkillStore()
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let memoryStore = memory ?? NexusMemoryStore(url: support.appendingPathComponent("nexus-memory.json"))
+        let skillStore = skills ?? NexusSkillStore(url: support.appendingPathComponent("nexus-skills.json"))
         let memoryItems = memoryStore.curated
         let skillItems = skillStore.available
         let remembered = memoryItems.isEmpty
