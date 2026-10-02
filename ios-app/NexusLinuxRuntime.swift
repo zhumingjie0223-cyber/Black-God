@@ -9,6 +9,30 @@ struct NexusLinuxResult {
     var succeeded: Bool { failure == nil && exitCode == 0 }
 }
 
+struct NexusWorkspaceFile: Identifiable, Equatable, Sendable {
+    var id: String { path }
+    let path: String
+}
+
+enum NexusWorkspacePath {
+    static func sanitizeFileName(_ name: String) -> String {
+        let base = (name as NSString).lastPathComponent
+        let cleaned = base.replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\0", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = cleaned.isEmpty ? "import.bin" : cleaned
+        return String(value.prefix(120))
+    }
+
+    static func sanitizeRelativePath(_ path: String) -> String {
+        var value = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.hasPrefix("./") { value = String(value.dropFirst(2)) }
+        value = value.replacingOccurrences(of: "\0", with: "")
+        let parts = value.split(separator: "/").map(String.init).filter { $0 != ".." && $0 != "." && !$0.isEmpty }
+        return parts.joined(separator: "/")
+    }
+}
+
 /// A single kernel per app. Commands are serialized; host app data is never mounted.
 @MainActor
 final class NexusLinuxRuntime {
@@ -49,7 +73,7 @@ final class NexusLinuxRuntime {
         guard code == 0 else { throw NexusReasoningError.execution("Linux 启动失败（\(code)），请重启应用后再试。") }
         ready = true
     }
-    func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), onStatus: ((String) -> Void)? = nil, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
+    func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), confirm: String? = nil, onStatus: ((String) -> Void)? = nil, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
         try Task.checkCancellation()
         guard !busy else { throw NexusReasoningError.execution("Linux 正在执行另一项任务，请稍后重试。") }
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -57,6 +81,55 @@ final class NexusLinuxRuntime {
               timeout.isFinite, timeout > 0, timeout <= 120 else {
             throw NexusReasoningError.execution("命令为空、过长或超时范围无效（1—120秒）。")
         }
+        let audit = try NexusScriptAudit.authorize(
+            command,
+            confirm: confirm,
+            allowDangerous: NexusScriptAudit.allowDangerous()
+        )
+        if audit.level != .allow {
+            onStatus?(audit.summary)
+        }
+        return try await withPreparedWorkspace(workspace: workspace, onStatus: onStatus) { token in
+            let recordID = try journal.begin(workspace: workspace, command: command)
+            do {
+                try await ensureSessionRoot(workspace: workspace, onStatus: onStatus)
+                try checkPreparationCancellation()
+                ISHKernel.shared.nextRoot = "/sessions/" + workspace.uuidString
+                onStatus?("正在执行命令")
+                let result = try await runCommand(
+                    command: "umask 077\ncd /workspace || exit 125\n" + command,
+                    timeout: timeout,
+                    onOutput: onOutput
+                )
+                let status: String
+                if result.succeeded { status = "completed" }
+                else if result.exitCode < 0, let reason = cancellationReason {
+                    status = reason == "用户停止" ? "cancelled" : "interrupted"
+                } else { status = "failed" }
+                try journal.finish(recordID, status: status, exitCode: result.exitCode)
+                _ = token
+                return result
+            } catch {
+                try? journal.finish(recordID, status: Task.isCancelled ? "cancelled" : "failed")
+                throw error
+            }
+        }
+    }
+
+    /// 准备内核与会话工作区，不跑用户命令；供导入/配额读取复用，避免假执行 `true`。
+    func ensureWorkspaceReady(workspace: UUID, onStatus: ((String) -> Void)? = nil) async throws {
+        try Task.checkCancellation()
+        guard !busy else { throw NexusReasoningError.execution("Linux 正在执行另一项任务，请稍后重试。") }
+        try await withPreparedWorkspace(workspace: workspace, onStatus: onStatus) { _ in
+            try await ensureSessionRoot(workspace: workspace, onStatus: onStatus)
+        }
+    }
+
+    private func withPreparedWorkspace<T>(
+        workspace: UUID,
+        onStatus: ((String) -> Void)?,
+        body: (UUID) async throws -> T
+    ) async throws -> T {
         onStatus?("正在准备运行环境…")
         try prepare()
         guard ISHKernel.shared.reapAndCountGuestProcesses() == 0 else {
@@ -71,7 +144,7 @@ final class NexusLinuxRuntime {
             busy = false; executionToken = nil; cancellationReason = nil; ISHKernel.shared.nextRoot = nil
         }
         let storageRoot = rootParent
-        let initialBudget = NexusStorage.budget()
+        let initialBudget = NexusStorage.hardBudget()
         onStatus?("正在检查工作区与可用空间…")
         let scan = Task { try await measureStorage(storageRoot, initialBudget) }
         preparationTask = scan
@@ -89,10 +162,11 @@ final class NexusLinuxRuntime {
         }
         preparationTask = nil
         try checkPreparationCancellation()
-        let spaceBudget = NexusStorage.adoptExistingUsage(measured)
+        let spaceBudget = NexusStorage.hardBudget(adoptExistingUsage: measured)
         let space = NexusStorageSnapshot(used: measured.used, free: measured.free, budget: spaceBudget, files: measured.files)
         blackgod_set_guest_storage(UInt64(space.budget), UInt64(max(0, space.used)))
-        if let reason = space.stopReason { busy = false; throw NexusReasoningError.execution(reason) }
+        if let reason = space.stopReason { throw NexusReasoningError.execution(reason) }
+        try NexusStorage.enforceHardCeiling(space)
         let watcher = Task { @MainActor in
             while !Task.isCancelled {
                 do {
@@ -110,54 +184,160 @@ final class NexusLinuxRuntime {
             }
         }
         defer { watcher.cancel() }
-        let recordID = try journal.begin(workspace: workspace, command: command)
-        do {
+        return try await body(token)
+    }
+
+    private func ensureSessionRoot(workspace: UUID, onStatus: ((String) -> Void)?) async throws {
         let root = "/sessions/" + workspace.uuidString
-        if !preparedWorkspaces.contains(workspace) {
-            onStatus?("正在准备独立工作区…")
-            let setup = """
-            set -e
-            if [ ! -d '\(root)' ] && [ -d '\(root).previous' ]; then mv '\(root).previous' '\(root)'; fi
-            if [ ! -f '\(root)/.ready' ]; then
-              mkdir -p /sessions
-              chmod 700 /sessions
-              staging='\(root).install'
-              rm -rf "$staging"
-              mkdir -p "$staging"
-              cp -al /bin /sbin /lib /usr /etc "$staging/"
-              mkdir -p "$staging/dev" "$staging/tmp" "$staging/workspace"
-              cp -a /dev/null /dev/zero /dev/urandom "$staging/dev/"
-              chown 1000:1000 "$staging/workspace" "$staging/tmp"
-              chmod 700 "$staging/workspace" "$staging/tmp"
-              if [ -d '\(root)/workspace' ]; then cp -a '\(root)/workspace/.' "$staging/workspace/"; fi
-              touch "$staging/.ready"
-              if [ -d '\(root)' ]; then rm -rf '\(root).previous'; mv '\(root)' '\(root).previous'; fi
-              mv "$staging" '\(root)'
-              rm -rf '\(root).previous'
-            fi
-            """
-            ISHKernel.shared.nextRoot = nil
-            let result = try await runCommand(command: setup, timeout: 30)
-            guard result.succeeded else { throw NexusReasoningError.execution("无法创建独立工作区：" + (result.failure ?? result.errorOutput)) }
-            preparedWorkspaces.insert(workspace)
+        guard !preparedWorkspaces.contains(workspace) else { return }
+        onStatus?("正在准备独立工作区…")
+        let setup = """
+        set -e
+        if [ ! -d '\(root)' ] && [ -d '\(root).previous' ]; then mv '\(root).previous' '\(root)'; fi
+        if [ ! -f '\(root)/.ready' ]; then
+          mkdir -p /sessions
+          chmod 700 /sessions
+          staging='\(root).install'
+          rm -rf "$staging"
+          mkdir -p "$staging"
+          cp -al /bin /sbin /lib /usr /etc "$staging/"
+          mkdir -p "$staging/dev" "$staging/tmp" "$staging/workspace"
+          cp -a /dev/null /dev/zero /dev/urandom "$staging/dev/"
+          chown 1000:1000 "$staging/workspace" "$staging/tmp"
+          chmod 700 "$staging/workspace" "$staging/tmp"
+          if [ -d '\(root)/workspace' ]; then cp -a '\(root)/workspace/.' "$staging/workspace/"; fi
+          touch "$staging/.ready"
+          if [ -d '\(root)' ]; then rm -rf '\(root).previous'; mv '\(root)' '\(root).previous'; fi
+          mv "$staging" '\(root)'
+          rm -rf '\(root).previous'
+        fi
+        """
+        ISHKernel.shared.nextRoot = nil
+        let result = try await runCommand(command: setup, timeout: 30)
+        guard result.succeeded else {
+            throw NexusReasoningError.execution("无法创建独立工作区：" + (result.failure ?? result.errorOutput))
         }
-        try checkPreparationCancellation()
-        ISHKernel.shared.nextRoot = root
-        onStatus?("正在执行命令")
-        let result = try await runCommand(command: "umask 077\ncd /workspace || exit 125\n" + command, timeout: timeout, onOutput: onOutput)
-        // 被系统（进入后台、空间不足）强制停止的命令记为“意外中断”，用户主动停止记为“已取消”；只有命令自身出错才记“失败”。
-        let status: String
-        if result.succeeded { status = "completed" }
-        else if result.exitCode < 0, let reason = cancellationReason { status = reason == "用户停止" ? "cancelled" : "interrupted" }
-        else { status = "failed" }
-        try journal.finish(recordID, status: status, exitCode: result.exitCode)
-        return result
-        } catch {
-            try? journal.finish(recordID, status: Task.isCancelled ? "cancelled" : "failed")
-            throw error
+        preparedWorkspaces.insert(workspace)
+    }
+
+    func recentExecutions() throws -> [NexusExecutionRecord] { try journal.records() }
+
+    /// 已安装镜像根目录（含 data/sessions）；未安装时为 nil。
+    func installedImageRoot() -> URL? {
+        let fm = FileManager.default
+        guard let children = try? fm.contentsOfDirectory(at: rootParent, includingPropertiesForKeys: nil) else { return nil }
+        return children.first { fm.fileExists(atPath: $0.appendingPathComponent("meta.db").path) }
+    }
+
+    func hostWorkspaceURL(for workspace: UUID) -> URL? {
+        installedImageRoot()?.appendingPathComponent("data/sessions/\(workspace.uuidString)/workspace", isDirectory: true)
+    }
+
+    /// 列出沙箱工作区文件（相对 /workspace）。必要时先准备环境。
+    func listWorkspaceFiles(workspace: UUID, limit: Int = 80) async throws -> [NexusWorkspaceFile] {
+        let result = try await execute(
+            command: "find . -maxdepth 3 \\( -type f -o -type l \\) ! -path './.*' 2>/dev/null | sed 's|^\\./||' | head -n \(max(1, limit))",
+            timeout: 30,
+            workspace: workspace
+        )
+        guard result.succeeded || !result.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            let detail = result.failure ?? (result.errorOutput.isEmpty ? "无法列出工作区文件" : result.errorOutput)
+            throw NexusReasoningError.execution(detail)
+        }
+        return result.output
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.contains("\0") && !$0.hasPrefix("../") }
+            .prefix(limit)
+            .map { NexusWorkspaceFile(path: $0) }
+    }
+
+    func importToWorkspace(data: Data, named name: String, workspace: UUID) async throws {
+        let safe = NexusWorkspacePath.sanitizeFileName(name.contains("/") ? (name as NSString).lastPathComponent : name)
+        let relative = name.contains("/") ? NexusWorkspacePath.sanitizeRelativePath(name) : safe
+        guard !data.isEmpty, data.count <= Int(NexusWorkspaceQuota.maxSingleWrite) else {
+            throw NexusReasoningError.execution("导入文件需在 1 字节到 \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxSingleWrite)) 之间。")
+        }
+        try await ensureWorkspaceReady(workspace: workspace)
+        guard let dir = hostWorkspaceURL(for: workspace) else {
+            throw NexusReasoningError.execution("工作区尚未就绪，请先打开沙箱或运行一条命令。")
+        }
+        let target = relative.contains("/")
+            ? dir.appendingPathComponent(relative)
+            : dir.appendingPathComponent(safe)
+        let creating = !FileManager.default.fileExists(atPath: target.path)
+        try NexusWorkspaceQuota.enforce(adding: Int64(data.count), creatingFile: creating, at: dir)
+        if let root = installedImageRoot() {
+            let image = try await NexusStorage.measureInBackground(root: root, budget: NexusStorage.hardBudget())
+            try NexusStorage.enforceHardCeiling(image, adding: Int64(data.count))
+        }
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: target, options: .atomic)
+    }
+
+    func deleteWorkspaceFile(_ path: String, workspace: UUID, confirm: String) async throws {
+        guard confirm.trimmingCharacters(in: .whitespacesAndNewlines) == "确认删除" else {
+            throw NexusReasoningError.execution("确认口令不正确。请输入「确认删除」。")
+        }
+        let safe = NexusWorkspacePath.sanitizeRelativePath(path)
+        guard !safe.isEmpty else { throw NexusReasoningError.execution("缺少有效 path。") }
+        let encoded = safe.replacingOccurrences(of: "'", with: "'\\''")
+        let result = try await execute(
+            command: "test -e '\(encoded)' && rm -rf -- '\(encoded)' && printf deleted",
+            timeout: 30,
+            workspace: workspace,
+            confirm: NexusScriptAudit.confirmPhrase
+        )
+        guard result.succeeded else {
+            throw NexusReasoningError.execution(result.failure ?? "删除失败")
         }
     }
-    func recentExecutions() throws -> [NexusExecutionRecord] { try journal.records() }
+
+    func imageQuotaSummary() async -> String {
+        guard let root = installedImageRoot() else { return "整镜像：尚未安装运行环境" }
+        do {
+            let budget = NexusStorage.hardBudget()
+            let snap = try await NexusStorage.measureInBackground(root: root, budget: budget)
+            return "整镜像硬顶 \(NexusWorkspaceQuota.byteText(snap.used))/\(NexusWorkspaceQuota.byteText(budget))（绝对上限 \(NexusStorage.absoluteCeilingGiB) GiB）"
+        } catch {
+            return "整镜像：用量读取失败"
+        }
+    }
+
+    func exportWorkspaceFile(_ path: String, workspace: UUID) async throws -> Data {
+        let safe = NexusWorkspacePath.sanitizeRelativePath(path)
+        let encoded = safe.replacingOccurrences(of: "'", with: "'\\''")
+        let result = try await execute(
+            command: "test -f '\(encoded)' && wc -c < '\(encoded)' && base64 '\(encoded)'",
+            timeout: 60,
+            workspace: workspace
+        )
+        guard result.succeeded else {
+            throw NexusReasoningError.execution(result.failure ?? "无法导出该文件")
+        }
+        let lines = result.output.split(whereSeparator: \.isNewline).map(String.init)
+        guard let sizeLine = lines.first, let size = Int(sizeLine.trimmingCharacters(in: .whitespaces)), size <= 2 * 1024 * 1024 else {
+            throw NexusReasoningError.execution("文件过大或不存在（导出上限 2 MiB）。")
+        }
+        let b64 = lines.dropFirst().joined()
+        guard let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else {
+            throw NexusReasoningError.execution("导出解码失败。")
+        }
+        return data
+    }
+
+    func clearWorkspaceFiles(workspace: UUID, confirm: String) async throws {
+        guard confirm.trimmingCharacters(in: .whitespacesAndNewlines) == "确认清空工作区" else {
+            throw NexusReasoningError.execution("确认口令不正确。请输入「确认清空工作区」。")
+        }
+        let result = try await execute(
+            command: "find . -mindepth 1 -maxdepth 3 -exec rm -rf {} + 2>/dev/null; printf cleared",
+            timeout: 60,
+            workspace: workspace,
+            confirm: NexusScriptAudit.confirmPhrase
+        )
+        guard result.succeeded else { throw NexusReasoningError.execution(result.failure ?? "清空失败") }
+    }
 
     private func checkPreparationCancellation() throws {
         try Task.checkCancellation()

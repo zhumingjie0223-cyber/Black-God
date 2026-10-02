@@ -18,12 +18,36 @@ struct NexusStorage {
     static let gib: Int64 = 1024 * 1024 * 1024
     static let reserve: Int64 = 256 * 1024 * 1024
     static let choices: [Int64] = [1, 2, 4, 8]
+    /// 整镜像绝对硬顶（GiB），不可被设置项突破。
+    static let absoluteCeilingGiB: Int64 = 8
     static var root: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BlackGodLinux", isDirectory: true)
     }
     static func budget(in defaults: UserDefaults = .standard) -> Int64 {
         let value = defaults.integer(forKey: "blackgod.linux.storageGiB")
         return (choices.contains(Int64(value)) ? Int64(value) : 2) * gib
+    }
+    /// 用户预算与绝对硬顶取较小值。
+    static func hardBudget(in defaults: UserDefaults = .standard) -> Int64 {
+        min(budget(in: defaults), absoluteCeilingGiB * gib)
+    }
+    /// 先按已有用量认领预算，再套绝对硬顶。
+    static func hardBudget(adoptExistingUsage snapshot: NexusStorageSnapshot, defaults: UserDefaults = .standard) -> Int64 {
+        min(adoptExistingUsage(snapshot, defaults: defaults), absoluteCeilingGiB * gib)
+    }
+    /// 超硬顶或手机空间不足时直接拒绝，不是软提醒。
+    static func enforceHardCeiling(_ snapshot: NexusStorageSnapshot, adding bytes: Int64 = 0) throws {
+        if let reason = snapshot.stopReason {
+            throw NexusReasoningError.execution(reason)
+        }
+        if bytes > 0, snapshot.used + bytes > snapshot.budget {
+            throw NexusReasoningError.execution(
+                "整镜像硬顶 \(ByteCountFormatter.string(fromByteCount: snapshot.budget, countStyle: .binary))，当前已用 \(ByteCountFormatter.string(fromByteCount: snapshot.used, countStyle: .binary))，无法再写入 \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .binary))。"
+            )
+        }
+        if snapshot.budget > absoluteCeilingGiB * gib {
+            throw NexusReasoningError.execution("整镜像绝对硬顶为 \(absoluteCeilingGiB) GiB，当前预算配置无效。")
+        }
     }
     // 首次升级按已有文件选择预算，不覆盖用户之后明确选择的容量。
     static func adoptExistingUsage(_ snapshot: NexusStorageSnapshot, defaults: UserDefaults = .standard) -> Int64 {

@@ -66,6 +66,7 @@ private struct NexusToolsSectionLabel: View {
 
 /// Advanced diagnostic terminal; ordinary tasks enter through the shared chat engine.
 struct NexusTerminalView: View {
+    var workspaceName: String = "tools"
     @StateObject private var live = NexusLiveExecution()
     @FocusState private var editingCommand: Bool
     @State private var command = "uname -a\nprintf 'Hello from Black God\\n'"
@@ -74,12 +75,12 @@ struct NexusTerminalView: View {
     @State private var task: Task<Void, Never>?
     @State private var records: [NexusExecutionRecord] = []
     @State private var journalError: String?
-    private var workspace: UUID { NexusWorkspaceIdentity.id(for: "tools") }
+    private var workspace: UUID { NexusWorkspaceIdentity.id(for: workspaceName) }
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    BGPageHeader(title: "命令工作区", subtitle: "本机 Alpine Linux · ARM64", eyebrow: "高级工具 · 实验功能")
+                    BGPageHeader(title: "沙箱终端", subtitle: "本机 Alpine Linux · ARM64", eyebrow: "隔离工作区")
                     VStack(alignment: .leading, spacing: 14) {
                         Label("编写命令", systemImage: "terminal").font(.headline).foregroundStyle(Color.bgTextPrimary)
                         TextEditor(text: $command)
@@ -146,6 +147,7 @@ struct NexusTerminalView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("运行范围", systemImage: "info.circle").font(.subheadline.weight(.semibold))
                         Text("内置 BusyBox，可运行 sh、awk 等脚本。命令默认最多 30 秒，单路输出上限 256 KiB。")
+                        Text("高危命令（如删根、远程管道执行、格式化）默认被脚本审计拦截；可在沙箱页打开「允许危险命令」。")
                         Text("进入后台会停止当前命令，暂不支持持续后台任务。")
                     }.font(.caption).foregroundStyle(Color.bgTextSecondary).bgCard()
                     Text("运行环境由 Black God 内置提供。所含开源组件、源码与许可证见「开源许可」页。")

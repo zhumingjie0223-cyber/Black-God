@@ -11,6 +11,7 @@ struct MeView: View {
     @ObservedObject var memory: NexusMemoryStore
     @ObservedObject var skills: NexusSkillStore
     @ObservedObject var practice: NexusSkillPractice
+    var onVaultWiped: () -> Void = {}
     @State private var showSkills = false
     @State private var showPrivacy = false
     @State private var showLicenses = false
@@ -22,6 +23,9 @@ struct MeView: View {
     @State private var showAdvanced = false
     @State private var showMemory = false
     @State private var showNexusConnection = false
+    @State private var showTerminal = false
+    @State private var showVault = false
+    @State private var showMediaDraft = false
 
     var body: some View {
         ScrollView {
@@ -49,12 +53,26 @@ struct MeView: View {
                     Button { showCognitive = true } label: {
                         SettingRow(icon: "checkmark.shield", title: "神枢成长", value: "", color: .bgJadeHi, compact: true)
                     }.accessibilityIdentifier("cognitive.open")
+                    Divider().overlay(Color.bgCardLight)
+                    Button { showMediaDraft = true } label: {
+                        SettingRow(icon: "wand.and.stars", title: "灵感草稿", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("media.open")
                 }
 
-                settingsGroup("设置") {
+                settingsGroup("执行") {
+                    Button { showTerminal = true } label: {
+                        SettingRow(icon: "terminal", title: "手动终端", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("linux.open")
+                    Divider().overlay(Color.bgCardLight)
                     Button { showAdvanced = true } label: {
                         SettingRow(icon: "slider.horizontal.3", title: "高级设置", value: "", color: .bgJadeHi, compact: true)
                     }.accessibilityIdentifier("advanced.open")
+                }
+
+                settingsGroup("设置") {
+                    Button { showVault = true } label: {
+                        SettingRow(icon: "externaldrive.badge.timemachine", title: "数据与备份", value: "", color: .bgJadeHi, compact: true)
+                    }.accessibilityIdentifier("vault.open")
                     Divider().overlay(Color.bgCardLight)
                     Button { showPrivacy = true } label: {
                         SettingRow(icon: "lock.shield", title: "隐私保护", value: "", color: .bgJadeHi, compact: true)
@@ -85,6 +103,22 @@ struct MeView: View {
         .sheet(isPresented: $showSkills) { NexusSkillsView(store: skills, practice: practice) }
         .sheet(isPresented: $showAdvanced) { NexusAdvancedSettingsView() }
         .sheet(isPresented: $showMemory) { NexusMemoryView(memory: memory) }
+        .sheet(isPresented: $showVault) {
+            NexusDataVaultView(memory: memory, skills: skills, onWiped: onVaultWiped)
+        }
+        .sheet(isPresented: $showMediaDraft) {
+            NavigationStack {
+                MediaView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showMediaDraft = false } } }
+            }
+        }
+        .sheet(isPresented: $showTerminal) {
+            NavigationStack {
+                NexusTerminalView().navigationTitle("手动终端")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
+            }
+        }
         .sheet(isPresented: $showNexusConnection) {
             APIConfigView().environmentObject(appState)
         }

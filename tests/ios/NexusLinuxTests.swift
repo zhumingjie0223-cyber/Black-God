@@ -265,7 +265,12 @@ extension NexusLinuxTests {
         XCTAssertTrue(result.output.contains("Alpine Linux"), result.output)
         XCTAssertTrue(result.output.contains("1000"))
         for command in ["chroot / /bin/true", "mount -t proc proc /tmp", "echo broken > /bin/busybox", "chmod 777 /bin/busybox", "chown 0 /workspace", "mknod /workspace/disk b 1 1", "kill -9 1", "touch /bin/forbidden", "truncate -s 0 /bin/busybox", "ln /workspace/x /bin/forbidden"] {
-            let attempt = try await runtime.execute(command: command, workspace: workspace)
+            // 这些命令需进客户机验证失败；宿主审计默认拦截，测试带口令放行以检验沙箱内边界。
+            let attempt = try await runtime.execute(
+                command: command,
+                workspace: workspace,
+                confirm: NexusScriptAudit.confirmPhrase
+            )
             XCTAssertFalse(attempt.succeeded, command)
             let intact = try await runtime.execute(command: "printf intact", workspace: workspace)
             XCTAssertEqual(intact.output, "intact", command)

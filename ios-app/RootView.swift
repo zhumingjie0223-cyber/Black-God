@@ -20,9 +20,9 @@ struct RootView: View {
                 Group {
                 switch appState.currentTab {
                 case .chat: ChatView(vm: chatModel)
-                case .media: MediaView()
+                case .media: NexusSandboxView()
                 case .monitor: MonitorView()
-                case .me: MeView(cognitive: chatModel.cognitive, memory: chatModel.memory, skills: chatModel.skills, practice: chatModel.practice)
+                case .me: MeView(cognitive: chatModel.cognitive, memory: chatModel.memory, skills: chatModel.skills, practice: chatModel.practice, onVaultWiped: { _ = chatModel.reloadAfterVaultWipe() })
                 }
             }
                 .frame(maxWidth: 960)

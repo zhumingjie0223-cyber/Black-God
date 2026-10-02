@@ -13,6 +13,8 @@ struct ChatView: View {
     @State private var memoryMessage: ChatMessage?
     @State private var showConnection = false
     @State private var showClearConversation = false
+    @State private var showSessions = false
+    @State private var showTerminal = false
     @State private var showTaskDetails = false
     @State private var showPracticeDetails = false
     @FocusState private var inputFocused: Bool
@@ -84,6 +86,14 @@ struct ChatView: View {
         .sheet(item: $skillDraft) { draft in NexusSkillEditor(store: vm.skills, draft: draft) }
         .sheet(item: $memoryMessage) { msg in NexusMemoryEditor(memory: vm.memory, initialText: msg.content) }
         .sheet(isPresented: $showConnection) { APIConfigView() }
+        .sheet(isPresented: $showSessions) { NexusSessionListView(vm: vm) }
+        .sheet(isPresented: $showTerminal) {
+            NavigationStack {
+                NexusTerminalView().navigationTitle("手动终端")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showTerminal = false } } }
+            }
+        }
         .sheet(isPresented: $showTaskDetails) {
             NavigationStack {
                 ScrollView {
@@ -107,7 +117,7 @@ struct ChatView: View {
             }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("将停止当前回答，删除本机聊天消息和任务恢复记录，无法撤销。已保存的长期记忆、技能与自我状态记录需在各自页面管理。损坏文件会保留本地恢复副本。")
+            Text("将停止当前回答，删除本会话的聊天消息和任务恢复记录，无法撤销。其他会话、长期记忆、技能与自我状态记录不受影响。损坏文件会保留本地恢复副本。")
         }
     }
 
@@ -165,12 +175,31 @@ struct ChatView: View {
                     .accessibilityIdentifier("chat.title")
                 HStack(spacing: 5) {
                     PresenceDot(duration: vm.presence.breath)
-                    Text(vm.presence.action == .practice || vm.presence.action == .pulse ? "就绪" : vm.currentMood).font(.caption).foregroundStyle(Color.bgTextSecondary)
+                    if vm.supportsSessions {
+                        Text(vm.activeSessionTitle)
+                            .font(.caption)
+                            .foregroundStyle(Color.bgTextSecondary)
+                            .lineLimit(1)
+                            .accessibilityIdentifier("chat.sessionTitle")
+                    }
+                    Text(vm.presence.action == .practice || vm.presence.action == .pulse ? "就绪" : vm.currentMood)
+                        .font(.caption)
+                        .foregroundStyle(Color.bgTextSecondary)
                         .accessibilityIdentifier("chat.mood")
                 }
             }
             Spacer(minLength: 4)
             Menu {
+                if vm.supportsSessions {
+                    Button("会话列表", systemImage: "bubble.left.and.bubble.right") { showSessions = true }
+                        .accessibilityIdentifier("chat.sessions")
+                    Button("新建对话", systemImage: "plus.message") {
+                        if vm.createSession() { input = ""; inputFocused = false }
+                    }
+                    .accessibilityIdentifier("chat.newSession")
+                }
+                Button("手动终端", systemImage: "terminal") { showTerminal = true }
+                    .accessibilityIdentifier("chat.terminal")
                 if vm.live.visible || vm.currentPlan != nil {
                     Button("任务详情", systemImage: "list.bullet.rectangle") { openTaskDetails(practice: false) }
                         .accessibilityIdentifier("chat.taskDetailsMenu")
@@ -195,6 +224,14 @@ struct ChatView: View {
                     .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
             }
             .accessibilityLabel("对话管理").accessibilityIdentifier("chat.actions")
+            if vm.supportsSessions {
+                Button { showSessions = true } label: {
+                    Image(systemName: "bubble.left.and.bubble.right").font(.system(size: 17))
+                        .foregroundStyle(Color.bgJadeHi).frame(width: 44, height: 44)
+                        .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .accessibilityLabel("会话列表").accessibilityIdentifier("chat.sessionsButton")
+            }
             Button { showConnection = true } label: {
                 Image(systemName: "slider.horizontal.3").font(.system(size: 19))
                     .foregroundStyle(Color.bgJadeHi).frame(width: 44, height: 44)

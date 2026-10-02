@@ -135,6 +135,10 @@ final class NexusIntelligenceTests: XCTestCase {
         let selected = NexusContextBudget.history(messages, maxCharacters: 100)
         XCTAssertLessThanOrEqual(selected.reduce(0) { $0 + $1.content.count }, 100)
         XCTAssertEqual(selected.last?.content, "最新回答")
+        let pack = NexusContextBudget.compact(messages, maxCharacters: 100)
+        XCTAssertEqual(pack.messages.last?.content, "最新回答")
+        XCTAssertTrue(pack.droppedCount >= 1)
+        XCTAssertNotNil(pack.summary)
     }
 }
 

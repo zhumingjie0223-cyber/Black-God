@@ -181,15 +181,78 @@ struct NexusMemorySearchTool: NexusTool {
 }
 
 enum NexusContextBudget {
+    struct Pack {
+        let messages: [ChatMessage]
+        /// 被挤出窗口的较早内容摘要；注入提示，不当成最新用户指令。
+        let summary: String?
+        let droppedCount: Int
+    }
+
     static func history(_ messages: [ChatMessage], maxCharacters: Int = 16000) -> [ChatMessage] {
+        compact(messages, maxCharacters: maxCharacters).messages
+    }
+
+    /// 保留最近对话；若超预算，从更早轮次提取约束与首问，写成可追溯压缩摘要。
+    static func compact(_ messages: [ChatMessage], maxCharacters: Int = 16000, keepRecent: Int = 20) -> Pack {
+        let window = Array(messages.suffix(keepRecent))
+        let earlier = Array(messages.dropLast(window.count))
+        let fitted = fit(window, maxCharacters: maxCharacters)
+        // 窗口内被截断的原文也算“挤出”，否则超长旧消息只裁切却不生成摘要。
+        let truncated = window.filter { original in
+            guard let kept = fitted.first(where: { $0.id == original.id }) else { return true }
+            return kept.content.count < original.content.count
+        }
+        let dropped = earlier + truncated
+        guard !dropped.isEmpty else {
+            return Pack(messages: fitted, summary: nil, droppedCount: 0)
+        }
+        let summary = summarize(dropped)
+        let summaryCost = summary.count + 40
+        let remaining = max(0, maxCharacters - min(summaryCost, maxCharacters / 3))
+        let recent = fit(window, maxCharacters: remaining)
+        return Pack(messages: recent, summary: summary, droppedCount: dropped.count)
+    }
+
+    private static func fit(_ messages: [ChatMessage], maxCharacters: Int) -> [ChatMessage] {
         var selected: [ChatMessage] = []
         var remaining = max(0, maxCharacters)
-        for message in messages.suffix(20).reversed() {
+        for message in messages.reversed() {
             guard remaining > 0 else { break }
             let content = String(message.content.suffix(remaining))
             selected.append(ChatMessage(id: message.id, role: message.role, content: content))
             remaining -= content.count
         }
         return selected.reversed()
+    }
+
+    private static func summarize(_ dropped: [ChatMessage]) -> String {
+        var lines: [String] = ["共压缩 \(dropped.count) 条较早消息。"]
+        if let firstUser = dropped.first(where: { $0.role == "user" }) {
+            lines.append("最早用户要求：" + clip(firstUser.content, 240))
+        }
+        let markers = ["必须", "不要", "禁止", "务必", "只能", "约束", "记住", "优先", "不要再"]
+        var constraints: [String] = []
+        for message in dropped where message.role == "user" {
+            for piece in message.content.components(separatedBy: CharacterSet.newlines) {
+                let text = piece.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty, markers.contains(where: { text.contains($0) }) else { continue }
+                let item = clip(text, 120)
+                if !constraints.contains(item) { constraints.append(item) }
+                if constraints.count >= 6 { break }
+            }
+            if constraints.count >= 6 { break }
+        }
+        if !constraints.isEmpty {
+            lines.append("可能仍有效的约束线索（须用最新用户要求核对）：")
+            lines.append(contentsOf: constraints.map { "- " + $0 })
+        }
+        lines.append("以上摘要不能覆盖最新用户要求；冲突时以最新要求为准。")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func clip(_ text: String, _ limit: Int) -> String {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count > limit else { return value }
+        return String(value.prefix(limit - 1)) + "…"
     }
 }

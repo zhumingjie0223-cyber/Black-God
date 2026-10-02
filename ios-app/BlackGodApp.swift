@@ -86,7 +86,8 @@ enum AppTab: Int, CaseIterable {
     var icon: String {
         switch self {
         case .chat: return "message.fill"
-        case .media: return "wand.and.stars"; case .monitor: return "waveform.path.ecg"
+        case .media: return "shippingbox.fill"
+        case .monitor: return "waveform.path.ecg"
         case .me: return "person.fill"
         }
     }
