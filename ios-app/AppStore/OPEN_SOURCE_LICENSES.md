@@ -10,7 +10,7 @@ App Store 构建包含下列组件；各组件保留各自许可。
 - iSH ARM64: https://github.com/OpenMinis/ish-arm64 at 3f6384c70eefd1a370f121d3492a5f21f7767df9. Source snapshot is in vendor/ish. Preserve LICENSE.md, LICENSE.IOS and all upstream notices. iSH identifies its license as GPLv3 with the additional iOS terms.
 - ISHShellExecutor.h/.m: adapted from https://github.com/OpenMinis/OpenMinis at 4ef29002e88db1e20e462ec2ff46916e8a7dcb45, src/ios/iSH. License text is LICENSE.OpenMinis. Modifications: bounded output, registration before process start, removal of Minis-specific environment, and maintained integration with Black God lifecycle cleanup.
 - ISHKernel.m: Black God minimal host, with guest fault recovery adapted from the pinned iSH main.c. Uses type-derived offsets rather than Minis' outdated numeric offsets. No Minis native device offloads are linked or registered.
-- Alpine minirootfs 3.22.5 aarch64, with signature-verified OpenSSL 3.5.8 updates. Exact CDN URLs, SHA256 hashes and the image identity are pinned in tools/runtime/image-lock.json. tools/runtime/prepare_image.py imports the clean base and uses Alpine apk to verify and install the pinned updates offline. No preconfigured Minis image or user data is copied. Installed package licenses and upstream texts are bundled in ios-app/AppStore/OPEN_SOURCE_LICENSES.md.
+- Alpine minirootfs 3.22.5 aarch64, with signature-verified OpenSSL 3.5.9 updates. Exact CDN URLs, SHA256 hashes and the image identity are pinned in tools/runtime/image-lock.json. tools/runtime/prepare_image.py imports the clean base and uses Alpine apk to verify and install the pinned updates offline. No preconfigured Minis image or user data is copied. Installed package licenses and upstream texts are bundled in ios-app/AppStore/OPEN_SOURCE_LICENSES.md.
 
 
 Original Black God source retains its existing MIT notices. A linked runtime build includes GPL components and must not be described or distributed as an MIT-only binary. App Store Connect reports version 1.2.1 as ready for distribution. The corresponding source for version 1.3.0 (13), including modifications, build scripts and bundled Alpine package sources, is provided at https://github.com/zhumingjie0223-cyber/Black-God/releases/tag/v1.3.0-build14. Source publication and App Store review or availability are separate statuses. The repository root LICENSE does not replace any third-party license.
@@ -773,8 +773,8 @@ Public License instead of this License.  But first, please read
 - busybox-binsh 1.37.0-r20 — GPL-2.0-only
 - ca-certificates-bundle 20260611-r0 — MPL-2.0 AND MIT
 - libapk2 2.14.10-r0 — GPL-2.0-only
-- libcrypto3 3.5.8-r0 — Apache-2.0
-- libssl3 3.5.8-r0 — Apache-2.0
+- libcrypto3 3.5.9-r0 — Apache-2.0
+- libssl3 3.5.9-r0 — Apache-2.0
 - musl 1.2.5-r12 — MIT
 - musl-utils 1.2.5-r12 — MIT AND BSD-2-Clause AND GPL-2.0-or-later
 - scanelf 1.3.8-r1 — GPL-2.0-only
@@ -1997,7 +1997,7 @@ permissive licensing, and of not having licensing issues being an
 obstacle to adoption, that text has been removed.
 
 
-## openssl-3.5.8/LICENSE.txt
+## openssl-3.5.9/LICENSE.txt
 
 
                                  Apache License

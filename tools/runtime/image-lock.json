@@ -9,14 +9,14 @@
   },
   "packages": [
     {
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/libcrypto3-3.5.8-r0.apk",
-      "file": "libcrypto3-3.5.8-r0.apk",
-      "sha256": "094c5816644ade889f74387e8d91aad89dc9a05eda150494e3f91b80ffc15460"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/libcrypto3-3.5.9-r0.apk",
+      "file": "libcrypto3-3.5.9-r0.apk",
+      "sha256": "ede2ef7eca3b65a42e902aaf7890f9c5647dca0c55123a817179ad9f3bc6ef24"
     },
     {
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/libssl3-3.5.8-r0.apk",
-      "file": "libssl3-3.5.8-r0.apk",
-      "sha256": "2b175c982f9ff9a80fc88fa587f6db0ae1c58eef4b3f7fe69e8f066be9ff1090"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/libssl3-3.5.9-r0.apk",
+      "file": "libssl3-3.5.9-r0.apk",
+      "sha256": "338c9f6154582b4b76455a59f95538bcea8df039c5c72916dd2d8d0d844c9583"
     }
   ]
 }

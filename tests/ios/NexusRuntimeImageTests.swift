@@ -85,7 +85,7 @@ extension NexusLinuxTests {
     func testUpdatedSystemPackagesAreUsedByGuest() async throws {
         let result = try await NexusLinuxRuntime.shared.execute(command: "apk info -v", workspace: UUID())
         XCTAssertTrue(result.succeeded, result.errorOutput)
-        for version in ["musl-1.2.5-r12", "libcrypto3-3.5.8-r0", "libssl3-3.5.8-r0", "zlib-1.3.2-r0", "busybox-1.37.0-r20"] { XCTAssertTrue(result.output.contains(version), result.output) }
+        for version in ["musl-1.2.5-r12", "libcrypto3-3.5.9-r0", "libssl3-3.5.9-r0", "zlib-1.3.2-r0", "busybox-1.37.0-r20"] { XCTAssertTrue(result.output.contains(version), result.output) }
     }
 }
 
