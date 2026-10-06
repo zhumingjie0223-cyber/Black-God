@@ -34,6 +34,7 @@ struct NexusSandboxView: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 hero
@@ -43,7 +44,10 @@ struct NexusSandboxView: View {
 
                 VStack(alignment: .leading, spacing: 18) {
                     actionRow
-                    if showControls { controlsPanel }
+                    BGPullDrawer(isOpen: $showControls, title: "开关", accessibilityID: "sandbox.drawer") {
+                        controlsPanelContent
+                    }
+                    .id("sandbox.drawer.anchor")
                     filesPanel
                     if !auditEvents.isEmpty { auditPanel }
                     Text("沙箱页属 sandbox 工作区；对话属 chat 工作区。http_fetch 仅 HTTPS；预览禁脚本；宿主密钥不进沙箱。")
@@ -51,6 +55,13 @@ struct NexusSandboxView: View {
                 }
                 .padding(20)
             }
+        }
+        .onChange(of: showControls) { _, open in
+            guard open else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.9)) {
+                proxy.scrollTo("sandbox.drawer.anchor", anchor: .top)
+            }
+        }
         }
         .background {
             ZStack {
@@ -196,8 +207,11 @@ struct NexusSandboxView: View {
             }
             .buttonStyle(BGSecondaryButtonStyle())
             .accessibilityIdentifier("sandbox.storage")
-            Button { withAnimation { showControls.toggle() } } label: {
-                Label(showControls ? "收起" : "开关", systemImage: "slider.horizontal.3")
+            Button {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { showControls.toggle() }
+                appState.haptic(.light)
+            } label: {
+                Label(showControls ? "收" : "开", systemImage: "slider.horizontal.3")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(BGSecondaryButtonStyle())
@@ -205,7 +219,7 @@ struct NexusSandboxView: View {
         }
     }
 
-    private var controlsPanel: some View {
+    private var controlsPanelContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle("允许助手使用沙箱执行", isOn: $allowExecution)
                 .font(.headline).tint(Color.bgJadeHi)
@@ -219,10 +233,9 @@ struct NexusSandboxView: View {
             Text(imageQuotaText)
                 .font(.caption.monospacedDigit()).foregroundStyle(Color.bgJadeHi)
                 .accessibilityIdentifier("sandbox.imageQuota")
-            Text("工作区硬上限 \(NexusWorkspaceQuota.maxFiles) 文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes))；整镜像硬顶 \(NexusStorage.absoluteCeilingGiB) GiB。")
+            Text("上限 \(NexusWorkspaceQuota.maxFiles) 文件 / \(NexusWorkspaceQuota.byteText(NexusWorkspaceQuota.maxBytes)) · 镜像 \(NexusStorage.absoluteCeilingGiB) GiB")
                 .font(.footnote).foregroundStyle(Color.bgTextSecondary)
         }
-        .padding(16).bgFloating()
     }
 
     private var filesPanel: some View {
@@ -305,11 +318,13 @@ struct NexusSandboxView: View {
                 status = "已点亮 · 内核探测完成"
                 demoPhase = "展示页已打开"
                 busy = false
+                appState.taskCompleteHaptic(success: true)
                 refreshFiles()
             } catch {
                 busy = false
                 errorText = error.localizedDescription
                 demoPhase = "点亮失败"
+                appState.taskCompleteHaptic(success: false)
             }
         }
     }

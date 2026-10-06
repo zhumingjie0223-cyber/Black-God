@@ -66,7 +66,7 @@ struct NexusLiveExecutionView: View {
                 .background(stateColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text("执行过程").font(.subheadline.weight(.semibold)).foregroundStyle(Color.bgTextPrimary)
+                Text("过程").font(.subheadline.weight(.semibold)).foregroundStyle(Color.bgTextPrimary)
                 Text(stateLabel).font(.caption).foregroundStyle(stateColor)
             }.fixedSize(horizontal: false, vertical: true)
         }
@@ -165,9 +165,12 @@ struct NexusActivitySummary: View {
 
 private struct NexusRunningActivitySummaryRow: View {
     @ObservedObject var live: NexusLiveExecution
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let openDetails: () -> Void
     let stop: () -> Void
-    @ScaledMetric(relativeTo: .caption) private var shellOutputHeight = 108.0
+    @State private var pulse = false
+    @ScaledMetric(relativeTo: .caption) private var shellOutputHeight = 128.0
 
     private var shellEntries: [NexusLiveExecution.Entry] {
         guard let command = live.latestCommand else { return [] }
@@ -179,75 +182,125 @@ private struct NexusRunningActivitySummaryRow: View {
 
     var body: some View {
         if live.state == .running {
-            if !shellEntries.isEmpty {
-                VStack(spacing: 0) {
-                    header(shell: true)
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 6) {
-                                ForEach(shellEntries) { entry in
-                                    Text((entry.kind == .command ? "$ " : "") + entry.text)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundStyle(entry.kind == .error ? Color.orange : entry.kind == .command ? Color.bgJadeHi : Color.bgTextPrimary)
-                                        .textSelection(.enabled)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .id(entry.id)
-                                }
-                            }.padding(10)
-                        }
-                        .frame(height: min(shellOutputHeight, 220))
-                        .background(Color.bgDark, in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityIdentifier("chat.shellOutput")
-                        .onAppear {
-                            if let id = shellEntries.last?.id { proxy.scrollTo(id, anchor: .bottom) }
-                        }
-                        .onChange(of: shellEntries.last?.id) { _, id in
-                            if let id { proxy.scrollTo(id, anchor: .bottom) }
-                        }
-                    }.padding(.horizontal, 8).padding(.bottom, 8)
+            VStack(spacing: 0) {
+                header(shell: !shellEntries.isEmpty)
+                if !shellEntries.isEmpty {
+                    theaterScreen
+                } else {
+                    progressRail
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
                 }
-                .bgFloating(cornerRadius: 18)
-                .accessibilityIdentifier("chat.shellLive")
-            } else {
-                header(shell: false).bgFloating(cornerRadius: 18)
+            }
+            .bgFloating(cornerRadius: 20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.bgJadeHi.opacity(pulse ? 0.55 : 0.18), lineWidth: 1.2)
+            )
+            .shadow(color: Color.bgJadeHi.opacity(pulse ? 0.18 : 0.05), radius: pulse ? 18 : 8)
+            .accessibilityIdentifier(shellEntries.isEmpty ? "chat.taskLive" : "chat.shellLive")
+            .onAppear {
+                guard !reduceMotion, ChatMotion.continuousAnimationsEnabled else { return }
+                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
+            }
+            .onChange(of: live.entries.count) { _, count in
+                // 每步轻触；UI 测关闭连续动效时也不打满震动
+                guard ChatMotion.continuousAnimationsEnabled, appState.hapticEnabled, count > 0 else { return }
+                appState.haptic(.soft)
             }
         }
     }
 
+    private var theaterScreen: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    ForEach(shellEntries) { entry in
+                        Text((entry.kind == .command ? "$ " : "") + entry.text)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(entry.kind == .error ? Color.orange : entry.kind == .command ? Color.bgJadeHi : Color.bgTextPrimary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(entry.id)
+                    }
+                }.padding(12)
+            }
+            .frame(height: min(shellOutputHeight, 240))
+            .background(
+                LinearGradient(
+                    colors: [Color.bgDark, Color(red: 0.03, green: 0.07, blue: 0.05)],
+                    startPoint: .top, endPoint: .bottom
+                ),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.bgJadeHi.opacity(0.12), lineWidth: 1)
+            )
+            .accessibilityIdentifier("chat.shellOutput")
+            .onAppear {
+                if let id = shellEntries.last?.id { proxy.scrollTo(id, anchor: .bottom) }
+            }
+            .onChange(of: shellEntries.last?.id) { _, id in
+                if let id { proxy.scrollTo(id, anchor: .bottom) }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
+    }
+
+    private var progressRail: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<8, id: \.self) { i in
+                Capsule()
+                    .fill(Color.bgJadeHi.opacity(pulse ? (i % 2 == 0 ? 0.55 : 0.22) : 0.2))
+                    .frame(height: 4)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
     private func header(shell: Bool) -> some View {
         HStack(spacing: 0) {
-            Button(action: openDetails) {
+            Button {
+                appState.haptic(.light)
+                openDetails()
+            } label: {
                 HStack(spacing: 0) {
-                    Image(systemName: shell ? "terminal" : "waveform")
-                        .font(.subheadline.weight(.medium)).foregroundStyle(Color.bgJadeHi)
+                    Image(systemName: shell ? "terminal.fill" : "sparkle")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
                         .frame(width: shell ? 36 : 44).accessibilityHidden(true)
-                    if shell {
-                        Text("工具直播").font(.caption.weight(.semibold)).foregroundStyle(Color.bgJadeHi)
-                            .lineLimit(1).fixedSize(horizontal: true, vertical: false).padding(.trailing, 8)
-                    }
                     Text(live.status)
-                        .font(shell ? .caption : .subheadline).foregroundStyle(Color.bgTextPrimary)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.bgTextPrimary)
                         .lineLimit(1).truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold)).foregroundStyle(Color.bgTextSecondary)
-                        .frame(width: 24).accessibilityHidden(true)
-                }.frame(minHeight: 44).contentShape(Rectangle())
+                        .padding(.trailing, 6)
+                    Text("\(live.entries.count)")
+                        .font(.caption2.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(Color.bgJadeHi)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color.bgJadeHi.opacity(0.12), in: Capsule())
+                        .accessibilityLabel("\(live.entries.count) 步")
+                    Image(systemName: "chevron.up")
+                        .font(.caption2.weight(.bold)).foregroundStyle(Color.bgTextSecondary)
+                        .frame(width: 22).accessibilityHidden(true)
+                }.frame(minHeight: 52).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(shell ? "工具直播详情" : "任务详情")
+            .accessibilityLabel("过程")
             .accessibilityValue(live.status)
-            .accessibilityHint("查看当前任务的完整执行记录")
+            .accessibilityHint("查看执行记录")
             .accessibilityIdentifier("chat.taskDetails")
 
-            Rectangle().fill(Color.bgTextSecondary.opacity(0.18)).frame(width: 1, height: 18)
+            Rectangle().fill(Color.bgTextSecondary.opacity(0.18)).frame(width: 1, height: 22)
                 .accessibilityHidden(true)
 
             Button(role: .destructive, action: stop) {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.orange)
-                    .frame(width: 44, height: 44).contentShape(Rectangle())
+                    .frame(width: 44, height: 52).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("停止当前任务")
