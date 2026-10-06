@@ -761,10 +761,28 @@ extension XCTestCase {
             }
             return CGRect(x: window.minX, y: top, width: window.width, height: max(80, bottom - top))
         }
+        /// 滚动减速或列表行复用期间 frame 会变化甚至为空；等两次读取一致再判断。
+        func settledFrame() -> CGRect? {
+            guard element.exists else { return nil }
+            var last = element.frame
+            for _ in 0..<6 {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+                guard element.exists else { return nil }
+                let now = element.frame
+                if now == last { return now }
+                last = now
+            }
+            return last
+        }
+        /// 先用 frame 判断位置，确认完整落在可操作区域后才查询 isHittable：
+        /// 对 frame 为空或在窗口外的元素查询 isHittable 会报
+        /// “Activation point invalid”并直接记为失败（PR #139 的 shuyu.turn）。
         func visible() -> Bool {
-            guard element.exists, element.isHittable else { return false }
-            let bounds = contentBounds(), frame = element.frame
-            return frame.minY >= bounds.minY && frame.maxY <= bounds.maxY
+            guard let frame = settledFrame(), !frame.isEmpty,
+                  app.windows.firstMatch.frame.intersects(frame) else { return false }
+            let bounds = contentBounds()
+            guard frame.minY >= bounds.minY && frame.maxY <= bounds.maxY else { return false }
+            return element.isHittable
         }
         if visible() { return }
         func nudge(contentUp: Bool) {
@@ -778,7 +796,7 @@ extension XCTestCase {
         }
         for attempt in 0..<(upSwipes + downSwipes) {
             if visible() { return }
-            if element.exists {
+            if element.exists, !element.frame.isEmpty {
                 let frame = element.frame, bounds = contentBounds()
                 if frame.minY < bounds.minY { nudge(contentUp: false); continue }
                 if frame.maxY > bounds.maxY { nudge(contentUp: true); continue }
