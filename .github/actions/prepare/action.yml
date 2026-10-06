@@ -1,0 +1,42 @@
+name: Prepare Black God build
+description: 固定 Xcode 版本、安装构建工具、生成内置运行时与 Xcode 工程。unit-tests / ui-tests / build-app 三个 job 共用，保证环境一致。
+inputs:
+  xcode-app:
+    description: 固定使用的 Xcode 安装路径（与上一次成功运行的 macos-26 镜像一致）
+    required: false
+    default: /Applications/Xcode_26.6.app
+runs:
+  using: composite
+  steps:
+    - name: Select pinned Xcode
+      shell: bash
+      env:
+        XCODE_APP: ${{ inputs.xcode-app }}
+      run: |
+        set -euo pipefail
+        if [ ! -d "$XCODE_APP/Contents/Developer" ]; then
+          echo "::error::未找到 $XCODE_APP；运行器镜像上可用的 Xcode："
+          ls -d /Applications/Xcode*.app || true
+          exit 1
+        fi
+        sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+        echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+        xcodebuild -version
+
+    # 只缓存按 image-lock.json 锁定的下载件（Alpine rootfs 与 apk）。
+    # prepare_image.py 对缓存文件同样校验 sha256，缓存被污染会直接失败。
+    - name: Cache pinned runtime downloads
+      uses: actions/cache@v5
+      with:
+        path: |
+          .runtime-build/*.tar.gz
+          .runtime-build/*.apk
+        key: runtime-downloads-${{ hashFiles('tools/runtime/image-lock.json') }}
+
+    - name: Install build tools
+      shell: bash
+      run: brew install xcodegen ninja llvm lld libarchive pkg-config
+
+    - name: Generate Xcode Project and runtime
+      shell: bash
+      run: make generate

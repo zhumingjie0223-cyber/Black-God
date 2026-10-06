@@ -9,14 +9,40 @@ final class BlackGodUITests: XCTestCase {
     }
 
     /// 模拟器偶发启动超时：先终止残留进程，再等首屏就绪信号。
+    /// arguments 为 nil 时沿用上一次的启动参数（用于同一用例内重启应用）。
     @MainActor
-    private func launchReady(_ app: XCUIApplication, arguments: [String], file: StaticString = #filePath, line: UInt = #line) {
-        app.launchArguments = arguments
+    private func launchReady(_ app: XCUIApplication, arguments: [String]? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        if let arguments { app.launchArguments = arguments }
         app.terminate()
         app.launch()
         let ready = app.buttons["chat.actions"].waitForExistence(timeout: 30)
             || app.buttons["tab.0"].waitForExistence(timeout: 5)
         XCTAssertTrue(ready, "应用首屏未就绪", file: file, line: line)
+    }
+
+    /// 每个页签只在本页出现的标志元素（RootView 用 switch 渲染，未选中的页签不在视图树中）。
+    @MainActor
+    private func tabMarker(_ index: Int, in app: XCUIApplication) -> XCUIElement {
+        switch index {
+        case 0: return app.buttons["chat.actions"]
+        case 2: return app.staticTexts["sandbox.title"]
+        case 3: return app.staticTexts["monitor.sample-count"]
+        case 4: return app.buttons["memory.open"]
+        default: return app.buttons["tab.\(index)"]
+        }
+    }
+
+    /// 切换页签并确认已切换：冷启动或繁忙运行器上偶发丢失首次点击，
+    /// 若标志元素未出现则重试点击一次；最终仍以断言判定，不放宽结果。
+    @MainActor
+    private func selectTab(_ index: Int, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let tab = app.buttons["tab.\(index)"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "页签 tab.\(index) 未出现", file: file, line: line)
+        tab.tap()
+        let marker = tabMarker(index, in: app)
+        if marker.waitForExistence(timeout: 5) { return }
+        if tab.exists && tab.isHittable { tab.tap() }
+        XCTAssertTrue(marker.waitForExistence(timeout: 10), "切换到 tab.\(index) 后未出现本页标志元素", file: file, line: line)
     }
 
     @MainActor
@@ -27,7 +53,7 @@ final class BlackGodUITests: XCTestCase {
         capture(app, name: "新版-对话")
         XCTAssertFalse(app.buttons["tab.1"].exists)
         XCTAssertFalse(app.buttons["execution.start"].exists)
-        app.buttons["tab.2"].tap()
+        selectTab(2, in: app)
         XCTAssertTrue(app.staticTexts["sandbox.title"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["sandbox.demo"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["sandbox.terminal"].exists)
@@ -49,10 +75,10 @@ final class BlackGodUITests: XCTestCase {
         // End editing before changing the phone's bottom navigation.
         _ = app.buttons["tab.3"].waitForExistence(timeout: 3)
         if !app.buttons["tab.3"].exists { app.swipeDown() }
-        app.buttons["tab.3"].tap()
+        selectTab(3, in: app)
         XCTAssertTrue(app.staticTexts["monitor.sample-count"].waitForExistence(timeout: 5))
         capture(app, name: "新版-监测")
-        app.buttons["tab.4"].tap()
+        selectTab(4, in: app)
         XCTAssertTrue(app.buttons["api.open"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.switches["haptic.enabled"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.switches["haptic.taskComplete"].exists)
@@ -61,26 +87,25 @@ final class BlackGodUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["模型连接"].waitForExistence(timeout: 5))
         capture(app, name: "新版-模型连接")
         app.buttons["完成"].tap()
-        app.buttons["tab.0"].tap()
+        selectTab(0, in: app)
         XCTAssertTrue(app.buttons["chat.connection"].isHittable)
     }
 
     @MainActor
     func testLargeTextKeepsPrimaryControlsReachable() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])
         XCTAssertTrue(app.buttons["chat.connection"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["chat.connection"].isHittable)
         XCTAssertTrue(app.buttons["chat.send"].exists)
         capture(app, name: "新版-辅助大字体对话")
-        app.buttons["tab.3"].tap()
+        selectTab(3, in: app)
         let benchmark = app.buttons["benchmark.open"]
         reveal(benchmark, in: app, upSwipes: 12)
         benchmark.tap()
         XCTAssertTrue(app.buttons["benchmark.start"].waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
-        app.buttons["tab.4"].tap()
+        selectTab(4, in: app)
         let connection = app.buttons["api.open"]
         reveal(connection, in: app); connection.tap()
         let login = app.buttons["oauth.login"]
@@ -93,23 +118,22 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testTabletSidebarAndLandscapeComposer() throws {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         guard app.frame.width >= 700 else { throw XCTSkip("此用例用于原生 iPad 布局") }
         for i in [0, 2, 3, 4] { XCTAssertTrue(app.buttons["tab.\(i)"].isHittable) }
         capture(app, name: "新版-iPad竖屏")
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
-        app.buttons["tab.0"].tap()
+        selectTab(0, in: app)
         XCTAssertGreaterThan(app.frame.width, app.frame.height)
         XCTAssertTrue(app.buttons["chat.connection"].isHittable)
         XCTAssertTrue(app.descendants(matching: .any)["chat.input"].isHittable)
         capture(app, name: "新版-iPad横屏")
         XCTAssertFalse(app.buttons["tab.1"].exists)
-        app.buttons["tab.3"].tap()
+        selectTab(3, in: app)
         XCTAssertTrue(app.staticTexts["monitor.sample-count"].waitForExistence(timeout: 5))
         capture(app, name: "新版-iPad监测")
-        app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
+        selectTab(4, in: app); app.buttons["api.open"].tap()
         XCTAssertTrue(app.navigationBars["模型连接"].waitForExistence(timeout: 5))
         capture(app, name: "新版-iPad连接面板")
         app.buttons["完成"].tap()
@@ -117,11 +141,13 @@ final class BlackGodUITests: XCTestCase {
 
     @MainActor
     private func openAdvanced(in app: XCUIApplication) {
-        app.buttons["tab.4"].tap()
+        selectTab(4, in: app)
         let advanced = app.buttons["advanced.open"]
         reveal(advanced, in: app)
         advanced.tap()
-        XCTAssertTrue(app.navigationBars["高级设置"].waitForExistence(timeout: 5))
+        let title = app.navigationBars["高级设置"]
+        if !title.waitForExistence(timeout: 5), advanced.exists, advanced.isHittable { advanced.tap() }
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -133,8 +159,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testConversationManagementEntryIsDiscoverable() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch(); app.buttons["tab.0"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]); selectTab(0, in: app)
         let actions = app.buttons["chat.actions"]
         XCTAssertTrue(actions.waitForExistence(timeout: 8))
         XCTAssertTrue(actions.isHittable)
@@ -149,9 +174,8 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testChatComposerChipsUseJadePrompts() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
-        app.buttons["tab.0"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
+        selectTab(0, in: app)
         XCTAssertTrue(app.buttons["chat.chip.plan"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["chat.chip.calc"].exists)
         XCTAssertTrue(app.buttons["chat.chip.shuyu"].exists)
@@ -191,8 +215,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testSelfContinuityEntryPauseAndClear() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch(); app.buttons["tab.4"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]); selectTab(4, in: app)
         let entry = app.buttons["cognitive.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
         entry.tap(); app.buttons["self.open"].tap()
@@ -221,8 +244,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testCognitivePermissionsAndObservationEntry() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch(); app.buttons["tab.4"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]); selectTab(4, in: app)
         let entry = app.buttons["cognitive.open"]
         for _ in 0..<4 where !entry.isHittable { app.swipeUp() }
         XCTAssertTrue(entry.isHittable); entry.tap()
@@ -255,8 +277,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testVersionAndBundledLicensePage() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch(); app.buttons["tab.4"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]); selectTab(4, in: app)
         let entry = app.buttons["licenses.open"]
         for _ in 0..<5 where !entry.isHittable { app.swipeUp() }
         // 版本文案随 project.yml 的版本号变化；只校验“x.y.z（build）”格式，避免每次升 build 都改测试。
@@ -281,9 +302,8 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testOAuthLoginButtonPaddingStartsAndCancels() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
-        app.buttons["tab.4"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
+        selectTab(4, in: app)
         app.buttons["api.open"].tap()
         let login = app.buttons["oauth.login"]
         reveal(login, in: app)
@@ -306,9 +326,8 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testOAuthLoginEntryAndBrowserCancellation() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
-        app.buttons["tab.4"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
+        selectTab(4, in: app)
         app.buttons["api.open"].tap()
         let login = app.buttons["oauth.login"]
         XCTAssertTrue(login.waitForExistence(timeout: 10))
@@ -338,8 +357,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testDeviceLoginBrowserReturnAndExplicitCancellation() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch(); app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]); selectTab(4, in: app); app.buttons["api.open"].tap()
         let login = app.buttons["oauth.kimi-oauth"]
         XCTAssertTrue(login.waitForExistence(timeout: 10)); login.tap()
         // Anonymous authorization only. Never submit account details or consent.
@@ -360,8 +378,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testClaudeConfigurationAndExplicitDataPermission() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch(); app.buttons["tab.4"].tap(); app.buttons["api.open"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]); selectTab(4, in: app); app.buttons["api.open"].tap()
         let claude = app.buttons["claude.api"]
         for _ in 0..<5 where !claude.isHittable { app.swipeUp() }
         XCTAssertTrue(claude.isHittable); claude.tap()
@@ -382,8 +399,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testBuiltInPracticeAndStorageControls() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         openAdvanced(in: app)
         reveal(app.buttons["shuyu.open"], in: app)
         app.buttons["shuyu.open"].tap()
@@ -469,7 +485,7 @@ final class BlackGodUITests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "运行空间"; shot.lifetime = .keepAlways; add(shot)
         app.navigationBars["运行空间"].buttons["完成"].tap()
         app.navigationBars["高级设置"].buttons["完成"].tap()
-        app.buttons["tab.4"].tap()
+        selectTab(4, in: app)
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "任务技能")).firstMatch.tap()
         let start = app.buttons["practice.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 10))
@@ -510,9 +526,8 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testMonitorSeparatesTelemetryFromIndependentAcceptance() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
-        app.buttons["tab.3"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
+        selectTab(3, in: app)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "无警告答复率")).firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "模型自检通过率")).firstMatch.exists)
         reveal(app.buttons["benchmark.open"], in: app)
@@ -528,8 +543,7 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testBackgroundStopAndRelaunchRecovery() throws {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         func openTools() {
             openAdvanced(in: app)
             let advanced = app.buttons["linux.advanced"]
@@ -576,7 +590,7 @@ final class BlackGodUITests: XCTestCase {
         expectation(for: executionStarted, evaluatedWith: app.staticTexts["live.status"])
         waitForExpectations(timeout: 30)
         app.terminate()
-        app.launch()
+        launchReady(app)
         openTools()
         // This record comes from forced termination, not an automatic retry.
         let interrupted = app.staticTexts["linux.latestStatus"]
@@ -591,9 +605,8 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testProviderPresetsAndModelDiscoveryControls() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
-        app.buttons["tab.4"].tap()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
+        selectTab(4, in: app)
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "神枢连接")).firstMatch.tap()
         let provider = app.buttons["api.provider"]
         reveal(provider, in: app)
@@ -625,10 +638,9 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testCuratedMemoryCreateCorrectPersistAndDelete() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         func openMemory() {
-            app.buttons["tab.4"].tap()
+            selectTab(4, in: app)
             let button = app.buttons["memory.open"]
             XCTAssertTrue(button.waitForExistence(timeout: 10))
             button.tap()
@@ -652,7 +664,7 @@ final class BlackGodUITests: XCTestCase {
         save("请用中文")
         XCTAssertFalse(app.staticTexts["请用英文"].exists)
         app.terminate()
-        app.launch()
+        launchReady(app)
         openMemory()
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
@@ -670,10 +682,9 @@ final class BlackGodUITests: XCTestCase {
     @MainActor
     func testSkillsCreateEditRestoreAndDelete() {
         let app = makeApplication()
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
+        launchReady(app, arguments: ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"])
         func openSkills() {
-            app.buttons["tab.4"].tap()
+            selectTab(4, in: app)
             let button = app.buttons["skills.open"]
             XCTAssertTrue(button.waitForExistence(timeout: 10))
             button.tap()
@@ -697,7 +708,7 @@ final class BlackGodUITests: XCTestCase {
         verification.tap(); verification.typeText("结果应为7")
         app.buttons["skills.save"].tap()
         XCTAssertTrue(app.buttons["skills.add"].waitForExistence(timeout: 5))
-        app.terminate(); app.launch(); openSkills(); openEditor()
+        app.terminate(); launchReady(app); openSkills(); openEditor()
         XCTAssertEqual(app.textViews["skills.steps"].value as? String, "用计算工具计算3+4")
         let check = app.textViews["skills.verification"].exists ? app.textViews["skills.verification"] : app.textFields["skills.verification"]
         check.tap(); check.typeText("；核对最终输出")
@@ -750,10 +761,28 @@ extension XCTestCase {
             }
             return CGRect(x: window.minX, y: top, width: window.width, height: max(80, bottom - top))
         }
+        /// 滚动减速或列表行复用期间 frame 会变化甚至为空；等两次读取一致再判断。
+        func settledFrame() -> CGRect? {
+            guard element.exists else { return nil }
+            var last = element.frame
+            for _ in 0..<6 {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+                guard element.exists else { return nil }
+                let now = element.frame
+                if now == last { return now }
+                last = now
+            }
+            return last
+        }
+        /// 先用 frame 判断位置，确认完整落在可操作区域后才查询 isHittable：
+        /// 对 frame 为空或在窗口外的元素查询 isHittable 会报
+        /// “Activation point invalid”并直接记为失败（PR #139 的 shuyu.turn）。
         func visible() -> Bool {
-            guard element.exists, element.isHittable else { return false }
-            let bounds = contentBounds(), frame = element.frame
-            return frame.minY >= bounds.minY && frame.maxY <= bounds.maxY
+            guard let frame = settledFrame(), !frame.isEmpty,
+                  app.windows.firstMatch.frame.intersects(frame) else { return false }
+            let bounds = contentBounds()
+            guard frame.minY >= bounds.minY && frame.maxY <= bounds.maxY else { return false }
+            return element.isHittable
         }
         if visible() { return }
         func nudge(contentUp: Bool) {
@@ -767,7 +796,7 @@ extension XCTestCase {
         }
         for attempt in 0..<(upSwipes + downSwipes) {
             if visible() { return }
-            if element.exists {
+            if element.exists, !element.frame.isEmpty {
                 let frame = element.frame, bounds = contentBounds()
                 if frame.minY < bounds.minY { nudge(contentUp: false); continue }
                 if frame.maxY > bounds.maxY { nudge(contentUp: true); continue }
