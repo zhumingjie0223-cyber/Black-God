@@ -1,6 +1,10 @@
 name: Build Black God iOS
 
 # 自动验证原生改动；此流程只产生测试证据和无签名构建，不上传 App Store。
+# 三个 job：
+#   unit-tests  引擎检查 + 单元回归测试（含覆盖率），是无签名构建的前置门槛
+#   ui-tests    界面测试，与单元测试并行；失败的用例自动重跑一次
+#   build-app   只依赖 unit-tests，界面测试偶发失败不阻塞构建产物
 on:
   workflow_dispatch:
   pull_request:
@@ -12,6 +16,7 @@ on:
       - 'shuyu/**'
       - 'Makefile'
       - '.github/workflows/build.yml'
+      - '.github/actions/**'
   push:
     branches: [main]
     paths:
@@ -22,6 +27,7 @@ on:
       - 'shuyu/**'
       - 'Makefile'
       - '.github/workflows/build.yml'
+      - '.github/actions/**'
 
 permissions:
   contents: read
@@ -31,18 +37,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: macos-latest
-    timeout-minutes: 60
+  unit-tests:
+    runs-on: macos-26
+    timeout-minutes: 40
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
-    - name: Install build tools
-      run: brew install xcodegen ninja llvm lld libarchive pkg-config
-
-    - name: Generate Xcode Project and runtime
-      run: make generate
+    - name: Prepare build environment
+      uses: ./.github/actions/prepare
 
     - name: Verify guest uname memory boundaries
       run: python3 tools/runtime/test_uname.py
@@ -59,27 +62,117 @@ jobs:
         xcrun simctl bootstatus "$DEVICE_ID" -b
         echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
 
-    - name: Run iOS regression tests
+    - name: Run iOS unit regression tests
       working-directory: ios-app
+      env:
+        DEVICE_ID: ${{ steps.sim.outputs.device_id }}
       run: |
         set -euo pipefail
-        DEVICE_ID="${{ steps.sim.outputs.device_id }}"
         xcodebuild test \
           -project BlackGod.xcodeproj \
           -scheme BlackGod \
           -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+          -only-testing:BlackGodTests \
           -parallel-testing-enabled NO \
-          -resultBundlePath TestResults.xcresult \
+          -enableCodeCoverage YES \
+          -resultBundlePath UnitTestResults.xcresult \
           CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-
 
-    - name: Upload test results
+    - name: Coverage summary
       if: always()
-      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      working-directory: ios-app
+      run: |
+        set -euo pipefail
+        test -d UnitTestResults.xcresult
+        xcrun xccov view --report --only-targets UnitTestResults.xcresult
+        xcrun xccov view --report --json UnitTestResults.xcresult > coverage.json
+        python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+        import json
+        data = json.load(open("coverage.json"))
+        print("## 单元测试覆盖率\n")
+        print("| 目标 | 行覆盖率 | 已覆盖 / 可执行行 |")
+        print("|---|---|---|")
+        for t in data.get("targets", []):
+            print(f"| {t['name']} | {t['lineCoverage'] * 100:.1f}% | {t['coveredLines']} / {t['executableLines']} |")
+        app = next((t for t in data.get("targets", []) if t["name"].endswith(".app")), None)
+        if app:
+            files = sorted((f for f in app.get("files", []) if f.get("executableLines", 0) >= 50),
+                           key=lambda f: f["lineCoverage"])[:15]
+            print("\n### 覆盖率最低的 15 个文件（可执行行 ≥ 50）\n")
+            print("| 文件 | 行覆盖率 | 已覆盖 / 可执行行 |")
+            print("|---|---|---|")
+            for f in files:
+                print(f"| {f['name']} | {f['lineCoverage'] * 100:.1f}% | {f['coveredLines']} / {f['executableLines']} |")
+        PY
+
+    - name: Upload unit test results
+      if: always()
+      uses: actions/upload-artifact@v6
       with:
-        name: BlackGod-test-results
-        path: ios-app/TestResults.xcresult
+        name: BlackGod-unit-test-results
+        path: |
+          ios-app/UnitTestResults.xcresult
+          ios-app/coverage.json
         if-no-files-found: warn
         retention-days: 14
+
+  ui-tests:
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Prepare build environment
+      uses: ./.github/actions/prepare
+
+    - name: Boot iOS Simulator
+      id: sim
+      run: |
+        set -euo pipefail
+        DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(d["udid"] for group in data["devices"].values() for d in group if d.get("isAvailable") and "iPhone" in d["name"]))')
+        xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+        xcrun simctl bootstatus "$DEVICE_ID" -b
+        echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+    # 失败的用例最多再跑一次（共 2 次）；两次都失败才判定失败，断言本身不放宽。
+    - name: Run iOS UI tests
+      working-directory: ios-app
+      env:
+        DEVICE_ID: ${{ steps.sim.outputs.device_id }}
+      run: |
+        set -euo pipefail
+        xcodebuild test \
+          -project BlackGod.xcodeproj \
+          -scheme BlackGod \
+          -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+          -only-testing:BlackGodUITests \
+          -parallel-testing-enabled NO \
+          -retry-tests-on-failure \
+          -test-iterations 2 \
+          -resultBundlePath UITestResults.xcresult \
+          CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-
+
+    - name: Upload UI test results
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: BlackGod-ui-test-results
+        path: ios-app/UITestResults.xcresult
+        if-no-files-found: warn
+        retention-days: 14
+
+  build-app:
+    needs: unit-tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Prepare build environment
+      uses: ./.github/actions/prepare
 
     - name: Build App (unsigned)
       working-directory: ios-app
@@ -105,7 +198,7 @@ jobs:
         ditto -c -k --keepParent Payload BlackGod-unsigned.ipa
 
     - name: Upload unsigned build
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: BlackGod-unsigned-IPA
         path: ios-app/BlackGod-unsigned.ipa
