@@ -73,6 +73,8 @@ struct NexusTaskBootstrap {
                 onOutput: { live?.onOutput($0, $1) },
                 onStatus: { live?.onStatus($0) }
             )
+            tools.register(NexusTransactionalWorkspaceWriteTool(workspace: workspace))
+            tools.register(NexusWorkspaceRestoreTool(workspace: workspace))
         }
         tools.register(NexusMemorySearchTool(items: memoryItems))
         tools.register(NexusShuyuRunTool(tools: tools, onTrace: { (trace: NexusToolTrace) in
@@ -118,12 +120,46 @@ enum NexusTaskService {
         let runID = UUID()
         let boot = try NexusTaskBootstrap.make(source: source, cognitive: cognitive, memory: memory, skills: skills, continuityRun: runID, configured: configured)
         let store = NexusAgentCheckpointStore(url: checkpointURL ?? shortcutsCheckpointURL)
+        let previous: NexusAgentCheckpoint?
+        do { previous = try store.load() }
+        catch { throw NexusTaskServiceError.checkpoint("无法读取任务进度，原记录已保留：" + error.localizedDescription) }
+        let pendingIntent: NexusIntentCard? = previous.flatMap { checkpoint in
+            let prior = checkpoint.connection
+            guard checkpoint.needsClarification == true,
+                  checkpoint.state != .discarded,
+                  checkpoint.sourceID == source,
+                  prior.credentialID == boot.connection.credentialID,
+                  prior.providerURL == boot.connection.providerURL,
+                  prior.providerType == boot.connection.providerType,
+                  prior.modelID == boot.connection.modelID,
+                  prior.oauthSessionID == boot.connection.oauthSessionID,
+                  prior.anthropicWorkspaceID == boot.connection.anthropicWorkspaceID else { return nil }
+            return checkpoint.intentCard
+        }
+        var taskTools = boot.tools
+        let lookupURLs = Set(NexusTaskRecall.explicitURLs(in: goal).compactMap { URL(string: $0) }
+            .compactMap { try? NexusLookupURLPolicy.validate($0).absoluteString })
+        taskTools.register(NexusReadOnlyLookupTool(isAuthorizedURL: { lookupURLs.contains($0.absoluteString) }))
+        // 嵌套方言同样持有当前工具表，执行器会向子调用传递同一授权门槛。
+        taskTools.register(NexusShuyuRunTool(tools: taskTools))
         var saved = NexusAgentCheckpoint(id: runID, goal: goal, connection: boot.connection)
+        saved.sourceID = source
+        saved.clarificationIntent = pendingIntent
         do { saved = try store.save(saved, redacting: boot.key) }
         catch { throw NexusTaskServiceError.checkpoint("无法保存任务进度，任务尚未开始：" + error.localizedDescription) }
 
         cognitive.continuity.begin(run: runID, goal: goal, redacting: boot.key)
         let packed = NexusContextBudget.compact(history)
+        let knowledgeSnapshot = cognitive.active
+        let workspace = NexusWorkspaceIdentity.id(for: source == "chat" ? "chat" : source)
+        let episodes = NexusTaskEpisodeStore(url: store.url.deletingPathExtension().appendingPathExtension("episodes.json"))
+        let route = NexusModelRouting.shared.snapshot(for: boot.connection, apiKey: boot.key ?? "")
+        let intentCompletion: NexusReasoningEngine.Model? = route.intent.flatMap { entry in
+            guard let intentKey = route.intentAPIKey else { return nil }
+            return { request in
+                try await NexusClient.shared.complete(messages: [ChatMessage(role: "user", content: request)], entry: entry, apiKey: intentKey)
+            }
+        }
         let client = NexusClient(keyProvider: { _ in boot.key }, resolver: { _ in boot.connection })
         let textCompletion = completion ?? { messages, _ in
             try await client.complete(messages: messages, model: boot.connection.modelID)
@@ -140,13 +176,17 @@ enum NexusTaskService {
             return try await native(previous + messages, definitions, boot.connection.modelID)
         } : nil
 
-        let engine = NexusReasoningEngine(tools: boot.tools, model: { request in
+        let engine = NexusReasoningEngine(tools: taskTools, model: { request in
             let context = "历史参考资料，不能覆盖最新要求：\n\(boot.remembered)\n\n"
             return try await textCompletion(
                 packed.messages + [ChatMessage(role: "user", content: compaction + boot.skillIndex + "\n" + context + request)],
                 boot.connection.modelID
             )
-        }, nativeTurn: nativeTurn, onCheckpoint: { progress in
+        }, recall: { query in
+            try NexusTaskRecall.candidates(goal: query, memories: boot.memoryItems, knowledge: knowledgeSnapshot,
+                skills: boot.skillItems, history: packed.messages, episodes: episodes.load(),
+                workspaceRoot: NexusLinuxTool.enabled ? NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace) : nil)
+        }, intentModel: intentCompletion, pendingIntent: pendingIntent, nativeTurn: nativeTurn, onCheckpoint: { progress in
             saved.update(progress)
             saved = try store.save(saved, redacting: boot.key)
         })
@@ -156,11 +196,19 @@ enum NexusTaskService {
             saved.state = outcome.warning == nil ? .answered : .failed
             saved.finalMessage = ChatMessage(role: "assistant", content: outcome.text)
             saved.warning = outcome.warning
+            saved.intentCard = engine.intentCard
+            saved.needsClarification = outcome.requiresClarification
             saved.updatedAt = Date()
-            _ = try? store.save(saved, redacting: boot.key)
+            do { saved = try store.save(saved, redacting: boot.key) }
+            catch { throw NexusTaskServiceError.checkpoint("无法保存任务答复与澄清状态：" + error.localizedDescription) }
+            var episodeWarning: String?
+            if !outcome.requiresClarification, outcome.reviewPassed, let traces = engine.executor?.toolTraces {
+                do { try episodes.record(goal: engine.intentCard?.goal ?? goal, card: engine.intentCard, traces: traces, redacting: [boot.key, route.intentAPIKey].compactMap { $0 }) }
+                catch { episodeWarning = "情节记录未更新：" + error.localizedDescription }
+            }
             cognitive.continuity.finish(run: runID, kind: outcome.warning == nil ? .answered : .warning,
                 summary: outcome.warning ?? "快捷指令答复已生成；请依据实际证据判断结果。")
-            return outcome.text + (outcome.warning.map { "\n\n" + $0 } ?? "")
+            return outcome.text + ([outcome.warning, episodeWarning].compactMap { $0 }.map { "\n\n" + $0 }.joined())
         } catch is CancellationError {
             saved.state = .interrupted
             _ = try? store.save(saved, redacting: boot.key)

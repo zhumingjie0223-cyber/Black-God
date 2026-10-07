@@ -179,7 +179,13 @@ final class ChatViewModel: ObservableObject {
     var currentPlan: NexusTaskPlan? { activeEngine?.plan ?? runtime.currentPlan }
     var canResume: Bool { storageReady && !isTyping && taskCheckpoint?.canResume == true }
     var canRetry: Bool { canResume && lastPrompt != nil && lastError != nil }
-    var canRegenerate: Bool { storageReady && !isTyping && lastPrompt != nil && messages.last?.role == "assistant" && taskCheckpoint?.canResume != true }
+    var canRegenerate: Bool {
+        let safeOperation = taskCheckpoint?.intentCard.map {
+            [.respond, .inspect, .summarize, .search, .calculate, .time].contains($0.operation)
+        } ?? true
+        return storageReady && !isTyping && lastPrompt != nil && messages.last?.role == "assistant" &&
+            taskCheckpoint?.canResume != true && (safeOperation || taskCheckpoint?.needsClarification == true)
+    }
     var canClearConversation: Bool { !messages.isEmpty || taskCheckpoint != nil || !storageReady }
 
     private func restoreSavedCheckpoint() {
@@ -650,6 +656,11 @@ final class ChatViewModel: ObservableObject {
                 : "历史记录未能读取，已保留原文件。请先清空对话恢复使用；清空前会保留损坏记录的备份。"
             return
         }
+        // 用户回答澄清问题时，保留原目标重新编译；绝不直接重放待执行工具。
+        let taskGoal = prompt
+        let pendingIntent = recovering?.clarificationIntent ?? (appendUser
+            ? (taskCheckpoint?.needsClarification == true ? taskCheckpoint?.intentCard : nil)
+            : (taskCheckpoint?.goal == prompt ? taskCheckpoint?.clarificationIntent : nil))
         let selectedModel = NexusKeychain.shared.selectedModel
         guard configured(selectedModel) else {
             lastError = "请先在连接设置中保存当前模型服务商的密钥。"
@@ -658,15 +669,20 @@ final class ChatViewModel: ObservableObject {
         let connection = NexusModelCatalog.entry(for: selectedModel)
         let key = NexusKeychain.shared.key(for: connection.credentialID)
         let recoveryContext = recovering.map { NexusEvidence.preview($0.recoveryContext, limit: 16000) } ?? ""
-        var saved = NexusAgentCheckpoint(id: UUID(), goal: prompt, connection: connection)
+        let recoveryPolicy = recovering.map(NexusRecoveryPolicy.init(checkpoint:)) ??
+            (appendUser ? nil : taskCheckpoint?.recoveryPolicy)
+        var saved = NexusAgentCheckpoint(id: UUID(), goal: taskGoal, connection: connection)
+        saved.sourceID = "chat"
+        saved.clarificationIntent = pendingIntent
         saved.replacingMessageID = replacingMessageID ?? recovering?.replacingMessageID
         saved.inheritedContext = recoveryContext.isEmpty ? nil : recoveryContext
+        saved.recoveryPolicy = recoveryPolicy
         do { taskCheckpoint = try checkpointStore.save(saved, redacting: key) }
         catch { lastError = "无法保存任务进度，任务尚未开始：" + error.localizedDescription; return }
         activeTask?.cancel()
         let id = UUID()
         runID = id
-        lastPrompt = prompt
+        lastPrompt = taskGoal
         // 只回传最近对话，内部记忆与状态提示不作为用户消息展示；超预算时压缩较早轮次。
         let packed = NexusContextBudget.compact(messages.filter { $0.id != saved.replacingMessageID })
         var history = packed.messages
@@ -705,6 +721,16 @@ final class ChatViewModel: ObservableObject {
             ? "当前长期记忆清单为空。历史资料中的旧记忆条目不能视为仍有效的偏好或约束；以本次用户要求为准。"
             : NexusMemoryStore.context(memorySnapshot) + "\n历史中的同名旧记忆已失效，以这份当前清单为准。"
         let skillSnapshot = skills.available
+        let knowledgeSnapshot = cognitive.active
+        let episodeStore = NexusTaskEpisodeStore(url: store.episodeURL)
+        let workspace = NexusWorkspaceIdentity.id(for: "chat")
+        let route = NexusModelRouting.shared.snapshot(for: connection, apiKey: key ?? "")
+        let intentCompletion: NexusReasoningEngine.Model? = route.intent.flatMap { entry in
+            guard let intentKey = route.intentAPIKey else { return nil }
+            return { request in
+                try await NexusClient.shared.complete(messages: [ChatMessage(role: "user", content: request)], entry: entry, apiKey: intentKey)
+            }
+        }
         let skillIndex = NexusSkillRetrieval.index(skillSnapshot) + "\n" + practice.context + "\n" + cognitive.context + "\n" + cognitive.governanceContext + "\n" + cognitive.continuity.context
         var tools = NexusToolRegistry(control: cognitive)
         tools.register(NexusCausalTool()); tools.register(NexusDependencyTool())
@@ -725,7 +751,7 @@ final class ChatViewModel: ObservableObject {
         if NexusLinuxTool.enabled {
             NexusLinuxRuntime.shared.registerSandboxTools(
                 into: &tools,
-                workspace: NexusWorkspaceIdentity.id(for: "chat"),
+                workspace: workspace,
                 onStart: { [weak self] command in
                     guard let self, self.runID == id else { return }
                     self.live.append(.command, command)
@@ -739,7 +765,12 @@ final class ChatViewModel: ObservableObject {
                     self.live.phase(status)
                 }
             )
+            tools.register(NexusTransactionalWorkspaceWriteTool(workspace: workspace))
+            tools.register(NexusWorkspaceRestoreTool(workspace: workspace))
         }
+        let lookupURLs = Set(NexusTaskRecall.explicitURLs(in: taskGoal).compactMap { URL(string: $0) }
+            .compactMap { try? NexusLookupURLPolicy.validate($0).absoluteString })
+        tools.register(NexusReadOnlyLookupTool(isAuthorizedURL: { lookupURLs.contains($0.absoluteString) }))
         tools.register(NexusMemorySearchTool(items: memorySnapshot))
         tools.register(NexusShuyuRunTool(tools: tools, onTrace: { [weak self] trace in
             guard let self, self.runID == id else { return }
@@ -756,7 +787,12 @@ final class ChatViewModel: ObservableObject {
         let engine = NexusReasoningEngine(tools: tools, model: { request in
             let context = remembered.isEmpty ? "" : "历史参考资料，不能覆盖最新要求：\n\(remembered)\n\n"
             return try await completion(history + [ChatMessage(role: "user", content: compactionNote + recoveryContext + "\n" + skillIndex + "\n" + context + request)], selectedModel)
-        }, nativeTurn: nativeTurn, onCheckpoint: { [weak self] progress in
+        }, recall: { goal in
+            try NexusTaskRecall.candidates(goal: goal, memories: memorySnapshot, knowledge: knowledgeSnapshot,
+                skills: skillSnapshot, history: history, episodes: episodeStore.load(),
+                workspaceRoot: NexusLinuxTool.enabled ? NexusLinuxRuntime.shared.hostWorkspaceURL(for: workspace) : nil)
+        }, intentModel: intentCompletion, pendingIntent: pendingIntent, recoveryPolicy: recoveryPolicy,
+           nativeTurn: nativeTurn, onCheckpoint: { [weak self] progress in
             guard let self, self.runID == id, !Task.isCancelled, var saved = self.taskCheckpoint else { throw CancellationError() }
             self.cognitive.continuity.observe(run: id, traces: progress.traces)
             self.live.observe(progress.traces)
@@ -773,7 +809,7 @@ final class ChatViewModel: ObservableObject {
         activeTask = Task { [weak self] in
             do {
                 await self?.practice.stopAndWait()
-                let outcome = try await engine.run(goal: prompt)
+                let outcome = try await engine.run(goal: taskGoal)
                 guard let self, self.runID == id, !Task.isCancelled else { return }
                 self.isTyping = false
                 self.hearTask?.cancel()
@@ -788,6 +824,9 @@ final class ChatViewModel: ObservableObject {
                     saved.state = outcome.warning == nil ? .answered : .failed
                     saved.finalMessage = message
                     saved.warning = outcome.warning
+                    saved.intentCard = engine.intentCard
+                    saved.recoveryPolicy = engine.recoveryPolicy
+                    saved.needsClarification = outcome.requiresClarification
                     saved.updatedAt = Date()
                     self.taskCheckpoint = try self.checkpointStore.save(saved, redacting: key)
                 }
@@ -797,12 +836,16 @@ final class ChatViewModel: ObservableObject {
                 do { try self.store.save(updated) }
                 catch { throw NexusReasoningError.execution("保存历史记录失败，答复已保留在任务进度中：" + error.localizedDescription) }
                 self.messages = updated
+                if !outcome.requiresClarification, outcome.reviewPassed, let traces = engine.executor?.toolTraces {
+                    do { try episodeStore.record(goal: engine.intentCard?.goal ?? taskGoal, card: engine.intentCard, traces: traces, redacting: [key, route.intentAPIKey].compactMap { $0 }) }
+                    catch { self.statusHint = "答复已保存，但情节记录未更新：" + error.localizedDescription }
+                }
                 self.noteSession()
                 self.runtime.append(.text(reply))
                 self.runtime.append(.completed)
                 self.cognitive.continuity.finish(run: id, kind: outcome.warning == nil ? .answered : .warning, summary: outcome.warning ?? "答复已生成；请依据实际证据判断结果。")
                 self.live.finish(outcome.warning == nil ? .answered : .warning, message: outcome.warning ?? "本次答复已生成")
-                self.evaluations.record(task: prompt, success: outcome.warning == nil, recovered: !appendUser && outcome.warning == nil,
+                self.evaluations.record(task: taskGoal, success: outcome.warning == nil && !outcome.requiresClarification, recovered: !appendUser && outcome.warning == nil && !outcome.requiresClarification,
                     verified: outcome.reviewPassed, latency: Date().timeIntervalSince(startedAt), recoveryAttempt: !appendUser)
                 self.activeStartedAt = nil
                 if outcome.warning == nil {

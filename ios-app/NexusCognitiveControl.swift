@@ -276,11 +276,21 @@ final class NexusCognitiveControl: ObservableObject {
         do { try commit(next, event: "permission.analysis-only", subject: "model-tools") }
         catch { writable = false; self.error = "权限保存失败，受管工具保持停止。"; throw error }
     }
+    private static let readOnlyTools: Set<String> = ["echo", "calc", "clock", "shuyu", "shuyu_execute", "plan", "verify", "skill_search", "skill_read", "memory_search", "causal_model", "dependency_plan", "web_lookup"]
+    private static let workspaceTools: Set<String> = ["shell_execute", "workspace_list", "workspace_read", "workspace_write", "workspace_delete", "workspace_restore", "http_fetch"]
+    private static let governanceTools: Set<String> = ["knowledge_propose", "self_reflect", "self_decision_proposal", "self_decision_review", "self_decision_publish"]
+
+    // 工具自己的参数、联网和任务卡检查仍独立执行；这里检查治理权限及工作区租约。
+    private func permits(_ tool: String, now: Date) -> Bool {
+        !state.stopped && (Self.readOnlyTools.contains(tool) ||
+            (Self.governanceTools.contains(tool) && state.governanceEnabled) ||
+            (Self.workspaceTools.contains(tool) && (state.workspaceUntil.map { $0 > now } ?? false)))
+    }
+
     func begin(_ call: NexusToolCall, now: Date = Date()) throws -> Int {
-        let readOnly: Set<String> = ["echo", "calc", "clock", "shuyu", "shuyu_execute", "plan", "verify", "skill_search", "skill_read", "memory_search", "causal_model", "dependency_plan"]
-        let governanceTools: Set<String> = ["knowledge_propose", "self_reflect", "self_decision_proposal", "self_decision_review", "self_decision_publish"]
+        let governanceTools = Self.governanceTools
         let isGovernance = governanceTools.contains(call.name)
-        let allowed = !state.stopped && (readOnly.contains(call.name) || (isGovernance && state.governanceEnabled) || (call.name == "shell_execute" && (state.workspaceUntil.map { $0 > now } ?? false)))
+        let allowed = permits(call.name, now: now)
         if isGovernance && !state.governanceEnabled { _ = try? commit(state, event: "tool.denied", subject: call.name + ":" + call.id.uuidString + ":governance-closed") }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let hash = SHA256.hash(data: try encoder.encode(call.arguments)).map { String(format: "%02x", $0) }.joined()
@@ -288,9 +298,9 @@ final class NexusCognitiveControl: ObservableObject {
         guard allowed else { throw failure("当前模型工具权限不允许此操作；工作区授权需在神枢成长页开启，30分钟后失效。") }
         return revision
     }
-    func finish(_ call: NexusToolCall, succeeded: Bool, startedRevision: Int) throws {
+    func finish(_ call: NexusToolCall, succeeded: Bool, startedRevision: Int, now: Date = Date()) throws {
         try commit(state, event: succeeded ? "tool.completed" : "tool.failed", subject: call.name + ":" + call.id.uuidString)
-        guard startedRevision == revision, !state.stopped, call.name != "shell_execute" || (state.workspaceUntil.map { $0 > Date() } ?? false) else { throw failure("工具运行期间权限或资料已改变，结果不再交给模型；已发生的操作不会被撤销。") }
+        guard startedRevision == revision, permits(call.name, now: now) else { throw failure("工具运行期间权限或资料已改变，结果不再交给模型；已发生的操作不会被撤销。") }
     }
     private func canPublish(risk: String) -> Bool {
         ["low", "medium"].contains(risk.lowercased())

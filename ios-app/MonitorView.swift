@@ -9,6 +9,7 @@ struct MonitorView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showBenchmark = false
+    @State private var showIntentRegression = false
     @State private var showMetricNotes = false
     @StateObject private var model = NexusMonitorModel()
 
@@ -29,6 +30,11 @@ struct MonitorView: View {
                     MetricCard(title: "平均耗时", valueText: model.latencyText, symbol: "clock", sample: "\(model.latencySampleCount) 条有效耗时")
                 }
                 benchmarkCard
+                Button { showIntentRegression = true } label: {
+                    Label("50句意图固定回归", systemImage: "checklist").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(BGSecondaryButtonStyle())
+                .accessibilityIdentifier("intent-regression.open")
                 metricNotes
                 recentTasks
             }
@@ -38,6 +44,7 @@ struct MonitorView: View {
         .refreshable { model.refresh() }
         .task { model.refresh() }
         .sheet(isPresented: $showBenchmark) { NexusBenchmarkView() }
+        .sheet(isPresented: $showIntentRegression) { NexusIntentRegressionView() }
     }
 
     private var metricColumns: [GridItem] {
@@ -89,6 +96,7 @@ struct MonitorView: View {
                 Text("运行统计不代表任务正确率；模型自检由模型自身完成。")
                 Text("每项指标下方列出样本数。重试仅计主动重试；耗时仅计有效记录。无样本显示 —。")
                 Text("独立验收会另行运行任务，核对答案与工具证据。旧版记录仍保留。")
+                Text("50句意图回归另列对象、工具和澄清标签一致数；无警告答复率不能衡量理解或智慧。")
             }
             .font(.caption).foregroundStyle(Color.bgTextSecondary)
             .fixedSize(horizontal: false, vertical: true).padding(.top, 10)

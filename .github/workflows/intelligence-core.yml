@@ -1,0 +1,59 @@
+name: 意图与证据核心回归
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'ios-app/**'
+      - 'tests/ios/**'
+      - 'tests/fixtures/**'
+      - 'tools/intelligence/**'
+      - 'Makefile'
+      - '.github/workflows/intelligence-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios-app/**'
+      - 'tests/ios/**'
+      - 'tests/fixtures/**'
+      - 'tools/intelligence/**'
+      - 'Makefile'
+      - '.github/workflows/intelligence-core.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: intelligence-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-regression:
+    name: 真实入口、治理与固定中文回归
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BLACK_GOD_TOOLCHAIN_ROOT: ${{ runner.temp }}/black-god-swift
+      SWIFT_BINARY: ${{ runner.temp }}/black-god-swift/swift-6.2.1-RELEASE-ubuntu24.04/usr/bin/swift
+      SWIFT_TEST_JOBS: '4'
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+      - name: 安装核心编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg pkg-config libssl-dev
+      - name: 校验并安装官方固定版本Swift
+        run: bash tools/intelligence/install-swift-linux.sh
+      - name: 执行核心回归
+        run: |
+          set -euo pipefail
+          make test-intelligence 2>&1 | tee intelligence-tests.log
+      - name: 保留实际测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intelligence-core-results
+          path: intelligence-tests.log
+          if-no-files-found: warn
+          retention-days: 14

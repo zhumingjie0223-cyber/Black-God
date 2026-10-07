@@ -16,12 +16,23 @@ protocol NexusTool {
     var name: String { get }
     var usage: String { get }
     var canReuseResult: Bool { get }
+    var guaranteesRollback: Bool { get }
     func execute(_ call: NexusToolCall) async -> NexusToolResult
 }
 
 extension NexusTool {
     var usage: String { name }
     var canReuseResult: Bool { false }
+    var guaranteesRollback: Bool { false }
+}
+
+typealias NexusToolAuthorization = @MainActor (NexusToolCall) -> String?
+typealias NexusNestedTraceObserver = @MainActor (NexusToolTrace) -> Void
+
+/// Composite tools must propagate the same authorization check to every child call.
+protocol NexusAuthorizableTool: NexusTool {
+    func execute(_ call: NexusToolCall, authorize: NexusToolAuthorization?,
+                 onTrace: NexusNestedTraceObserver?) async -> NexusToolResult
 }
 
 struct NexusToolRegistry {
@@ -31,16 +42,26 @@ struct NexusToolRegistry {
     var isEmpty: Bool { tools.isEmpty }
     func contains(_ name: String) -> Bool { tools[name] != nil }
     func canReuseResult(_ name: String) -> Bool { tools[name]?.canReuseResult ?? false }
+    func guaranteesRollback(_ name: String) -> Bool { tools[name]?.guaranteesRollback ?? false }
     var manifest: String {
         tools.keys.sorted().compactMap { tools[$0] }.map { "\($0.name): \($0.usage)" }.joined(separator: "\n")
     }
     mutating func register(_ tool: any NexusTool) { tools[tool.name] = tool }
-    func execute(_ call: NexusToolCall) async -> NexusToolResult {
+    func execute(_ call: NexusToolCall, authorize: NexusToolAuthorization? = nil,
+                 onTrace: NexusNestedTraceObserver? = nil) async -> NexusToolResult {
         do {
             try Task.checkCancellation()
+            if let reason = await authorize?(call) {
+                return NexusToolResult(callID: call.id, output: "授权拦截：" + reason, succeeded: false)
+            }
             let revision = try await control?.begin(call)
             guard let tool = tools[call.name] else { throw NexusReasoningError.execution("未知工具：\(call.name)") }
-            let result = await tool.execute(call)
+            let result: NexusToolResult
+            if let composite = tool as? any NexusAuthorizableTool {
+                result = await composite.execute(call, authorize: authorize, onTrace: onTrace)
+            } else {
+                result = await tool.execute(call)
+            }
             if let control, let revision { try await control.finish(call, succeeded: result.succeeded, startedRevision: revision) }
             try Task.checkCancellation()
             return result

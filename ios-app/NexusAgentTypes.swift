@@ -12,16 +12,37 @@ struct NexusTaskStep: Codable, Equatable, Identifiable {
     let title: String
     var status: NexusStepStatus
     var result: String?
+    /// Stable source IDs and tool:<call UUID> pointers, preserved during a repair.
+    var evidenceIDs: [String]
+    /// True only when this step has observed successful execution evidence.
+    var executionVerified: Bool?
 
-    init(title: String, status: NexusStepStatus = .pending, result: String? = nil) {
+    init(title: String, status: NexusStepStatus = .pending, result: String? = nil,
+         evidenceIDs: [String] = [], executionVerified: Bool? = nil) {
         self.id = UUID()
         self.title = title
         self.status = status
         self.result = result
+        self.evidenceIDs = evidenceIDs
+        self.executionVerified = executionVerified
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, status, result, evidenceIDs, executionVerified
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        status = try values.decode(NexusStepStatus.self, forKey: .status)
+        result = try values.decodeIfPresent(String.self, forKey: .result)
+        evidenceIDs = try values.decodeIfPresent([String].self, forKey: .evidenceIDs) ?? []
+        executionVerified = try values.decodeIfPresent(Bool.self, forKey: .executionVerified)
     }
 }
 
-enum NexusStepStatus: String, Codable { case pending, running, passed, failed, skipped }
+enum NexusStepStatus: String, Codable { case pending, running, answered, passed, failed, skipped }
 
 struct NexusObservation: Codable, Equatable {
     let stepID: UUID

@@ -1,6 +1,6 @@
 # Black God 隐私与数据使用 / Privacy and data use
 
-更新日期 / Updated: 2026-09-24
+更新日期 / Updated: 2026-10-08
 
 ## 中文
 
@@ -10,11 +10,15 @@ Black God 是独立的多服务商 AI 客户端，支持本机工具和内置 Li
 
 API 密钥、OAuth 访问令牌和刷新令牌存放在本机 Keychain，设置为仅此设备可用。连接配置、对话、记忆、技能、任务检查点和运行文件保存在应用容器。容器数据是否包含在系统备份中取决于系统设置；Keychain 凭据可能在卸载后保留，不承诺卸载会删除所有凭据。
 
+1.4.0开发版还保存带有限工具输出快照的任务情节（每会话最多100条），用于本地对象召回；模型生成的结论不作为有效事实。文件写入的原始状态可保存为本机工作区私有备份，最多最近10份、每份含元数据不超过2 MiB，恢复前检查目标未被后续修改。清空聊天包含对应情节，但不删除工作区文件及其私有备份。
+
 ### 数据发送与许可
 
 在你明确允许某个连接发送内容后，模型请求会把当前对话、选用的长期记忆、技能指令和工具结果发送至你配置的服务商。这些内容可能包含个人信息和文件内容。服务商收到认证凭据、请求与网络连接信息，可将使用情况关联至其账号。数据保留与处理由相应服务商及其下游服务政策决定。
 
 “我的 → 神枢连接”显示接收地址及发送内容，并提供许可开关。关闭许可阻止后续模型内容请求；已发送的请求或服务商已保留的数据不会因此撤回。获取模型列表会向该服务商发送认证凭据，不会发送对话内容。
+
+如果你另行选择意图分类连接，本次用户指令及召回候选的名称摘要会发送至该连接；它也必须拥有单独的发送许可。未选择时使用本地编译。只读网页检索仅访问你本次明确给出的HTTPS网址，在本地匹配查询词，不把聊天、查询词或模型密钥发送至文档站点；文档站点仍会接收请求网址和连接信息。
 
 账号授权时，登录页面、验证码、授权码、PKCE 材料和令牌交换由相应授权服务处理。应用不索取服务商密码。OpenRouter 是聚合服务，可能将模型请求交由其下游提供商处理。Kimi、Grok 和 MiniMax 的兼容登录使用公开 CLI 授权流程，权限与额度由服务商决定。
 
@@ -46,9 +50,13 @@ Black God is an independent AI client with local tools and an embedded Linux env
 
 API keys and OAuth access/refresh tokens are stored in this-device-only Keychain entries. Connections, chats, memories, skills, task checkpoints and workspace files are stored in the app container. System backups depend on device settings. Keychain entries may survive uninstalling the app.
 
+The 1.4.0 development version also stores up to 100 task episodes per conversation, including bounded tool-output snapshots for local object retrieval. Model conclusions do not become confirmed facts. Workspace writes can retain the previous state in private local backups: the latest 10 archives per workspace, each at most 2 MiB including metadata. Restoration checks that the target has not subsequently changed. Clearing a conversation deletes its episodes but preserves workspace files and their private backups.
+
 After you explicitly allow a connection, model requests send the current conversation, selected memories, skill instructions and tool results to its configured provider. These may contain personal information or file content. Authentication and network information can associate requests with your provider account. Provider and downstream policies govern retention and processing. OpenRouter may route requests to downstream model providers.
 
 The connection screen displays the destination, explains the data and provides a permission switch. Turning permission off prevents subsequent model-content requests; it cannot recall data already sent. Model discovery sends authentication credentials but no conversation. Account login and code/token exchange use provider authorization services; Black God does not ask for provider passwords. Kimi, Grok and MiniMax compatibility sign-in uses public CLI authorization flows.
+
+If you select a separate intent-classification connection, it receives the current instruction and recalled candidate names and summaries, subject to its own data-sending permission. Without a selected connection, compilation runs locally. Read-only document lookup visits only a public HTTPS URL explicitly supplied in the current request. Query matching runs locally; chat text, query terms and model credentials are not sent to the document site. The site still receives the requested URL and connection information.
 
 Network-enabled tools, scripts and package commands may contact their specified websites or repositories. Tool output may enter later model requests. Review task plans and avoid unnecessary sensitive data. Actual device free space is used locally for display and write protection.
 
@@ -65,6 +73,6 @@ The self-state stream stores the latest 120 goal summaries, task phases, tool re
 
 ### Conversation clearing and audit retention
 
-Clearing the current conversation stops the active reply and deletes local chat messages and the current task recovery record. It does not delete separately managed memories, skills, self-state records, evaluation records or workspace files. If a chat or task file cannot be read, a local recovery copy is preserved in ConversationRecovery before clearing; these copies are not uploaded or deleted by the conversation-clear action.
+Clearing the current conversation stops the active reply and deletes local chat messages, associated task episodes and the current task recovery record. It does not delete separately managed memories, skills, self-state records, evaluation records or workspace files. If a chat or task file cannot be read, a local recovery copy is preserved in ConversationRecovery before clearing; these copies are not uploaded or deleted by the conversation-clear action.
 
 Permission and tool audits retain the latest 2,000 events and a cumulative count of removed events. The oldest events are removed as new ones arrive, and their details cannot be recovered in the app. Pending tool call identifiers are stored separately so an interrupted call can be identified at the next launch. This is not a complete historical audit archive.

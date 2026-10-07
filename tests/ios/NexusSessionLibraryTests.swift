@@ -14,7 +14,7 @@ final class NexusSessionLibraryTests: XCTestCase {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    func testBootstrapCreatesEmptyActiveSession() throws {
+    func testBootstrapCreatesEmptyActiveSession() async throws {
         let library = NexusSessionLibrary(root: folder)
         let index = try library.bootstrap()
         XCTAssertEqual(index.sessions.count, 1)
@@ -23,7 +23,7 @@ final class NexusSessionLibraryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("nexus-conversation.json").path))
     }
 
-    func testMigratesLegacyConversationAndCheckpoint() throws {
+    func testMigratesLegacyConversationAndCheckpoint() async throws {
         let legacy = NexusConversationStore(url: folder.appendingPathComponent("nexus-conversation.json"))
         let checkpoint = NexusAgentCheckpointStore(url: folder.appendingPathComponent("nexus-conversation.agent.json"))
         let user = ChatMessage(role: "user", content: "旧对话主题很长很长很长很长很长很长很长很长")
@@ -44,7 +44,7 @@ final class NexusSessionLibraryTests: XCTestCase {
         XCTAssertTrue(index.sessions[0].title.hasSuffix("…") || index.sessions[0].title == NexusSessionRecord.cleanTitle(user.content))
     }
 
-    func testCreateSwitchDeleteAndExportKeepIsolation() throws {
+    func testCreateSwitchDeleteAndExportKeepIsolation() async throws {
         let library = NexusSessionLibrary(root: folder)
         let first = try library.bootstrap().activeID
         try library.conversationStore(for: first).save([ChatMessage(role: "user", content: "会话甲")])
@@ -73,7 +73,7 @@ final class NexusSessionLibraryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: library.conversationURL(for: second.id).path))
     }
 
-    func testCannotDeleteLastSessionAndRespectsLimit() throws {
+    func testCannotDeleteLastSessionAndRespectsLimit() async throws {
         let library = NexusSessionLibrary(root: folder)
         let only = try library.bootstrap().activeID
         XCTAssertThrowsError(try library.delete(only)) { error in
@@ -88,6 +88,8 @@ final class NexusSessionLibraryTests: XCTestCase {
         }
     }
 
+    // 真实会话入口也由便携包编译；这些断言检查持久化和任务状态，不依赖界面绘制。
+    #if canImport(SwiftUI)
     func testViewModelKeepsSessionsIsolatedAndExports() async throws {
         let library = NexusSessionLibrary(root: folder)
         let first = try library.bootstrap().sessions[0]
@@ -127,7 +129,7 @@ final class NexusSessionLibraryTests: XCTestCase {
         XCTAssertEqual(vm.sessions.count, 1)
     }
 
-    func testCustomStoreWithoutLibraryKeepsSingleFileBehavior() throws {
+    func testCustomStoreWithoutLibraryKeepsSingleFileBehavior() async throws {
         let store = NexusConversationStore(url: folder.appendingPathComponent("chat.json"))
         try store.save([ChatMessage(role: "user", content: "单文件")])
         let vm = ChatViewModel(store: store, configured: { _ in false })
@@ -141,4 +143,5 @@ final class NexusSessionLibraryTests: XCTestCase {
         for _ in 0..<200 where vm.isTyping { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertFalse(vm.isTyping)
     }
+    #endif
 }

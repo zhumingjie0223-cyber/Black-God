@@ -17,6 +17,7 @@ struct NexusConversationStore {
     }
 
     var clearIntentURL: URL { url.appendingPathExtension("clearing") }
+    var episodeURL: URL { url.deletingPathExtension().appendingPathExtension("episodes.json") }
 
     /// The marker is committed first so a crash cannot resurrect a reply from the checkpoint.
     func clear(checkpointURL: URL, preserving unreadableFiles: [URL] = []) throws {
@@ -40,6 +41,7 @@ struct NexusConversationStore {
         guard fm.fileExists(atPath: clearIntentURL.path) else { return false }
         try save([])
         if fm.fileExists(atPath: checkpointURL.path) { try fm.removeItem(at: checkpointURL) }
+        if fm.fileExists(atPath: episodeURL.path) { try fm.removeItem(at: episodeURL) }
         try fm.removeItem(at: clearIntentURL)
         return true
     }

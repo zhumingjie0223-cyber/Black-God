@@ -1,4 +1,4 @@
-.PHONY: build test test-ios test-shuyu generate prepare-runtime
+.PHONY: build test test-ios test-shuyu test-intelligence generate prepare-runtime
 IOS_DESTINATION ?= platform=iOS Simulator,name=iPhone 17 Pro Max
 
 prepare-runtime:
@@ -17,6 +17,9 @@ test-shuyu:
 	python3 tools/shuyu/bundle.py --check
 	cd shuyu && npm test
 	cd shuyu && python3 -m unittest discover -s tests
+
+test-intelligence:
+	tools/intelligence/run-tests.sh
 
 test-ios: generate
 	cd ios-app && xcodebuild test -project BlackGod.xcodeproj -scheme BlackGod -destination '$(IOS_DESTINATION)' CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-

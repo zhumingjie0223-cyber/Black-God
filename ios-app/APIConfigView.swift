@@ -2,6 +2,7 @@ import SwiftUI
 
 struct APIConfigView: View {
     @StateObject private var oauth = NexusOAuthLogin()
+    @StateObject private var modelRouting = NexusModelRouting.shared
     @State private var oauthConnected = false
     @State private var oauthSessionID: String?
     @State private var workspaceID = ""
@@ -62,6 +63,7 @@ struct APIConfigView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     connectionSummary
                     if !savedConnections.isEmpty { savedConnectionCard }
+                    modelRoleCard
                     accountCard
                     providerCard
                     if !oauthConnected { credentialCard }
@@ -158,6 +160,32 @@ struct APIConfigView: View {
             .pickerStyle(.menu)
             help("切换说明") {
                 note("打开配置后点击“保存并使用”，即可切换当前模型。进行中的任务继续使用发送时的连接。")
+            }
+        }
+        .disabled(isTesting || oauth.isRunning)
+    }
+
+    private var modelRoleCard: some View {
+        let planning = NexusKeychain.shared.selectedConnection ?? NexusModelCatalog.entry(for: NexusKeychain.shared.selectedModel)
+        let candidates = modelRouting.eligibleIntentConnections(for: planning)
+        return connectionCard("模型分工", icon: "arrow.triangle.branch") {
+            Text("计划、执行与收口：" + planning.displayName + " · " + planning.modelID)
+                .font(.footnote).foregroundStyle(Color.bgTextSecondary)
+            Picker("意图分类与槽填充", selection: Binding(get: {
+                candidates.contains(where: { $0.id == modelRouting.intentConnectionID }) ? modelRouting.intentConnectionID : ""
+            }, set: { modelRouting.intentConnectionID = $0 })) {
+                Text("本地编译（默认）").tag("")
+                ForEach(candidates) { entry in
+                    Text(entry.displayName + " · " + entry.modelID).tag(entry.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityIdentifier("api.intent-role")
+            note("指定意图连接后，它会收到本次指令与本地召回的候选摘要，只做分类与槽填充，不执行工具。不同连接可能属于另一个服务商或账号，请先核对接收方与发送许可。")
+            note("未配置意图连接，或其许可、凭据不可用时，使用本地编译，不新增模型请求。角色设置立即保存在本机；进行中的任务继续使用发送时的连接与凭据。")
+            help("意图模型接收什么") {
+                note("请按服务商实际提供的模型选择；应用不推断模型大小或质量。")
+                note("只可选择已保存且开启发送许可的连接。不同连接可能属于另一个服务商或账号；请先在该连接的发送许可中核对接收方。计划、工具执行和最终回答继续使用当前主连接。")
             }
         }
         .disabled(isTesting || oauth.isRunning)

@@ -70,26 +70,44 @@ struct NexusShuyuStepResult: Codable {
 }
 
 /// 有界执行，不暴露JavaScript或宿主对象；每个子工具仍检查当前权限。
-struct NexusShuyuRunTool: NexusTool {
+struct NexusShuyuRunTool: NexusAuthorizableTool {
     let name = "shuyu_execute"
     let usage = "执行最多8行枢语。例：行：计算(\"12*3\") → \"36\"。支持计算、枢语、检索、邻近、一息、余息、回息、摇息、落息、起息、栖息、转息、顾息、倾息、贴息、含息、温息、醒息、规划、核对、时间、执行。每个shell最多10秒；未知工具或语法会在执行前拒绝，失败或不符合→预期时停止。"
     let tools: NexusToolRegistry
     var onTrace: (@MainActor (NexusToolTrace) -> Void)? = nil
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
+        await execute(call, authorize: nil, onTrace: nil)
+    }
+    func execute(_ call: NexusToolCall, authorize: NexusToolAuthorization?,
+                 onTrace observer: NexusNestedTraceObserver?) async -> NexusToolResult {
         var results: [NexusShuyuStepResult] = []
         do {
             let program = try await NexusShuyuEngine.shared.compile(call.arguments["program"] ?? "")
             guard program.actions.allSatisfy({ tools.contains($0.tool) && ["calc", "shuyu", "shell_execute", "plan", "verify", "clock"].contains($0.tool) }) else {
                 throw NexusReasoningError.execution("枢语程序包含当前未开放的工具，尚未执行")
             }
-            for action in program.actions {
+            let calls = program.actions.map { NexusToolCall(id: UUID(), name: $0.tool, arguments: $0.arguments) }
+            // Preflight the entire program so an ambiguous forbidden shell cannot follow a write.
+            for inner in calls {
+                if let reason = await authorize?(inner) {
+                    let trace = NexusToolTrace(stepID: call.id, round: 0, call: inner,
+                        result: "授权拦截：" + reason, succeeded: false, timestamp: Date(), authorizationDenied: true)
+                    await onTrace?(trace)
+                    await observer?(trace)
+                    throw NexusReasoningError.execution("授权拦截：" + reason)
+                }
+            }
+            for (index, action) in program.actions.enumerated() {
                 try Task.checkCancellation()
-                let inner = NexusToolCall(id: UUID(), name: action.tool, arguments: action.arguments)
-                let value = await tools.execute(inner)
+                let inner = calls[index]
+                let value = await tools.execute(inner, authorize: authorize, onTrace: observer)
                 try Task.checkCancellation()
                 let matched = action.expected.map { value.output.trimmingCharacters(in: .whitespacesAndNewlines) == $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 results.append(NexusShuyuStepResult(id: action.id, tool: action.tool, output: NexusEvidence.preview(value.output, limit: 3000), succeeded: value.succeeded, matched: matched))
-                await onTrace?(NexusToolTrace(stepID: call.id, round: results.count, call: inner, result: value.output, succeeded: value.succeeded, timestamp: Date()))
+                let trace = NexusToolTrace(stepID: call.id, round: results.count, call: inner, result: value.output,
+                    succeeded: value.succeeded, timestamp: Date(), authorizationDenied: value.output.hasPrefix("授权拦截："))
+                await onTrace?(trace)
+                await observer?(trace)
                 if !value.succeeded || matched == false { break }
             }
             let ok = results.count == program.actions.count && results.allSatisfy { $0.succeeded && $0.matched != false }

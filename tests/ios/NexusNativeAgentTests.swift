@@ -108,7 +108,7 @@ final class NexusNativeAgentTests: XCTestCase {
                 return NexusNativeReply(text: #"{"name":"calc","arguments":{"expression":"12*3"}}"#, calls: [], assistant: ["role": "assistant", "content": ""])
             }
             guard case .results(let results) = messages.last else { throw NexusError.invalidResponse }
-            XCTAssertEqual(results.first?.1.output, "36")
+            XCTAssertEqual(Double(results.first?.1.output ?? ""), 36)
             return try self.reply(text: "总价36元")
         })
         let answer = await executor.run(goal: "计算12*3")
@@ -131,7 +131,7 @@ final class NexusNativeAgentTests: XCTestCase {
             rounds += 1
             if rounds == 1 { return try self.reply([self.call()]) }
             guard case .results(let results) = messages.last else { throw NexusError.invalidResponse }
-            XCTAssertEqual(results.first?.1.output, "36")
+            XCTAssertEqual(Double(results.first?.1.output ?? ""), 36)
             return try self.reply(text: "总价36元")
         })
         let answer = await executor.run(goal: "计算12*3")
@@ -146,7 +146,7 @@ final class NexusNativeAgentTests: XCTestCase {
             if round == 1 { return try self.reply([self.call("a"), self.call("b", arguments: "{\"expression\":\"2+3\"}")]) }
             guard case .results(let results) = messages.last else { throw NexusError.invalidResponse }
             XCTAssertEqual(results.map { $0.0.providerID }, ["a", "b"])
-            XCTAssertEqual(results.map { $0.1.output }, ["36", "5"])
+            XCTAssertEqual(results.map { Double($0.1.output) }, [36, 5])
             return try self.reply(text: "36和5")
         })
         _ = await executor.run(goal: "计算两项")
@@ -162,7 +162,7 @@ final class NexusNativeAgentTests: XCTestCase {
                 XCTAssertFalse(results[0].1.succeeded)
                 return try self.reply([self.call("second")])
             }
-            XCTAssertEqual(results[0].1.output, "36")
+            XCTAssertEqual(Double(results[0].1.output), 36)
             return try self.reply(text: "36")
         })
         let answer = await executor.run(goal: "计算")
@@ -229,7 +229,7 @@ extension NexusNativeAgentTests {
                 return try self.reply([self.call()])
             }
             guard case .results(let results) = messages.last else { throw NexusError.invalidResponse }
-            XCTAssertEqual(results.first?.1.output, "36")
+            XCTAssertEqual(Double(results.first?.1.output ?? ""), 36)
             return try self.reply(text: "已计算为36")
         })
         let result = try await engine.run(goal: "计算12乘3")

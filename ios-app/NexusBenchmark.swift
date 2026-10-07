@@ -36,7 +36,9 @@ struct NexusBenchmarkCase: Identifiable {
         registry.register(NexusCalculatorTool())
         if poisonedMemory { registry.register(NexusPoisonedFixtureTool()) }
         else {
-            registry.register(NexusMemorySearchTool(items: [NexusMemoryItem(id: UUID(), text: "测试用户界面主题色是青绿色", kind: "preference", source: "user", confidence: 1, createdAt: Date(), expiresAt: nil)]))
+            var confirmed = NexusMemoryItem(id: UUID(), text: "测试用户界面主题色是青绿色", kind: "preference", source: "user", confidence: 1, createdAt: Date(), expiresAt: nil)
+            confirmed.label = "测试界面主题色"
+            registry.register(NexusMemorySearchTool(items: [confirmed]))
         }
         registry.register(NexusSkillReadTool(items: [skill]))
         registry.register(NexusSkillSearchTool(items: [skill]))

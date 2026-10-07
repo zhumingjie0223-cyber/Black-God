@@ -1,5 +1,7 @@
 import XCTest
+#if canImport(UIKit)
 import UIKit
+#endif
 @testable import BlackGod
 
 final class NexusCognitiveReasoningTests: XCTestCase {
@@ -22,6 +24,7 @@ final class NexusCognitiveReasoningTests: XCTestCase {
         XCTAssertThrowsError(try NexusDependencyTool.evaluate([.init(id: "a", duration: 1, dependencies: ["b"]), .init(id: "b", duration: 1, dependencies: ["a"])]))
         XCTAssertThrowsError(try NexusDependencyTool.evaluate([.init(id: "a", duration: -1, dependencies: [])]))
     }
+    #if canImport(UIKit)
     @MainActor
     func testRealImageTextRecognitionAndBadImageRejection() throws {
         let image = UIGraphicsImageRenderer(size: CGSize(width: 1000, height: 250)).image { context in
@@ -34,6 +37,7 @@ final class NexusCognitiveReasoningTests: XCTestCase {
         XCTAssertTrue(result.source.contains("SHA256="))
         XCTAssertThrowsError(try NexusVisualObservation.recognize(Data("invalid".utf8)))
     }
+    #endif
 }
 
 @MainActor
@@ -59,7 +63,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         try JSONEncoder().encode(state).write(to: url, options: .atomic)
         return url
     }
-    func testFullAuditRotatesAndStillAllowsExecutionAndDurableRevocation() throws {
+    func testFullAuditRotatesAndStillAllowsExecutionAndDurableRevocation() async throws {
         let url = try fullAuditURL()
         let control = NexusCognitiveControl(url: url)
         let originalFirst = try XCTUnwrap(control.state.audit.first?.id)
@@ -80,7 +84,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertThrowsError(try reopened.begin(call))
         XCTAssertFalse(String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("private-input"))
     }
-    func testRestartRecoversPendingCallAfterItsStartedEventLeavesAuditWindow() throws {
+    func testRestartRecoversPendingCallAfterItsStartedEventLeavesAuditWindow() async throws {
         let call = "shell_execute:" + UUID().uuidString
         let url = try fullAuditURL(pendingCall: call)
         let recovered = NexusCognitiveControl(url: url)
@@ -94,7 +98,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertEqual(reopened.state.auditRetiredCount, 8001)
         XCTAssertEqual(reopened.state.audit.filter { $0.event == "tool.interrupted" }.count, 1)
     }
-    func testLegacyFullAuditDerivesPendingCallsAndRecoversWithoutLockout() throws {
+    func testLegacyFullAuditDerivesPendingCallsAndRecoversWithoutLockout() async throws {
         let url = try fullAuditURL()
         var state = try JSONDecoder().decode(NexusCognitiveControl.State.self, from: Data(contentsOf: url))
         let call = "calc:" + UUID().uuidString
@@ -111,7 +115,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertEqual(recovered.state.audit.last?.event, "tool.interrupted")
         XCTAssertNoThrow(try recovered.revokeAll())
     }
-    func testFailedAuditRotationDoesNotPermitToolOrRetireMemoryAndRevocationStillStops() throws {
+    func testFailedAuditRotationDoesNotPermitToolOrRetireMemoryAndRevocationStillStops() async throws {
         let url = try fullAuditURL()
         let control = NexusCognitiveControl(url: url)
         let originalIDs = control.state.audit.map(\.id)
@@ -126,7 +130,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertNotNil(control.error)
         XCTAssertThrowsError(try control.begin(.init(id: UUID(), name: "calc", arguments: [:])))
     }
-    func testProposalCannotPromoteItselfAndConflictNeedsExplicitReplacement() throws {
+    func testProposalCannotPromoteItselfAndConflictNeedsExplicitReplacement() async throws {
         let store = store()
         try store.propose(topic: "test", statement: "old", source: "original")
         XCTAssertFalse(store.context.contains("old"))
@@ -145,7 +149,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertTrue(store.candidates.contains { $0.statement == "old" })
         XCTAssertFalse(store.active.contains { $0.statement == "old" })
     }
-    func testExpiredUnknownAndRevokedPermissionsFailWithAudit() throws {
+    func testExpiredUnknownAndRevokedPermissionsFailWithAudit() async throws {
         let store = store()
         let shell = NexusToolCall(id: UUID(), name: "shell_execute", arguments: ["command": "private-input"])
         XCTAssertThrowsError(try store.begin(shell))
@@ -168,7 +172,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertTrue(store.state.audit.contains { $0.event == "permission.revoked" })
     }
     /// 1.2.0 build 7 及以前落盘的治理文件没有 governanceEnabled / selfDecisions 键；升级后必须仍可读写，不能整体停用受管操作。
-    func testBuild7GovernanceFileWithoutNewKeysStillLoadsAndStaysWritable() throws {
+    func testBuild7GovernanceFileWithoutNewKeysStillLoadsAndStaysWritable() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -188,7 +192,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertNil(reopened.error)
         XCTAssertEqual(reopened.active.count, 1)
     }
-    func testRestartRemovesLeaseAndKeepsKnowledge() throws {
+    func testRestartRemovesLeaseAndKeepsKnowledge() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("control.json")
@@ -201,7 +205,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertNil(next.state.workspaceUntil)
         XCTAssertThrowsError(try next.begin(.init(id: UUID(), name: "shell_execute", arguments: [:])))
     }
-    func testCorruptAndUnwritableStoresFailClosed() throws {
+    func testCorruptAndUnwritableStoresFailClosed() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -214,7 +218,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         let unwritable = NexusCognitiveControl(url: url.appendingPathComponent("child"))
         XCTAssertThrowsError(try unwritable.begin(.init(id: UUID(), name: "calc", arguments: [:])))
     }
-    func testInterruptedAuditIsRecoveredWithoutPretendingNoSideEffects() throws {
+    func testInterruptedAuditIsRecoveredWithoutPretendingNoSideEffects() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("control.json")
@@ -226,7 +230,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertFalse(recovered.state.audit.contains { $0.event == "tool.completed" })
         XCTAssertEqual(NexusCognitiveControl(url: url).state.audit.filter { $0.event == "tool.interrupted" }.count, 1)
     }
-    func testFailedKnowledgeWriteCannotChangeActiveRevision() throws {
+    func testFailedKnowledgeWriteCannotChangeActiveRevision() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("control.json")
@@ -249,7 +253,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertTrue(result.succeeded); XCTAssertEqual(store.candidates.count, 1); XCTAssertTrue(store.active.isEmpty)
         XCTAssertFalse(tools.contains("knowledge_confirm"))
     }
-    func testSelfDecisionLifecycleAndRiskGating() throws {
+    func testSelfDecisionLifecycleAndRiskGating() async throws {
         let store = store()
         let run = UUID()
         store.continuity.begin(run: run, goal: "self improve", redacting: nil)
@@ -271,7 +275,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertThrowsError(try store.publishSelfDecision(blocked, note: "尝试发布"))
         XCTAssertEqual(store.state.selfDecisions.last?.status, .rejected)
     }
-    func testAutoSelfDecisionGenerationFromFailedToolTraces() throws {
+    func testAutoSelfDecisionGenerationFromFailedToolTraces() async throws {
         let store = store()
         let run = UUID()
         store.continuity.begin(run: run, goal: "auto close", redacting: nil)
@@ -292,7 +296,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertTrue(store.state.selfDecisions.allSatisfy { $0.status == .proposed })
         XCTAssertTrue(store.state.selfDecisions.allSatisfy { $0.scope == "工具可靠性" })
     }
-    func testAutoSelfDecisionGenerationIsIdempotentForSameFailures() throws {
+    func testAutoSelfDecisionGenerationIsIdempotentForSameFailures() async throws {
         let store = store()
         let run = UUID()
         store.continuity.begin(run: run, goal: "idempotent", redacting: nil)
@@ -306,7 +310,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         _ = try store.generateSelfDecisionsFromToolFailures(traces, runID: run.uuidString, maxSuggestions: 2)
         XCTAssertEqual(store.state.selfDecisions.count, countAfterFirst)
     }
-    func testAutoSelfDecisionGenerationIgnoresGovernanceAndSuccessfulTools() throws {
+    func testAutoSelfDecisionGenerationIgnoresGovernanceAndSuccessfulTools() async throws {
         let store = store()
         let run = UUID()
         store.continuity.begin(run: run, goal: "ignore successful tools", redacting: nil)
@@ -322,7 +326,7 @@ final class NexusCognitiveControlTests: XCTestCase {
         XCTAssertEqual(ids.count, 0)
         XCTAssertEqual(store.state.selfDecisions.count, 0)
     }
-    func testGovernanceCloseDeniesSelfDecisionToolsAndWritesAudit() throws {
+    func testGovernanceCloseDeniesSelfDecisionToolsAndWritesAudit() async throws {
         let store = store()
         try store.setGovernanceEnabled(false)
         let denied = NexusToolCall(id: UUID(), name: "self_decision_proposal", arguments: [

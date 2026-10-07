@@ -29,7 +29,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
     }
     override func tearDown() async throws { try FileManager.default.removeItem(at: folder) }
 
-    func testRestartShowsInterruptedTaskWithoutAutomaticallyCallingModel() throws {
+    func testRestartShowsInterruptedTaskWithoutAutomaticallyCallingModel() async throws {
         var saved = NexusAgentCheckpoint(id: UUID(), goal: "处理文件", connection: connection)
         saved.pendingTool = "shell_execute"
         try store.save(saved)
@@ -43,8 +43,8 @@ final class NexusAgentCheckpointTests: XCTestCase {
     }
 
     func testResumeCarriesGoalCriteriaEvidenceAndDoesNotDuplicateUserMessage() async throws {
-        try conversation.save([ChatMessage(role: "user", content: "计算总价")])
-        var saved = NexusAgentCheckpoint(id: UUID(), goal: "计算总价", connection: connection)
+        try conversation.save([ChatMessage(role: "user", content: "说明旧金额记录")])
+        var saved = NexusAgentCheckpoint(id: UUID(), goal: "说明旧金额记录", connection: connection)
         saved.criteria = ["不能漏掉运费"]
         saved.evidence = [NexusSavedEvidence(callID: UUID(), stepID: UUID(), tool: "calc", output: "36", succeeded: true)]
         saved.pendingTool = "shell_execute"
@@ -52,7 +52,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         var requests: [String] = []
         let vm = ChatViewModel(store: conversation, configured: { _ in true }, completion: { messages, _ in
             requests.append(messages.map(\.content).joined(separator: "\n"))
-            return #"{"answer":"已有商品总价36，请补充运费。"}"#
+            return #"{"answer":"记录显示商品总价36，运费未记录；当前金额仍需核对。"}"#
         })
         vm.resume()
         try await finish(vm)
@@ -66,7 +66,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         XCTAssertEqual(try store.load()?.state, .answered)
     }
 
-    func testChangedDestinationCannotReceiveRecoveryData() throws {
+    func testChangedDestinationCannotReceiveRecoveryData() async throws {
         var other = connection
         other.connectionID = "different-account"
         try store.save(NexusAgentCheckpoint(id: UUID(), goal: "私人任务", connection: other))
@@ -79,7 +79,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         XCTAssertTrue(vm.canResume)
     }
 
-    func testFinalAnswerIsRecoveredExactlyOnceAfterPartialCommit() throws {
+    func testFinalAnswerIsRecoveredExactlyOnceAfterPartialCommit() async throws {
         var saved = NexusAgentCheckpoint(id: UUID(), goal: "测试", connection: connection)
         saved.state = .answered
         saved.finalMessage = ChatMessage(role: "assistant", content: "已经生成的答复")
@@ -92,7 +92,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         XCTAssertFalse(second.canResume)
     }
 
-    func testDiscardPersistsAcrossRestart() throws {
+    func testDiscardPersistsAcrossRestart() async throws {
         try store.save(NexusAgentCheckpoint(id: UUID(), goal: "停止的任务", connection: connection))
         let vm = ChatViewModel(store: conversation)
         vm.discardRecovery()
@@ -100,7 +100,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         XCTAssertEqual(try store.load()?.state, .discarded)
     }
 
-    func testCorruptCheckpointIsReportedAndNeverReplayed() throws {
+    func testCorruptCheckpointIsReportedAndNeverReplayed() async throws {
         try Data("{broken".utf8).write(to: store.url)
         let vm = ChatViewModel(store: conversation)
         XCTAssertFalse(vm.canResume)
@@ -108,7 +108,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: store.url), Data("{broken".utf8))
     }
 
-    func testSecretRedactionAndEvidenceBoundsDoNotRetainToolArguments() throws {
+    func testSecretRedactionAndEvidenceBoundsDoNotRetainToolArguments() async throws {
         let key = "secret-fixture-unique"
         var saved = NexusAgentCheckpoint(id: UUID(), goal: "任务 " + key, connection: connection)
         let plan = CheckpointTestPlanner().makePlan(for: "任务")
@@ -152,7 +152,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
                 XCTAssertTrue(markers.contains { $0 == "calc" })
                 XCTAssertNil(markers.last!)
                 guard case .results(let results) = messages.last else { throw NexusError.invalidResponse }
-                XCTAssertEqual(results.first?.1.output, "7")
+                XCTAssertEqual(Double(results.first?.1.output ?? ""), 7)
                 return try NexusNativeCodec.decode(Data(#"{"choices":[{"message":{"content":"7"},"finish_reason":"stop"}]}"#.utf8), type: .openAICompatible)
             }, onCheckpoint: { plan, traces, pending in
                 markers.append(pending)
@@ -162,11 +162,11 @@ final class NexusAgentCheckpointTests: XCTestCase {
             })
         let answer = await executor.run(goal: "计算")
         XCTAssertEqual(answer, "7")
-        XCTAssertEqual(try store.load()?.evidence.last?.output, "7")
+        XCTAssertEqual(Double(try store.load()?.evidence.last?.output ?? ""), 7)
         XCTAssertNil(try store.load()?.pendingTool)
     }
 
-    func testCannotStartIfCheckpointPathIsUnwritable() throws {
+    func testCannotStartIfCheckpointPathIsUnwritable() async throws {
         var requests = 0
         let vm = ChatViewModel(store: conversation, configured: { _ in true }, completion: { _, _ in requests += 1; return "未执行" })
         // Inject a write failure after a successful initial read, rather than exercising corrupt-file recovery.
@@ -192,7 +192,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
                 try self.store.save(saved)
             })
         _ = await executor.run(goal: "计算")
-        XCTAssertEqual(executor.toolTraces.first?.result, "7")
+        XCTAssertEqual(Double(executor.toolTraces.first?.result ?? ""), 7)
         XCTAssertNotNil(executor.lastError)
         XCTAssertEqual(try store.load()?.pendingTool, "calc")
         XCTAssertTrue(try store.load()?.evidence.isEmpty == true)
@@ -203,11 +203,11 @@ final class NexusAgentCheckpointTests: XCTestCase {
             try NexusNativeCodec.decode(Data(#"{"choices":[{"message":{"content":"未确认的答复"},"finish_reason":"stop"}]}"#.utf8), type: .openAICompatible)
         }, completion: { messages, _ in
             let prompt = messages.last?.content ?? ""
-            if prompt.contains("[任务规划]") { return #"{"steps":["检查目标"]}"# }
+            if prompt.contains("[任务规划]") { return #"{"steps":["生成建议"]}"# }
             if prompt.contains("[结果复核]") { return "不是合法复核JSON" }
             return "未确认的答复"
         })
-        vm.send("检查目标")
+        vm.send("给我一个建议")
         try await finish(vm)
         XCTAssertTrue(vm.canResume)
         XCTAssertEqual(vm.taskCheckpoint?.state, .failed)
@@ -217,7 +217,7 @@ final class NexusAgentCheckpointTests: XCTestCase {
         XCTAssertTrue(restored.taskCheckpoint?.recoveryContext.contains("未取得有效的模型复核结果") == true)
     }
 
-    func testUnsupportedVersionFailsWithoutDiscardingRecord() throws {
+    func testUnsupportedVersionFailsWithoutDiscardingRecord() async throws {
         var saved = NexusAgentCheckpoint(id: UUID(), goal: "新版本任务", connection: connection)
         saved.version = 2
         try store.save(saved)

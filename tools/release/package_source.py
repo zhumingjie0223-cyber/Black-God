@@ -51,8 +51,8 @@ def source_files(repo):
     ])
     for directory in ['vendor/ish', 'ios-app/Assets.xcassets', 'ios-app/ShuyuRuntime',
                       'ios-app/zh-Hans.lproj', 'ios-app/en.lproj',
-                      'tools/runtime', 'tools/shuyu', 'tools/release',
-                      'tests/ios', 'tests/ui', 'shuyu']:
+                      'tools/runtime', 'tools/shuyu', 'tools/release', 'tools/intelligence',
+                      'tests/ios', 'tests/ui', 'tests/fixtures', 'shuyu']:
         for p in (repo / directory).rglob('*'):
             parts = p.relative_to(repo).parts
             if any(x in {'.git', '__pycache__', 'node_modules'} for x in parts):

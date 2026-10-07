@@ -541,6 +541,7 @@ struct NexusPlanStrip: View {
         switch status {
         case .running: return Color.bgJadeHi
         case .passed: return Color.bgJade
+        case .answered: return Color.bgTextSecondary
         case .failed: return Color.orange
         case .skipped: return Color.bgTextSecondary
         case .pending: return Color.bgTextSecondary.opacity(0.6)
@@ -551,6 +552,7 @@ struct NexusPlanStrip: View {
         case .pending: return "待做"
         case .running: return "进行中"
         case .passed: return "完成"
+        case .answered: return "已答复"
         case .failed: return "失败"
         case .skipped: return "跳过"
         }

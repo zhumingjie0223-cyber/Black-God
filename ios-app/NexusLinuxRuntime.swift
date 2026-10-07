@@ -74,6 +74,9 @@ final class NexusLinuxRuntime {
         ready = true
     }
     func execute(command: String, timeout: TimeInterval = 30, workspace: UUID = UUID(), confirm: String? = nil, onStatus: ((String) -> Void)? = nil, onOutput: ((String, Bool) -> Void)? = nil) async throws -> NexusLinuxResult {
+        guard !NexusWorkspaceTransactions.isActive(workspace: workspace) else {
+            throw NexusReasoningError.execution("工作区正在备份或恢复文件，请稍后再执行命令。")
+        }
         try Task.checkCancellation()
         guard !busy else { throw NexusReasoningError.execution("Linux 正在执行另一项任务，请稍后重试。") }
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -253,6 +256,9 @@ final class NexusLinuxRuntime {
     }
 
     func importToWorkspace(data: Data, named name: String, workspace: UUID) async throws {
+        guard NexusWorkspaceTransactions.allowsImport(workspace: workspace, path: name) else {
+            throw NexusReasoningError.execution("当前工作区正在进行文件事务，暂不接受其他写入。")
+        }
         let safe = NexusWorkspacePath.sanitizeFileName(name.contains("/") ? (name as NSString).lastPathComponent : name)
         let relative = name.contains("/") ? NexusWorkspacePath.sanitizeRelativePath(name) : safe
         guard !data.isEmpty, data.count <= Int(NexusWorkspaceQuota.maxSingleWrite) else {
@@ -270,6 +276,9 @@ final class NexusLinuxRuntime {
         if let root = installedImageRoot() {
             let image = try await NexusStorage.measureInBackground(root: root, budget: NexusStorage.hardBudget())
             try NexusStorage.enforceHardCeiling(image, adding: Int64(data.count))
+        }
+        guard NexusWorkspaceTransactions.allowsImport(workspace: workspace, path: name) else {
+            throw NexusReasoningError.execution("当前工作区正在进行文件事务，暂不接受其他写入。")
         }
         try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: target, options: .atomic)

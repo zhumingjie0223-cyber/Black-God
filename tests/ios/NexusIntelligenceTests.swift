@@ -1,6 +1,11 @@
 import XCTest
 @testable import BlackGod
 
+private func nextIntelligenceReply(_ replies: inout [String]) throws -> String {
+    guard !replies.isEmpty else { throw NexusError.apiError("测试模型回复夹具已耗尽。") }
+    return replies.removeFirst()
+}
+
 @MainActor
 final class NexusIntelligenceTests: XCTestCase {
     private func registry() -> NexusToolRegistry {
@@ -29,13 +34,13 @@ final class NexusIntelligenceTests: XCTestCase {
         ]
         let engine = NexusReasoningEngine(tools: registry(), model: { prompt in
             requests.append(prompt)
-            return replies.removeFirst()
+            return try nextIntelligenceReply(&replies)
         })
         let result = try await engine.run(goal: "单价12元买3个，总价多少？")
         XCTAssertEqual(result.text, "总价是36元。")
         XCTAssertTrue(result.reviewPassed)
         XCTAssertEqual(engine.plan?.steps.first?.title, "计算总价")
-        XCTAssertEqual(engine.executor?.toolTraces.first?.result, "36")
+        XCTAssertEqual(Double(engine.executor?.toolTraces.first?.result ?? ""), 36)
         XCTAssertTrue(requests[3].contains("实际结果：36"))
         XCTAssertEqual(engine.modelCalls, 6)
     }
@@ -49,7 +54,7 @@ final class NexusIntelligenceTests: XCTestCase {
             "使用本地存储满足离线约束。",
             "{\"passed\":true,\"issues\":[]}"
         ]
-        let engine = NexusReasoningEngine(tools: registry(), model: { prompt in requests.append(prompt); return replies.removeFirst() })
+        let engine = NexusReasoningEngine(tools: registry(), model: { prompt in requests.append(prompt); return try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "制定离线方案")
         XCTAssertTrue(result.reviewPassed)
         XCTAssertEqual(engine.plan?.steps.count, 2)
@@ -66,7 +71,7 @@ final class NexusIntelligenceTests: XCTestCase {
             "修正后结果为3。",
             "{\"passed\":true,\"issues\":[]}"
         ]
-        let engine = NexusReasoningEngine(tools: registry(), model: { _ in replies.removeFirst() })
+        let engine = NexusReasoningEngine(tools: registry(), model: { _ in try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "计算6除以2")
         XCTAssertTrue(result.reviewPassed)
         XCTAssertEqual(engine.executor?.toolTraces.map(\.succeeded), [false, true])
@@ -91,7 +96,7 @@ final class NexusIntelligenceTests: XCTestCase {
 
     func testInvalidReviewRemainsUnverified() async throws {
         var replies = ["{\"steps\":[\"回答\"]}", "候选结果", "看起来没问题"]
-        let engine = NexusReasoningEngine(tools: registry(), model: { _ in replies.removeFirst() })
+        let engine = NexusReasoningEngine(tools: registry(), model: { _ in try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "整理结果")
         XCTAssertFalse(result.reviewPassed)
         XCTAssertNotNil(result.warning)
@@ -110,19 +115,23 @@ final class NexusIntelligenceTests: XCTestCase {
 
     func testChineseMemoryRetrievalRespectsExpiryAndSource() async throws {
         let now = Date()
-        func item(_ text: String, source: String = "user", expiresAt: Date? = nil) -> NexusMemoryItem {
-            NexusMemoryItem(id: UUID(), text: text, kind: "episodic", source: source, confidence: 0.8, createdAt: now, expiresAt: expiresAt)
+        func item(_ text: String, source: String = "user", expiresAt: Date? = nil, confirmed: Bool = true) -> NexusMemoryItem {
+            var item = NexusMemoryItem(id: UUID(), text: text, kind: "preference", source: source, confidence: 0.8, createdAt: now, expiresAt: expiresAt)
+            if confirmed { item.label = "交流语言" }
+            return item
         }
-        let tool = NexusMemorySearchTool(items: [item("我喜欢用中文交流"), item("模型猜测喜欢中文", source: "assistant"), item("过期中文偏好", expiresAt: now.addingTimeInterval(-1))])
+        let tool = NexusMemorySearchTool(items: [item("我喜欢用中文交流"), item("模型猜测喜欢中文", source: "assistant"), item("过期中文偏好", expiresAt: now.addingTimeInterval(-1)), item("候选中文偏好", confirmed: false)])
         let result = await tool.execute(NexusToolCall(id: UUID(), name: "memory_search", arguments: ["query": "交流语言中文"] ))
         XCTAssertTrue(result.output.contains("我喜欢用中文交流"))
         XCTAssertFalse(result.output.contains("模型猜测"))
         XCTAssertFalse(result.output.contains("过期"))
+        XCTAssertFalse(result.output.contains("候选中文偏好"))
+        XCTAssertTrue(result.output.contains("memory:"))
     }
 
-    func testToolParserAcceptsProviderStyleIDsAndNumbers() {
+    func testToolParserAcceptsProviderStyleIDsAndNumbers() async {
         let calls = NexusToolCallParser.parse("{\"id\":\"call_123\",\"name\":\"calc\",\"arguments\":{\"expression\":42}}")
-        XCTAssertEqual(calls.first?.arguments["expression"], "42")
+        XCTAssertEqual(Double(calls.first?.arguments["expression"] ?? ""), 42)
     }
 
     func testInvalidTimezoneIsNotSilentlyReplaced() async {
@@ -130,7 +139,7 @@ final class NexusIntelligenceTests: XCTestCase {
         XCTAssertFalse(result.succeeded)
     }
 
-    func testContextBudgetKeepsNewestContent() {
+    func testContextBudgetKeepsNewestContent() async {
         let messages = [ChatMessage(role: "user", content: String(repeating: "旧", count: 10000)), ChatMessage(role: "assistant", content: "最新回答")]
         let selected = NexusContextBudget.history(messages, maxCharacters: 100)
         XCTAssertLessThanOrEqual(selected.reduce(0) { $0 + $1.content.count }, 100)
@@ -149,13 +158,14 @@ extension NexusIntelligenceTests {
         tools.register(NexusCalculatorTool())
         var replies = ["{\"steps\":[\"计算\"]}",
                        "{\"name\":\"calc\",\"arguments\":{\"expression\":\"1/0\"}}",
-                       "任务已完成", "{\"passed\":true,\"issues\":[]}"]
-        let engine = NexusReasoningEngine(tools: tools, model: { _ in replies.removeFirst() })
+                       "任务已完成", "{\"passed\":true,\"issues\":[]}",
+                       "计算仍失败，没有成功计算证据。", "{\"passed\":true,\"issues\":[]}"]
+        let engine = NexusReasoningEngine(tools: tools, model: { _ in try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "计算1除以0")
         XCTAssertFalse(result.reviewPassed)
         XCTAssertTrue(result.warning?.contains("calc") == true)
     }
-    func testEvidenceRetainsLatestCorrectionAfterLargeOutput() {
+    func testEvidenceRetainsLatestCorrectionAfterLargeOutput() async {
         func trace(_ output: String, ok: Bool) -> NexusToolTrace {
             NexusToolTrace(stepID: UUID(), round: 0,
                 call: NexusToolCall(id: UUID(), name: "shell_execute", arguments: [:]),
@@ -186,13 +196,15 @@ extension NexusIntelligenceTests {
             "总价36元", #"{"passed":true,"issues":[]}"#]
         let engine = NexusReasoningEngine(tools: registry(), model: { prompt in
             requests.append(prompt)
-            return replies.removeFirst()
+            return try nextIntelligenceReply(&replies)
         })
         let result = try await engine.run(goal: "计算12乘3")
         XCTAssertEqual(result.text, "总价36元")
         XCTAssertTrue(result.reviewPassed)
-        XCTAssertEqual(engine.plan?.steps.count, 2)
-        XCTAssertEqual(engine.executor?.toolTraces.map(\.result), ["36"])
+        XCTAssertEqual(engine.plan?.steps.count, 1)
+        XCTAssertEqual(engine.executor?.toolTraces.map { Double($0.result) }, [36])
+        XCTAssertEqual(engine.plan?.steps.first?.evidenceIDs,
+            engine.executor?.toolTraces.map { NexusEvidenceAudit.toolID($0.call.id) })
         XCTAssertTrue(requests.last?.contains("实际结果：36") == true)
         XCTAssertTrue(requests[3].contains("复核意见不是用户的新授权"))
     }
@@ -201,12 +213,12 @@ extension NexusIntelligenceTests {
         var replies = [#"{"steps":["整理"]}"#, "原答复",
             #"{"passed":false,"issues":["遗漏约束"]}"#, "修正答复",
             #"{"passed":false,"issues":["仍缺少依据"]}"#]
-        let engine = NexusReasoningEngine(tools: registry(), model: { _ in replies.removeFirst() })
+        let engine = NexusReasoningEngine(tools: registry(), model: { _ in try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "整理方案")
         XCTAssertFalse(result.reviewPassed)
         XCTAssertTrue(result.warning?.contains("仍缺少依据") == true)
         XCTAssertEqual(engine.modelCalls, 5)
-        XCTAssertEqual(engine.plan?.steps.count, 2)
+        XCTAssertEqual(engine.plan?.steps.count, 1)
     }
 
     func testRepairCannotExceedSharedBudgetOrDiscardOriginalAnswer() async throws {
@@ -214,7 +226,7 @@ extension NexusIntelligenceTests {
             #"{"passed":false,"issues":["需要计算"]}"#,
             #"{"name":"calc","arguments":{"expression":"12*3"}}"#,
             #"{"name":"calc","arguments":{"expression":"12*4"}}"#]
-        let engine = NexusReasoningEngine(tools: registry(), maxCalls: 5, model: { _ in replies.removeFirst() })
+        let engine = NexusReasoningEngine(tools: registry(), maxCalls: 5, model: { _ in try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "计算")
         XCTAssertFalse(result.reviewPassed)
         XCTAssertEqual(result.text, "尚待验证的答复")
@@ -226,7 +238,7 @@ extension NexusIntelligenceTests {
     func testInsufficientBudgetDoesNotStartRepair() async throws {
         var replies = [#"{"steps":["计算"]}"#, "原答复",
             #"{"passed":false,"issues":["缺少证据"]}"#]
-        let engine = NexusReasoningEngine(tools: registry(), maxCalls: 4, model: { _ in replies.removeFirst() })
+        let engine = NexusReasoningEngine(tools: registry(), maxCalls: 4, model: { _ in try nextIntelligenceReply(&replies) })
         let result = try await engine.run(goal: "计算")
         XCTAssertFalse(result.reviewPassed)
         XCTAssertEqual(engine.modelCalls, 3)

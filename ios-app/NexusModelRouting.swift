@@ -111,3 +111,71 @@ enum NexusEndpoint {
         return "custom_" + digest
     }
 }
+
+/// A role preference names an already saved connection; it never supplies a new
+/// model, endpoint, credential or permission. The active chat connection remains
+/// the planning/execution/final-response connection.
+@MainActor
+final class NexusModelRouting: ObservableObject {
+    static let shared = NexusModelRouting()
+    private static let intentRoleKey = "blackgod.model-routing.intent-connection-id.v1"
+
+    private let defaults: UserDefaults
+    private let connections: () -> [NexusModelEntry]
+    private let keyProvider: (String) -> String?
+    private let consent: NexusDataConsent
+
+    @Published var intentConnectionID: String {
+        didSet {
+            if intentConnectionID.isEmpty { defaults.removeObject(forKey: Self.intentRoleKey) }
+            else { defaults.set(intentConnectionID, forKey: Self.intentRoleKey) }
+        }
+    }
+
+    init(defaults: UserDefaults = .standard,
+         connections: @escaping () -> [NexusModelEntry] = { NexusKeychain.shared.savedConnections },
+         keyProvider: @escaping (String) -> String? = { NexusKeychain.shared.key(for: $0) },
+         consent: NexusDataConsent = .shared) {
+        self.defaults = defaults
+        self.connections = connections
+        self.keyProvider = keyProvider
+        self.consent = consent
+        intentConnectionID = defaults.string(forKey: Self.intentRoleKey) ?? ""
+    }
+
+    /// Only explicit saved, authorized connections can be assigned the intent
+    /// role. A name does not establish a model's size, capability or availability.
+    func eligibleIntentConnections(for planning: NexusModelEntry) -> [NexusModelEntry] {
+        connections().filter {
+            $0.id != planning.id && $0.validWorkspace &&
+            !$0.modelID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            NexusEndpoint.requestURL(for: $0) != nil && consent.allows($0)
+        }
+    }
+
+    func intentConnection(for planning: NexusModelEntry) -> NexusModelEntry? {
+        guard !intentConnectionID.isEmpty else { return nil }
+        // Do not substitute the main model or an unrelated account if this role
+        // is absent, revoked, removed, or no longer valid.
+        return eligibleIntentConnections(for: planning).first { $0.id == intentConnectionID }
+    }
+
+    /// Capture once at task submission. Later role/key/connection changes apply
+    /// to the next task. Transport must still check live consent on every request.
+    func snapshot(for planning: NexusModelEntry, apiKey: String) -> Snapshot {
+        guard let intent = intentConnection(for: planning),
+              let key = keyProvider(intent.credentialID),
+              !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return Snapshot(planning: planning, planningAPIKey: apiKey, intent: nil, intentAPIKey: nil)
+        }
+        return Snapshot(planning: planning, planningAPIKey: apiKey, intent: intent, intentAPIKey: key)
+    }
+
+    struct Snapshot {
+        let planning: NexusModelEntry
+        let planningAPIKey: String
+        let intent: NexusModelEntry?
+        let intentAPIKey: String?
+        var usesLocalCompiler: Bool { intent == nil }
+    }
+}

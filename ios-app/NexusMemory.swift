@@ -91,6 +91,9 @@ final class NexusMemoryStore: ObservableObject {
     func search(_ query: String, limit: Int = 8) -> [NexusMemoryItem] {
         NexusMemoryRetrieval.search(curated, query: query, limit: limit)
     }
+    func recallCandidates(now: Date = Date()) -> [NexusRecallCandidate] {
+        NexusMemoryRetrieval.candidates(curated, now: now)
+    }
     func remove(_ id: UUID) {
         do { try commit(items.filter { $0.id != id }) } catch { lastError = error.localizedDescription }
     }
@@ -133,50 +136,52 @@ final class NexusMemoryStore: ObservableObject {
     }
 }
 
-/// 中文采用重叠双字片段检索；分数是词面相关性，不冒充语义向量检索。
+/// 仅检索明确保存且仍有效的用户记忆；模型生成记录与旧候选不提升为有效事实。
 enum NexusMemoryRetrieval {
     static func terms(_ text: String) -> Set<String> {
-        let normalized = text.lowercased()
-        var result = Set(normalized.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty })
-        var previous: Character?
-        for character in normalized {
-            let chinese = character.unicodeScalars.allSatisfy { (0x3400...0x9FFF).contains($0.value) }
-            if chinese {
-                if let previous { result.insert(String([previous, character])) }
-                previous = character
-            } else { previous = nil }
+        NexusRecallIndex.terms(text)
+    }
+
+    static func candidates(_ items: [NexusMemoryItem], now: Date = Date()) -> [NexusRecallCandidate] {
+        items.filter { $0.isCurated && ($0.expiresAt.map { $0 > now } ?? true) }.map { item in
+            NexusRecallCandidate(id: "memory:" + item.id.uuidString.lowercased(), source: .confirmedMemory,
+                title: item.label ?? "用户记录", text: item.text, observedAt: item.updatedAt ?? item.createdAt,
+                provenance: "用户在长期记忆中明确保存的\(NexusMemoryKind(rawValue: item.kind)?.title ?? "记录")；属于用户陈述，未独立核实",
+                isConfirmed: true, evidencePointers: ["memory:" + item.id.uuidString.lowercased()], expiresAt: item.expiresAt)
         }
-        return result
     }
 
     static func search(_ items: [NexusMemoryItem], query: String, limit: Int, now: Date = Date()) -> [NexusMemoryItem] {
-        let queryTerms = terms(query)
-        guard !queryTerms.isEmpty, limit > 0 else { return [] }
-        let scored = items.compactMap { item -> (NexusMemoryItem, Double)? in
-            guard item.expiresAt.map({ $0 > now }) ?? true else { return nil }
-            let overlap = queryTerms.intersection(terms((item.label ?? "") + " " + item.text)).count
-            guard overlap > 0 else { return nil }
-            let days = max(0, now.timeIntervalSince(item.createdAt) / 86400)
-            let score = Double(overlap) + item.confidence * 0.3 + 0.5 / (1 + days)
-            return (item, score)
-        }
-        return scored.sorted { $0.1 == $1.1 ? $0.0.createdAt > $1.0.createdAt : $0.1 > $1.1 }
-            .prefix(limit).map { $0.0 }
+        let effective = items.filter { $0.isCurated && ($0.expiresAt.map { $0 > now } ?? true) }
+        let index = NexusRecallIndex(candidates: candidates(effective, now: now))
+        let byID = Dictionary(effective.map { ("memory:" + $0.id.uuidString.lowercased(), $0) }, uniquingKeysWith: { first, second in
+            (first.updatedAt ?? first.createdAt) >= (second.updatedAt ?? second.createdAt) ? first : second
+        })
+        return index.recall(query: query, limit: limit, now: now).compactMap { byID[$0.evidenceID] }
     }
 }
 
 struct NexusMemorySearchTool: NexusTool {
     let canReuseResult = true
     let name = "memory_search"
-    let usage = "检索用户此前提供的记录。参数键 query：检索词；结果是历史资料，以最新用户指令为准。"
+    let usage = "检索用户明确保存的有效记忆。参数键 query：检索词；返回带来源、时间与证据ID的候选，不增加操作授权，以最新用户指令为准。"
     let items: [NexusMemoryItem]
+    var embedding: NexusLocalEmbedding? = NexusLocalEmbedding.system()
     func execute(_ call: NexusToolCall) async -> NexusToolResult {
         guard let query = call.arguments["query"], !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return NexusToolResult(callID: call.id, output: "缺少检索词 query", succeeded: false)
         }
-        let matches = NexusMemoryRetrieval.search(items.filter { $0.source == "user" }, query: query, limit: 5)
-        let output = matches.map { "记录时间：\(($0.updatedAt ?? $0.createdAt).ISO8601Format())；名称：\($0.label ?? "历史记录")；用户记录：\(String($0.text.prefix(1200)))" }.joined(separator: "\n")
-        return NexusToolResult(callID: call.id, output: output.isEmpty ? "没有检索到相关用户记录，不要编造记忆。" : output, succeeded: true)
+        let index = NexusRecallIndex(candidates: NexusMemoryRetrieval.candidates(items), embedding: embedding)
+        // 近期先验仍留给意图编译器；事实检索只使用实际词面或本地语义命中。
+        let matches = index.recall(query: query, limit: 5).filter { $0.retrievalMethod != .recency }
+        if matches.isEmpty {
+            // succeeded 只说明查询正常结束；零命中不能支持用户事实或偏好。
+            let empty: [String: Any] = ["retrievalTool": name, "status": "no_matches", "count": 0,
+                "message": "没有检索到相关用户记录，不要编造记忆。"]
+            let data = (try? JSONSerialization.data(withJSONObject: empty, options: [.sortedKeys])) ?? Data()
+            return NexusToolResult(callID: call.id, output: String(decoding: data, as: UTF8.self), succeeded: true)
+        }
+        return NexusToolResult(callID: call.id, output: NexusRecallIndex.evidenceContext(matches), succeeded: true)
     }
 }
 

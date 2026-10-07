@@ -94,7 +94,9 @@ struct NexusDataVault {
         }
         let legacyChat = root.appendingPathComponent("nexus-conversation.json")
         let legacyAgent = root.appendingPathComponent("nexus-conversation.agent.json")
-        for url in [legacyChat, legacyAgent] where FileManager.default.fileExists(atPath: url.path) {
+        let shortcutEpisodes = root.appendingPathComponent("nexus-shortcuts.agent.episodes.json")
+        let legacyEpisodes = root.appendingPathComponent("nexus-conversation.episodes.json")
+        for url in [legacyChat, legacyAgent, shortcutEpisodes, legacyEpisodes] where FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)
         }
     }
