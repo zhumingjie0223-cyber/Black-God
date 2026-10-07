@@ -17,10 +17,8 @@ Reflexion 自我反思模块 — Black God 思维强化引擎 #1
 """
 import json
 
-
 # 判断是否值得反思：简单问候/极短答案不反思，省钱省时
 SKIP_KEYWORDS = ("你好", "hi", "hello", "在吗", "谢谢", "几号", "几点", "天气")
-
 
 def should_reflect(user_msg, answer, had_tools):
     """决定这次任务是否值得反思"""
@@ -42,7 +40,6 @@ def should_reflect(user_msg, answer, had_tools):
         return True
     return False
 
-
 CRITIQUE_PROMPT = """你是一个严格的审稿人。请批判性审查下面这个回答是否真正解决了用户的问题。
 
 用户问题：
@@ -59,7 +56,6 @@ CRITIQUE_PROMPT = """你是一个严格的审稿人。请批判性审查下面�
 只输出 JSON，格式如下，不要有其他文字：
 {{"ok": true/false, "problems": "若有问题简述哪里不对，无问题留空", "hint": "若需重做，给出改进方向"}}"""
 
-
 REDO_PROMPT = """你之前的回答经审查发现问题：
 {problems}
 
@@ -67,7 +63,6 @@ REDO_PROMPT = """你之前的回答经审查发现问题：
 
 请针对用户的原始问题，给出一个修正后的、更准确完整的回答。
 用户原始问题：{user_msg}"""
-
 
 def reflect(user_msg, answer, log, call_fn):
     """
@@ -117,7 +112,6 @@ def reflect(user_msg, answer, log, call_fn):
         pass
 
     return answer, {"reflected": True, "ok": False, "problems": problems}
-
 
 def _parse_verdict(raw):
     """从模型输出里提取 JSON 判定，容错处理"""

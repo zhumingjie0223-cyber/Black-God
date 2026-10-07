@@ -44,7 +44,6 @@ LOCK_FILE = "/tmp/minis-mcp-daemon.lock"  # cold-start fork guard (one winner fo
 CONN_TIMEOUT = 310.0  # socket recv timeout, slightly above the 300s RPC timeout
 LOCK_STALE_SECONDS = 12.0  # reclaim a cold-start lock older than this (crashed start)
 
-
 def _log(msg):
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -53,26 +52,22 @@ def _log(msg):
     except OSError:
         pass
 
-
 def _emit(obj, pretty):
     if pretty:
         print(json.dumps(obj, ensure_ascii=False, indent=2))
     else:
         print(json.dumps(obj, ensure_ascii=False))
 
-
 def _fail(message, code, server=None, pretty=False):
     _log("ERROR [%s] %s (server=%s)" % (code, message, server))
     _emit({"error": message, "code": code, "server": server}, pretty)
     sys.exit(1)
-
 
 def _require_server(name, pretty):
     server = config.get_server(name)
     if server is None:
         _fail("server not found: %s" % name, "NOT_FOUND", name, pretty)
     return server
-
 
 # --- daemon lifecycle + IPC -------------------------------------------------
 
@@ -83,7 +78,6 @@ def _read_daemon_port():
             return int(f.read().strip())
     except (ValueError, OSError):
         return None
-
 
 def daemon_alive():
     """True if the daemon's port file is present and its recorded PID is live."""
@@ -97,7 +91,6 @@ def daemon_alive():
     except (ValueError, OSError):
         return False
 
-
 def _wait_for_port(deadline):
     """Block until the daemon publishes its port file, or the deadline passes.
     Returns True if the port appeared."""
@@ -107,7 +100,6 @@ def _wait_for_port(deadline):
             return True
         time.sleep(0.1)
     return False
-
 
 def _acquire_cold_start_lock():
     """Atomically claim the right to fork the daemon. Returns the lock fd on
@@ -133,7 +125,6 @@ def _acquire_cold_start_lock():
         except OSError:
             return None
     return None
-
 
 def maybe_start_daemon():
     """Fork the daemon if it isn't running. A cold-start lock ensures only one
@@ -217,7 +208,6 @@ def maybe_start_daemon():
     finally:
         os._exit(0)
 
-
 def send_to_daemon(request, timeout=CONN_TIMEOUT):
     """Send one newline-delimited JSON request over 127.0.0.1, return the parsed
     reply dict."""
@@ -250,7 +240,6 @@ def send_to_daemon(request, timeout=CONN_TIMEOUT):
         except OSError:
             pass
 
-
 def call_daemon(request, pretty):
     """Ensure the daemon is up, send the request, unwrap into _emit/_fail. One
     retry if the daemon wasn't ready yet right after a fresh fork."""
@@ -264,7 +253,6 @@ def call_daemon(request, pretty):
               request.get("server"), pretty)
     return resp.get("result")
 
-
 # --- argument helpers -------------------------------------------------------
 
 def _pop_flag(args, name):
@@ -273,7 +261,6 @@ def _pop_flag(args, name):
         args.remove(name)
         return True
     return False
-
 
 def _pop_opt(args, name):
     """Remove `--name value` and return value, or None. Repeatable callers use
@@ -287,7 +274,6 @@ def _pop_opt(args, name):
         del args[i:i + 1]
     return None
 
-
 def _pop_opt_all(args, name):
     """Remove every `--name value` and return the list of values."""
     out = []
@@ -298,14 +284,12 @@ def _pop_opt_all(args, name):
         out.append(v)
     return out
 
-
 # --- subcommands ------------------------------------------------------------
 
 def cmd_list(args, pretty):
     show_all = _pop_flag(args, "--all")
     result = call_daemon({"cmd": "list", "all": show_all}, pretty)
     _emit(result, pretty)
-
 
 def cmd_info(args, pretty):
     name = args[0] if args else None
@@ -314,7 +298,6 @@ def cmd_info(args, pretty):
     server = _require_server(name, pretty)
     _emit({"name": name, "config": server}, pretty)
 
-
 def cmd_tools(args, pretty):
     name = args[0] if args else None
     if not name:
@@ -322,14 +305,12 @@ def cmd_tools(args, pretty):
     result = call_daemon({"cmd": "tools", "server": name}, pretty)
     _emit(result, pretty)
 
-
 def cmd_ping(args, pretty):
     name = args[0] if args else None
     if not name:
         _fail("usage: ping <server>", "PARSE_ERROR", None, pretty)
     result = call_daemon({"cmd": "ping", "server": name}, pretty)
     _emit(result, pretty)
-
 
 def cmd_call(args, pretty):
     if len(args) < 2:
@@ -353,7 +334,6 @@ def cmd_call(args, pretty):
     result = call_daemon({"cmd": "call", "server": name, "tool": tool, "args": arguments}, pretty)
     _emit(result, pretty)
 
-
 def cmd_shutdown(args, pretty):
     """Stop the background daemon (no-op if it isn't running)."""
     if not daemon_alive():
@@ -363,7 +343,6 @@ def cmd_shutdown(args, pretty):
     if not resp.get("ok"):
         _fail(resp.get("error", "shutdown failed"), resp.get("code", "MCP_ERROR"), None, pretty)
     _emit(resp.get("result", {"shutdown": True}), pretty)
-
 
 def cmd_add(args, pretty):
     name = _pop_opt(args, "--name")
@@ -405,7 +384,6 @@ def cmd_add(args, pretty):
     config.upsert_server(name, server)
     _emit({"added": name, "config": server}, pretty)
 
-
 def cmd_remove(args, pretty):
     name = args[0] if args else None
     if not name:
@@ -414,7 +392,6 @@ def cmd_remove(args, pretty):
         _fail("server not found: %s" % name, "NOT_FOUND", name, pretty)
     _emit({"removed": name}, pretty)
 
-
 def cmd_set_enabled(args, pretty, enabled):
     name = args[0] if args else None
     if not name:
@@ -422,7 +399,6 @@ def cmd_set_enabled(args, pretty, enabled):
     if not config.set_enabled(name, enabled):
         _fail("server not found: %s" % name, "NOT_FOUND", name, pretty)
     _emit({"server": name, "enabled": enabled}, pretty)
-
 
 USAGE = """shuyu-mcp-cli — MCP (Model Context Protocol) client for the Minis agent.
 
@@ -460,11 +436,9 @@ Examples:
   shuyu-mcp-cli add --name github --command npx --args "-y @modelcontextprotocol/server-github" --env "GITHUB_TOKEN=$GITHUB_TOKEN"
 """
 
-
 def _print_usage():
     """Print usage to stdout (human-facing; not the JSON channel)."""
     print(USAGE.rstrip())
-
 
 def main():
     argv = sys.argv[1:]
@@ -506,7 +480,6 @@ def main():
     except Exception as exc:  # noqa: BLE001 - last-resort, never crash to stdout
         _log("UNEXPECTED %s: %s" % (type(exc).__name__, exc))
         _fail("internal error: %s" % exc, "MCP_ERROR", None, pretty)
-
 
 if __name__ == "__main__":
     main()

@@ -19,18 +19,17 @@ import json
 import time
 from typing import List, Dict, Any
 
-
 class PlannerAgent:
     """规划智能体 - 分解任务，生成执行计划"""
-    
+
     def __init__(self, call_fn):
         """call_fn: 模型调用函数，接收 messages 列表，返回文本"""
         self.call_fn = call_fn
-    
+
     def plan(self, task: str) -> Dict[str, Any]:
         """
         分析任务，生成执行计划
-        
+
         返回：
         {
           "task_name": "任务名",
@@ -61,7 +60,7 @@ class PlannerAgent:
 }}
 
 只输出 JSON，不要其他文字。"""
-        
+
         messages = [{"role": "user", "content": prompt}]
         try:
             raw = self.call_fn(messages)
@@ -69,7 +68,7 @@ class PlannerAgent:
             return plan if plan else {"subtasks": [], "error": "规划失败"}
         except Exception as e:
             return {"subtasks": [], "error": str(e)}
-    
+
     def _parse_json(self, raw: str) -> Dict:
         """从模型输出提取 JSON"""
         if not raw:
@@ -87,19 +86,18 @@ class PlannerAgent:
             pass
         return None
 
-
 class ExecutorAgent:
     """执行智能体 - 执行单个子任务，独立上下文"""
-    
+
     def __init__(self, agent_id: int, call_fn):
         self.agent_id = agent_id
         self.call_fn = call_fn
         self.context = {}  # 独立上下文，不会爆炸
-    
+
     def execute(self, subtask: Dict, shared_context: str = "") -> Dict:
         """
         执行子任务
-        
+
         返回：
         {
           "agent_id": 1,
@@ -111,7 +109,7 @@ class ExecutorAgent:
         }
         """
         start = time.time()
-        
+
         prompt = f"""执行这个子任务：
 
 标题：{subtask.get('title', '')}
@@ -121,12 +119,12 @@ class ExecutorAgent:
 {shared_context}
 
 请完成这个子任务，输出结果。如果失败，说明原因。"""
-        
+
         messages = [{"role": "user", "content": prompt}]
         try:
             result = self.call_fn(messages)
             duration = time.time() - start
-            
+
             return {
                 "agent_id": self.agent_id,
                 "subtask_id": subtask.get("id"),
@@ -145,17 +143,16 @@ class ExecutorAgent:
                 "issues": [str(e)]
             }
 
-
 class VerificationAgent:
     """验证智能体 - 检查中间结果，发现问题通知重规划"""
-    
+
     def __init__(self, call_fn):
         self.call_fn = call_fn
-    
+
     def verify(self, subtask: Dict, result: str) -> Dict:
         """
         验证子任务的结果
-        
+
         返回：
         {
           "verified": true/false,
@@ -182,7 +179,7 @@ JSON 格式：
   "issues": ["问题1", "问题2"],
   "suggestion": "改进建议"
 }}"""
-        
+
         messages = [{"role": "user", "content": prompt}]
         try:
             raw = self.call_fn(messages)
@@ -211,7 +208,7 @@ JSON 格式：
         verdict["verified"] = True if v is None else bool(v)
         verdict.setdefault("issues", [])
         return verdict
-    
+
     def _parse_json(self, raw: str) -> Dict:
         if not raw:
             return None
@@ -228,22 +225,21 @@ JSON 格式：
             pass
         return None
 
-
 class Coordinator:
     """协调智能体 - 异步协调，任务状态管理"""
-    
+
     def __init__(self, max_executors: int = 3):
         self.max_executors = max_executors
         self.task_queue = []
         self.completed_tasks = []
         self.failed_tasks = []
-    
+
     def coordinate(self, plan: Dict, planner: PlannerAgent, 
                    executors: List[ExecutorAgent], 
                    verifier: VerificationAgent) -> Dict:
         """
         协调整个执行流程
-        
+
         返回：
         {
           "status": "completed/partial_failed",
@@ -256,14 +252,14 @@ class Coordinator:
         start = time.time()
         subtasks = plan.get("subtasks", [])
         shared_context = plan.get("context_for_executors", "")
-        
+
         completed = []
         failed = []
         replans = 0
-        
+
         # 按依赖关系执行任务
         executed_ids = set()
-        
+
         while len(completed) + len(failed) < len(subtasks):
             # 找出可以执行的任务（依赖已完成）
             ready_tasks = [
@@ -271,18 +267,18 @@ class Coordinator:
                 if t.get("id") not in executed_ids 
                 and all(dep in executed_ids for dep in t.get("depends_on", []))
             ]
-            
+
             if not ready_tasks:
                 break
-            
+
             # 分配给 Executor 并行执行
             for task in ready_tasks[:self.max_executors]:
                 executor = executors[len(executed_ids) % len(executors)]
                 result = executor.execute(task, shared_context)
-                
+
                 # 验证结果
                 verdict = verifier.verify(task, result.get("result", ""))
-                
+
                 if verdict.get("verified"):
                     completed.append(result)
                     executed_ids.add(task.get("id"))
@@ -301,7 +297,7 @@ class Coordinator:
                     else:
                         failed.append(result)
                         executed_ids.add(task.get("id"))
-        
+
         return {
             "status": "completed" if not failed else "partial_failed",
             "completed": completed,
@@ -310,15 +306,14 @@ class Coordinator:
             "total_duration": round(time.time() - start, 2)
         }
 
-
 def multi_agent_execute(task: str, call_fn, num_executors: int = 3) -> Dict:
     """
     多智能体执行引擎的完整流程
-    
+
     task: 用户任务
     call_fn: 模型调用函数
     num_executors: 并行执行的 Executor 数量
-    
+
     返回：dict —— {
         "final":     最终答案文本,
         "task":      原始任务,

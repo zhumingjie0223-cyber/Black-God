@@ -17,7 +17,7 @@ if __name__ == "__main__":
             if line and not line.startswith('#') and '=' in line:
                 k, v = line.split('=', 1)
                 os.environ.setdefault(k.strip(), v.strip())
-    
+
     # 启动内核
     from agent_kernel_v4 import start_server
     port = int(os.environ.get("BG_PORT", "8765"))

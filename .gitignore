@@ -83,3 +83,7 @@ ios-app/AppStore/package*.json
 .runtime-build-tools/
 ios-app/Runtime/Libs/
 ios-app/Runtime/AlpineRootfs/
+
+# 编译器覆盖率产物
+default.profraw
+*.profraw

@@ -83,7 +83,6 @@ EMOTION_DETAILS_PRIVATE = {
     "shy": "假推开但语气软",
 }
 
-
 class VoiceEngine:
     """统一语音引擎"""
 
@@ -293,7 +292,6 @@ class VoiceEngine:
         return {"ok": True, "model": p.stem, "format": p.suffix,
                 "size_mb": round(p.stat().st_size/1048576, 2), "status": "registered"}
 
-
 # 单例
 _engine: Optional[VoiceEngine] = None
 _lock = threading.Lock()
@@ -304,7 +302,6 @@ def get_voice_engine() -> VoiceEngine:
         if _engine is None:
             _engine = VoiceEngine()
         return _engine
-
 
 if __name__ == "__main__":
     eng = get_voice_engine()

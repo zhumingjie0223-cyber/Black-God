@@ -159,13 +159,13 @@ class OpenAIAgent:
 
     def run(self, user_msg, history=None):
         history = history or []
-        
+
         # 用 adaptive_reasoning 判断复杂度等级（自动选择推理深度）
         try:
             level = adaptive_reasoning.ReasoningLevelSelector().select_level(user_msg)
         except Exception:
             level = "medium"
-        
+
         # 标准 Agent Loop
         messages = [{"role": "system", "content": self.build_system(user_msg)}] + \
                    history + [{"role": "user", "content": user_msg}]
@@ -207,14 +207,14 @@ class OpenAIAgent:
             """供反思模块调用的模型接口"""
             resp = call_openai(messages, self.base, self.key, self.model)
             return resp["choices"][0]["message"].get("content", "")
-        
+
         refined_answer, reflection_info = reflexion.reflect(
             user_msg=task, answer=answer, log=log, call_fn=_call_for_reflection
         )
-        
+
         # 如果反思发现问题并重做了，用新答案；否则用原答案
         final_answer = refined_answer if reflection_info.get("reflected") else answer
-        
+
         result = {"answer": final_answer, "steps": log, "reflection": reflection_info}
         evo = self._maybe_evolve(task, log, final_answer)
         if evo:

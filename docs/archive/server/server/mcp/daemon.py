@@ -46,7 +46,6 @@ CONN_TIMEOUT = 310.0       # socket recv timeout (slightly above RPC_TIMEOUT)
 
 log = logging.getLogger("mcp-daemon")
 
-
 # --- STDIO MCP server subprocess --------------------------------------------
 
 class MCPServerProcess:
@@ -187,7 +186,6 @@ class MCPServerProcess:
                 self.proc.kill()
         log.info("[%s] stopped", self.name)
 
-
 # --- HTTP MCP session (wraps the existing stateless HTTPTransport) ----------
 
 class MCPHTTPSession:
@@ -220,7 +218,6 @@ class MCPHTTPSession:
 
     def stop(self):
         pass
-
 
 # --- connection pool --------------------------------------------------------
 
@@ -309,7 +306,6 @@ class MCPPool:
             self._pool.clear()
         for session in sessions:
             session.stop()
-
 
 # --- daemon server ----------------------------------------------------------
 

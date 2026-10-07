@@ -36,7 +36,6 @@ _BASE.mkdir(parents=True, exist_ok=True)
 NEVER_LEAVE_FILE = _BASE / "never_leave.json"     # 用户「禁碰清单」
 AUDIT_LOG = _BASE / "privacy_audit.jsonl"          # 本地审计日志
 
-
 # ============================================================
 # 1) 敏感模式（命中即视为机密，必须脱敏或拦截）
 # ============================================================
@@ -68,7 +67,6 @@ SENSITIVE_PATH_HINTS = [
     "private_key", "service-account", ".kube/config", "wallet", ".npmrc",
 ]
 
-
 # ============================================================
 # 2) 禁碰清单（用户标记「永不外发」的路径/仓库/服务器/关键词）
 # ============================================================
@@ -81,7 +79,6 @@ def _load_never_leave():
     # 默认空清单；用户可通过 add_never_leave() 维护
     return {"paths": [], "keywords": [], "repos": [], "hosts": []}
 
-
 def add_never_leave(kind: str, value: str) -> bool:
     """把某个路径/关键词/仓库/主机加入禁碰清单（本地）。kind ∈ paths|keywords|repos|hosts"""
     d = _load_never_leave()
@@ -91,7 +88,6 @@ def add_never_leave(kind: str, value: str) -> bool:
         d[kind].append(value)
         NEVER_LEAVE_FILE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
     return True
-
 
 # ============================================================
 # 3) 扫描 / 脱敏
@@ -112,7 +108,6 @@ def scan(text: str):
         if kw and kw in text:
             findings.append({"type": "never_leave_keyword", "kind": "never_leave", "sample": kw})
     return findings
-
 
 def redact(text: str):
     """把机密替换为 [REDACTED:type]，返回 (脱敏后文本, 命中报告)。"""
@@ -135,7 +130,6 @@ def redact(text: str):
             report.append({"type": "never_leave_keyword", "kind": "never_leave", "count": 1})
     return out, report
 
-
 def is_sensitive_path(path: str) -> bool:
     p = (path or "").lower()
     if any(h in p for h in SENSITIVE_PATH_HINTS):
@@ -145,7 +139,6 @@ def is_sensitive_path(path: str) -> bool:
         if marker and marker.lower() in p:
             return True
     return False
-
 
 # ============================================================
 # 4) 审计（本地 JSONL，append-only）
@@ -165,7 +158,6 @@ def audit(action: str, dest: str, report, extra=None):
         pass
     return rec
 
-
 # ============================================================
 # 5) 对外的护栏入口（集成时调这几个）
 # ============================================================
@@ -183,7 +175,6 @@ def guard_outbound_text(text: str, dest: str = "connector", block_on_secret: boo
     if rep:
         audit("redact", dest, rep)
     return clean, {"blocked": False, "findings": rep}
-
 
 def guard_model_messages(messages, block_on_secret: bool = False):
     """
@@ -214,7 +205,6 @@ def guard_model_messages(messages, block_on_secret: bool = False):
         audit("redact", "model_gateway", all_findings)
     return out, {"blocked": blocked, "findings": all_findings}
 
-
 def guard_file_upload(file_path: str, file_content, allow_token: str = None):
     """
     文件上传(S3/R2)前调用。敏感文件默认拦截，除非带显式同意 token。
@@ -244,7 +234,6 @@ def guard_file_upload(file_path: str, file_content, allow_token: str = None):
     audit("allow", "s3_upload", findings, {"path": file_path})
     return {"allowed": True, "reason": "ok", "findings": findings}
 
-
 # ——「显式同意」令牌：一次性，需用户在前端确认后下发——
 _CONSENT_SECRET = os.environ.get("BG_CONSENT_SECRET", "")
 def make_consent_token(scope: str) -> str:
@@ -262,7 +251,6 @@ def _consent_ok(token: str) -> bool:
         if token == hashlib.sha256(raw.encode()).hexdigest()[:32]:
             return True
     return False
-
 
 # ============================================================
 # 自测

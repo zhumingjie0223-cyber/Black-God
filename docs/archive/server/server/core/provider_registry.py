@@ -56,7 +56,7 @@ def get_default_provider(reveal_secret=False):
     default_id = registry.get('default')
     if not default_id:
         return None
-    
+
     # 合并 meta + secret
     meta = registry['providers'].get(default_id, {})
     if reveal_secret:
@@ -65,7 +65,7 @@ def get_default_provider(reveal_secret=False):
         secret = load_provider(default_id)
     if not secret:
         return None
-    
+
     return {**meta, **secret, 'id': default_id}
 
 def list_all_providers(reveal_secret=False):
@@ -94,7 +94,7 @@ def unregister_provider(provider_id):
 if __name__ == '__main__':
     print('=== Provider Registry Self Test ===')
     from secret_store import save_provider as save_secret
-    
+
     # 注册一个 Provider
     save_secret('test_claude', {'token': 'sk-ant-test123', 'base_url': 'https://api.anthropic.com/v1'})
     register_provider('test_claude', {
@@ -105,16 +105,16 @@ if __name__ == '__main__':
         'enabled': True
     })
     print('✅ registered')
-    
+
     # 设为默认
     set_default_provider('test_claude')
     default = get_default_provider(reveal_secret=False)
     print(f"✅ default: {default['label']}, token={default.get('token','N/A')}")
-    
+
     # 列表
     all_p = list_all_providers()
     print(f"✅ list: {[p['id'] for p in all_p]}")
-    
+
     # 注销
     unregister_provider('test_claude')
     print('✅ unregistered')

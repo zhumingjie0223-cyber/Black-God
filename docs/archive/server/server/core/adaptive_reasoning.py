@@ -24,15 +24,14 @@ import json
 import re
 from typing import Dict
 
-
 class ReasoningLevelSelector:
     """自动选择推理等级"""
-    
+
     @staticmethod
     def select_level(task: str) -> str:
         """
         根据任务特征自动选择推理等级
-        
+
         返回：none / low / medium / high / xhigh
         """
         # 计算复杂度指标
@@ -43,11 +42,11 @@ class ReasoningLevelSelector:
             "多步", "复杂", "困难", "挑战", "问题"
         ]
         keyword_count = sum(1 for kw in complexity_keywords if kw in task)
-        
+
         # 数学/代码关键词
         code_keywords = ["代码", "算法", "编程", "函数", "类", "设计模式"]
         has_code = any(kw in task for kw in code_keywords)
-        
+
         # 计算复杂度分数
         score = 0
         if length < 20:
@@ -60,11 +59,11 @@ class ReasoningLevelSelector:
             score += 3  # 较长
         else:
             score += 4  # 很长
-        
+
         score += keyword_count * 0.5
         if has_code:
             score += 2
-        
+
         # 映射到推理等级
         if score < 1:
             return "none"
@@ -77,25 +76,24 @@ class ReasoningLevelSelector:
         else:
             return "xhigh"
 
-
 class ReasoningPromptBuilder:
     """为不同推理等级构建 prompt"""
-    
+
     @staticmethod
     def build(task: str, level: str) -> str:
         """为指定推理等级构建 prompt"""
-        
+
         base = f"任务：{task}\n\n"
-        
+
         if level == "none":
             return base + "请快速回答，无需详细推理。"
-        
+
         elif level == "low":
             return base + """请进行轻度推理：
 1. 快速分析问题
 2. 给出初步答案
 3. 简单说明理由"""
-        
+
         elif level == "medium":
             return base + """请进行中度推理：
 1. 分析问题的关键点
@@ -103,7 +101,7 @@ class ReasoningPromptBuilder:
 3. 选择最合理的方案
 4. 详细说明理由
 5. 检查答案的完整性"""
-        
+
         elif level == "high":
             return base + """请进行深度推理：
 1. 详细分析问题的各个方面
@@ -112,7 +110,7 @@ class ReasoningPromptBuilder:
 4. 选择最优方案并详细论证
 5. 预见可能的问题并给出应对方案
 6. 最后再检查一遍逻辑是否严密"""
-        
+
         elif level == "xhigh":
             return base + """请进行超深度推理（思维链）：
 1. 逐步分解问题为子问题
@@ -129,18 +127,17 @@ class ReasoningPromptBuilder:
 - 考虑过的替代方案
 - 做出的决策和理由
 - 自我验证的结果"""
-        
-        return base
 
+        return base
 
 class InternalVerifier:
     """内部验证器 - 推理过程中的自我检查"""
-    
+
     @staticmethod
     def verify_reasoning(reasoning: str, task: str, call_fn) -> Dict:
         """
         验证推理过程的正确性
-        
+
         返回：
         {
           "valid": true/false,
@@ -169,7 +166,7 @@ JSON 格式：
   "confidence": 0.95,
   "suggestion": "改进建议"
 }}"""
-        
+
         messages = [{"role": "user", "content": prompt}]
         try:
             raw = call_fn(messages)
@@ -178,23 +175,22 @@ JSON 格式：
         except Exception as e:
             return {"valid": False, "confidence": 0, "issues": [str(e)]}
 
-
 class AdaptiveReasoningEngine:
     """自适应推理引擎 - 根据任务动态选择推理深度"""
-    
+
     def __init__(self, call_fn):
         self.call_fn = call_fn
         self.selector = ReasoningLevelSelector()
         self.builder = ReasoningPromptBuilder()
         self.verifier = InternalVerifier()
-    
+
     def reason(self, task: str, force_level: str = None) -> Dict:
         """
         执行自适应推理
-        
+
         task: 任务描述
         force_level: 强制推理等级（可选）
-        
+
         返回：
         {
           "answer": "最终答案",
@@ -206,13 +202,13 @@ class AdaptiveReasoningEngine:
         """
         import time
         start = time.time()
-        
+
         # Step 1: 选择推理等级
         level = force_level or self.selector.select_level(task)
-        
+
         # Step 2: 构建 prompt
         prompt = self.builder.build(task, level)
-        
+
         # Step 3: 调用模型进行推理
         messages = [{"role": "user", "content": prompt}]
         try:
@@ -225,14 +221,14 @@ class AdaptiveReasoningEngine:
                 "verification": {"valid": False},
                 "duration": time.time() - start
             }
-        
+
         # Step 4: 内部验证（仅在 high/xhigh 等级）
         verification = None
         if level in ["high", "xhigh"]:
             verification = self.verifier.verify_reasoning(
                 reasoning_result, task, self.call_fn
             )
-            
+
             # 如果验证失败，进行修正
             if not verification.get("valid"):
                 correction_prompt = f"""你的前一个推理有问题：
@@ -246,10 +242,10 @@ class AdaptiveReasoningEngine:
                     reasoning_result = self.call_fn(messages)
                 except Exception:
                     pass
-        
+
         # Step 5: 提取最终答案（从推理过程中）
         final_answer = _extract_final_answer(reasoning_result)
-        
+
         return {
             "answer": final_answer,
             "reasoning_level": level,
@@ -257,7 +253,6 @@ class AdaptiveReasoningEngine:
             "verification": verification or {"valid": True, "confidence": 0.9},
             "duration": round(time.time() - start, 2)
         }
-
 
 def _parse_json(raw: str) -> Dict:
     """从文本中提取 JSON"""
@@ -275,7 +270,6 @@ def _parse_json(raw: str) -> Dict:
     except Exception:
         pass
     return None
-
 
 def _extract_final_answer(text: str) -> str:
     """从推理过程中提取最终答案"""

@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from package_source import validate_alpine
 
-
 class SourceIntegrityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -47,7 +46,6 @@ class SourceIntegrityTests(unittest.TestCase):
         self.manifest['origins'][0]['sources'][0]['file'] = '../sample'
         with self.assertRaisesRegex(ValueError, 'escapes collection'):
             self.validate()
-
 
 if __name__ == '__main__':
     unittest.main()

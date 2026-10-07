@@ -21,7 +21,6 @@ import urllib.parse
 import os
 import time
 
-
 # ─────────────────────────────────────────
 # Telegram Bot 连接器
 # ─────────────────────────────────────────
@@ -83,7 +82,6 @@ class TelegramConnector:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-
 # ─────────────────────────────────────────
 # 飞书 Webhook 连接器
 # ─────────────────────────────────────────
@@ -134,7 +132,6 @@ class FeishuConnector:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-
 # ─────────────────────────────────────────
 # Slack Webhook 连接器
 # ─────────────────────────────────────────
@@ -174,7 +171,6 @@ class SlackConnector:
         ]
         return self.send(title, blocks)
 
-
 # ─────────────────────────────────────────
 # 通用 Webhook 连接器
 # ─────────────────────────────────────────
@@ -198,7 +194,6 @@ class WebhookConnector:
                 return {"ok": True, "status": r.status, "body": r.read().decode()[:500]}
         except Exception as e:
             return {"ok": False, "error": str(e)}
-
 
 # ─────────────────────────────────────────
 # 连接器管理器（统一调度）
@@ -267,7 +262,6 @@ class ConnectorManager:
             },
             "custom_webhooks": list(self._webhooks.keys())
         }
-
 
 # 全局单例
 _manager = None

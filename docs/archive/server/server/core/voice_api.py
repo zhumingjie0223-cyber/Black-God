@@ -94,7 +94,6 @@ class VoiceAPI:
 
         return {"code": 404, "error": f"未知路由: {path}"}
 
-
 def asyncio_run(coro):
     """安全执行异步函数"""
     import asyncio

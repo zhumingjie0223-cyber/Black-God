@@ -45,7 +45,6 @@ port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 BASE = f"http://127.0.0.1:{port}"
 
-
 def sse_events(goal):
     """POST 目标并解析 SSE 事件列表。"""
     req = urllib.request.Request(
@@ -63,12 +62,10 @@ def sse_events(goal):
                         events.append(json.loads(ln[5:].strip()))
     return events
 
-
 def check(cond, label):
     mark = "✓" if cond else "✗"
     print(f"  {mark} {label}")
     return cond
-
 
 def main():
     print("自主智能体端到端冒烟测试")
@@ -127,7 +124,6 @@ def main():
     print("-" * 44)
     print("✅ 全部通过" if passed else "❌ 存在失败")
     return 0 if passed else 1
-
 
 if __name__ == "__main__":
     code = main()

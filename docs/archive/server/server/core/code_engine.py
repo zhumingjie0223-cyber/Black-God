@@ -18,7 +18,6 @@ import tempfile
 import os
 from pathlib import Path
 
-
 class CodeEngine:
     """黑神编码引擎：写代码 → 跑 → 错了自己修 → 再跑，直到通过"""
 
@@ -130,13 +129,11 @@ class CodeEngine:
             trace["refactored_code"] = self.refactor(trace["final_code"])
         return trace
 
-
 def _extract_code(text: str) -> str:
     if not text:
         return ""
     m = re.search(r"```[a-zA-Z]*\n?(.*?)```", text, re.S)
     return m.group(1).strip() if m else text.strip()
-
 
 def _parse_json(raw: str) -> dict:
     if not raw:
@@ -152,7 +149,6 @@ def _parse_json(raw: str) -> dict:
     except Exception:
         pass
     return None
-
 
 def code_tool(args, call_fn=None, **kw):
     """Agent 工具：code(requirement=...)"""

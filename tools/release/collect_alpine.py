@@ -25,7 +25,7 @@ def origin(item):
     local.mkdir(parents=True,exist_ok=True);(local/f['name']).write_bytes(fetch(f['download_url']))
    elif f['type']=='dir':folder(f['path'],local/f['name'])
    else:raise ValueError('Unsupported recipe object '+f['type'])
- 
+
  if not (dest/'.complete').exists():
   folder('main/'+name,dest)
   (dest/'.complete').write_text(commit)

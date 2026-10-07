@@ -34,7 +34,6 @@ DEFAULT_TTL = 21600
 SUBS_FILE = os.path.join(BASE_DIR, "subscriptions.json")
 _LOCK = threading.Lock()
 
-
 # ---------------- 订阅存储（示例 JSON 文件；生产换 DB） ----------------
 def _load():
     if not os.path.exists(SUBS_FILE):
@@ -45,13 +44,11 @@ def _load():
     except Exception:
         return {}
 
-
 def _save(d):
     tmp = SUBS_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
     os.replace(tmp, SUBS_FILE)
-
 
 def save_subscription(subscription, user_id=None):
     ep = (subscription or {}).get("endpoint")
@@ -63,7 +60,6 @@ def save_subscription(subscription, user_id=None):
         _save(d)
     return True
 
-
 def remove_subscription(endpoint):
     with _LOCK:
         d = _load()
@@ -73,12 +69,10 @@ def remove_subscription(endpoint):
             return True
     return False
 
-
 def _subs_for(user_id=None):
     d = _load()
     items = list(d.values())
     return items if user_id is None else [x for x in items if x.get("userId") == user_id]
-
 
 # ---------------- 发送 ----------------
 def send_web_push(subscription, payload: dict, ttl=DEFAULT_TTL, urgency="normal"):
@@ -105,7 +99,6 @@ def send_web_push(subscription, payload: dict, ttl=DEFAULT_TTL, urgency="normal"
             print("[push] 发送失败:", code, repr(e))
         return False
 
-
 def _payload(title, body, url="/", task_id=None, danger=False, **extra):
     p = {
         "title": title,
@@ -123,18 +116,15 @@ def _payload(title, body, url="/", task_id=None, danger=False, **extra):
     p.update(extra)
     return p
 
-
 def push_to_user(user_id, title, body, url="/", task_id=None, danger=False, ttl=DEFAULT_TTL, **extra):
     payload = _payload(title, body, url, task_id, danger, **extra)
     urgency = "high" if danger else "normal"
     return sum(1 for it in _subs_for(user_id) if send_web_push(it["subscription"], payload, ttl, urgency))
 
-
 def push_broadcast(title, body, url="/", task_id=None, danger=False, ttl=DEFAULT_TTL, **extra):
     payload = _payload(title, body, url, task_id, danger, **extra)
     urgency = "high" if danger else "normal"
     return sum(1 for it in _subs_for(None) if send_web_push(it["subscription"], payload, ttl, urgency))
-
 
 # ================================ HTTP ================================
 class Handler(BaseHTTPRequestHandler):
@@ -177,7 +167,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, *a):
         pass  # 安静点
-
 
 if __name__ == "__main__":
     if not os.path.exists(VAPID_PRIVATE_PEM):

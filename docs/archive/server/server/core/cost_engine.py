@@ -19,7 +19,6 @@ from typing import Optional, Protocol
 
 from gateway import ModelGateway, Task, Tier, default_gateway
 
-
 class Layer(str, Enum):
     RULES = "L0_rules"
     EXACT = "L1_exact_cache"
@@ -28,14 +27,12 @@ class Layer(str, Enum):
     SKILL = "L4_skill"
     MODEL = "L6_model"
 
-
 @dataclass
 class Answer:
     text: str
     layer: Layer
     cost: float = 0.0
     model: Optional[str] = None
-
 
 @dataclass
 class TaskBudget:
@@ -51,7 +48,6 @@ class TaskBudget:
     def charge(self, tokens: int, cost: float) -> None:
         self.used_tokens += tokens
         self.used_cost += cost
-
 
 # --------------------------------------------------------------------------- #
 #  各层接口 (Protocol) —— 真实实现替换这些即可
@@ -78,10 +74,8 @@ class Skill(Protocol):
 class SkillRouter(Protocol):
     def match(self, req: str) -> Optional[Skill]: ...
 
-
 def normalize(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip().lower())
-
 
 # --------------------------------------------------------------------------- #
 #  引擎
@@ -187,7 +181,6 @@ class CostEngine:
         lines.append(f"本地拦截率(未到强模型): {local_rate*100:.1f}%")
         lines.append(f"总模型成本: {self.total_cost:.3f}")
         return "\n".join(lines)
-
 
 def build_engine(gateway: Optional[ModelGateway] = None) -> CostEngine:
     """用演示用 mock 组件装配一个可跑的引擎（见 demo.py 里的实现）。"""

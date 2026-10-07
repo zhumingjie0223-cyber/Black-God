@@ -11,7 +11,6 @@ import subprocess
 
 LOG_PATH = "/var/shuyu/mcp-servers/mcp-cli.log"
 
-
 def _log(msg):
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -20,7 +19,6 @@ def _log(msg):
             f.write("[%s] [deps] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), msg))
     except OSError:
         pass
-
 
 def _run(cmd):
     """Run a shell command, swallow output into the log. Returns exit code."""
@@ -36,7 +34,6 @@ def _run(cmd):
         _log("%s -> exception %s" % (cmd, exc))
         return 1
 
-
 # command-name -> install command(s) to try in order.
 _RESOLVERS = {
     "npx": ["apk add --quiet nodejs npm"],
@@ -47,7 +44,6 @@ _RESOLVERS = {
     "uvx": ["pip install --quiet uv", "pip install --quiet --break-system-packages uv"],
     "uv": ["pip install --quiet uv", "pip install --quiet --break-system-packages uv"],
 }
-
 
 def ensure_command(command):
     """Best-effort: make `command` runnable. No-op if already on PATH or if we

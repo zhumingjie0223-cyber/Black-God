@@ -20,7 +20,6 @@ from typing import Optional, Callable
 from gateway import ModelGateway, ModelBackend, Tier
 import llm_adapter as la
 
-
 # --------------------------------------------------------------------------- #
 #  后端注册表：name -> (tier, 能力画像, 成本, 延迟, 拒绝率, base, model 解析)
 #  base/model 用环境变量覆盖，缺省给合理默认。
@@ -71,7 +70,6 @@ BACKEND_SPECS = [
     },
 ]
 
-
 def _make_generate_fn(api_key: str, base: str, model: str) -> Callable[[str], str]:
     """生成一个真实调用闭包，绑定到具体后端的 key/base/model。"""
     def _gen(prompt: str) -> str:
@@ -79,7 +77,6 @@ def _make_generate_fn(api_key: str, base: str, model: str) -> Callable[[str], st
         return la.llm(prompt, key=api_key, base=base, model=model,
                       max_tokens=2048, timeout=90)
     return _gen
-
 
 def real_gateway(force_mock: bool = False) -> ModelGateway:
     """
@@ -117,7 +114,6 @@ def real_gateway(force_mock: bool = False) -> ModelGateway:
     gw._real_backend_count = real_count  # 供上层探测
     return gw
 
-
 def status() -> dict:
     """报告哪些后端有真实 key（不输出 key 值）。"""
     out = {"real": [], "mock": [], "live_check": None}
@@ -128,7 +124,6 @@ def status() -> dict:
             out["mock"].append(s["name"])
     out["has_any_key"] = len(out["real"]) > 0
     return out
-
 
 if __name__ == "__main__":
     import json

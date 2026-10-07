@@ -10,7 +10,6 @@ import shuyu_engine as e
 
 CAP_EXPECTED = 1040 * 180 * 80 * 64 * 8  # 7,667,712,000
 
-
 def _sample_ids(seed, n):
     """确定性伪随机采样（线性同余），保证测试可复现"""
     x = seed
@@ -20,14 +19,12 @@ def _sample_ids(seed, n):
         out.append(x % CAP_EXPECTED)
     return out
 
-
 class TestCapacity(unittest.TestCase):
     def test_capacity(self):
         self.assertEqual(e.CAP, CAP_EXPECTED)
 
     def test_axis_sizes(self):
         self.assertEqual((e.NC, e.NM, e.NS, e.NK, e.NP), (1040, 180, 80, 64, 8))
-
 
 class TestDecode(unittest.TestCase):
     def test_boundaries(self):
@@ -46,7 +43,6 @@ class TestDecode(unittest.TestCase):
             han = e.decode(i)["汉"]
             self.assertRegex(han, pure, f"编号 {i} 汉译不纯: {han}")
 
-
 class TestRoundtrip(unittest.TestCase):
     def test_decode_encode(self):
         for i in [0, 1, 2949119999, 2949120000, CAP_EXPECTED - 1] + _sample_ids(20260712, 500):
@@ -56,7 +52,6 @@ class TestRoundtrip(unittest.TestCase):
     def test_encode_invalid(self):
         for bad in ["", "不是词", "Ao-cor", "Zzz-cor-is·qi"]:
             self.assertEqual(e.encode(bad), -1)
-
 
 class TestRobustness(unittest.TestCase):
     """健壮性与单射性回归（2026-09 补）
@@ -102,7 +97,6 @@ class TestRobustness(unittest.TestCase):
         for bad in [None, 123, [], {}]:
             self.assertEqual(e.encode(bad), -1)
 
-
 class TestAppendOnly(unittest.TestCase):
     """追加式铁律：老编号一个不许动"""
 
@@ -120,10 +114,8 @@ class TestAppendOnly(unittest.TestCase):
         self.assertEqual(e.decode(2949120000)["层"], "显照")
         self.assertEqual(e.decode(CAP_EXPECTED - 1)["层"], "冰川")
 
-
 if __name__ == "__main__":
     unittest.main()
-
 
 # ══════════════════════════════════════════════════════════════
 # v4.1 新能力（2026-09-05）：汉译反向寻址 / 语义寻址 / 造词族对等 / CLI
@@ -148,7 +140,6 @@ class TestDecodeShape(unittest.TestCase):
         """层名改按下标取，必须与旧的 startswith 匹配完全一致"""
         for c in range(e.NC):
             self.assertEqual(e.decode(e._id_of(c, 0, 0, 0, 0))["层"], e._layer_of(e.CORES[c][0]))
-
 
 class TestAxisCompleteness(unittest.TestCase):
     def test_axes(self):
@@ -183,7 +174,6 @@ class TestAxisCompleteness(unittest.TestCase):
         self.assertFalse(set(e._HAN_SCAL) - {""} & first(e.PHASES), "标位字不得是相轴首字")
         self.assertFalse(first(e.SCALS) & first(e.PHASES), "标轴首字不得是相轴首字")
 
-
 class TestEncodeHan(unittest.TestCase):
     def test_roundtrip(self):
         for i in [0, 1, 2949119999, 2949120000, CAP_EXPECTED - 1] + _sample_ids(20260905, 3000):
@@ -200,7 +190,6 @@ class TestEncodeHan(unittest.TestCase):
         for i in _sample_ids(4444, 300):
             w = e.decode(i)
             self.assertEqual(e.encode_han(w["汉"]), e.encode(w["词"]))
-
 
 class TestSearchCompose(unittest.TestCase):
     def test_search(self):
@@ -661,7 +650,6 @@ class TestSearchCompose(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.rouse(0, -1, 3)
 
-
 class TestCoinFamily(unittest.TestCase):
     def test_auto_coin_deterministic_and_known_values(self):
         self.assertEqual(e.auto_coin("神枢")["id"], 780009883)   # 与 JS autoCoin('神枢') 同值
@@ -691,7 +679,6 @@ class TestCoinFamily(unittest.TestCase):
             self.assertEqual(w["层意图"], layer)
             self.assertEqual(w["id"], e.auto_coin(f"7|{layer}")["id"])
         self.assertEqual(e.coin_from_state({"心绪": 0.9})["层"], "情感")
-
 
 class TestCLI(unittest.TestCase):
     """CLI 子进程测试：命令行是权哥直接摸得到的界面，不许假"""

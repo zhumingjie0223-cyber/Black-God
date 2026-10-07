@@ -28,13 +28,11 @@ TIMEOUT_SECONDS = 300  # 5 min
 # $VAR / ${VAR}.
 _ENV_RE = re.compile(r"\$\$?\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
 
-
 class MCPError(Exception):
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
         self.message = message
-
 
 def expand_env(value):
     """Replace $VAR / ${VAR} / $$VAR / $${VAR} with the environment value (empty
@@ -43,13 +41,11 @@ def expand_env(value):
         return value
     return _ENV_RE.sub(lambda m: os.environ.get(m.group(1), ""), value)
 
-
 def _expand_headers(headers):
     out = {}
     for k, v in (headers or {}).items():
         out[k] = expand_env(v)
     return out
-
 
 def _parse_response(resp):
     """Extract the JSON-RPC object from either a JSON body or an SSE stream."""
@@ -73,7 +69,6 @@ def _parse_response(resp):
         return json.loads(text)
     except ValueError as exc:
         raise MCPError("PARSE_ERROR", "invalid JSON response: %s" % exc)
-
 
 class HTTPTransport:
     def __init__(self, server, server_name):

@@ -25,7 +25,6 @@ import time
 import json
 from pathlib import Path
 
-
 class Sandbox:
     """安全沙箱：隔离执行，后台稳定"""
 
@@ -82,7 +81,7 @@ class Sandbox:
             # 端口映射（本地服务调试/监听）
             for host_port, container_port in self.ports.items():
                 cmd.extend(["-p", f"{host_port}:{container_port}"])
-            
+
             cmd.extend([
                 image,
                 "python3" if language == "python" else "sh",
@@ -198,7 +197,6 @@ class Sandbox:
             return {"success": not alive, "stopped": not alive}
         except Exception as e:
             return {"success": False, "error": str(e)}
-
 
 def sandbox_tool(args, **kw):
     """Agent 工具：sandbox(code=..., language=...)"""

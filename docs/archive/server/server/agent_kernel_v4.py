@@ -27,7 +27,6 @@ try:
 except Exception:  # 模块缺失/导入失败都不能拖垮内核
     _RDE = None
 
-
 def build_tone_hint(user_message: str) -> str:
     """据用户当下的情绪与场景，生成中性语气微调提示；不可用时返回空串。"""
     if not _RDE or not user_message:
@@ -94,7 +93,7 @@ class MemorySystem:
     def __init__(self):
         self.db_path = DATA_DIR / "memory.db"
         self._init_db()
-    
+
     def _init_db(self):
         conn = sqlite3.connect(str(self.db_path))
         c = conn.cursor()
@@ -115,49 +114,49 @@ class MemorySystem:
             c.execute("ALTER TABLE tasks ADD COLUMN meta TEXT DEFAULT ''")
         conn.commit()
         conn.close()
-    
+
     def save_global(self, key: str, value: str):
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("INSERT OR REPLACE INTO global_memory (key, value, updated_at) VALUES (?,?,?)",
                      (key, value, datetime.now().isoformat()))
         conn.commit(); conn.close()
-    
+
     def get_global(self, key: str) -> Optional[str]:
         conn = sqlite3.connect(str(self.db_path))
         row = conn.execute("SELECT value FROM global_memory WHERE key=?", (key,)).fetchone()
         conn.close()
         return row[0] if row else None
-    
+
     def save_daily(self, content: str):
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("INSERT INTO daily_memory (date, content) VALUES (?,?)",
                      (datetime.now().strftime("%Y-%m-%d"), content))
         conn.commit(); conn.close()
-    
+
     def get_daily(self, date: str = None) -> List[Dict]:
         date = date or datetime.now().strftime("%Y-%m-%d")
         conn = sqlite3.connect(str(self.db_path))
         rows = conn.execute("SELECT content, created_at FROM daily_memory WHERE date=? ORDER BY created_at DESC LIMIT 50", (date,)).fetchall()
         conn.close()
         return [{"content": r[0], "time": r[1]} for r in rows]
-    
+
     def save_session(self, role: str, content: str):
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("INSERT INTO session_memory (role, content) VALUES (?,?)", (role, content))
         conn.commit(); conn.close()
-    
+
     def get_session(self, limit: int = 50) -> List[Dict]:
         conn = sqlite3.connect(str(self.db_path))
         rows = conn.execute("SELECT role, content FROM session_memory ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         conn.close()
         return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
-    
+
     def save_task(self, task_id: str, message: str, status: str = "pending", result: str = ""):
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("INSERT OR REPLACE INTO tasks (id, message, status, result, created_at) VALUES (?,?,?,?,?)",
                      (task_id, message, status, result, datetime.now().isoformat()))
         conn.commit(); conn.close()
-    
+
     def get_tasks(self, limit: int = 50) -> List[Dict]:
         conn = sqlite3.connect(str(self.db_path))
         rows = conn.execute("SELECT id, message, status, result, created_at FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
@@ -376,7 +375,7 @@ def execute_tool(name: str, args: dict) -> str:
             timeout = args.get("timeout", 60)
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, cwd=str(ROOT))
             return f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}\nexit_code: {result.returncode}"
-        
+
         elif name == "file_read":
             path = args.get("path", "")
             lines = args.get("lines", 0)
@@ -385,7 +384,7 @@ def execute_tool(name: str, args: dict) -> str:
             if lines > 0:
                 content = '\n'.join(content.split('\n')[:lines])
             return f"文件: {path}\n大小: {len(content)} 字符\n内容:\n{content[:5000]}"
-        
+
         elif name == "file_write":
             path = args.get("path", "")
             content = args.get("content", "")
@@ -393,17 +392,17 @@ def execute_tool(name: str, args: dict) -> str:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)
             return f"已写入: {path} ({len(content)} 字符)"
-        
+
         elif name == "memory_save":
             memory.save_global(args["key"], args["value"])
             return f"已保存记忆: {args['key']}"
-        
+
         elif name == "memory_recall":
             keywords = args.get("keywords", "")
             results = memory.get_daily()
             matches = [r for r in results if any(kw.lower() in r['content'].lower() for kw in keywords.split())]
             return json.dumps(matches[:10], ensure_ascii=False, indent=2) if matches else "未找到相关记忆"
-        
+
         elif name == "web_search":
             query = args.get("query", "")
             limit = args.get("limit", 5)
@@ -413,19 +412,19 @@ def execute_tool(name: str, args: dict) -> str:
                 html = resp.read().decode('utf-8', errors='replace')
             results = re.findall(r'class="result__snippet">(.*?)</a>', html, re.S)
             return "\n".join(f"{i+1}. {r.strip()[:200]}" for i, r in enumerate(results[:limit])) or "无搜索结果"
-        
+
         elif name == "generate_image":
             prompt = args.get("prompt", "")
             width = args.get("width", 512)
             height = args.get("height", 512)
             url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={width}&height={height}"
             return f"图像已生成: {url}"
-        
+
         elif name == "generate_voice":
             text = args.get("text", "")
             emotion = args.get("emotion", "温柔")
             return f"语音合成请求: [{emotion}] {text[:100]}... (需 edge-tts 或外接 API)"
-        
+
         elif name == "http_request":
             url = args.get("url", "")
             method = args.get("method", "GET").upper()
@@ -435,15 +434,15 @@ def execute_tool(name: str, args: dict) -> str:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 result = resp.read().decode('utf-8', errors='replace')
             return f"HTTP {resp.status}\n{result[:3000]}"
-        
+
         elif name == "task_create":
             task_id = hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
             memory.save_task(task_id, args["message"])
             return f"任务已创建: {task_id} - {args['message']}"
-        
+
         else:
             return f"未知工具: {name}"
-    
+
     except Exception as e:
         return f"工具执行错误: {str(e)}"
 
@@ -456,7 +455,7 @@ class AgentLoop:
         self.base_url = base_url.rstrip('/')
         self.model = model
         self.max_steps = max_steps
-    
+
     def _call_model(self, messages: List[Dict], tools: List[Dict] = None) -> Dict:
         """调用模型 API（OpenAI 兼容）"""
         payload = {
@@ -468,7 +467,7 @@ class AgentLoop:
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-        
+
         data = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions",
@@ -560,15 +559,15 @@ class AgentLoop:
         """执行 Agent Loop：多步推理 + 工具调用 + 自我反思"""
         # 第 1 层：System Prompt 注入
         system_prompt = CONSTITUTION + "\n\n## 可用技能\n" + "\n".join(f"- {k}: {v}" for k, v in SKILLS.items())
-        
+
         messages = [{"role": "system", "content": system_prompt}]
-        
+
         # 注入记忆上下文
         recent_memories = memory.get_session(20)
         if recent_memories:
             mem_text = "## 最近对话记忆\n" + "\n".join(f"[{m['role']}]: {m['content'][:200]}" for m in recent_memories[-10:])
             messages.append({"role": "system", "content": mem_text})
-        
+
         if context:
             messages.extend(context)
 
@@ -581,29 +580,29 @@ class AgentLoop:
 
         # 保存用户消息到会话记忆
         memory.save_session("user", user_message)
-        
+
         steps_log = []
         final_response = ""
-        
+
         for step in range(self.max_steps):
             try:
                 response = self._call_model(messages, TOOLS)
                 choice = response["choices"][0]
                 msg = choice["message"]
-                
+
                 # 检查是否有工具调用
                 if msg.get("tool_calls"):
                     messages.append({"role": "assistant", "content": msg.get("content", ""), "tool_calls": msg["tool_calls"]})
-                    
+
                     for tc in msg["tool_calls"]:
                         func_name = tc["function"]["name"]
                         func_args = json.loads(tc["function"]["arguments"])
-                        
+
                         step_info = {"step": step + 1, "tool": func_name, "args": func_args}
                         result = execute_tool(func_name, func_args)
                         step_info["result"] = result[:500]
                         steps_log.append(step_info)
-                        
+
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tc["id"],
@@ -614,7 +613,7 @@ class AgentLoop:
                     final_response = msg.get("content", "")
                     messages.append({"role": "assistant", "content": final_response})
                     break
-                    
+
             except Exception as e:
                 steps_log.append({"step": step + 1, "error": str(e)})
                 if step == 0:
@@ -626,13 +625,13 @@ class AgentLoop:
                     except:
                         final_response = f"模型调用失败: {str(e)}"
                 break
-        
+
         if not final_response and steps_log:
             final_response = f"执行了 {len(steps_log)} 步工具调用，但未生成最终回复。"
-        
+
         # 保存助手回复到会话记忆
         memory.save_session("assistant", final_response[:500])
-        
+
         return {
             "response": final_response,
             "steps": steps_log,
@@ -660,7 +659,6 @@ def _extract_json(text: str) -> dict:
         return json.loads(t)
     except Exception:
         return {}
-
 
 class AutonomousAgent:
     """自主智能体：先把目标拆成计划，再按计划边执行边流式汇报，最后产出交付物。
@@ -814,7 +812,6 @@ class AutonomousAgent:
         except Exception as e:
             return f"写交付文件失败: {e}", None
 
-
 # ═══════════════════════════════════════════
 # 第 2 层：API 路由（RESTful）
 # ═══════════════════════════════════════════
@@ -841,10 +838,10 @@ from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 class AgentHandler(BaseHTTPRequestHandler):
     """Black God Agent HTTP 处理器"""
-    
+
     def log_message(self, format, *args):
         pass  # 静默日志
-    
+
     def _json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8')
         self.send_response(status)
@@ -855,7 +852,7 @@ class AgentHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
-    
+
     def _read_body(self) -> dict:
         length = int(self.headers.get('Content-Length', 0))
         if length == 0:
@@ -887,13 +884,13 @@ class AgentHandler(BaseHTTPRequestHandler):
         payload = f"data: {json.dumps(obj, ensure_ascii=False)}\n\n".encode('utf-8')
         self.wfile.write(payload)
         self.wfile.flush()
-    
+
     def do_OPTIONS(self):
         self._json({"ok": True})
-    
+
     def do_GET(self):
         path = self.path.split('?')[0]
-        
+
         # 静态文件
         web_root = ROOT.parent / "web"
         if path == "/" or path == "/index.html":
@@ -928,11 +925,11 @@ class AgentHandler(BaseHTTPRequestHandler):
                 self._serve_file(file_path, ct)
             else:
                 self._json({"error": "not found"}, 404)
-        
+
         # API 路由
         elif path == "/api/health":
             self._json({"status": "ok", "agent": "Black God 888", "version": "4.0", "timestamp": datetime.now().isoformat()})
-        
+
         elif path == "/api/stats":
             tasks = memory.get_tasks(100)
             completed = sum(1 for t in tasks if t['status'] == 'completed')
@@ -944,7 +941,7 @@ class AgentHandler(BaseHTTPRequestHandler):
                 "memory_entries": len(memory.get_daily()),
                 "model": get_agent().model
             })
-        
+
         elif path == "/api/tasks":
             self._json({"tasks": memory.get_tasks(50)})
 
@@ -972,20 +969,20 @@ class AgentHandler(BaseHTTPRequestHandler):
                     self._json({"error": "artifact not found"}, 404)
             else:
                 self._json({"error": "bad artifact path"}, 400)
-        
+
         elif path == "/api/memory":
             self._json({"memories": memory.get_daily()})
-        
+
         elif path == "/api/capabilities":
             self._json({
                 "tools": [t["function"]["name"] for t in TOOLS],
                 "skills": list(SKILLS.keys()),
                 "features": ["autonomous_agent", "task_planning", "streaming_sse", "agent_loop", "memory_system", "skill_system", "tool_system", "function_calling", "system_prompt"]
             })
-        
+
         elif path == "/api/tool-matrix":
             self._json({"tools": TOOLS})
-        
+
         elif path == "/api/preferences":
             prefs = {}
             for key in ["user_name", "theme", "language", "model_preference"]:
@@ -993,7 +990,7 @@ class AgentHandler(BaseHTTPRequestHandler):
                 if val:
                     prefs[key] = val
             self._json({"preferences": prefs})
-        
+
         elif path == "/api/categories":
             # 从 SKILLS 提取分类（key 即分类 slug）
             categories = [
@@ -1023,10 +1020,10 @@ class AgentHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/events":
             self._json({"events": [], "message": "事件流端点，请使用 SSE 连接"})
-        
+
         else:
             self._json({"error": "not found", "path": path}, 404)
-    
+
     def do_POST(self):
         path = self.path.split('?')[0]
         body = self._read_body()
@@ -1053,7 +1050,7 @@ class AgentHandler(BaseHTTPRequestHandler):
             if not message:
                 self._json({"error": "message is required"}, 400)
                 return
-            
+
             agent = get_agent()
             result = agent.run(message, context)
             self._json(result)
@@ -1083,7 +1080,7 @@ class AgentHandler(BaseHTTPRequestHandler):
         elif path == "/api/confirm":
             task_id = body.get("task_id", "")
             self._json({"confirmed": True, "task_id": task_id, "message": "任务已确认"})
-        
+
         elif path == "/api/memory/save":
             key = body.get("key", "")
             value = body.get("value", "")
@@ -1092,12 +1089,12 @@ class AgentHandler(BaseHTTPRequestHandler):
                 self._json({"saved": True, "key": key})
             else:
                 self._json({"error": "key and value required"}, 400)
-        
+
         elif path == "/api/preferences":
             for key, value in body.items():
                 memory.save_global(key, str(value))
             self._json({"saved": True, "preferences": body})
-        
+
         elif path == "/api/tool/execute":
             tool_name = body.get("tool", "")
             tool_args = body.get("args", {})
@@ -1106,10 +1103,10 @@ class AgentHandler(BaseHTTPRequestHandler):
                 self._json({"tool": tool_name, "result": result})
             else:
                 self._json({"error": "tool name required"}, 400)
-        
+
         else:
             self._json({"error": "not found", "path": path}, 404)
-    
+
     def _serve_file(self, filepath: Path, content_type: str):
         if not filepath.is_file():
             self._json({"error": "file not found"}, 404)

@@ -14,14 +14,12 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 
-
 class Complexity(Enum):
     TRIVIAL = "trivial"    # 0-20分: 格式化/改错字/简单问答
     LOW = "low"             # 20-40分: 小功能/单文件改动
     MEDIUM = "medium"       # 40-60分: 常规开发/多文件协调
     HIGH = "high"           # 60-80分: 复杂重构/架构调整
     MAX = "max"             # 80-100分: 顶级架构设计/关键决策
-
 
 @dataclass
 class ModelRoute:
@@ -31,7 +29,6 @@ class ModelRoute:
     sub_provider: str
     sub_model: str
     label: str
-
 
 # ============================================================
 # 神枢路由表 —— 基于今晚实测的真实Provider/模型清单
@@ -83,7 +80,6 @@ EMERGENCY_FALLBACK = ModelRoute(
     label="紧急兜底：Anthropic全线不可用时启用",
 )
 
-
 # ============================================================
 # 复杂度评分器
 # ============================================================
@@ -105,7 +101,6 @@ COMPLEXITY_KEYWORDS = {
         "typo", "format", "translate", "simple",
     ],
 }
-
 
 def score_complexity(task_text: str, estimated_steps: int = 1,
                       file_count: int = 1) -> Complexity:
@@ -134,11 +129,9 @@ def score_complexity(task_text: str, estimated_steps: int = 1,
 
     return Complexity.MEDIUM  # 默认走中档，不确定时不赌运气
 
-
 def get_route(complexity: Complexity) -> ModelRoute:
     """获取指定复杂度对应的路由配置"""
     return ROUTING_TABLE.get(complexity, ROUTING_TABLE[Complexity.MEDIUM])
-
 
 def apply_route_to_session(route: ModelRoute) -> dict:
     """
@@ -208,7 +201,6 @@ def apply_route_to_session(route: ModelRoute) -> dict:
     results["applied"] = results.get("primary_write", False) and results.get("sub_write", False)
     return results
 
-
 def route_task(task_text: str, estimated_steps: int = 1, file_count: int = 1) -> dict:
     """
     对外主入口: 输入任务描述，输出完整路由决策。
@@ -223,7 +215,6 @@ def route_task(task_text: str, estimated_steps: int = 1, file_count: int = 1) ->
         "complexity": complexity.value,
         "route": apply_route_to_session(route),
     }
-
 
 if __name__ == "__main__":
     import sys

@@ -14,7 +14,6 @@ from collections import Counter
 from cost_engine import (CostEngine, Layer, normalize, build_engine)
 from gateway import default_gateway
 
-
 # --------------------------------------------------------------------------- #
 #  各层 mock 实现
 # --------------------------------------------------------------------------- #
@@ -32,7 +31,6 @@ class DemoRules:
             return "系统状态: 全部正常 (本地查询)"
         return None
 
-
 class DemoExactCache:
     """L1：归一化精确命中。"""
     def __init__(self):
@@ -41,7 +39,6 @@ class DemoExactCache:
         return self.store.get(key)
     def put(self, key: str, value: str):
         self.store[key] = value
-
 
 class DemoSemanticCache:
     """L2：用词袋 Jaccard 近似语义相似（真实环境换 embedding + 向量库）。"""
@@ -64,7 +61,6 @@ class DemoSemanticCache:
     def put(self, req: str, value: str):
         self.items.append((self._toks(req), value))
 
-
 class DemoMemory:
     """L3：种了几条事实，关键词命中。"""
     def __init__(self):
@@ -80,7 +76,6 @@ class DemoMemory:
         return None
     def remember(self, req: str, value: str):
         pass
-
 
 class _GitSkill:
     name = "git-workflow"
@@ -105,7 +100,6 @@ class DemoSkillRouter:
             if any(k in low for k in kws):
                 return skill
         return None
-
 
 # --------------------------------------------------------------------------- #
 #  跑演示
@@ -154,7 +148,6 @@ def run():
     print(f"走级联后的实际模型成本   = {engine.total_cost:.2f}")
     if forced > 0:
         print(f"节省 ≈ {(1 - engine.total_cost / forced) * 100:.1f}%")
-
 
 if __name__ == "__main__":
     run()

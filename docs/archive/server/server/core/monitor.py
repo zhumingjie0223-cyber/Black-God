@@ -16,7 +16,6 @@ import time
 from pathlib import Path
 from datetime import datetime
 
-
 class Monitor:
     """动态监测：全方位监控 + 自动告警"""
 
@@ -68,7 +67,7 @@ class Monitor:
             cpu = float(r.stdout.strip() or 0)
         except Exception:
             cpu = 0.0
-        
+
         # 内存
         try:
             r = subprocess.run(["free", "-m"], capture_output=True, text=True, timeout=5)
@@ -79,7 +78,7 @@ class Monitor:
             mem_percent = (mem_used / mem_total) * 100 if mem_total > 0 else 0
         except Exception:
             mem_total = mem_used = mem_percent = 0
-        
+
         # 磁盘
         try:
             r = subprocess.run(["df", "/"], capture_output=True, text=True, timeout=5)
@@ -90,7 +89,7 @@ class Monitor:
             disk_percent = float(disk_line[4].replace('%', ''))
         except Exception:
             disk_total = disk_used = disk_percent = 0
-        
+
         return {
             "cpu": {"percent": cpu, "alert": cpu > 80},
             "memory": {
@@ -111,7 +110,7 @@ class Monitor:
     def check_security(self) -> dict:
         """安全监测：异常登录/攻击尝试"""
         alerts = []
-        
+
         # 检查失败登录（暴力破解）
         try:
             r = subprocess.run(["grep", "Failed password", "/var/log/auth.log"],
@@ -152,7 +151,7 @@ class Monitor:
             "security": self.check_security(),
             "business": self.check_business(),
         }
-        
+
         # 收集所有告警
         alerts = []
         if result["resources"]["cpu"]["alert"]:
@@ -162,23 +161,23 @@ class Monitor:
         if result["resources"]["disk"]["alert"]:
             alerts.append(f"磁盘告警: {result['resources']['disk']['percent']:.1f}%")
         alerts.extend(result["security"]["alerts"])
-        
+
         result["alerts"] = alerts
         result["healthy"] = len(alerts) == 0
-        
+
         # 记录历史
         self.metrics_history.append(result)
         if len(self.metrics_history) > 100:
             self.metrics_history.pop(0)
-        
+
         # 触发告警
         if alerts and self.alert_callback:
             self.alert_callback(alerts)
-        
+
         # 记录日志
         if alerts:
             self._log_alert(alerts)
-        
+
         return result
 
     def _log_alert(self, alerts):
@@ -201,12 +200,11 @@ class Monitor:
                 print(f"  ⚠️ {len(result['alerts'])} 个告警")
                 for a in result['alerts']:
                     print(f"    - {a}")
-            
+
             if duration and (time.time() - start) > duration:
                 break
-            
-            time.sleep(interval)
 
+            time.sleep(interval)
 
 def monitor_tool(args, **kw):
     """Agent工具：monitor() 返回当前状态"""

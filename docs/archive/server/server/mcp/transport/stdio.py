@@ -19,13 +19,11 @@ from utils import deps
 
 TIMEOUT_SECONDS = 300  # 5 min
 
-
 def _expand_env_map(env):
     merged = dict(os.environ)
     for k, v in (env or {}).items():
         merged[k] = expand_env(v)
     return merged
-
 
 class STDIOTransport:
     def __init__(self, server, server_name):

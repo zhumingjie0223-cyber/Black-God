@@ -10,7 +10,6 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[2]
 
-
 def validate_alpine(root):
     manifest = json.loads((root / 'manifest.json').read_text())
     if manifest.get('errors') or not manifest.get('packages'):
@@ -39,7 +38,6 @@ def validate_alpine(root):
                 raise ValueError('Source checksum mismatch: ' + item['file'])
     return manifest
 
-
 def source_files(repo):
     files = set()
     for pattern in ['ios-app/*.swift', 'ios-app/*.entitlements']:
@@ -65,7 +63,6 @@ def source_files(repo):
         if not p.is_file() or p.is_symlink() or not p.resolve().is_relative_to(repo.resolve()):
             raise ValueError('Missing or unsafe source path: ' + str(p))
     return sorted(files)
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -114,7 +111,6 @@ def main():
     args.output.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2))
     print(json.dumps({k: v for k, v in manifest.items() if k != 'files'}, indent=2))
     print('Verified archive files:', len(files))
-
 
 if __name__ == '__main__':
     main()

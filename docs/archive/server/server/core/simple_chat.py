@@ -35,14 +35,14 @@ class SimpleChat:
             max_steps=3,
             auto_evolve=False
         )
-    
+
     def chat(self, message, history=None):
         """简化版对话"""
         history = history or []
-        
+
         try:
             result = self.agent.run(message, history=history)
-            
+
             return {
                 "ok": True,
                 "answer": result.get("answer", ""),
@@ -64,6 +64,6 @@ if __name__ == "__main__":
         base_url="http://127.0.0.1:9000/v1",
         model="auto"
     )
-    
+
     result = chat.chat("1+1等于几？")
     print(json.dumps(result, ensure_ascii=False, indent=2))

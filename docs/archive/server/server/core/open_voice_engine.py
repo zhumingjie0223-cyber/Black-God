@@ -24,7 +24,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-
 class OpenVoiceEngine:
     """开源语音总控：LLM 生成情绪脚本 → 开源TTS合成"""
 
@@ -243,7 +242,6 @@ JSON格式：
             return {"success": False, "error": r.stderr[:200], "script": script}
         except Exception as e:
             return {"success": False, "error": str(e), "script": script}
-
 
 def _parse_json(raw: str):
     if not raw:

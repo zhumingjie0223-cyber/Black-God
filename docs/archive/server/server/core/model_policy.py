@@ -22,10 +22,8 @@ import os
 import re
 from urllib.parse import urlparse
 
-
 class ModelPolicyError(Exception):
     """模型不合规：本地端点 / 不在白名单。上层应据此拒绝或回退。"""
-
 
 # ——— 默认允许的远端模型（可被 BG_ALLOWED_MODELS 覆盖）———
 _DEFAULT_ALLOWED = [
@@ -43,17 +41,14 @@ _LOCAL_PORTS = {11434, 1234, 8080, 5000, 5001, 8000, 1337, 4891}
 _LOCAL_MARKERS = ("ollama", "lmstudio", "lm-studio", "llama.cpp", "llamacpp",
                   "localai", "koboldcpp", "textgen", "vllm", "jan.ai")
 
-
 def allowed_models():
     env = os.environ.get("BG_ALLOWED_MODELS", "").strip()
     if env:
         return [m.strip() for m in env.split(",") if m.strip()]
     return list(_DEFAULT_ALLOWED)
 
-
 def _allow_local():
     return os.environ.get("BG_ALLOW_LOCAL", "0") == "1"
-
 
 def is_local_endpoint(base_url: str) -> bool:
     """判断一个 base_url 是否指向本地模型推理端点。"""
@@ -76,7 +71,6 @@ def is_local_endpoint(base_url: str) -> bool:
         return True
     return False
 
-
 def assert_remote(base_url: str, model: str):
     """
     入口校验：本地端点 / 不在白名单 → 抛 ModelPolicyError。
@@ -97,7 +91,6 @@ def assert_remote(base_url: str, model: str):
         )
     return True
 
-
 def pick_model(tier: str = "heavy") -> str:
     """
     分级路由：返回该级别对应的已批准远端模型。
@@ -117,7 +110,6 @@ def pick_model(tier: str = "heavy") -> str:
         return m
     return allow[0] if allow else "gpt-4o"
 
-
 def classify_tier(message: str, capabilities=None) -> str:
     """
     极简任务分级（你文档里的"分级调用"）：
@@ -129,7 +121,6 @@ def classify_tier(message: str, capabilities=None) -> str:
     if message and len(message) > 200:
         return "heavy"
     return "light"
-
 
 if __name__ == "__main__":
     print("白名单:", allowed_models())

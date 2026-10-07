@@ -11,7 +11,6 @@ import time
 import os
 from pathlib import Path
 
-
 class MediaEngine:
     """生图 + 生视频统一引擎"""
 
@@ -96,7 +95,6 @@ class MediaEngine:
     def _video_via_api(self, prompt: str):
         """预留：接入外部视频生成API（如可灵/Runway/即梦）"""
         return {"success": False, "error": "API视频生成需配置Key", "todo": True}
-
 
 # Agent 工具注册
 def gen_image_tool(args, **kw):

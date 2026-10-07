@@ -86,7 +86,6 @@ class H(BaseHTTPRequestHandler):
                 return self._send({"ok": False, "error": str(e)[:300]}, 200)
         return self._send({"error": "not found"}, 404)
 
-
 def main():
     if not TOKEN:
         print("拒绝启动：未设 NEXUS_EXEC_TOKEN。公网执行脑必须带 token。\n"
@@ -95,7 +94,6 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("NEXUS_EXEC_PORT", "8765"))
     print(f"神枢执行脑已起：0.0.0.0:{port} · ROOT={ROOT} · token 已启用", flush=True)
     ThreadingHTTPServer(("0.0.0.0", port), H).serve_forever()
-
 
 if __name__ == "__main__":
     main()

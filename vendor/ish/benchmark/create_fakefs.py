@@ -25,7 +25,6 @@ import struct
 import os
 import sys
 
-
 def create_fakefs(data_dir: str, output_dir: str) -> None:
     db_path = os.path.join(output_dir, "meta.db")
 
@@ -87,7 +86,6 @@ def create_fakefs(data_dir: str, output_dir: str) -> None:
 
     print(f"Created {db_path}: {count} entries, root inode={root[0]}")
     db.close()
-
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

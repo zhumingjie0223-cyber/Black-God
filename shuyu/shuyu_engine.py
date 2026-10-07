@@ -363,9 +363,7 @@ def near(value, limit=8):
             out.append({"距": 1, "轴": name, "id": w["id"], "词": w["词"], "汉": w["汉"], "义": w["义"], "坐标": w["坐标"]})
     return out[:n]
 
-
 _PULSE_MAX_AT = 4102444800
-
 
 def _pulse_phase(hour):
     if 5 <= hour <= 7:
@@ -375,7 +373,6 @@ def _pulse_phase(hour):
     if 17 <= hour <= 19:
         return "昏"
     return "夜"
-
 
 def pulse(seed, at):
     """一息：按显式 Unix 秒沿一轴呼吸一格，不环绕；与 lexicon.js pulse 同构。"""
@@ -421,7 +418,6 @@ def pulse(seed, at):
         "id": out["id"], "词": out["词"], "汉": out["汉"], "义": out["义"], "坐标": out["坐标"],
     }
 
-
 def _parse_trail_n(n):
     if n is None or n == "":
         return 3
@@ -442,13 +438,11 @@ def _parse_trail_n(n):
         raise ValueError("余息步数必须是2至4")
     return value
 
-
 def _compact_pulse(p):
     return {
         "息": p["息"], "时": p["时"], "分": p["分"], "轴": p["轴"], "向": p["向"], "动": p["动"],
         "id": p["id"], "词": p["词"], "汉": p["汉"], "义": p["义"], "坐标": p["坐标"],
     }
-
 
 def trail(seed, at, n=3):
     """余息：从一词连续呼吸几格，每步 +60 秒，不环绕；与 lexicon.js trail 同构。"""
@@ -476,7 +470,6 @@ def trail(seed, at, n=3):
         "id": last["id"], "词": last["词"], "汉": last["汉"], "义": last["义"], "坐标": last["坐标"],
     }
 
-
 def echo(seed, at, n=3):
     """回息：余息走完后沿末步反向弹一格，不环绕；与 lexicon.js echo 同构。"""
     walk = trail(seed, at, n)
@@ -503,13 +496,11 @@ def echo(seed, at, n=3):
         "id": out["id"], "词": out["词"], "汉": out["汉"], "义": out["义"], "坐标": out["坐标"],
     }
 
-
 def _compact_pose(word, meta):
     return {
         "息": meta["息"], "时": meta["时"], "分": meta["分"], "轴": meta["轴"], "向": meta["向"], "动": meta["动"],
         "id": word["id"], "词": word["词"], "汉": word["汉"], "义": word["义"], "坐标": word["坐标"],
     }
-
 
 def sway(seed, at, n=3):
     """摇息：回息后按分钟在弹回词与末步之间摇摆，不环绕；与 lexicon.js sway 同构。"""
@@ -538,7 +529,6 @@ def sway(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
-
 def land(seed, at, n=3):
     """落息：摇息后按四分钟窗落地，偏停在弹回词，不环绕；与 lexicon.js land 同构。"""
     rest = echo(seed, at, n)
@@ -566,7 +556,6 @@ def land(seed, at, n=3):
         "着": rest_pose if airborne else lean,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def stir(seed, at, n=3):
     """起息：落息落地后按八分钟窗从着地点朝邻格起身，不环绕；与 lexicon.js stir 同构。"""
@@ -602,7 +591,6 @@ def stir(seed, at, n=3):
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
 
-
 def perch(seed, at, n=3):
     """栖息：起息起身后沿起身轴再蹲一格，越界则蹲在起身词上，未起不栖；与 lexicon.js perch 同构。"""
     up = stir(seed, at, n)
@@ -637,7 +625,6 @@ def perch(seed, at, n=3):
         "栖": nested,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def turn(seed, at, n=3):
     """转息：栖息后再朝侧邻转头，未栖不转，无侧邻则停在栖处；与 lexicon.js turn 同构。"""
@@ -676,7 +663,6 @@ def turn(seed, at, n=3):
         "转": pick is not None,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def gaze(seed, at, n=3):
     """顾息：转头后再沿转轴把目光探一格，未转不顾，三十二分钟窗才探，越界停在转处；与 lexicon.js gaze 同构。"""
@@ -720,7 +706,6 @@ def gaze(seed, at, n=3):
         "顾": gazing,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def incline(seed, at, n=3):
     """倾息：望出去后再沿望轴倾近一格，未顾不倾，六十四分钟窗才倾，越界停在望处；与 lexicon.js incline 同构。"""
@@ -766,7 +751,6 @@ def incline(seed, at, n=3):
         "倾": inclining,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def nestle(seed, at, n=3):
     """贴息：倾近后再贴住一格，未倾不贴，一百二十八分钟窗才贴，越界停在倾处；与 lexicon.js nestle 同构。"""
@@ -814,7 +798,6 @@ def nestle(seed, at, n=3):
         "贴": nestling,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def hold(seed, at, n=3):
     """含息：贴住后再含住一格，未贴不含，二百五十六分钟窗才含，越界停在贴处；与 lexicon.js hold 同构。"""
@@ -864,7 +847,6 @@ def hold(seed, at, n=3):
         "含": holding,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def warm(seed, at, n=3):
     """温息：含住后再温住一格，未含不温，五百一十二分钟窗才温，越界停在含处；与 lexicon.js warm 同构。"""
@@ -916,7 +898,6 @@ def warm(seed, at, n=3):
         "温": warming,
         "id": pose["id"], "词": pose["词"], "汉": pose["汉"], "义": pose["义"], "坐标": pose["坐标"],
     }
-
 
 def rouse(seed, at, n=3):
     """醒息：温住后再醒一格，未温不醒，一千零二十四分钟窗才醒，越界停在温处；与 lexicon.js rouse 同构。"""

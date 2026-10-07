@@ -27,14 +27,11 @@ except Exception:
         return 0
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-
 def sse(event: str, data: dict) -> bytes:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
 
-
 # —— 待确认登记表：cid -> {event, approved} ——
 _PENDING = {}
-
 
 # ------------------------------------------------------------------
 # 把这个生成器换成你真实的 Agent 执行循环。
@@ -93,10 +90,8 @@ def run_agent(message, history, capabilities, persona, user_profile, model, task
     push_to_user(uid, "任务完成 ✓" if ok else "任务失败 ✕", answer[:60],
                  url="/", task_id=task_id, danger=not ok, ttl=86400)  # 失败留存 1 天
 
-
 def real_tool_call(tool, message):
     return f"[{tool}] 执行完成"
-
 
 # ==================================================================
 class Handler(BaseHTTPRequestHandler):
@@ -150,7 +145,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
         self.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
-
 
 # ==================================================================
 # 用法：必须是 Threading 服务器，确认阻塞时才能并发处理 /api/confirm

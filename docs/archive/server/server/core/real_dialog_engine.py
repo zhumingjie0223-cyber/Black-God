@@ -20,7 +20,6 @@ import time
 from pathlib import Path
 from collections import deque
 
-
 class RealDialogEngine:
     """真实对话引擎：像赵思涵一样真实地对话"""
 
@@ -211,7 +210,6 @@ class RealDialogEngine:
         if self.user_mood == "tired":
             return "要不先休息会儿？我陪你"
         return "还有什么需要我帮的吗？"
-
 
 def dialog_tool(args, llm_call=None, **kw):
     """Agent工具：dialog(input=...)"""

@@ -24,14 +24,11 @@ import urllib.request
 import urllib.error
 from typing import Optional, List, Dict, Any, Callable
 
-
 class LLMError(Exception):
     """模型调用失败（网络/超时/限流/HTTP 错误）。"""
 
-
 class LLMRefusal(Exception):
     """模型拒绝执行（留作网关 fallback / 重路由判据）。"""
-
 
 # --------------------------------------------------------------------------- #
 #  配置解析
@@ -58,12 +55,10 @@ def _cfg(key: Optional[str], base: Optional[str], model: Optional[str]) -> tuple
     )
     return api_key, base_url, mdl
 
-
 def has_key() -> bool:
     """是否已配置可用的 API Key（供上层判断要不要走本地兜底）。"""
     k, _, _ = _cfg(None, None, None)
     return bool(k)
-
 
 # --------------------------------------------------------------------------- #
 #  原始调用：返回完整 OpenAI 兼容 dict（兼容 v4 的 _call_model）
@@ -129,7 +124,6 @@ def llm_raw(
             continue
     raise last_err or LLMError("未知调用失败")
 
-
 # --------------------------------------------------------------------------- #
 #  文本调用：直接返回 assistant 文本（core 模块最常用）
 # --------------------------------------------------------------------------- #
@@ -150,7 +144,6 @@ def llm(messages_or_prompt, **opts) -> str:
     except (KeyError, IndexError):
         return ""
 
-
 def make_llm(**fixed) -> Callable[[Any], str]:
     """
     生成一个固定配置的 call_fn，喂给 core 模块。
@@ -159,7 +152,6 @@ def make_llm(**fixed) -> Callable[[Any], str]:
     def _call(messages_or_prompt) -> str:
         return llm(messages_or_prompt, **fixed)
     return _call
-
 
 # --------------------------------------------------------------------------- #
 #  自检
@@ -186,7 +178,6 @@ def self_test() -> Dict[str, Any]:
         out["live"] = False
         out["error"] = str(e)[:200]
     return out
-
 
 if __name__ == "__main__":
     print(json.dumps(self_test(), ensure_ascii=False, indent=2))

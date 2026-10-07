@@ -11,7 +11,6 @@
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-
 class MockHandler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -127,7 +126,6 @@ class MockHandler(BaseHTTPRequestHandler):
             self._send_stream(chunks)
         else:
             self._send(self._completion(model, message=final))
-
 
 if __name__ == "__main__":
     srv = ThreadingHTTPServer(("127.0.0.1", 9000), MockHandler)

@@ -85,7 +85,6 @@ VOICE_CONFIG = {
     },
 }
 
-
 class VoiceEngineV3:
     """智能语音引擎 — 自分析情绪 + 实时合成"""
 
@@ -208,7 +207,6 @@ class VoiceEngineV3:
                 "all_voices": self.list_voices(),
                 "emotions": self.get_available_emotions(),
                 "adult_blocked": self.adult_blocked, "stats": self.stats}
-
 
 _engine: Optional[VoiceEngineV3] = None
 _lock = threading.Lock()

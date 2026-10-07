@@ -53,7 +53,6 @@ LANG_CMD = {
     "rust": "rustc -o /tmp/out && /tmp/out",
 }
 
-
 def _docker_available():
     """检查 Docker 是否可用"""
     try:
@@ -64,7 +63,6 @@ def _docker_available():
         return r.returncode == 0
     except Exception:
         return False
-
 
 def run_in_docker(lang: str, code: str,
                   timeout: int = 30,
@@ -159,7 +157,6 @@ def run_in_docker(lang: str, code: str,
         except Exception:
             pass
 
-
 def _run_subprocess(lang: str, code: str, timeout: int = 30) -> dict:
     """降级方案：subprocess 执行"""
     import resource
@@ -219,7 +216,6 @@ def _run_subprocess(lang: str, code: str, timeout: int = 30) -> dict:
                 os.unlink(tmp.name)
         except Exception:
             pass
-
 
 def get_sandbox_status() -> dict:
     """返回沙箱状态"""

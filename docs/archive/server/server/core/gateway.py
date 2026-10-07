@@ -16,12 +16,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Optional
 
-
 class Tier(str, Enum):
     LOCAL = "local"   # 本地小模型，~0 成本
     SMALL = "small"   # 便宜模型
     STRONG = "strong" # 强模型，贵
-
 
 @dataclass
 class Task:
@@ -32,7 +30,6 @@ class Task:
     mode: str = "balanced"         # cost | balanced | quality | latency
     refuse_sensitive: bool = False # 任务是否容易被模型拒绝（避开高拒绝模型）
 
-
 @dataclass
 class Result:
     text: str
@@ -42,14 +39,11 @@ class Result:
     latency_ms: float
     tier: Tier
 
-
 class ModelError(Exception):
     """模型调用失败（超时/限流/网络等）。"""
 
-
 class ModelRefusal(Exception):
     """模型拒绝执行。"""
-
 
 # --------------------------------------------------------------------------- #
 #  熔断器：某后端连续失败就暂时下线，半开探测恢复
@@ -74,7 +68,6 @@ class CircuitBreaker:
         self._fails += 1
         if self._fails >= self.fail_threshold:
             self._open_until = time.monotonic() + self.cooldown_s  # 打开
-
 
 # --------------------------------------------------------------------------- #
 #  模型后端
@@ -106,7 +99,6 @@ class ModelBackend:
         if r < 0.06 + self.refuse_prob:
             raise ModelRefusal(f"{self.name} refused")
         return f"[{self.name}] answer to: {prompt[:48]}"
-
 
 # --------------------------------------------------------------------------- #
 #  网关
@@ -198,7 +190,6 @@ class ModelGateway:
         slot = self._success.setdefault((model, task_type), [0, 0])
         slot[0] += int(ok)
         slot[1] += 1
-
 
 # --------------------------------------------------------------------------- #
 #  默认后端集（含本地小模型兜底）
