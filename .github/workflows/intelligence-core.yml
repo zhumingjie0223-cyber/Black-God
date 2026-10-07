@@ -33,12 +33,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      BLACK_GOD_TOOLCHAIN_ROOT: ${{ runner.temp }}/black-god-swift
-      SWIFT_BINARY: ${{ runner.temp }}/black-god-swift/swift-6.2.1-RELEASE-ubuntu24.04/usr/bin/swift
       SWIFT_TEST_JOBS: '4'
     steps:
       - name: 检出源码
         uses: actions/checkout@v4
+      - name: 配置临时工具链目录
+        run: |
+          printf 'BLACK_GOD_TOOLCHAIN_ROOT=%s\n' "$RUNNER_TEMP/black-god-swift" >> "$GITHUB_ENV"
+          printf 'SWIFT_BINARY=%s\n' "$RUNNER_TEMP/black-god-swift/swift-6.2.1-RELEASE-ubuntu24.04/usr/bin/swift" >> "$GITHUB_ENV"
       - name: 安装核心编译依赖
         run: |
           sudo apt-get update
