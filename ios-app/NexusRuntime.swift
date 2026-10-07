@@ -8,6 +8,7 @@ final class NexusRuntime: ObservableObject {
     @Published private(set) var events: [NexusRunEvent] = []
     @Published private(set) var metrics = NexusRunMetrics()
     @Published private(set) var currentPlan: NexusTaskPlan?
+    @Published private(set) var intentCard: NexusIntentCard?
     private(set) var taskContract: NexusTaskContract?
     private let terminationPolicy = NexusTerminationPolicy()
     @Published private(set) var pendingApprovals: [NexusToolCall] = []
@@ -25,18 +26,31 @@ final class NexusRuntime: ObservableObject {
     private let checkpointStore = NexusCheckpointStore()
     private(set) var sessionID = UUID()
 
-    func begin(prompt: String) {
+    func begin(prompt: String, memories: [String] = [], files: [String] = [], skills: [String] = []) {
         var loop = executionLoop
         loop.installDefaults()
         executionLoop = loop
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        runState = .planning
-        currentPlan = planner.makePlan(for: text)
-        taskContract = NexusTaskContract(goal: text)
+        let card = NexusIntentCompiler.compile(text, memories: memories, files: files, skills: skills)
+        intentCard = card
         observations.removeAll()
         verdicts.removeAll()
-        append(.planned(prompt: text))
+        if card.needsQuestion {
+            currentPlan = nil
+            taskContract = nil
+            runState = .waitingForInput
+            append(.status(card.question ?? "需要补一个对象"))
+            return
+        }
+        runState = .planning
+        let goal = card.executableGoal
+        currentPlan = planner.makePlan(for: goal)
+        taskContract = NexusTaskContract(goal: goal)
+        append(.planned(prompt: goal))
+        if let assumption = card.assumption {
+            append(.status(assumption))
+        }
         append(.status("计划已生成：\(currentPlan?.steps.count ?? 0) 步"))
     }
 
@@ -94,6 +108,9 @@ final class NexusRuntime: ObservableObject {
         let decision = terminationPolicy.decide(contract: taskContract ?? NexusTaskContract(goal: ""), output: output, round: observations.count, verified: verdict.passed)
         append(.status(decision.reason))
         append(.status(verdict.passed ? "结果验证通过" : "结果验证失败：\(verdict.reason)"))
+        if let card = intentCard, card.risk == .high, !verdict.passed {
+            append(.status("高风险任务缺证据，不标成功"))
+        }
     }
 
     func approveAndExecute(_ call: NexusToolCall) async {
@@ -136,6 +153,7 @@ final class NexusRuntime: ObservableObject {
         sessionID = UUID()
         events.removeAll()
         currentPlan = nil
+        intentCard = nil
         observations.removeAll()
         verdicts.removeAll()
         runState = .idle
