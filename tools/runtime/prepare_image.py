@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Create the pinned runtime image; APK verifies repository signatures offline."""
-import hashlib,json,shutil,sqlite3,struct,subprocess,urllib.request,uuid
+import hashlib,json,shutil,sqlite3,struct,subprocess,sys,urllib.error,urllib.request,uuid
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 BUILD=ROOT/'.runtime-build'
@@ -18,6 +18,10 @@ def download(item):
             with urllib.request.urlopen(item['url'],timeout=60) as r:temporary.write_bytes(r.read())
             if hashlib.sha256(temporary.read_bytes()).hexdigest()!=item['sha256']:raise ValueError('Downloaded checksum mismatch')
             temporary.replace(path)
+        except urllib.error.HTTPError as error:
+            # 只为诊断记录锁定文件名与状态，保留原异常和校验行为。
+            print('锁定下载失败：'+item['file']+'；HTTP '+str(error.code),file=sys.stderr)
+            raise
         finally:temporary.unlink(missing_ok=True)
     if hashlib.sha256(path.read_bytes()).hexdigest()!=item['sha256']:raise ValueError('Cached checksum mismatch: '+path.name)
     return path

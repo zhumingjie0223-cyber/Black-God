@@ -41,8 +41,34 @@ jobs:
     - name: Install build tools
       run: brew install xcodegen ninja llvm lld libarchive pkg-config
 
-    - name: Generate Xcode Project and runtime
-      run: make generate
+    - name: 生成工程与运行镜像
+      run: |
+        set -euo pipefail
+        generation_log="$RUNNER_TEMP/black-god-runtime-generation.log"
+        set +e
+        make generate 2>&1 | tee "$generation_log"
+        generation_statuses=("${PIPESTATUS[@]}")
+        set -e
+        generation_status=${generation_statuses[0]}
+        capture_status=${generation_statuses[1]}
+        if (( generation_status != 0 )); then
+          # 诊断失败不能覆盖真实生成失败；公开内容仅使用枚举字段。
+          python3 tools/runtime/report_build_failure.py "$generation_log" "$generation_status" || true
+          exit "$generation_status"
+        fi
+        if (( capture_status != 0 )); then
+          printf '%s\n' '::error title=生成日志保存失败::工程生成返回成功，但完整日志未能保存。'
+          exit "$capture_status"
+        fi
+
+    - name: 保存工程生成日志
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: BlackGod-runtime-generation-log
+        path: ${{ runner.temp }}/black-god-runtime-generation.log
+        if-no-files-found: warn
+        retention-days: 14
 
     - name: Verify guest uname memory boundaries
       run: python3 tools/runtime/test_uname.py
