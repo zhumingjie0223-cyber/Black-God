@@ -44,7 +44,8 @@ struct MediaView: View {
                         copied = true
                     } label: {
                         Label(copied ? "已复制描述" : "复制描述", systemImage: copied ? "checkmark" : "doc.on.doc")
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 24)
+                            .contentShape(Rectangle())
                     }.buttonStyle(BGPrimaryButtonStyle())
                     .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("media.copy")
@@ -73,6 +74,20 @@ struct MediaView: View {
         }
         .background(Color.bgDark)
         .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            if editingPrompt {
+                HStack {
+                    Spacer()
+                    Button("完成编辑") { editingPrompt = false }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 18).frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityIdentifier("media.editing.done")
+                }
+                .padding(.horizontal, 8)
+                .background(Color.bgDark)
+            }
+        }
         .onChange(of: prompt) { _, _ in copied = false }
         .onChange(of: selectedMode) { _, _ in copied = false }
     }
